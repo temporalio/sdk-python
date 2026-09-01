@@ -622,8 +622,8 @@ def test_sandbox_workflow_context_separates_run_and_chain_identity() -> None:
     assert first.first_execution_run_id == "first-run"
 
 
-@tool(name="sandbox_bash")
-def custom_bash(command: str) -> str:
+@tool(name="sandbox_shell")
+def custom_shell(command: str) -> str:
     return command
 
 
@@ -633,16 +633,16 @@ def test_sandbox_default_tools_and_override() -> None:
         sandbox=TemporalSandbox("recording"),
         start_to_close_timeout=timedelta(seconds=15),
     )
-    assert "sandbox_bash" in default_agent.tool_registry.registry
+    assert "sandbox_shell" in default_agent.tool_registry.registry
     assert "sandbox_file_editor" in default_agent.tool_registry.registry
 
     override_agent = TemporalAgent(
         model="mock",
         sandbox=TemporalSandbox("recording"),
-        tools=[custom_bash],
+        tools=[custom_shell],
         start_to_close_timeout=timedelta(seconds=15),
     )
-    assert override_agent.tool_registry.registry["sandbox_bash"] is custom_bash
+    assert override_agent.tool_registry.registry["sandbox_shell"] is custom_shell
     assert "sandbox_file_editor" in override_agent.tool_registry.registry
 
 

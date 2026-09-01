@@ -4633,12 +4633,13 @@ wheels = [
 
 [[package]]
 name = "strands-agents"
-version = "1.47.0"
+version = "1.51.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "boto3" },
     { name = "botocore" },
     { name = "docstring-parser" },
+    { name = "httpx" },
     { name = "jsonschema" },
     { name = "mcp" },
     { name = "opentelemetry-api" },
@@ -4649,9 +4650,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/05/5eb8431ff340739b1c21b0da7d19ec9604b9c4953a1c4638df915321573c/strands_agents-1.47.0.tar.gz", hash = "sha256:97770cb6beb6e5fd1a58849f41201eb7edb43fd67ad3de6544ada2f342c2bcf0", size = 1157139, upload-time = "2026-07-10T14:45:05.809Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/07/cb77bb1773d885e96dc0412920c620cdc660ef5113e9b61c3cd026240102/strands_agents-1.51.0.tar.gz", hash = "sha256:4cbd0b183aad0bb60ac7c6043d29841c8933937c97228e91669d2d97fc40776d", size = 1285092, upload-time = "2026-08-07T18:07:43.833Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d0/cb/ceae892c5823bea9254160efc02a4553f2ced9d183676110c03c3a9ff0f3/strands_agents-1.47.0-py3-none-any.whl", hash = "sha256:1f6ce17404ff02079244ad7a4a180a2a7150546275e4b91187d71472ba8fe3f2", size = 600611, upload-time = "2026-07-10T14:45:03.942Z" },
+    { url = "https://files.pythonhosted.org/packages/99/4c/937595709a56e966bc471d2fe14071910b2f57d1975a7fd701da18eedabe/strands_agents-1.51.0-py3-none-any.whl", hash = "sha256:1e0a8d125652d7a863cae8fd717b22e4fa5c7983b499438d1f0f50bf328e8832", size = 663778, upload-time = "2026-08-07T18:07:42.253Z" },
 ]
 
 [[package]]
@@ -4827,7 +4828,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=3.20,<8.0.0" },
     { name = "pydantic", marker = "extra == 'pydantic'", specifier = ">=2.0.0,<3" },
     { name = "python-dateutil", marker = "python_full_version < '3.11'", specifier = ">=2.8.2,<3" },
-    { name = "strands-agents", marker = "extra == 'strands-agents'", specifier = ">=1.47.0" },
+    { name = "strands-agents", marker = "extra == 'strands-agents'", specifier = ">=1.51.0" },
     { name = "types-aioboto3", extras = ["s3"], marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "types-protobuf", specifier = ">=3.20,<8.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
@@ -4876,7 +4877,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.6,<4" },
     { name = "ruff", specifier = ">=0.15.12,<0.16" },
     { name = "setuptools", specifier = "<82" },
-    { name = "strands-agents", specifier = ">=1.47.0" },
+    { name = "strands-agents", specifier = ">=1.51.0" },
     { name = "strands-agents-tools", specifier = ">=0.5.2" },
     { name = "toml", specifier = ">=0.10.2,<0.11" },
     { name = "twine", specifier = ">=4.0.1,<5" },

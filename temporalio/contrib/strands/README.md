@@ -268,7 +268,7 @@ recording its result, causing a retry to perform the operation again. Use a
 bounded `retry_policy`, and make commands and mutations idempotent when repeated
 execution would be unsafe.
 
-By default, `TemporalSandbox.get_tools()` vends `sandbox_bash` and
+By default, `TemporalSandbox.get_tools()` vends `sandbox_shell` and
 `sandbox_file_editor`. A tool passed explicitly through `TemporalAgent(tools=...)`
 with either name takes precedence, following Strands' normal sandbox-tool
 override behavior.

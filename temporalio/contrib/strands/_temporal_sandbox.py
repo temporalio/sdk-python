@@ -6,12 +6,7 @@ from typing import Any, TypeVar
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 from strands.sandbox.errors import SandboxPathNotFoundError, SandboxTimeoutError
 from strands.types.tools import AgentTool
-
-# Strands 1.52 keeps make_bash importable until 2.0 but omits it from __all__.
-from strands.vended_tools import (
-    make_bash,  # pyright: ignore[reportPrivateImportUsage]
-    make_file_editor,
-)
+from strands.vended_tools import make_file_editor, make_shell
 
 from temporalio import workflow
 from temporalio.common import Priority, RetryPolicy
@@ -147,10 +142,10 @@ class TemporalSandbox(Sandbox):
         )
 
     def get_tools(self) -> list[AgentTool]:
-        """Vend Strands' standard bash and file-editor sandbox tools."""
+        """Vend Strands' standard shell and file-editor sandbox tools."""
         return [
             make_file_editor(sandbox=self, name="sandbox_file_editor"),
-            make_bash(sandbox=self, name="sandbox_bash"),
+            make_shell(sandbox=self, name="sandbox_shell"),
         ]
 
     async def _execute(
