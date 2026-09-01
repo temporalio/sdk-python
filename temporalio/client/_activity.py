@@ -337,12 +337,12 @@ class ActivityExecutionDescription(ActivityExecution):
     """Underlying protobuf callbacks"""
 
     raw_input: temporalio.api.common.v1.Payloads | None = field(repr=False)
-    """Raw input of the activity. Use :py:meth:`input` to decode."""
+    """Raw input of the activity. Use `input` to decode."""
 
     raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None = field(
         repr=False
     )
-    """Raw outcome of the activity. Use :py:meth:`outcome` to decode."""
+    """Raw outcome of the activity. Use :py:meth:`result` or :py:meth:`outcome_failure` to decode."""
 
     data_converter: DataConverter = field(repr=False)
     """Data converter used to convert raw payloads. By default it's the same as the client's data converter."""
@@ -445,9 +445,9 @@ class ActivityExecutionDescription(ActivityExecution):
         )
 
     def has_heartbeat_details(self) -> bool:
-        """True if heartbeat details are available. Use :py:meth:`heartbeat_details` to retrieve them.
+        """True if heartbeat details are available. Use `heartbeat_details` to retrieve them.
 
-        Always false if `include_heartbeat_details` was false in the `describe` call.
+        Always false if `include_heartbeat_details` was false in the `ActivityHandle.describe` call.
         """
         return self.raw_info.HasField("heartbeat_details")
 
@@ -456,7 +456,7 @@ class ActivityExecutionDescription(ActivityExecution):
     ) -> list[Any] | None:
         """Returns details from the last heartbeat, or `None` if not available.
 
-        Always `None` if `include_heartbeat_details` was false in the `describe` call.
+        Always `None` if ``include_heartbeat_details`` was false in the `ActivityHandle.describe` call.
         Type hints can be provided to aid data conversion.
         """
         return (
@@ -468,16 +468,16 @@ class ActivityExecutionDescription(ActivityExecution):
         )
 
     def has_last_failure(self) -> bool:
-        """True if last failure is available. Use :py:meth:`last_failure` to retrieve it.
+        """True if last failure is available. Use `last_failure` to retrieve it.
 
-        Always false if `include_heartbeat_details` was false in the `describe` call.
+        Always false if ``include_last_failure`` was false in the `ActivityHandle.describe` call.
         """
         return self.raw_info.HasField("last_failure")
 
     async def last_failure(self) -> BaseException | None:
         """Returns failure from the last failed attempt, or `None` if not available.
 
-        Always `None` if `include_last_failure` was false in the `describe` call.
+        Always `None` if ``include_last_failure`` was false in the `ActivityHandle.describe` call.
         """
         return (
             await self.data_converter.decode_failure(self.raw_info.last_failure)
@@ -486,16 +486,16 @@ class ActivityExecutionDescription(ActivityExecution):
         )
 
     def has_input(self) -> bool:
-        """True if activity input is available. Use :py:meth:`input` to retrieve it.
+        """True if activity input is available. Use `input  <ActivityExecutionDescription.input>` to retrieve it.
 
-        Always false if `include_input` was false in the `describe` call.
+        Always false if ``include_input`` was false in the `ActivityHandle.describe` call.
         """
         return self.raw_input is not None
 
     async def input(self, type_hints: list[type] | None = None) -> list[Any] | None:
         """Returns activity input, or `None` if not available.
 
-        Always `None` if `include_input` was false in the `describe` call.
+        Always `None` if ``include_input`` was false in the `ActivityHandle.describe` call.
         Type hints can be provided to aid data conversion.
         """
         return (
@@ -505,10 +505,10 @@ class ActivityExecutionDescription(ActivityExecution):
         )
 
     def has_result(self) -> bool:
-        """True if activity result is available. Use :py:meth:`result` to retrieve it.
+        """True if activity result is available. Use `result` to retrieve it.
 
         Activity result is only available if the activity has completed and was successful.
-        Always false if `include_outcome` was false in the `describe` call.
+        Always false if `include_outcome` was false in the `ActivityHandle.describe` call.
         """
         return self.raw_outcome is not None and self.raw_outcome.HasField("result")
 
@@ -516,7 +516,7 @@ class ActivityExecutionDescription(ActivityExecution):
         """Returns activity result, or `None` if not available.
 
         Activity result is only available if the activity has completed successfully.
-        Always false if `include_outcome` was false in the `describe` call.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
         Type hints can be provided to aid data conversion.
         """
         if self.raw_outcome is None or not self.raw_outcome.HasField("result"):
@@ -532,12 +532,12 @@ class ActivityExecutionDescription(ActivityExecution):
         return results[0]
 
     def has_outcome_failure(self) -> bool:
-        """True if activity outcome failure is available. Use :py:meth:`outcome_failure` to retrieve it.
+        """True if activity outcome failure is available. Use `outcome_failure` to retrieve it.
 
         Activity outcome failure is only available if the activity has closed with a failure.
-        Use :py:meth:`last_failure` to retrieve failure of the most recent failed attempt of an activity that's still
-        running or that completed successfully.
-        Always false if `include_outcome` was false in the `describe` call.
+        Use `last_failure` to retrieve failure of the most recent failed attempt of an activity that's still running or
+        that completed successfully.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
         """
         return self.raw_outcome is not None and self.raw_outcome.HasField("failure")
 
@@ -545,9 +545,9 @@ class ActivityExecutionDescription(ActivityExecution):
         """Returns activity outcome failure, or `None` if not available.
 
         Activity outcome failure is only available if the activity has closed with a failure.
-        Use :py:meth:`last_failure` to retrieve failure of the most recent failed attempt of an activity that's still
-        running or that completed successfully.
-        Always false if `include_outcome` was false in the `describe` call.
+        Use `last_failure` to retrieve failure of the most recent failed attempt of an activity that's still running or
+        that completed successfully.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
         """
         return (
             await self.data_converter.decode_failure(self.raw_outcome.failure)
