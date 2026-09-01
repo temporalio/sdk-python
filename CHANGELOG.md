@@ -30,6 +30,8 @@ to include examples, links to docs, or any other relevant information.
 
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
 
 ### Security
 
