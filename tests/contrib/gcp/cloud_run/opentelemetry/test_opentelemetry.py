@@ -10,7 +10,7 @@ import pytest
 from opentelemetry.trace import NoOpTracerProvider, set_tracer_provider
 
 from temporalio.client import ClientConfig
-from temporalio.contrib.gcp.cloud_run import (
+from temporalio.contrib.gcp.cloud_run.opentelemetry import (
     CLOUD_RUN_SERVICE_ENV_VAR,
     CLOUD_RUN_WORKER_POOL_ENV_VAR,
     DEFAULT_METRIC_PERIODICITY,
@@ -204,13 +204,14 @@ def test_plugin_owned_provider_is_shut_down(
     monkeypatch.setattr(tracer_provider, "force_flush", force_flush)
     monkeypatch.setattr(tracer_provider, "shutdown", shutdown)
     monkeypatch.setattr(
-        "temporalio.contrib.gcp.cloud_run._opentelemetry._create_tracer_provider",
+        "temporalio.contrib.gcp.cloud_run.opentelemetry._opentelemetry._create_tracer_provider",
         lambda endpoint, service_name: tracer_provider,
     )
     runtime = cast(Runtime, Mock(spec=Runtime))
     runtime_factory = Mock(return_value=runtime)
     monkeypatch.setattr(
-        "temporalio.contrib.gcp.cloud_run._opentelemetry.Runtime", runtime_factory
+        "temporalio.contrib.gcp.cloud_run.opentelemetry._opentelemetry.Runtime",
+        runtime_factory,
     )
 
     plugin = OpenTelemetryPlugin()
@@ -232,11 +233,11 @@ def test_plugin_owned_provider_is_cleaned_up_on_runtime_failure(
     shutdown = Mock()
     monkeypatch.setattr(tracer_provider, "shutdown", shutdown)
     monkeypatch.setattr(
-        "temporalio.contrib.gcp.cloud_run._opentelemetry._create_tracer_provider",
+        "temporalio.contrib.gcp.cloud_run.opentelemetry._opentelemetry._create_tracer_provider",
         lambda endpoint, service_name: tracer_provider,
     )
     monkeypatch.setattr(
-        "temporalio.contrib.gcp.cloud_run._opentelemetry.Runtime",
+        "temporalio.contrib.gcp.cloud_run.opentelemetry._opentelemetry.Runtime",
         Mock(side_effect=RuntimeError("runtime failed")),
     )
 
@@ -254,7 +255,7 @@ def test_rejects_conflicting_global_tracer_provider(
     shutdown = Mock()
     monkeypatch.setattr(tracer_provider, "shutdown", shutdown)
     monkeypatch.setattr(
-        "temporalio.contrib.gcp.cloud_run._opentelemetry._create_tracer_provider",
+        "temporalio.contrib.gcp.cloud_run.opentelemetry._opentelemetry._create_tracer_provider",
         lambda endpoint, service_name: tracer_provider,
     )
 

@@ -1,6 +1,6 @@
 # Temporal Google Cloud Run integration
 
-`temporalio.contrib.gcp.cloud_run` provides an OpenTelemetry plugin with
+`temporalio.contrib.gcp.cloud_run.opentelemetry` provides an OpenTelemetry plugin with
 defaults for Temporal Python SDK workers running on Google Cloud Run. Cloud Run
 worker pools are the recommended deployment because Temporal workers are
 continuous, pull-based background workloads.
@@ -39,7 +39,7 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.gcp.cloud_run import OpenTelemetryPlugin
+from temporalio.contrib.gcp.cloud_run.opentelemetry import OpenTelemetryPlugin
 from temporalio.worker import Worker
 
 otel_plugin = OpenTelemetryPlugin()
