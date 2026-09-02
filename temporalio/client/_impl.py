@@ -815,16 +815,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        # Remove present but unrequested flags, in case the server sent them anyway.
-        if not input.include_input:
-            resp.ClearField("input")
-        if not input.include_outcome:
-            resp.ClearField("outcome")
-        if not input.include_heartbeat_details:
-            resp.info.ClearField("heartbeat_details")
-        if not input.include_last_failure:
-            resp.info.ClearField("last_failure")
-
         return await ActivityExecutionDescription._from_describe_response(
             resp,
             namespace=self._client.namespace,
