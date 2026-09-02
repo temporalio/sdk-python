@@ -77,9 +77,7 @@ async def test_can_threshold_and_cache(env: WorkflowEnvironment) -> None:
         )
         result = await handle.result()
 
-    # The only way the conversation reaches >= 3 messages is if the snapshot from
-    # the pre-continue-as-new run was carried into the continued run and merged.
-    assert len(result["messages"]) >= 3, result
+    assert result["messages"] == ["start", "step", "step"], result
     assert result["todos"][0]["status"] == "completed"
 
 

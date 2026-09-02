@@ -158,23 +158,16 @@ async def call_backend_op(
 
 
 def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
-    """Prepend a snapshot's carried messages onto the next turn's input."""
+    """Restore a snapshot's carried messages for the next turn."""
     raw_prior: Any = snapshot.get("messages") or []
     prior = list(raw_prior)
     if not prior:
         return input
     if isinstance(input, Mapping):
         merged = dict(input)
-        raw_next: Any = input.get("messages") or []
-        merged["messages"] = [*prior, *list(raw_next)]
+        merged["messages"] = prior
         return merged
-    return {"messages": [*prior, *_as_message_list(input)]}
-
-
-def _as_message_list(input: Any) -> list[Any]:
-    if isinstance(input, (list, tuple)):
-        return list(input)
-    return [input]
+    return {"messages": prior}
 
 
 async def run_deep_agent(
