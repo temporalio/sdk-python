@@ -1255,10 +1255,18 @@ class WorkflowExecution:
     """Run ID for the parent workflow if this was started as a child."""
 
     root_id: str | None
-    """ID for the root workflow."""
+    """ID for the root workflow.
+
+    The root namespace is not retained and may differ from this workflow's namespace for
+    cross-namespace child workflows. Track it separately if needed.
+    """
 
     root_run_id: str | None
-    """Run ID for the root workflow."""
+    """Run ID for the root workflow.
+
+    The root namespace is not retained and may differ from this workflow's namespace for
+    cross-namespace child workflows. Track it separately if needed.
+    """
 
     raw_info: temporalio.api.workflow.v1.WorkflowExecutionInfo
     """Underlying protobuf info."""

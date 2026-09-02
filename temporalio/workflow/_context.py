@@ -92,6 +92,8 @@ class Info:
     namespace: str
     parent: ParentInfo | None
     root: RootInfo | None
+    """Root information. Its namespace is not retained and may differ from this workflow's
+    namespace for cross-namespace child workflows. Track it separately if needed."""
     priority: temporalio.common.Priority
     """The priority of this workflow execution. If not set, or this server predates priorities,
     then returns a default instance."""
@@ -217,7 +219,11 @@ class ParentInfo:
 
 @dataclass(frozen=True)
 class RootInfo:
-    """Information about the root workflow."""
+    """Information about the root workflow.
+
+    The namespace is not retained and may differ from the current workflow's namespace for
+    cross-namespace child workflows. Track it separately if needed.
+    """
 
     run_id: str
     workflow_id: str
