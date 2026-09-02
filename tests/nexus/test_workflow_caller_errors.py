@@ -29,7 +29,12 @@ from temporalio.client import (
     Client,
     WorkflowFailureError,
 )
-from temporalio.converter import DataConverter, DefaultPayloadConverter, PayloadCodec
+from temporalio.converter import (
+    DataConverter,
+    DefaultPayloadConverter,
+    PayloadCodec,
+    create_payload_validation_error,
+)
 from temporalio.exceptions import (
     ApplicationError,
     NexusOperationError,
@@ -39,7 +44,7 @@ from temporalio.exceptions import (
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from temporalio.worker._nexus import _DummyPayloadSerializer
+from temporalio.worker._nexus import _NexusPayloadSerializer
 from tests.helpers import LogCapturer, assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 
@@ -844,7 +849,10 @@ async def test_nexus_operation_fails_without_retry_on_converter_failure(
             pytest.fail("Expected WorkflowFailureError")
 
 
-_PAYLOAD_VALIDATION_FAILURE_MESSAGE = "Nexus operation input failed validation"
+_PAYLOAD_VALIDATION_FAILURE_MESSAGE = "Payload validation failed"
+_PAYLOAD_VALIDATION_FAILURE_DETAILS = {
+    "violations": [{"path": "some.path", "reason": "must be an int"}]
+}
 
 
 class RaiseOnDecodeCodec(PayloadCodec):
@@ -876,7 +884,7 @@ def _converter_class_raising(error: Exception) -> type[DefaultPayloadConverter]:
 
 async def _deserialize_input(data_converter: DataConverter) -> Any:
     [payload] = DataConverter.default.payload_converter.to_payloads(["input"])
-    serializer = _DummyPayloadSerializer(data_converter=data_converter, payload=payload)
+    serializer = _NexusPayloadSerializer(data_converter=data_converter, payload=payload)
     return await serializer.deserialize(nexusrpc.Content(headers={}, data=b""))
 
 
@@ -893,10 +901,8 @@ async def _deserialize_input_with_converter_error(error: Exception) -> Any:
 
 
 async def test_codec_input_payload_validation_failure_is_bad_request():
-    validation_error = ApplicationError(
-        _PAYLOAD_VALIDATION_FAILURE_MESSAGE,
-        type="PayloadValidationError",
-        non_retryable=True,
+    validation_error = create_payload_validation_error(
+        _PAYLOAD_VALIDATION_FAILURE_DETAILS
     )
     with pytest.raises(nexusrpc.HandlerError) as err:
         await _deserialize_input_with_codec_error(validation_error)
@@ -942,10 +948,8 @@ async def test_retryable_codec_input_payload_validation_failure_is_internal():
 
 
 async def test_converter_input_payload_validation_failure_is_bad_request():
-    validation_error = ApplicationError(
-        _PAYLOAD_VALIDATION_FAILURE_MESSAGE,
-        type="PayloadValidationError",
-        non_retryable=True,
+    validation_error = create_payload_validation_error(
+        _PAYLOAD_VALIDATION_FAILURE_DETAILS
     )
     with pytest.raises(nexusrpc.HandlerError) as err:
         await _deserialize_input_with_converter_error(validation_error)
@@ -1002,10 +1006,8 @@ async def test_nexus_operation_fails_without_retry_on_codec_input_validation_fai
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    validation_error = ApplicationError(
-        _PAYLOAD_VALIDATION_FAILURE_MESSAGE,
-        type="PayloadValidationError",
-        non_retryable=True,
+    validation_error = create_payload_validation_error(
+        _PAYLOAD_VALIDATION_FAILURE_DETAILS
     )
     handler_client = Client(
         client.service_client,
@@ -1053,6 +1055,7 @@ async def test_nexus_operation_fails_without_retry_on_codec_input_validation_fai
         assert isinstance(cause, ApplicationError)
         assert cause.type == "PayloadValidationError"
         assert cause.message == _PAYLOAD_VALIDATION_FAILURE_MESSAGE
+        assert cause.details == (_PAYLOAD_VALIDATION_FAILURE_DETAILS,)
 
 
 async def test_nexus_operation_fails_without_retry_on_converter_input_validation_failure(
@@ -1062,10 +1065,8 @@ async def test_nexus_operation_fails_without_retry_on_converter_input_validation
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
-    validation_error = ApplicationError(
-        _PAYLOAD_VALIDATION_FAILURE_MESSAGE,
-        type="PayloadValidationError",
-        non_retryable=True,
+    validation_error = create_payload_validation_error(
+        _PAYLOAD_VALIDATION_FAILURE_DETAILS
     )
     handler_client = Client(
         client.service_client,
@@ -1114,3 +1115,4 @@ async def test_nexus_operation_fails_without_retry_on_converter_input_validation
         assert isinstance(cause, ApplicationError)
         assert cause.type == "PayloadValidationError"
         assert cause.message == _PAYLOAD_VALIDATION_FAILURE_MESSAGE
+        assert cause.details == (_PAYLOAD_VALIDATION_FAILURE_DETAILS,)

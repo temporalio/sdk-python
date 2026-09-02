@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.31.0"
+version = "1.32.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -197,7 +197,12 @@ exclude = [
   # Ignore generated code
   'temporalio/api',
   'temporalio/bridge/proto',
+  'temporalio/nexus/system/workflow_service',
 ]
+
+[[tool.mypy.overrides]]
+module = "temporalio.nexus.system.workflow_service.*"
+ignore_errors = true
 
 [tool.pydocstyle]
 convention = "google"

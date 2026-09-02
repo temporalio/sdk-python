@@ -20,6 +20,40 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+
+### Fixed
+
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+- `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
+  `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
+  the delay the server asked for was discarded on that path and the activity
+  retried on its configured interval instead.
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
+
+### Security
+
+## [1.32.0] - 2026-08-24
+
+### Added
+
+- Added `temporalio.converter.create_payload_validation_error` to create the
+  non-retryable application error used when a converted payload fails validation.
 - Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
   `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
   OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
@@ -48,6 +82,8 @@ to include examples, links to docs, or any other relevant information.
   variable names a worker will read.
 - **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
   environment variable name on the worker.
+- Added Nexus operation link propagation for Workflow Queries issued from operation handlers. The
+  queried Workflow link returned by the server is attached to the caller's Nexus operation event.
 
 ### Changed
 
@@ -74,8 +110,6 @@ to include examples, links to docs, or any other relevant information.
   message becomes specific to validation. Any other decode failure, and a
   retryable `PayloadValidationError`, keep their existing treatment.
 
-### Deprecated
-
 ### :boom: Breaking Changes
 
 - The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
@@ -86,6 +120,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `create_payload_validation_error(None)` now creates an application error with no
+  details instead of encoding `None` as a detail.
+- Client header encoding no longer mutates interceptor-provided payloads, preventing
+  update-with-start from encoding a shared header twice when
+  `HeaderCodecBehavior.CODEC` is enabled ([#1769](https://github.com/temporalio/sdk-python/issues/1769)).
 - `temporalio.contrib.opentelemetry` replay-safe spans now delegate
   `Span.add_link` to the wrapped span. Previously the wrapper inherited
   OpenTelemetry's non-abstract no-op default, silently dropping links added
@@ -101,8 +140,6 @@ to include examples, links to docs, or any other relevant information.
 - `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
   is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
   configs at its public runner API)
-
-### Security
 
 ## [1.31.0] - 2026-07-29
 
@@ -156,6 +193,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Continue-as-new requests from workflow update handlers now fail the workflow
+  task instead of leaving the update unresolved.
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
 

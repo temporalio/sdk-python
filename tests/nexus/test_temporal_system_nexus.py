@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any, cast
 
+import nexusrpc
 import pytest
 from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
@@ -35,12 +36,12 @@ from temporalio.converter import (
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
-    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from temporalio.worker._nexus import _NexusPayloadSerializer
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
 from tests.test_extstore import InMemoryTestDriver
 
@@ -166,6 +167,7 @@ def test_signal_with_start_serialization_context() -> None:
 class RejectOuterSystemNexusCodec(PayloadCodec):
     def __init__(self) -> None:
         self.encode_count = 0
+        self.decode_count = 0
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
@@ -202,6 +204,7 @@ class RejectOuterSystemNexusCodec(PayloadCodec):
                 raise RuntimeError(
                     "outer system nexus envelope should not be codec decoded"
                 )
+            self.decode_count += 1
             decoded.append(payload)
         return decoded
 
@@ -247,11 +250,16 @@ class _TracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
 
 
 class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
-    async def start_nexus_operation(
-        self, input: StartNexusOperationInput[Any, Any]
-    ) -> workflow.NexusOperationHandle[Any]:
-        interceptor_traces.append(("workflow.start_nexus_operation", input))
-        return await super().start_nexus_operation(input)
+    async def start_signal_with_start_workflow(
+        self, request: workflow_service_models.SignalWithStartWorkflowRequest
+    ) -> workflow.NexusOperationHandle[
+        workflow_service_models.SignalWithStartWorkflowResponse
+    ]:
+        request.headers = {**(request.headers or {}), "interceptor-header": "value"}
+        interceptor_traces.append(
+            ("workflow.start_signal_with_start_workflow", request)
+        )
+        return await super().start_signal_with_start_workflow(request)
 
 
 def _assert_stored_payloads_include(
@@ -266,15 +274,15 @@ def _assert_stored_payloads_include(
     assert expected_payload_data.issubset(stored_payload_data)
 
 
-def _assert_start_nexus_operation_interceptor_trace() -> None:
+def _assert_signal_with_start_workflow_interceptor_trace() -> None:
     assert len(interceptor_traces) == 1
     trace_name, trace_value = interceptor_traces.pop()
-    assert trace_name == "workflow.start_nexus_operation"
-    trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    request = trace_input.input
+    assert trace_name == "workflow.start_signal_with_start_workflow"
+    request = cast(workflow_service_models.SignalWithStartWorkflowRequest, trace_value)
     assert request.id == "system-nexus-workflow-id"
     assert request.signal == "test-signal"
     assert request.workflow == "test-workflow"
+    assert request.headers == {"interceptor-header": "value"}
 
 
 class _MarkingPayloadVisitor(VisitorFunctions):
@@ -331,6 +339,89 @@ def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Pay
     payload = _new_system_nexus_request_payload()
     del payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY]
     return payload
+
+
+async def test_nexus_payload_serializer_decodes_system_input() -> None:
+    """A marked system request is decoded into its generated Nexus model."""
+    data_converter = temporalio.converter.default()
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        args=["workflow-input"],
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+        headers={"test-header": "header-value"},
+    )
+    payload = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    ).to_payload(request)
+    assert payload is not None
+    assert payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY] == b"true"
+    assert payload.metadata["encoding"] == b"binary/protobuf"
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=workflow_service_models.SignalWithStartWorkflowRequest,
+    )
+
+    assert decoded == request
+
+
+async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
+    """The codec decodes nested user payloads but not the outer system envelope."""
+    codec = RejectOuterSystemNexusCodec()
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=codec,
+    )
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="test-workflow",
+        args=["workflow-input"],
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    payload = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    ).to_payload(request)
+    assert payload is not None
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=workflow_service_models.SignalWithStartWorkflowRequest,
+    )
+
+    assert codec.decode_count == 1
+    assert codec.encode_count == 0
+    assert decoded == request
+
+
+async def test_nexus_payload_serializer_uses_user_converter() -> None:
+    """An unmarked Nexus input continues to use the configured user converter."""
+    data_converter = temporalio.converter.default()
+    payload = data_converter.payload_converter.to_payload("ordinary-input")
+    assert payload is not None
+    assert SYSTEM_NEXUS_PAYLOAD_METADATA_KEY not in payload.metadata
+
+    decoded = await _NexusPayloadSerializer(
+        data_converter=data_converter,
+        payload=payload,
+    ).deserialize(
+        nexusrpc.Content(headers={}, data=b""),
+        as_type=str,
+    )
+
+    assert decoded == "ordinary-input"
 
 
 async def test_schedule_marked_system_nexus_payload_ignores_endpoint() -> None:
@@ -479,13 +570,10 @@ def _proto_scalar_sample(field: FieldDescriptor, *, path: str) -> Any:
 
 
 def _field_is_repeated(field: FieldDescriptor) -> bool:
-    return bool(
-        getattr(
-            field,
-            "is_repeated",
-            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
-        )
-    )
+    is_repeated = getattr(field, "is_repeated", None)
+    if is_repeated is not None:
+        return bool(is_repeated)
+    return getattr(field, "label") == FieldDescriptor.LABEL_REPEATED
 
 
 @pytest.mark.parametrize(
@@ -624,7 +712,7 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
             b'"details-value"',
         },
     )
-    _assert_start_nexus_operation_interceptor_trace()
+    _assert_signal_with_start_workflow_interceptor_trace()
 
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.

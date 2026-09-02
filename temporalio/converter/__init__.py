@@ -10,6 +10,7 @@ from temporalio.converter._extstore import (
     StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
+    StorageDriverSelectContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
     StorageWarning,
@@ -37,6 +38,9 @@ from temporalio.converter._payload_converter import (
     transfer_type_convertible,
     value_to_type,
 )
+from temporalio.converter._payload_validation_error import (
+    create_payload_validation_error,
+)
 from temporalio.converter._search_attributes import (
     decode_search_attributes,
     decode_typed_search_attributes,
@@ -58,6 +62,7 @@ __all__ = [
     "StorageDriverActivityInfo",
     "StorageDriverClaim",
     "StorageDriverRetrieveContext",
+    "StorageDriverSelectContext",
     "StorageDriverStoreContext",
     "StorageDriverWorkflowInfo",
     "StorageWarning",
@@ -86,6 +91,7 @@ __all__ = [
     "decode_search_attributes",
     "decode_typed_search_attributes",
     "default",
+    "create_payload_validation_error",
     "encode_search_attribute_values",
     "encode_search_attributes",
     "encode_typed_search_attribute_value",

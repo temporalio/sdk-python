@@ -428,6 +428,12 @@ class PayloadVisitor:
                 fs, o.search_attributes
             )
 
+    async def _visit_coresdk_workflow_commands_CancelWorkflowExecution(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("details"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.details)
+
     async def _visit_coresdk_workflow_commands_StartChildWorkflowExecution(
         self, fs: VisitorFunctions, o: Any
     ):
@@ -512,6 +518,10 @@ class PayloadVisitor:
         elif o.HasField("continue_as_new_workflow_execution"):
             await self._visit_coresdk_workflow_commands_ContinueAsNewWorkflowExecution(
                 fs, o.continue_as_new_workflow_execution
+            )
+        elif o.HasField("cancel_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_CancelWorkflowExecution(
+                fs, o.cancel_workflow_execution
             )
         elif o.HasField("start_child_workflow_execution"):
             await self._visit_coresdk_workflow_commands_StartChildWorkflowExecution(
@@ -635,3 +645,8 @@ class PayloadVisitor:
             await self._visit_temporal_api_common_v1_Header(fs, o.header)
         if o.HasField("user_metadata"):
             await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+
+    async def _visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass

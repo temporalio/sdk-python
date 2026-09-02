@@ -620,6 +620,7 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     LOCAL_RETRY_THRESHOLD_FIELD_NUMBER: builtins.int
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
+    INCLUDE_ARGUMENTS_INTO_MARKER_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -684,6 +685,11 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
     confirmed. Lang should default this to `WAIT_CANCELLATION_COMPLETED`, even though proto
     will default to `TRY_CANCEL` automatically.
     """
+    include_arguments_into_marker: builtins.bool
+    """If set, the local activity arguments will be included in the resulting marker under the
+    `input` key. This is disabled by default to avoid increasing history size unless the lang
+    SDK explicitly chooses to expose it.
+    """
     def __init__(
         self,
         *,
@@ -706,6 +712,7 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         local_retry_threshold: google.protobuf.duration_pb2.Duration | None = ...,
         cancellation_type: global___ActivityCancellationType.ValueType = ...,
+        include_arguments_into_marker: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -739,6 +746,8 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
             b"cancellation_type",
             "headers",
             b"headers",
+            "include_arguments_into_marker",
+            b"include_arguments_into_marker",
             "local_retry_threshold",
             b"local_retry_threshold",
             "original_schedule_time",
@@ -1102,8 +1111,19 @@ class CancelWorkflowExecution(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    DETAILS_FIELD_NUMBER: builtins.int
+    @property
+    def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
         self,
+        *,
+        details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> None: ...
 
 global___CancelWorkflowExecution = CancelWorkflowExecution

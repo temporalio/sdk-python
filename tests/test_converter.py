@@ -49,6 +49,7 @@ from temporalio.converter import (
     JSONTypeConverterUnhandled,
     PayloadCodec,
     TransferTypeConverter,
+    create_payload_validation_error,
     decode_search_attributes,
     encode_search_attribute_values,
     transfer_type_convertible,
@@ -104,6 +105,27 @@ MyNewTypeStr = NewType("MyNewTypeStr", str)
 @dataclass
 class NewTypeMessage:
     data: dict[MyNewTypeStr, str]
+
+
+@pytest.mark.parametrize(
+    "details",
+    [None, {"violations": [{"path": "some.path", "reason": "must be an int"}]}],
+)
+def test_create_payload_validation_error(details: Any) -> None:
+    err = create_payload_validation_error(details)
+
+    assert err.message == "Payload validation failed"
+    assert err.type == "PayloadValidationError"
+    assert err.non_retryable
+    assert err.details == (() if details is None else (details,))
+
+    failure = Failure()
+    DataConverter.default.failure_converter.to_failure(
+        err, DataConverter.default.payload_converter, failure
+    )
+    assert DataConverter.default.payload_converter.from_payloads(
+        failure.application_failure_info.details.payloads
+    ) == ([] if details is None else [details])
 
 
 async def test_converter_default():
