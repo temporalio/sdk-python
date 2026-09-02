@@ -111,7 +111,11 @@ async def call_tool(
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
     """Dispatch one tool call, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key("tool", activity_input.tool_name, activity_input.args)
+    key = _serde.cache_key(
+        "tool",
+        activity_input.tool_call_id,
+        [activity_input.tool_name, activity_input.args],
+    )
     hit, cached = _serde.cache_lookup(key)
     if hit:
         return _activity.ToolActivityOutput(message=cached)
