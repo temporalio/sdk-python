@@ -20,11 +20,27 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added standalone-activity operator commands to `ActivityHandle`: `pause`, `unpause`,
-  `reset`, `update_options` and `restore_original_options`.
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `reset`, `update_options` and `restore_original_options`.
+  `update_options` takes `ActivityOptionsUpdate` values built from the keys on
+  `ActivityOptionsKeys`, via `ActivityOptionsKey.value_set` to set an option or
+  `ActivityOptionsKey.value_unset` to clear it, and returns the server's resolved
+  `ActivityExecutionOptions`.
 - Added opt-in payload fields to `ActivityHandle.describe`: `include_input`,
   `include_outcome`, `include_heartbeat_details` and `include_last_failure`, all default
-  `False`.
+  `False`. `input`, `result`, `failure`, `heartbeat_details` and `has_result` are new members
+  on `ActivityExecutionDescription`, along with `raw_description` for the whole response.
+- Added missing `ActivityExecutionDescription` fields: `execution_time`, `start_delay`,
+  `total_heartbeat_count`, and the `schedule_to_close_timeout`, `schedule_to_start_timeout`,
+  `start_to_close_timeout` and `heartbeat_timeout` options.
+
+### :boom: Breaking Changes
+
+- `ActivityExecutionDescription.last_failure` previously came back unconditionally and is now
+  opt-in: pass `include_last_failure=True` to `ActivityHandle.describe`.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed

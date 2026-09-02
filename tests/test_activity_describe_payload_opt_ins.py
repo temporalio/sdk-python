@@ -86,7 +86,7 @@ async def test_unrequested_payloads_are_stripped(client: Client):
     # The stub returns every payload field regardless of what was asked for.
     desc = await client.get_activity_handle("act-1").describe()
 
-    assert desc.raw_description.input.payloads == []
+    assert len(desc.raw_description.input.payloads) == 0
     assert desc.input == []
     assert not desc.has_result
     assert desc.result is None
