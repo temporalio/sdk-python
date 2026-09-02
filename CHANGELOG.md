@@ -150,6 +150,8 @@ This file contains assembled releases only.
 - Cancelling an activity from a signal while the workflow itself is cancelled
   no longer causes a nondeterminism error from duplicate activity-cancellation
   commands.
+- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
+  ending the subscription normally.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
