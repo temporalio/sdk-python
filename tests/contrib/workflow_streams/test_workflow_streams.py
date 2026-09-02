@@ -405,8 +405,11 @@ class CancellableSubscriber:
         heartbeat_task = asyncio.create_task(heartbeat())
         try:
             stream = WorkflowStreamClient.from_within_activity()
-            async for _ in stream.subscribe(result_type=bytes):
-                self.started.set()
+            try:
+                async for _ in stream.subscribe(result_type=bytes):
+                    self.started.set()
+            except asyncio.CancelledError:
+                return "subscription-cancelled"
             return "subscription-ended"
         finally:
             heartbeat_task.cancel()
@@ -1190,7 +1193,7 @@ async def test_activity_subscription_propagates_cancellation(client: Client) -> 
         async with _async_timeout(5):
             await subscriber.started.wait()
         await handle.signal(CancelSubscriptionWorkflow.cancel_subscription)
-        assert await handle.result() == "CancelledError"
+        assert await handle.result() == "subscription-cancelled"
 
 
 @pytest.mark.asyncio
