@@ -37,6 +37,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
+  ending the subscription normally.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and

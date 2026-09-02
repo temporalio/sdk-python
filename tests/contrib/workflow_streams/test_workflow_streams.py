@@ -48,7 +48,7 @@ from temporalio.contrib.workflow_streams import (
 )
 from temporalio.contrib.workflow_streams._types import _encode_payload
 from temporalio.converter import DataConverter
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
@@ -86,6 +86,37 @@ class BasicWorkflowStreamWorkflow:
     @workflow.run
     async def run(self) -> None:
         await workflow.wait_condition(lambda: self._closed)
+
+
+@workflow.defn
+class CancelSubscriptionWorkflow:
+    @workflow.init
+    def __init__(self) -> None:
+        self.stream = WorkflowStream()
+        self._cancel_requested = False
+
+    @workflow.signal
+    def cancel_subscription(self) -> None:
+        self._cancel_requested = True
+
+    @workflow.run
+    async def run(self) -> str:
+        self.stream.topic("events", type=bytes).publish(b"seed")
+        handle = workflow.start_activity(
+            "subscribe_until_cancelled",
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
+            cancellation_type=workflow.ActivityCancellationType.WAIT_CANCELLATION_COMPLETED,
+        )
+        await workflow.wait_condition(lambda: self._cancel_requested)
+        handle.cancel()
+        try:
+            result = await handle
+        except ActivityError as err:
+            result = type(err.cause).__name__
+        self.stream.detach_pollers()
+        await workflow.wait_condition(workflow.all_handlers_finished)
+        return result
 
 
 @workflow.defn
@@ -358,6 +389,28 @@ async def publish_items(count: int) -> None:
         for i in range(count):
             activity.heartbeat()
             client.topic("events", type=bytes).publish(f"item-{i}".encode())
+
+
+class CancellableSubscriber:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    @activity.defn(name="subscribe_until_cancelled")
+    async def subscribe(self) -> str:
+        async def heartbeat() -> None:
+            while True:
+                activity.heartbeat()
+                await asyncio.sleep(0.1)
+
+        heartbeat_task = asyncio.create_task(heartbeat())
+        try:
+            stream = WorkflowStreamClient.from_within_activity()
+            async for _ in stream.subscribe(result_type=bytes):
+                self.started.set()
+            return "subscription-ended"
+        finally:
+            heartbeat_task.cancel()
+            await asyncio.gather(heartbeat_task, return_exceptions=True)
 
 
 @activity.defn(name="publish_multi_topic")
@@ -1076,7 +1129,7 @@ async def test_priority_flush(client: Client) -> None:
 @pytest.mark.asyncio
 async def test_iterator_cancellation(client: Client) -> None:
     """Cancelling a subscription iterator after it has yielded an item
-    completes cleanly."""
+    propagates cancellation."""
     async with new_worker(
         client,
         BasicWorkflowStreamWorkflow,
@@ -1112,15 +1165,32 @@ async def test_iterator_cancellation(client: Client) -> None:
         async with _async_timeout(5):
             await first_item.wait()
         task.cancel()
-        try:
+        with pytest.raises(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
         assert len(items) == 1
         assert items[0].data == b"seed"
 
         await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_activity_subscription_propagates_cancellation(client: Client) -> None:
+    subscriber = CancellableSubscriber()
+    async with new_worker(
+        client,
+        CancelSubscriptionWorkflow,
+        activities=[subscriber.subscribe],
+    ) as worker:
+        handle = await client.start_workflow(
+            CancelSubscriptionWorkflow.run,
+            id=f"workflow-stream-activity-cancel-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        async with _async_timeout(5):
+            await subscriber.started.wait()
+        await handle.signal(CancelSubscriptionWorkflow.cancel_subscription)
+        assert await handle.result() == "CancelledError"
 
 
 @pytest.mark.asyncio
