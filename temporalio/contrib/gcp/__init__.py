@@ -1,1 +1,1 @@
-"""Google Cloud integrations for Temporal SDK."""
+"""Google Cloud Platform integrations for Temporal."""
