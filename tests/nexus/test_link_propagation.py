@@ -130,6 +130,39 @@ def nexus_ctx() -> Generator[_TemporalStartOperationContext]:
         )
 
 
+@pytest.fixture
+def nexus_ctx_linkless() -> Generator[_TemporalStartOperationContext]:
+    """Like `nexus_ctx`, but with no inbound links and no callback URL."""
+    nexus_context = nexusrpc.handler.StartOperationContext(
+        service="svc",
+        operation="op",
+        headers={},
+        request_id="req-id",
+        callback_url=None,
+        inbound_links=[],
+        callback_headers={},
+        task_cancellation=_NexusTaskCancellation(),
+    )
+    ctx = temporalio.nexus._operation_context._TemporalStartOperationContext(
+        nexus_context=nexus_context,
+        client=mock.MagicMock(namespace=NAMESPACE),
+        info=lambda: temporalio.nexus.Info(
+            endpoint="endpoint", namespace=NAMESPACE, task_queue="tq"
+        ),
+        _runtime_metric_meter=mock.MagicMock(),
+        _worker_shutdown_event=mock.MagicMock(),
+    )
+    token = temporalio.nexus._operation_context._temporal_start_operation_context.set(
+        ctx
+    )
+    try:
+        yield ctx
+    finally:
+        temporalio.nexus._operation_context._temporal_start_operation_context.reset(
+            token
+        )
+
+
 def _make_client_impl(workflow_service: Any) -> _ClientImpl:
     client = mock.MagicMock()
     client.namespace = NAMESPACE
@@ -747,6 +780,30 @@ async def test_backing_activity_start_gets_nexus_request_fields() -> None:
     assert operation_token.namespace == NAMESPACE
     assert operation_token.activity_id == "activity-target"
     assert list(req.completion_callbacks[0].links) == [_inbound_nexus_link()]
+
+
+@pytest.mark.usefixtures("nexus_ctx_linkless")
+async def test_activity_start_omits_on_conflict_options_when_linkless() -> None:
+    impl = _make_client_impl(mock.MagicMock())
+
+    req = await impl._build_start_activity_execution_request(_start_activity_input())
+
+    assert req.request_id == "req-id"
+    assert not req.HasField("on_conflict_options")
+
+
+@pytest.mark.usefixtures("nexus_ctx_linkless")
+async def test_backing_activity_start_omits_on_conflict_options_when_linkless() -> None:
+    impl = _make_client_impl(mock.MagicMock())
+
+    with temporalio.nexus._operation_context._nexus_backing_start_context():
+        req = await impl._build_start_activity_execution_request(
+            _start_activity_input()
+        )
+
+    assert req.request_id == "req-id"
+    assert len(req.completion_callbacks) == 0
+    assert not req.HasField("on_conflict_options")
 
 
 # ── handler-level: backlinks land on the StartOperationResponse ──────────────────────────────

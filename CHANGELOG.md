@@ -27,11 +27,29 @@ to include examples, links to docs, or any other relevant information.
   `False`.
 ### Changed
 
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+
 ### Deprecated
 
 ### :boom: Breaking Changes
 
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+
 ### Fixed
+
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+- `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
+  `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
+  the delay the server asked for was discarded on that path and the activity
+  retried on its configured interval instead.
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
 
 ### Security
 

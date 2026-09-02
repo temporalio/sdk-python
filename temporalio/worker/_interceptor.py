@@ -21,6 +21,9 @@ import temporalio.common
 import temporalio.nexus
 import temporalio.nexus._util
 import temporalio.workflow
+from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
+    _SystemNexusWorkflowOutboundInterceptorBase,
+)
 from temporalio.workflow import ContinueAsNewVersioningBehavior, VersioningIntent
 
 
@@ -414,11 +417,13 @@ class WorkflowInboundInterceptor:
         return await self.next.handle_update_handler(input)
 
 
-class WorkflowOutboundInterceptor:
+class WorkflowOutboundInterceptor(_SystemNexusWorkflowOutboundInterceptorBase):
     """Outbound interceptor to wrap calls made from within workflows.
 
     This should be extended by any workflow outbound interceptors.
     """
+
+    next: WorkflowOutboundInterceptor
 
     def __init__(self, next: WorkflowOutboundInterceptor) -> None:
         """Create the outbound interceptor.
@@ -428,6 +433,11 @@ class WorkflowOutboundInterceptor:
                 of all calls is to delegate to the next interceptor.
         """
         self.next = next
+
+    def _next_system_nexus_interceptor(
+        self,
+    ) -> _SystemNexusWorkflowOutboundInterceptorBase:
+        return self.next
 
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""

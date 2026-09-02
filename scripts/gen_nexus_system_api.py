@@ -35,7 +35,7 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
-NEX_GEN_VERSION = "0.2.2"
+NEX_GEN_VERSION = "0.2.3"
 
 
 def nex_gen_command() -> list[str]:
@@ -131,6 +131,7 @@ def generate_nexus_system_api() -> None:
                 str(wit_path),
                 str(wit_deps_dir),
                 "--native-api",
+                "--system-nexus",
                 "--support-file",
                 str(python_support_path),
                 "--descriptors",

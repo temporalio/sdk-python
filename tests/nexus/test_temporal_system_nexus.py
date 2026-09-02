@@ -36,7 +36,6 @@ from temporalio.converter import (
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
-    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
@@ -251,11 +250,16 @@ class _TracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
 
 
 class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
-    async def start_nexus_operation(
-        self, input: StartNexusOperationInput[Any, Any]
-    ) -> workflow.NexusOperationHandle[Any]:
-        interceptor_traces.append(("workflow.start_nexus_operation", input))
-        return await super().start_nexus_operation(input)
+    async def start_signal_with_start_workflow(
+        self, request: workflow_service_models.SignalWithStartWorkflowRequest
+    ) -> workflow.NexusOperationHandle[
+        workflow_service_models.SignalWithStartWorkflowResponse
+    ]:
+        request.headers = {**(request.headers or {}), "interceptor-header": "value"}
+        interceptor_traces.append(
+            ("workflow.start_signal_with_start_workflow", request)
+        )
+        return await super().start_signal_with_start_workflow(request)
 
 
 def _assert_stored_payloads_include(
@@ -270,15 +274,15 @@ def _assert_stored_payloads_include(
     assert expected_payload_data.issubset(stored_payload_data)
 
 
-def _assert_start_nexus_operation_interceptor_trace() -> None:
+def _assert_signal_with_start_workflow_interceptor_trace() -> None:
     assert len(interceptor_traces) == 1
     trace_name, trace_value = interceptor_traces.pop()
-    assert trace_name == "workflow.start_nexus_operation"
-    trace_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    request = trace_input.input
+    assert trace_name == "workflow.start_signal_with_start_workflow"
+    request = cast(workflow_service_models.SignalWithStartWorkflowRequest, trace_value)
     assert request.id == "system-nexus-workflow-id"
     assert request.signal == "test-signal"
     assert request.workflow == "test-workflow"
+    assert request.headers == {"interceptor-header": "value"}
 
 
 class _MarkingPayloadVisitor(VisitorFunctions):
@@ -708,7 +712,7 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
             b'"details-value"',
         },
     )
-    _assert_start_nexus_operation_interceptor_trace()
+    _assert_signal_with_start_workflow_interceptor_trace()
 
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.
