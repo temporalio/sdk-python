@@ -463,7 +463,11 @@ class WorkflowStreamClient:
             except asyncio.TimeoutError:
                 pass
             self._flush_event.clear()
-            await self._flush()
+            try:
+                await self._flush()
+            except Exception:
+                if self._pending is None:
+                    raise
 
     @overload
     def subscribe(
