@@ -1402,6 +1402,40 @@ async def test_flush_retry_preserves_items_after_failures(
 
 
 @pytest.mark.asyncio
+async def test_background_flusher_retries_failed_signal(client: Client) -> None:
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-background-flush-retry-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        stream = WorkflowStreamClient(handle, batch_interval=timedelta(milliseconds=10))
+        real_signal = handle.signal
+        first_flush_failed = asyncio.Event()
+        retry_succeeded = asyncio.Event()
+
+        async def fail_first_signal(*args: Any, **kwargs: Any) -> Any:
+            if not first_flush_failed.is_set():
+                first_flush_failed.set()
+                raise RuntimeError("simulated delivery failure")
+            result = await real_signal(*args, **kwargs)
+            retry_succeeded.set()
+            return result
+
+        with patch.object(handle, "signal", side_effect=fail_first_signal):
+            async with stream:
+                stream.topic("events", type=bytes).publish(b"item")
+                await asyncio.wait_for(first_flush_failed.wait(), timeout=5)
+                await asyncio.wait_for(retry_succeeded.wait(), timeout=5)
+
+        items = await collect_items(client, handle, None, 0, 1)
+        assert [item.data for item in items] == [b"item"]
+
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
 async def test_flush_raises_after_max_retry_duration(client: Client) -> None:
     """When max_retry_duration is exceeded, flush raises TimeoutError and the
     client can resume publishing without losing subsequent items."""
