@@ -2035,7 +2035,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 try:
                     return await self._await_temporal_operation(
                         handle._result_fut,
-                        lambda _err, command: handle._apply_cancel_command(command),
+                        lambda _err: handle._request_cancel(),
                         completed_cancellation_flag=_WorkflowLogicFlag.RAISE_ON_CANCELLING_COMPLETED_ACTIVITY,
                     )
                 except _ActivityDoBackoffError as err:
@@ -2106,8 +2106,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Common code for handling cancel for start and run
         def apply_child_cancel_error(
             err: asyncio.CancelledError,
-            cancel_command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
         ) -> None:
+            cancel_command = self._add_command()
             # Send a cancel request to the child, forwarding the msg passed to
             # Task.cancel(msg) (if any) as the cancellation reason.
             reason = err.args[0] if err.args and isinstance(err.args[0], str) else ""
@@ -2171,7 +2171,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 OutputT,
                 await self._await_temporal_operation(
                     handle._result_fut,
-                    lambda _err, command: handle._apply_cancel_command(command),
+                    lambda _err: handle._apply_cancel_command(self._add_command()),
                 ),
             )
 
@@ -2194,7 +2194,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         await self._await_temporal_operation(
             handle._start_fut,
-            lambda _err, command: handle._apply_cancel_command(command),
+            lambda _err: handle._apply_cancel_command(self._add_command()),
             reraise_on_workflow_cancellation=True,
         )
         return handle
@@ -2252,10 +2252,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self,
         fut: asyncio.Future[_T],
         apply_cancel: Callable[
-            [
-                asyncio.CancelledError,
-                temporalio.bridge.proto.workflow_commands.WorkflowCommand,
-            ],
+            [asyncio.CancelledError],
             None,
         ],
         *,
@@ -2283,7 +2280,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         )
                         raise
 
-                apply_cancel(err, self._add_command())
+                apply_cancel(err)
 
                 # Clear the cancellation counter on Python 3.11+ so the next
                 # await does not immediately re-raise CancelledError.
@@ -2798,8 +2795,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         def apply_cancel(
             _err: asyncio.CancelledError,
-            command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
         ) -> None:
+            command = self._add_command()
             command.cancel_signal_workflow.seq = seq
 
         # Wait until completed or cancelled
@@ -3281,6 +3278,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._input = input
         self._result_fut = instance.create_future()
         self._started = False
+        self._cancel_command_seq: int | None = None
         instance._register_task(self, name=f"activity: {input.activity}")
         self._payload_converter = self._instance._payload_converter_with_context(
             temporalio.converter.ActivitySerializationContext(
@@ -3307,8 +3305,14 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             # to send a cancel command because the async function won't run to trap
             # the cancel (i.e. cancelled before started)
             if not self._started and not self.done():
-                self._apply_cancel_command(self._instance._add_command())
+                self._request_cancel()
         return super().cancel(msg)
+
+    def _request_cancel(self) -> None:
+        if self._cancel_command_seq == self._seq:
+            return
+        self._cancel_command_seq = self._seq
+        self._apply_cancel_command(self._instance._add_command())
 
     def _resolve_success(self, result: Any) -> None:
         # We intentionally let this error if already done
