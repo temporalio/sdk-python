@@ -1362,49 +1362,57 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         )
 
     async def update_schedule(self, input: UpdateScheduleInput) -> None:
-        # TODO(cretz): This is supposed to be a retry-conflict loop, but we do
-        # not yet have a way to know update failure is due to conflict token
-        # mismatch
-        update = input.updater(
-            ScheduleUpdateInput(
-                description=ScheduleDescription._from_proto(
-                    input.id,
-                    await self._client.workflow_service.describe_schedule(
-                        temporalio.api.workflowservice.v1.DescribeScheduleRequest(
-                            namespace=self._client.namespace,
-                            schedule_id=input.id,
-                        ),
-                        retry=True,
-                        metadata=input.rpc_metadata,
-                        timeout=input.rpc_timeout,
-                    ),
-                    self._client.data_converter,
+        while True:
+            describe_response = await self._client.workflow_service.describe_schedule(
+                temporalio.api.workflowservice.v1.DescribeScheduleRequest(
+                    namespace=self._client.namespace,
+                    schedule_id=input.id,
+                ),
+                retry=True,
+                metadata=input.rpc_metadata,
+                timeout=input.rpc_timeout,
+            )
+            update = input.updater(
+                ScheduleUpdateInput(
+                    description=ScheduleDescription._from_proto(
+                        input.id,
+                        describe_response,
+                        self._client.data_converter,
+                    )
                 )
             )
-        )
-        if inspect.iscoroutine(update):
-            update = await update
-        if not update:
-            return
-        assert isinstance(update, ScheduleUpdate)
-        request = temporalio.api.workflowservice.v1.UpdateScheduleRequest(
-            namespace=self._client.namespace,
-            schedule_id=input.id,
-            schedule=await update.schedule._to_proto(self._client),
-            identity=self._client.identity,
-            request_id=str(uuid.uuid4()),
-        )
-        if update.search_attributes is not None:
-            request.search_attributes.indexed_fields.clear()  # Ensure that we at least create an empty map
-            temporalio.converter.encode_search_attributes(
-                update.search_attributes, request.search_attributes
+            if inspect.iscoroutine(update):
+                update = await update
+            if not update:
+                return
+            assert isinstance(update, ScheduleUpdate)
+            request = temporalio.api.workflowservice.v1.UpdateScheduleRequest(
+                namespace=self._client.namespace,
+                schedule_id=input.id,
+                schedule=await update.schedule._to_proto(self._client),
+                conflict_token=describe_response.conflict_token,
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
             )
-        await self._client.workflow_service.update_schedule(
-            request,
-            retry=True,
-            metadata=input.rpc_metadata,
-            timeout=input.rpc_timeout,
-        )
+            if update.search_attributes is not None:
+                request.search_attributes.indexed_fields.clear()  # Ensure that we at least create an empty map
+                temporalio.converter.encode_search_attributes(
+                    update.search_attributes, request.search_attributes
+                )
+            try:
+                await self._client.workflow_service.update_schedule(
+                    request,
+                    retry=True,
+                    metadata=input.rpc_metadata,
+                    timeout=input.rpc_timeout,
+                )
+                return
+            except RPCError as err:
+                if (
+                    err.status != RPCStatusCode.FAILED_PRECONDITION
+                    or err.message != "mismatched conflict token"
+                ):
+                    raise
 
     async def update_worker_build_id_compatibility(
         self, input: UpdateWorkerBuildIdCompatibilityInput
