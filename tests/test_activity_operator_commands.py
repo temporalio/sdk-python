@@ -68,8 +68,7 @@ async def always_fail_activity() -> None:
 async def heartbeat_fail_increment(value: int) -> int:
     """Heartbeats, fails the first attempt, then succeeds.
 
-    One execution of this carries input, a result, heartbeat details and a last failure
-    all at once, which is what lets a single describe exercise every payload field.
+    The description will have input, a result, heartbeat details and a last failure.
     """
     activity.heartbeat("heartbeat details")
     if activity.info().attempt == 1:

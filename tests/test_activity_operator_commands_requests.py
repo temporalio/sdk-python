@@ -130,7 +130,7 @@ async def test_value_set_of_zero_sends_an_explicit_zero(
     )
 
     update = captured.requests["update"]
-    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
+    assert update.update_mask.paths == ["heartbeat_timeout"]
     # Present and zero, which is distinct from absent: the caller asked for zero.
     assert update.activity_options.HasField("heartbeat_timeout")
     assert update.activity_options.heartbeat_timeout.ToTimedelta() == timedelta(0)
@@ -143,8 +143,7 @@ async def test_value_unset_names_the_path_but_leaves_the_field_absent(
     await handle.update_options([ActivityOptionsKeys.heartbeat_timeout.value_unset()])
 
     update = captured.requests["update"]
-    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
-    # Absent, which is how the server is told to clear the option.
+    assert update.update_mask.paths == ["heartbeat_timeout"]
     assert not update.activity_options.HasField("heartbeat_timeout")
 
 
@@ -161,7 +160,7 @@ async def test_a_repeated_key_resolves_to_its_last_update(
 
     update = captured.requests["update"]
     # The later unset wins, and the path is named once.
-    assert sorted(update.update_mask.paths) == ["heartbeat_timeout"]
+    assert update.update_mask.paths == ["heartbeat_timeout"]
     assert not update.activity_options.HasField("heartbeat_timeout")
 
 

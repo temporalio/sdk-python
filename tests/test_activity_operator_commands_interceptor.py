@@ -1,7 +1,3 @@
-"""Tests that each operator command on ActivityHandle routes through its own outbound
-interceptor method, carrying the caller's arguments. Uses a stubbed service.
-"""
-
 from __future__ import annotations
 
 from datetime import timedelta
