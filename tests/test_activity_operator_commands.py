@@ -379,9 +379,6 @@ async def test_reset_restores_original_options(
 
         await handle.reset(restore_original_options=True)
 
-        # Asserted through task_queue rather than a timeout: describe exposes the timeouts
-        # only from sdk-python#1782 onward, and task_queue is equally round-tripped by the
-        # restore.
         async def check() -> None:
             assert (await handle.describe()).task_queue == task_queue
 
@@ -390,13 +387,7 @@ async def test_reset_restores_original_options(
 
 
 async def _heartbeat_detail_count(client: Client, handle: ActivityHandle) -> int:
-    """Count heartbeat payloads the server holds for an activity.
-
-    Goes through the raw service rather than ``handle.describe`` because the server
-    withholds payload fields unless they are requested, and the opt-in reaches
-    ``ActivityHandle.describe`` only with sdk-python#1782. Once that lands this can
-    become ``len(await (await handle.describe(...)).heartbeat_details())``.
-    """
+    """Count heartbeat payloads the server holds for an activity."""
     resp = await client.workflow_service.describe_activity_execution(
         temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest(
             namespace=client.namespace,
