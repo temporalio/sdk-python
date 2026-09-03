@@ -11,6 +11,7 @@ from typing import Any
 
 import pytest
 
+import temporalio.api.workflowservice.v1
 from temporalio import activity
 from temporalio.client import (
     ActivityExecutionStatus,
@@ -385,4 +386,93 @@ async def test_reset_restores_original_options(
             assert (await handle.describe()).task_queue == task_queue
 
         await assert_eventually(check)
+        await handle.terminate(reason="cleanup")
+
+
+async def _heartbeat_detail_count(client: Client, handle: ActivityHandle) -> int:
+    """Count heartbeat payloads the server holds for an activity.
+
+    Goes through the raw service rather than ``handle.describe`` because the server
+    withholds payload fields unless they are requested, and the opt-in reaches
+    ``ActivityHandle.describe`` only with sdk-python#1782. Once that lands this can
+    become ``len(await (await handle.describe(...)).heartbeat_details())``.
+    """
+    resp = await client.workflow_service.describe_activity_execution(
+        temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest(
+            namespace=client.namespace,
+            activity_id=handle.id,
+            run_id=handle.run_id or "",
+            include_heartbeat_details=True,
+        )
+    )
+    return len(resp.info.heartbeat_details.payloads)
+
+
+async def _start_heartbeat_ready_activity(
+    client: Client, task_queue: str
+) -> ActivityHandle:
+    """Start a heartbeat-once activity and wait until it has recorded heartbeat details."""
+    handle = await client.start_activity(
+        heartbeat_once_activity,
+        id=f"act-{uuid.uuid4()}",
+        task_queue=task_queue,
+        start_to_close_timeout=timedelta(seconds=60),
+        heartbeat_timeout=timedelta(seconds=30),
+    )
+
+    async def check() -> None:
+        assert await _heartbeat_detail_count(client, handle) > 0
+
+    await assert_eventually(check)
+    return handle
+
+
+async def test_pause_preserves_heartbeat(client: Client, env: WorkflowEnvironment):
+    _skip_if_unsupported(env)
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client, task_queue=task_queue, activities=[heartbeat_once_activity]
+    ):
+        handle = await _start_heartbeat_ready_activity(client, task_queue)
+        await handle.pause(reason="hold")
+        await _assert_eventually_paused(handle)
+
+        # Pause never touches heartbeat details.
+        assert await _heartbeat_detail_count(client, handle) == 1
+        await handle.terminate(reason="cleanup")
+
+
+async def test_unpause_preserves_heartbeat(client: Client, env: WorkflowEnvironment):
+    _skip_if_unsupported(env)
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client, task_queue=task_queue, activities=[heartbeat_once_activity]
+    ):
+        handle = await _start_heartbeat_ready_activity(client, task_queue)
+        await handle.pause(reason="hold")
+        await _assert_eventually_paused(handle)
+        await handle.unpause()
+
+        assert await _heartbeat_detail_count(client, handle) == 1
+        await handle.terminate(reason="cleanup")
+
+
+async def test_update_options_preserves_heartbeat(
+    client: Client, env: WorkflowEnvironment
+):
+    _skip_if_unsupported(env)
+    task_queue = str(uuid.uuid4())
+    async with Worker(
+        client, task_queue=task_queue, activities=[heartbeat_once_activity]
+    ):
+        handle = await _start_heartbeat_ready_activity(client, task_queue)
+        await handle.update_options(
+            [
+                ActivityOptionsKeys.start_to_close_timeout.value_set(
+                    timedelta(seconds=90)
+                )
+            ]
+        )
+
+        assert await _heartbeat_detail_count(client, handle) == 1
         await handle.terminate(reason="cleanup")
