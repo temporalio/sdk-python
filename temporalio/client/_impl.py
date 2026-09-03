@@ -806,17 +806,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 activity_id=input.activity_id,
                 run_id=input.activity_run_id or "",
                 long_poll_token=input.long_poll_token or b"",
-                include_input=input.include_input,
-                include_outcome=input.include_outcome,
-                include_heartbeat_details=input.include_heartbeat_details,
-                include_last_failure=input.include_last_failure,
             ),
             retry=True,
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        return await ActivityExecutionDescription._from_describe_response(
-            resp,
+        return await ActivityExecutionDescription._from_execution_info(
+            info=resp.info,
+            long_poll_token=resp.long_poll_token or None,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 ActivitySerializationContext(
@@ -829,6 +826,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     is_local=False,
                 )
             ),
+            callbacks=resp.callbacks,
         )
 
     def list_activities(

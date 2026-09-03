@@ -119,26 +119,6 @@ async def _start_running_slow_activity(
     return handle
 
 
-async def _start_heartbeat_ready_activity(
-    client: Client, task_queue: str
-) -> ActivityHandle:
-    """Start a heartbeat-once activity and wait until it has recorded heartbeat details."""
-    handle = await client.start_activity(
-        heartbeat_once_activity,
-        id=f"act-{uuid.uuid4()}",
-        task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=60),
-        heartbeat_timeout=timedelta(seconds=30),
-    )
-
-    async def check() -> None:
-        desc = await handle.describe(include_heartbeat_details=True)
-        assert len(desc.raw_heartbeat_details) > 0
-
-    await assert_eventually(check)
-    return handle
-
-
 async def test_unpause_resumes(client: Client, env: WorkflowEnvironment):
     _skip_if_unsupported(env)
     task_queue = str(uuid.uuid4())
@@ -254,12 +234,6 @@ async def test_update_options_respects_mask(client: Client, env: WorkflowEnviron
         assert updated.start_to_close_timeout == timedelta(seconds=90)
         assert updated.schedule_to_close_timeout == timedelta(seconds=120)
 
-        async def check() -> None:
-            desc = await handle.describe()
-            assert desc.start_to_close_timeout == timedelta(seconds=90)
-            assert desc.schedule_to_close_timeout == timedelta(seconds=120)
-
-        await assert_eventually(check)
         await handle.terminate(reason="cleanup")
 
 
@@ -315,7 +289,6 @@ async def test_update_options_all_fields(client: Client, env: WorkflowEnvironmen
 
         desc = await handle.describe()
         assert desc.task_queue == "updated-tq"
-        assert desc.start_delay == timedelta(seconds=500)
         await handle.terminate(reason="cleanup")
 
 
@@ -365,7 +338,6 @@ async def test_update_options_on_paused_activity(
         assert updated.start_to_close_timeout == timedelta(seconds=99)
 
         desc = await handle.describe()
-        assert desc.start_to_close_timeout == timedelta(seconds=99)
         assert desc.run_state in PAUSED_STATES
         await handle.terminate(reason="cleanup")
 
@@ -401,151 +373,16 @@ async def test_reset_restores_original_options(
             start_delay=timedelta(seconds=300),
         )
         await handle.update_options(
-            [
-                ActivityOptionsKeys.start_to_close_timeout.value_set(
-                    timedelta(seconds=90)
-                )
-            ]
+            [ActivityOptionsKeys.task_queue.value_set("updated-tq")]
         )
 
         await handle.reset(restore_original_options=True)
 
+        # Asserted through task_queue rather than a timeout: describe exposes the timeouts
+        # only from sdk-python#1782 onward, and task_queue is equally round-tripped by the
+        # restore.
         async def check() -> None:
-            desc = await handle.describe()
-            assert desc.start_to_close_timeout == timedelta(seconds=45)
+            assert (await handle.describe()).task_queue == task_queue
 
         await assert_eventually(check)
-        await handle.terminate(reason="cleanup")
-
-
-async def test_describe_reports_total_heartbeat_count(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[slow_activity]):
-        # The count tracks heartbeats the server recordedy.
-        handle = await _start_running_slow_activity(
-            client, task_queue, heartbeat_timeout=timedelta(seconds=3)
-        )
-
-        async def check() -> None:
-            assert (await handle.describe()).total_heartbeat_count >= 2
-
-        await assert_eventually(check, timeout=timedelta(seconds=20))
-        await handle.terminate(reason="cleanup")
-
-
-async def test_describe_payloads(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        activities=[heartbeat_fail_increment, always_fail_activity],
-    ):
-        handle = await client.start_activity(
-            heartbeat_fail_increment,
-            args=(1,),
-            id=f"act-{uuid.uuid4()}",
-            task_queue=task_queue,
-            start_to_close_timeout=timedelta(seconds=60),
-            heartbeat_timeout=timedelta(seconds=5),
-            retry_policy=RetryPolicy(
-                initial_interval=timedelta(seconds=0.1),
-                backoff_coefficient=1.0,
-                maximum_attempts=2,
-            ),
-        )
-        assert await handle.result() == 2
-
-        bare = await handle.describe()
-        assert not bare.has_result
-        assert bare.input == []
-        assert bare.result is None
-        assert bare.failure is None
-        assert len(bare.raw_heartbeat_details) == 0
-        assert bare.last_failure is None
-
-        full = await handle.describe(
-            include_input=True,
-            include_outcome=True,
-            include_heartbeat_details=True,
-            include_last_failure=True,
-        )
-        assert full.input == [1]
-        assert full.has_result
-        assert full.result == 2
-        assert full.failure is None
-        assert len(full.raw_heartbeat_details) == 1
-        assert isinstance(full.last_failure, ApplicationError)
-
-        failed = await client.start_activity(
-            always_fail_activity,
-            id=f"act-{uuid.uuid4()}",
-            task_queue=task_queue,
-            start_to_close_timeout=timedelta(seconds=60),
-            retry_policy=RetryPolicy(maximum_attempts=1),
-        )
-        with pytest.raises(Exception):
-            await failed.result()
-
-        desc = await failed.describe(include_outcome=True, include_last_failure=True)
-        assert not desc.has_result
-        assert desc.result is None
-        assert isinstance(desc.failure, ApplicationError)
-        assert desc.failure.message == "deliberate failure"
-
-
-async def test_pause_preserves_heartbeat(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-        await handle.pause(reason="hold")
-        await _assert_eventually_paused(handle)
-
-        # Pause never touches heartbeat details.
-        desc = await handle.describe(include_heartbeat_details=True)
-        assert len(desc.raw_heartbeat_details) == 1
-        await handle.terminate(reason="cleanup")
-
-
-async def test_unpause_preserves_heartbeat(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-        await handle.pause(reason="hold")
-        await _assert_eventually_paused(handle)
-        await handle.unpause()
-
-        desc = await handle.describe(include_heartbeat_details=True)
-        assert len(desc.raw_heartbeat_details) == 1
-        await handle.terminate(reason="cleanup")
-
-
-async def test_update_options_preserves_heartbeat(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[heartbeat_once_activity]
-    ):
-        handle = await _start_heartbeat_ready_activity(client, task_queue)
-        await handle.update_options(
-            [
-                ActivityOptionsKeys.start_to_close_timeout.value_set(
-                    timedelta(seconds=90)
-                )
-            ]
-        )
-
-        desc = await handle.describe(include_heartbeat_details=True)
-        assert len(desc.raw_heartbeat_details) == 1
         await handle.terminate(reason="cleanup")

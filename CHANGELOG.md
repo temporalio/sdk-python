@@ -24,16 +24,6 @@ to include examples, links to docs, or any other relevant information.
 
 - `ActivityHandle` now supports operator commands for standalone activities: `pause`,
   `unpause`, `reset`, `update_options` and `restore_original_options`.
-- Added opt-in payload fields to `ActivityHandle.describe`: `include_input`,
-  `include_outcome`, `include_heartbeat_details` and `include_last_failure`.
-- Added missing `ActivityExecutionDescription` fields: `execution_time`, `start_delay`,
-  `total_heartbeat_count`, and the `schedule_to_close_timeout`, `schedule_to_start_timeout`,
-  `start_to_close_timeout` and `heartbeat_timeout` options.
-
-### :boom: Breaking Changes
-
-- `ActivityExecutionDescription.last_failure` previously came back unconditionally and is now
-  opt-in: pass `include_last_failure=True` to `ActivityHandle.describe`.
 
 ### Changed
 

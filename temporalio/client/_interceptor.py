@@ -335,10 +335,6 @@ class DescribeActivityInput:
     activity_id: str
     activity_run_id: str | None
     long_poll_token: bytes | None
-    include_input: bool
-    include_outcome: bool
-    include_heartbeat_details: bool
-    include_last_failure: bool
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
