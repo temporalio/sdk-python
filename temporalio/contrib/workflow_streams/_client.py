@@ -56,6 +56,35 @@ from ._types import (
 
 T = TypeVar("T")
 
+# Keep these aligned with SDK Core's client retry policy:
+# https://github.com/temporalio/sdk-rust/blob/c8551672bb5c7bf1fb211ef1caf10b2c11483bfc/crates/client/src/retry.rs#L16-L25
+_RETRYABLE_RPC_STATUS_CODES: frozenset[RPCStatusCode] = frozenset(
+    {
+        RPCStatusCode.ABORTED,
+        RPCStatusCode.DATA_LOSS,
+        RPCStatusCode.INTERNAL,
+        RPCStatusCode.OUT_OF_RANGE,
+        RPCStatusCode.RESOURCE_EXHAUSTED,
+        RPCStatusCode.UNAVAILABLE,
+        RPCStatusCode.UNKNOWN,
+    }
+)
+
+# Core forwards oversized-message errors without retrying:
+# https://github.com/temporalio/sdk-rust/blob/c8551672bb5c7bf1fb211ef1caf10b2c11483bfc/crates/client/src/retry.rs#L292-L307
+_MESSAGE_TOO_LARGE_ERROR_PREFIXES: tuple[str, ...] = (
+    "grpc: received message larger than max",
+    "grpc: message after decompression larger than max",
+    "grpc: received message after decompression larger than max",
+)
+
+
+def _is_retryable_rpc_error(error: RPCError) -> bool:
+    return error.status in _RETRYABLE_RPC_STATUS_CODES and not (
+        error.status == RPCStatusCode.RESOURCE_EXHAUSTED
+        and error.message.startswith(_MESSAGE_TOO_LARGE_ERROR_PREFIXES)
+    )
+
 
 class WorkflowStreamClient:
     """Client for publishing to and subscribing from a workflow stream.
@@ -465,8 +494,8 @@ class WorkflowStreamClient:
             self._flush_event.clear()
             try:
                 await self._flush()
-            except Exception:
-                if self._pending is None:
+            except RPCError as err:
+                if not _is_retryable_rpc_error(err):
                     raise
 
     @overload
