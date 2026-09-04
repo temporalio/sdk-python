@@ -9,14 +9,13 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
 from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
-    cast,
 )
 
 from typing_extensions import Self
@@ -163,7 +162,7 @@ class ActivityExecutionAsyncIterator:
             return ret
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecution:
     """Info for an activity execution not started by a workflow, from list response.
 
@@ -184,22 +183,16 @@ class ActivityExecution:
     """Time the activity reached a terminal status, if closed."""
 
     execution_duration: timedelta | None
-    """Duration from scheduled to close time, only populated if closed."""
+    """Duration from schedule to close time, only populated if closed."""
+
+    execution_time: datetime | None
+    """The time at which the first activity task is made available for dispatch, computed as schedule time + start delay."""
 
     namespace: str
     """Namespace of the activity (copied from calling client)."""
 
-    raw_info: (
-        temporalio.api.activity.v1.ActivityExecutionListInfo
-        | temporalio.api.activity.v1.ActivityExecutionInfo
-    )
-    """Underlying protobuf info."""
-
-    scheduled_time: datetime
+    schedule_time: datetime
     """Time the activity was originally scheduled."""
-
-    state_transition_count: int | None
-    """Number of state transitions, if available."""
 
     status: ActivityExecutionStatus
     """Current status of the activity."""
@@ -210,17 +203,28 @@ class ActivityExecution:
     typed_search_attributes: temporalio.common.TypedSearchAttributes
     """Current set of search attributes if any."""
 
+    raw_info: (
+        temporalio.api.activity.v1.ActivityExecutionListInfo
+        | temporalio.api.activity.v1.ActivityExecutionInfo
+    ) = field(repr=False)
+    """Underlying protobuf info."""
+
     @classmethod
     def _from_raw_info(
-        cls, info: temporalio.api.activity.v1.ActivityExecutionListInfo, namespace: str
+        cls,
+        info: (
+            temporalio.api.activity.v1.ActivityExecutionListInfo
+            | temporalio.api.activity.v1.ActivityExecutionInfo
+        ),
+        namespace: str,
+        **kwargs: Any,
     ) -> Self:
         """Create from raw proto activity list info."""
         return cls(
+            raw_info=info,
             activity_id=info.activity_id,
             activity_run_id=info.run_id or None,
-            activity_type=(
-                info.activity_type.name if info.HasField("activity_type") else ""
-            ),
+            activity_type=info.activity_type.name,
             close_time=(
                 info.close_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("close_time")
@@ -231,15 +235,16 @@ class ActivityExecution:
                 if info.HasField("execution_duration")
                 else None
             ),
+            execution_time=(
+                info.execution_time.ToDatetime().replace(tzinfo=timezone.utc)
+                if info.HasField("execution_time")
+                else None
+            ),
             namespace=namespace,
-            raw_info=info,
-            scheduled_time=(
+            schedule_time=(
                 info.schedule_time.ToDatetime().replace(tzinfo=timezone.utc)
                 if info.HasField("schedule_time")
                 else datetime.min
-            ),
-            state_transition_count=(
-                info.state_transition_count if info.state_transition_count else None
             ),
             status=(
                 ActivityExecutionStatus(info.status)
@@ -250,10 +255,11 @@ class ActivityExecution:
             typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
                 info.search_attributes
             ),
+            **kwargs,
         )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecutionDescription(ActivityExecution):
     """Detailed information about an activity execution not started by a workflow.
 
@@ -267,20 +273,23 @@ class ActivityExecutionDescription(ActivityExecution):
     canceled_reason: str | None
     """Reason for cancellation, if cancel was requested."""
 
+    close_time: datetime | None
+    """Time when the activity transitioned to a closed state."""
+
     current_retry_interval: timedelta | None
     """Time until the next retry, if applicable."""
 
-    eager_execution_requested: bool
-    """Whether eager execution was requested for this activity."""
+    expiration_time: datetime | None
+    """The time at which the activity's schedule-to-close timeout expires."""
 
-    expiration_time: datetime
-    """Scheduled time plus schedule_to_close_timeout."""
+    heartbeat_timeout: timedelta | None
+    """Configured heartbeat timeout of the activity."""
 
     last_attempt_complete_time: datetime | None
     """Time when the last attempt completed."""
 
-    last_failure: Exception | None
-    """Failure from the last failed attempt, if any."""
+    last_deployment_version: temporalio.common.WorkerDeploymentVersion | None
+    """The Worker Deployment Version this activity was dispatched to most recently."""
 
     last_heartbeat_time: datetime | None
     """Time of the last heartbeat."""
@@ -288,17 +297,14 @@ class ActivityExecutionDescription(ActivityExecution):
     last_started_time: datetime | None
     """Time the last attempt was started."""
 
-    last_worker_identity: str
+    last_worker_identity: str | None
     """Identity of the last worker that processed the activity."""
 
     next_attempt_schedule_time: datetime | None
     """Time when the next attempt will be scheduled."""
 
-    paused: bool
-    """Whether the activity is paused."""
-
-    raw_heartbeat_details: Sequence[temporalio.api.common.v1.Payload]
-    """Details from the last heartbeat."""
+    priority: temporalio.common.Priority
+    """Priority metadata."""
 
     retry_policy: temporalio.common.RetryPolicy | None
     """Retry policy for the activity."""
@@ -306,114 +312,247 @@ class ActivityExecutionDescription(ActivityExecution):
     run_state: PendingActivityState | None
     """More detailed breakdown if status is RUNNING."""
 
-    long_poll_token: bytes | None
-    """Token for follow-on long-poll requests. None if the activity is complete."""
+    schedule_to_close_timeout: timedelta | None
+    """Configured schedule-to-close timeout of the activity."""
 
-    raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo]
+    schedule_to_start_timeout: timedelta | None
+    """Configured schedule-to-start timeout of the activity."""
+
+    start_to_close_timeout: timedelta | None
+    """Configured start-to-close timeout of the activity."""
+
+    start_delay: timedelta | None
+    """Time to wait before making the first activity task available for dispatch."""
+
+    total_heartbeat_count: int
+    """Total number of heartbeats recorded across all attempts of this activity, including retries.
+
+    Zero if the activity has not sent any heartbeats or if the server didn't report heartbeat count.
+    """
+
+    raw_info: temporalio.api.activity.v1.ActivityExecutionInfo = field(repr=False)
+    """Underlying protobuf info."""
+
+    raw_callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo] = field(repr=False)
     """Underlying protobuf callbacks"""
 
+    raw_input: temporalio.api.common.v1.Payloads | None = field(repr=False)
+    """Raw input of the activity. Use `input` to decode."""
+
+    raw_outcome: temporalio.api.activity.v1.ActivityExecutionOutcome | None = field(
+        repr=False
+    )
+    """Raw outcome of the activity. Use :py:meth:`result` or :py:meth:`outcome_failure` to decode."""
+
+    data_converter: DataConverter = field(repr=False)
+    """Data converter used to convert raw payloads. By default it's the same as the client's data converter."""
+
     @classmethod
-    async def _from_execution_info(
+    def _from_resp(
         cls,
-        info: temporalio.api.activity.v1.ActivityExecutionInfo,
-        long_poll_token: bytes | None,
+        resp: temporalio.api.workflowservice.v1.DescribeActivityExecutionResponse,
         namespace: str,
         data_converter: temporalio.converter.DataConverter,
-        callbacks: Sequence[temporalio.api.activity.v1.CallbackInfo],
+        **kwargs: Any,
     ) -> Self:
         """Create from raw proto activity execution info."""
-        # Decode heartbeat details if present
-        decoded_heartbeat_details: Sequence[temporalio.api.common.v1.Payload] = (
-            info.heartbeat_details.payloads
-        )
-        if decoded_heartbeat_details and data_converter.payload_codec:
-            decoded_heartbeat_details = await data_converter.payload_codec.decode(
-                decoded_heartbeat_details
-            )
-
-        return cls(
-            activity_id=info.activity_id,
-            activity_run_id=info.run_id or None,
-            activity_type=(
-                info.activity_type.name if info.HasField("activity_type") else ""
-            ),
-            attempt=info.attempt,
-            canceled_reason=info.canceled_reason or None,
-            close_time=(
-                info.close_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("close_time")
-                else None
-            ),
+        return cls._from_raw_info(
+            info=resp.info,
+            namespace=namespace,
+            attempt=resp.info.attempt,
+            canceled_reason=resp.info.canceled_reason or None,
             current_retry_interval=(
-                info.current_retry_interval.ToTimedelta()
-                if info.HasField("current_retry_interval")
-                else None
-            ),
-            eager_execution_requested=getattr(info, "eager_execution_requested", False),
-            execution_duration=(
-                info.execution_duration.ToTimedelta()
-                if info.HasField("execution_duration")
+                resp.info.current_retry_interval.ToTimedelta()
+                if resp.info.HasField("current_retry_interval")
                 else None
             ),
             expiration_time=(
-                info.expiration_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("expiration_time")
+                resp.info.expiration_time.ToDatetime(tzinfo=timezone.utc)
+                if resp.info.HasField("expiration_time")
                 else datetime.min
             ),
-            last_attempt_complete_time=(
-                info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("last_attempt_complete_time")
+            heartbeat_timeout=(
+                resp.info.heartbeat_timeout.ToTimedelta()
+                if resp.info.HasField("heartbeat_timeout")
                 else None
             ),
-            last_failure=(
-                cast(
-                    Exception | None,
-                    await data_converter.decode_failure(info.last_failure),
+            last_attempt_complete_time=(
+                resp.info.last_attempt_complete_time.ToDatetime(tzinfo=timezone.utc)
+                if resp.info.HasField("last_attempt_complete_time")
+                else None
+            ),
+            last_deployment_version=(
+                temporalio.common.WorkerDeploymentVersion(
+                    deployment_name=resp.info.last_deployment_version.deployment_name,
+                    build_id=resp.info.last_deployment_version.build_id,
                 )
-                if info.HasField("last_failure")
+                if resp.info.HasField("last_deployment_version")
                 else None
             ),
             last_heartbeat_time=(
-                info.last_heartbeat_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("last_heartbeat_time")
+                resp.info.last_heartbeat_time.ToDatetime(tzinfo=timezone.utc)
+                if resp.info.HasField("last_heartbeat_time")
                 else None
             ),
             last_started_time=(
-                info.last_started_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("last_started_time")
+                resp.info.last_started_time.ToDatetime(tzinfo=timezone.utc)
+                if resp.info.HasField("last_started_time")
                 else None
             ),
-            last_worker_identity=info.last_worker_identity,
-            long_poll_token=long_poll_token or None,
-            namespace=namespace,
+            last_worker_identity=resp.info.last_worker_identity or None,
             next_attempt_schedule_time=(
-                info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
-                if info.HasField("next_attempt_schedule_time")
+                resp.info.next_attempt_schedule_time.ToDatetime(tzinfo=timezone.utc)
+                if resp.info.HasField("next_attempt_schedule_time")
                 else None
             ),
-            paused=getattr(info, "paused", False),
-            raw_heartbeat_details=decoded_heartbeat_details,
-            raw_info=info,
-            retry_policy=temporalio.common.RetryPolicy.from_proto(info.retry_policy)
-            if info.HasField("retry_policy")
-            else None,
+            priority=temporalio.common.Priority._from_proto(resp.info.priority),
+            retry_policy=(
+                temporalio.common.RetryPolicy.from_proto(resp.info.retry_policy)
+                if resp.info.HasField("retry_policy")
+                else None
+            ),
             run_state=(
-                PendingActivityState(info.run_state) if info.run_state else None
+                PendingActivityState(resp.info.run_state)
+                if resp.info.run_state
+                else None
             ),
-            scheduled_time=(info.schedule_time.ToDatetime(tzinfo=timezone.utc)),
-            state_transition_count=(
-                info.state_transition_count if info.state_transition_count else None
+            schedule_to_close_timeout=(
+                resp.info.schedule_to_close_timeout.ToTimedelta()
+                if resp.info.HasField("schedule_to_close_timeout")
+                else None
             ),
-            status=(
-                ActivityExecutionStatus(info.status)
-                if info.status
-                else ActivityExecutionStatus.UNSPECIFIED
+            schedule_to_start_timeout=(
+                resp.info.schedule_to_start_timeout.ToTimedelta()
+                if resp.info.HasField("schedule_to_start_timeout")
+                else None
             ),
-            task_queue=info.task_queue,
-            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
-                info.search_attributes
+            start_to_close_timeout=(
+                resp.info.start_to_close_timeout.ToTimedelta()
+                if resp.info.HasField("start_to_close_timeout")
+                else None
             ),
-            raw_callbacks=callbacks,
+            start_delay=(
+                resp.info.start_delay.ToTimedelta()
+                if resp.info.HasField("start_delay")
+                else None
+            ),
+            total_heartbeat_count=resp.info.total_heartbeat_count,
+            raw_callbacks=resp.callbacks,
+            raw_input=resp.input if resp.HasField("input") else None,
+            raw_outcome=resp.outcome if resp.HasField("outcome") else None,
+            data_converter=data_converter,
+            **kwargs,
+        )
+
+    def has_heartbeat_details(self) -> bool:
+        """True if heartbeat details are available. Use `heartbeat_details` to retrieve them.
+
+        Always false if `include_heartbeat_details` was false in the `ActivityHandle.describe` call.
+        """
+        return self.raw_info.HasField("heartbeat_details")
+
+    async def heartbeat_details(
+        self, type_hints: list[type] | None = None
+    ) -> list[Any] | None:
+        """Returns details from the last heartbeat, or `None` if not available.
+
+        Always `None` if ``include_heartbeat_details`` was false in the `ActivityHandle.describe` call.
+        Type hints can be provided to aid data conversion.
+        """
+        return (
+            await self.data_converter.decode_wrapper(
+                self.raw_info.heartbeat_details, type_hints
+            )
+            if self.has_heartbeat_details()
+            else None
+        )
+
+    def has_last_failure(self) -> bool:
+        """True if last failure is available. Use `last_failure` to retrieve it.
+
+        Always false if ``include_last_failure`` was false in the `ActivityHandle.describe` call.
+        """
+        return self.raw_info.HasField("last_failure")
+
+    async def last_failure(self) -> BaseException | None:
+        """Returns failure from the last failed attempt, or `None` if not available.
+
+        Always `None` if ``include_last_failure`` was false in the `ActivityHandle.describe` call.
+        """
+        return (
+            await self.data_converter.decode_failure(self.raw_info.last_failure)
+            if self.has_last_failure()
+            else None
+        )
+
+    def has_input(self) -> bool:
+        """True if activity input is available. Use `input  <ActivityExecutionDescription.input>` to retrieve it.
+
+        Always false if ``include_input`` was false in the `ActivityHandle.describe` call.
+        """
+        return self.raw_input is not None
+
+    async def input(self, type_hints: list[type] | None = None) -> list[Any] | None:
+        """Returns activity input, or `None` if not available.
+
+        Always `None` if ``include_input`` was false in the `ActivityHandle.describe` call.
+        Type hints can be provided to aid data conversion.
+        """
+        return (
+            await self.data_converter.decode_wrapper(self.raw_input, type_hints)
+            if self.has_input()
+            else None
+        )
+
+    def has_result(self) -> bool:
+        """True if activity result is available. Use `result` to retrieve it.
+
+        Activity result is only available if the activity has completed and was successful.
+        Always false if `include_outcome` was false in the `ActivityHandle.describe` call.
+        """
+        return self.raw_outcome is not None and self.raw_outcome.HasField("result")
+
+    async def result(self, type_hint: type | None = None) -> Any | None:
+        """Returns activity result, or `None` if not available.
+
+        Activity result is only available if the activity has completed successfully.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
+        Type hints can be provided to aid data conversion.
+        """
+        if self.raw_outcome is None or not self.raw_outcome.HasField("result"):
+            return None
+        type_hints = [type_hint] if type_hint is not None else None
+        results = await self.data_converter.decode_wrapper(
+            self.raw_outcome.result, type_hints
+        )
+        if not results:
+            return None
+        if len(results) > 1:
+            warnings.warn(f"Expected single activity result, got {len(results)}")
+        return results[0]
+
+    def has_outcome_failure(self) -> bool:
+        """True if activity outcome failure is available. Use `outcome_failure` to retrieve it.
+
+        Activity outcome failure is only available if the activity has closed with a failure.
+        Use `last_failure` to retrieve failure of the most recent failed attempt of an activity that's still running or
+        that completed successfully.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
+        """
+        return self.raw_outcome is not None and self.raw_outcome.HasField("failure")
+
+    async def outcome_failure(self) -> BaseException | None:
+        """Returns activity outcome failure, or `None` if not available.
+
+        Activity outcome failure is only available if the activity has closed with a failure.
+        Use `last_failure` to retrieve failure of the most recent failed attempt of an activity that's still running or
+        that completed successfully.
+        Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
+        """
+        return (
+            await self.data_converter.decode_failure(self.raw_outcome.failure)
+            if self.raw_outcome is not None and self.raw_outcome.HasField("failure")
+            else None
         )
 
 
@@ -889,7 +1028,10 @@ class ActivityHandle(Generic[ReturnType]):
     async def describe(
         self,
         *,
-        long_poll_token: bytes | None = None,
+        include_input: bool = False,
+        include_outcome: bool = False,
+        include_heartbeat_details: bool = False,
+        include_last_failure: bool = False,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionDescription:
@@ -899,8 +1041,10 @@ class ActivityHandle(Generic[ReturnType]):
            This API is experimental.
 
         Args:
-            long_poll_token: Token from a previous describe response. If provided,
-                the request will long-poll until the activity state changes.
+            include_input: Include activity input in the response if available.
+            include_outcome: Include activity outcome in the response if available.
+            include_heartbeat_details: Include heartbeat details in the response if available.
+            include_last_failure: Include last failure in the response if available.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -911,7 +1055,10 @@ class ActivityHandle(Generic[ReturnType]):
             DescribeActivityInput(
                 activity_id=self._id,
                 activity_run_id=self._run_id,
-                long_poll_token=long_poll_token,
+                include_input=include_input,
+                include_outcome=include_outcome,
+                include_heartbeat_details=include_heartbeat_details,
+                include_last_failure=include_last_failure,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )
