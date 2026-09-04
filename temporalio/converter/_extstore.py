@@ -143,7 +143,25 @@ class StorageDriverActivityInfo:
 
 @dataclass(frozen=True)
 class StorageDriverStoreContext:
-    """Context passed to :meth:`StorageDriver.store` and ``driver_selector`` calls.
+    """Context passed to :meth:`StorageDriver.store` calls.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None
+    """The workflow or activity for which this payload is being stored.
+
+    For payloads being stored on behalf of an explicit target (e.g. a child
+    workflow being started, an activity being scheduled, an external workflow
+    being signaled), this is that target's identity.  When no explicit target
+    exists the current execution context (workflow or activity) is used as the
+    target instead."""
+
+
+@dataclass(frozen=True)
+class StorageDriverSelectContext:
+    """Context passed to :attr:`ExternalStorage.driver_selector` calls.
 
     .. warning::
         This API is experimental.
@@ -257,7 +275,7 @@ class ExternalStorage:
     """
 
     driver_selector: (
-        Callable[[StorageDriverStoreContext, Payload], StorageDriver | None] | None
+        Callable[[StorageDriverSelectContext, Payload], StorageDriver | None] | None
     ) = None
     """Controls which driver stores a given payload. A callable that returns the
     driver instance to use, or ``None`` to leave the payload stored inline.
@@ -287,6 +305,14 @@ class ExternalStorage:
         compare=False,
     )
     """Store context bound to this instance via :meth:`_with_store_context`."""
+
+    _select_context: StorageDriverSelectContext = dataclasses.field(
+        default=StorageDriverSelectContext(target=None),
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    """Selector context derived from :attr:`_store_context`."""
 
     _claim_converter: ClassVar[JSONProtoPayloadConverter] = JSONProtoPayloadConverter()
     _legacy_claim_converter: ClassVar[JSONPlainPayloadConverter] = (
@@ -325,7 +351,7 @@ class ExternalStorage:
         object.__setattr__(self, "_driver_map", driver_map)
 
     def _select_driver(
-        self, context: StorageDriverStoreContext, payload: Payload
+        self, context: StorageDriverSelectContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
         if payload.ByteSize() < self.payload_size_threshold:
@@ -354,12 +380,15 @@ class ExternalStorage:
         """Return a copy of this instance with ``ctx`` bound as the store context."""
         result = dataclasses.replace(self)
         object.__setattr__(result, "_store_context", ctx)
+        object.__setattr__(
+            result, "_select_context", StorageDriverSelectContext(target=ctx.target)
+        )
         return result
 
     async def _store_payload(self, payload: Payload) -> Payload:
         start_time = time.monotonic()
 
-        driver = self._select_driver(self._store_context, payload)
+        driver = self._select_driver(self._select_context, payload)
         if driver is None:
             return payload
 
@@ -401,7 +430,7 @@ class ExternalStorage:
 
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
-            driver = self._select_driver(self._store_context, payload)
+            driver = self._select_driver(self._select_context, payload)
             if driver is None:
                 continue
             to_store.append((index, payload, driver))

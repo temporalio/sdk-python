@@ -22,8 +22,6 @@ from temporalio.converter import (
     DataConverter,
 )
 
-from ._callback import Callback
-
 if TYPE_CHECKING:
     from ._activity import (
         ActivityExecutionAsyncIterator,
@@ -97,10 +95,6 @@ class StartWorkflowInput:
     rpc_timeout: timedelta | None
     request_eager_start: bool
     priority: temporalio.common.Priority
-    # The following options are experimental and unstable.
-    callbacks: Sequence[Callback]
-    links: Sequence[temporalio.api.common.v1.Link]
-    request_id: str | None
     versioning_override: temporalio.common.VersioningOverride | None = None
 
 
@@ -322,10 +316,6 @@ class StartWorkflowUpdateInput:
     ret_type: type | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
-    # The following options are for Workflow Updates exposed as Nexus Operations. Experimental and unstable
-    callbacks: Sequence[Callback] | None = None
-    links: Sequence[temporalio.api.common.v1.Link] | None = None
-    request_id: str | None = None
 
 
 @dataclass

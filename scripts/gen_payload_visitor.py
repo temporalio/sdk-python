@@ -2,7 +2,7 @@ import subprocess
 import sys
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
-from typing import cast
+from typing import cast, get_args, get_origin, get_type_hints
 
 import google.protobuf.message
 import nexusrpc
@@ -19,14 +19,15 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
 from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import (
     WorkflowActivationCompletion,
 )
+from temporalio.converter._payload_converter import _get_transfer_type_converter
 
 
 def discover_system_nexus_roots() -> list[Descriptor]:
-    module_path = (
-        base_dir / "temporalio" / "nexus" / "system" / "workflow_service" / "service.py"
-    )
+    module_path = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
     spec = spec_from_file_location(
-        "temporalio_nexus_system_workflow_service", module_path
+        "temporalio_nexus_system_workflow_service",
+        module_path / "__init__.py",
+        submodule_search_locations=[str(module_path)],
     )
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load generated system service from {module_path}")
@@ -35,10 +36,14 @@ def discover_system_nexus_roots() -> list[Descriptor]:
     spec.loader.exec_module(module)
 
     roots: list[Descriptor] = []
-    for operation in vars(module.WorkflowService).values():
-        if not isinstance(operation, nexusrpc.Operation):
+    for annotation in get_type_hints(module._services.WorkflowService).values():
+        if get_origin(annotation) is not nexusrpc.Operation:
             continue
-        for proto_type in (operation.input_type, operation.output_type):
+        for operation_type in get_args(annotation):
+            converter = _get_transfer_type_converter(operation_type)
+            proto_type = (
+                converter.transfer_type if converter is not None else operation_type
+            )
             if isinstance(proto_type, type) and issubclass(
                 proto_type, google.protobuf.message.Message
             ):
@@ -119,12 +124,20 @@ class VisitorGenerator:
 
         The generated code defines async visitor functions for each reachable
         protobuf message type starting from WorkflowActivation, including support
-        for repeated fields and map entries, and a convenience entrypoint
-        function `visit`.
+        for repeated fields and map entries. Payload-free roots get no-op methods
+        so the `visit` entrypoint recognizes them as supported.
         """
 
-        for r in roots:
-            self.walk(r)
+        for root in roots:
+            if not self.walk(root):
+                self.methods.append(
+                    f"""\
+    async def _visit_{name_for(root)}(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+"""
+                )
 
         header = """
 from __future__ import annotations

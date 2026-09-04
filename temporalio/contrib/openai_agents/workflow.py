@@ -22,6 +22,9 @@ from agents.tool import (
 from temporalio import activity
 from temporalio import workflow as temporal_workflow
 from temporalio.common import Priority, RetryPolicy
+from temporalio.contrib.openai_agents._errors import (
+    AgentsWorkflowError as AgentsWorkflowError,
+)
 from temporalio.contrib.openai_agents.sandbox._temporal_sandbox_client import (
     TemporalSandboxClient,
 )
@@ -377,7 +380,3 @@ class ToolSerializationError(TemporalError):
     To fix this error, ensure your tool returns string-convertible values or
     modify the tool to return a string representation of the result.
     """
-
-
-class AgentsWorkflowError(TemporalError):
-    """Error that occurs when the agents SDK raises an error which should terminate the calling workflow or update."""

@@ -48,6 +48,7 @@ from typing_extensions import Required, TypedDict
 from temporalio import activity
 from temporalio.contrib.openai_agents._heartbeat_decorator import auto_heartbeater
 from temporalio.contrib.openai_agents._temporal_worker_env_ref import (
+    AllowAllWorkerEnvVars,
     _WorkerEnvRefResolver,
 )
 from temporalio.contrib.workflow_streams import WorkflowStreamClient
@@ -310,11 +311,10 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
             retry_after = timedelta(seconds=float(retry_after_header))
 
     should_retry_header = e.response.headers.get("x-should-retry")
-    if should_retry_header == "true":
-        raise e
     if should_retry_header == "false":
         raise ApplicationError(
-            "Non retryable OpenAI error",
+            message="Non retryable OpenAI error",
+            type=APIStatusError.__name__,
             non_retryable=True,
             next_retry_delay=retry_after,
         ) from e
@@ -322,13 +322,19 @@ def _raise_for_openai_status(e: APIStatusError) -> NoReturn:
     # Retry on 408 (Request Timeout), 409 (Conflict / often transient
     # state mismatch), 429 (Too Many Requests / rate-limited), and any
     # 5xx (server-side errors). All other 4xx codes are caller errors
-    # that won't recover on retry.
+    # that won't recover on retry, unless the server explicitly asks for
+    # a retry via x-should-retry.
     retryable = (
-        e.response.status_code in [408, 409, 429] or e.response.status_code >= 500
+        should_retry_header == "true"
+        or e.response.status_code in [408, 409, 429]
+        or e.response.status_code >= 500
     )
     raise ApplicationError(
-        f"{'Retryable' if retryable else 'Non retryable'} OpenAI status code: "
-        f"{e.response.status_code}",
+        message=(
+            f"{'Retryable' if retryable else 'Non retryable'} OpenAI status code: "
+            f"{e.response.status_code}"
+        ),
+        type=APIStatusError.__name__,
         non_retryable=not retryable,
         next_retry_delay=retry_after,
     ) from e
@@ -342,7 +348,7 @@ class ModelActivity:
     def __init__(
         self,
         model_provider: ModelProvider | None = None,
-        resolvable_worker_env_vars: Collection[str] = (),
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ):
         """Initialize the activity with a model provider."""
         self._model_provider = model_provider or OpenAIProvider(

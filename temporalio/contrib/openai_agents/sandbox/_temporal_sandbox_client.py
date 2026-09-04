@@ -16,6 +16,7 @@ from agents.sandbox.snapshot import SnapshotBase, SnapshotSpec, SnapshotSpecUnio
 from pydantic.type_adapter import TypeAdapter
 
 from temporalio import workflow
+from temporalio.contrib.openai_agents._errors import AgentsWorkflowError
 from temporalio.contrib.openai_agents.sandbox._temporal_activity_models import (
     CreateSessionArgs,
     ResumeSessionArgs,
@@ -68,6 +69,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
         options: BaseSandboxClientOptions,
     ) -> SandboxSession:
         """Create a new sandbox session via activity."""
+        _reject_host_path_grants(manifest)
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_create",
             arg=CreateSessionArgs(
@@ -93,6 +95,7 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
 
     async def resume(self, state: SandboxSessionState) -> SandboxSession:
         """Resume an existing sandbox session via activity."""
+        _reject_host_path_grants(state.manifest)
         result: SessionResult = await workflow.execute_activity(
             f"{self._name}-sandbox_client_resume",
             arg=ResumeSessionArgs(state=state),
@@ -122,3 +125,16 @@ class TemporalSandboxClient(BaseSandboxClient[BaseSandboxClientOptions]):
     def deserialize_session_state(self, payload: dict[str, Any]) -> SandboxSessionState:
         """Deserialize a session state from a dict."""
         return SandboxSessionState.parse(payload)
+
+
+def _reject_host_path_grants(manifest: Manifest | None) -> None:
+    if manifest is None:
+        return
+    # Sandbox-side paths only: this message reaches the workflow failure event.
+    bound = [g.path for g in manifest.extra_path_grants if g.host_path is not None]
+    if bound:
+        raise AgentsWorkflowError(
+            "Sandbox path grants with a host_path are not supported by the Temporal OpenAI "
+            f"Agents plugin (found: {', '.join(bound)}). A grant's host_path is written "
+            "into the activity argument in plaintext. Remove host_path from these grants."
+        )

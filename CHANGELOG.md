@@ -20,6 +20,57 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows (including `activity_node(...)` for running Temporal
+  activities as graph nodes), dynamic `@node` workflows, and durable
+  human-in-the-loop via the `HitlRequest` / `pending_hitl_requests` /
+  `hitl_input_response` / `hitl_confirmation_response` helpers. The plugin
+  installs ADK's platform time, uuid, and random providers as process-wide
+  defaults so ADK-generated timestamps, ids (including default `RequestInput`
+  interrupt ids), and retry jitter replay deterministically.
+
+### Changed
+
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+- System Nexus Signal-with-Start Workflow operations now invoke
+  `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
+  point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+
+### Fixed
+
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+- `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
+  `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
+  the delay the server asked for was discarded on that path and the activity
+  retried on its configured interval instead.
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
+
+### Security
+
+## [1.32.0] - 2026-08-24
+
+### Added
+
+- Added `temporalio.converter.create_payload_validation_error` to create the
+  non-retryable application error used when a converted payload fails validation.
+- Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
+  `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
+  OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
+  Google ADK) are not duplicated on replay. `GoogleAdkPlugin` warns when a global OTel
+  provider is not replay-safe.
 - Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
   Core logs written to the console.
 
@@ -35,17 +86,22 @@ to include examples, links to docs, or any other relevant information.
   `uuid.uuid1()`/`uuid.uuid4()` restrictions.
 - **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
   Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
-- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
-  graph workflows (including `activity_node(...)` for running Temporal
-  activities as graph nodes), dynamic `@node` workflows, and durable
-  human-in-the-loop via the `HitlRequest` / `pending_hitl_requests` /
-  `hitl_input_response` / `hitl_confirmation_response` helpers. The plugin
-  installs ADK's platform time, uuid, and random providers as process-wide
-  defaults so ADK-generated timestamps, ids (including default `RequestInput`
-  interrupt ids), and retry jitter replay deterministically.
+- **Experimental**: `temporalio.contrib.openai_agents.temporal_worker_env_ref` names an environment
+  variable the worker reads for a hosted tool credential, keeping it out of workflow history.
+- **Experimental**: `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` names an environment
+  variable the worker reads for a sandbox environment value, keeping it out of workflow history.
+- **Experimental**: `OpenAIAgentsPlugin(resolvable_worker_env_vars=...)` allowlists the environment
+  variable names a worker will read.
+- **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
+  environment variable name on the worker.
+- Added Nexus operation link propagation for Workflow Queries issued from operation handlers. The
+  queried Workflow link returned by the server is attached to the caller's Nexus operation event.
 
 ### Changed
 
+- The `opentelemetry` and `lambda-worker-otel` extras now require
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, matching what
+  `temporalio.contrib.opentelemetry` already required in practice.
 - `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
   for repeated type hints instead of rebuilding their schemas for every
   payload, greatly speeding up decode of non-model hints such as discriminated
@@ -56,13 +112,36 @@ to include examples, links to docs, or any other relevant information.
   ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
   ``DataConverter.payload_converter_class``; ``None`` makes the cache
   unbounded and zero disables caching.
-
-### Deprecated
+- A data converter can now report that it understood a Nexus operation's input
+  but considers it invalid by raising a non-retryable `ApplicationError` of type
+  `PayloadValidationError` while decoding it. Such a failure is reported to the
+  caller as a `BAD_REQUEST` Nexus handler error with the message
+  `Invalid operation input`, retaining the original error as its cause. Raised
+  from a payload codec, that replaces a handler-side `INTERNAL` error; raised
+  from a payload converter, the type was already `BAD_REQUEST` and only the
+  message becomes specific to validation. Any other decode failure, and a
+  retryable `PayloadValidationError`, keep their existing treatment.
 
 ### :boom: Breaking Changes
 
+- The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
+  upper bound.
+- `temporalio.contrib.openai_agents` now rejects a sandbox `SandboxPathGrant` bound to a
+  `host_path`.
+- `temporalio.contrib.openai_agents` now rejects `run_config.sandbox.session`.
+
 ### Fixed
 
+- `create_payload_validation_error(None)` now creates an application error with no
+  details instead of encoding `None` as a detail.
+- Client header encoding no longer mutates interceptor-provided payloads, preventing
+  update-with-start from encoding a shared header twice when
+  `HeaderCodecBehavior.CODEC` is enabled ([#1769](https://github.com/temporalio/sdk-python/issues/1769)).
+- `temporalio.contrib.opentelemetry` replay-safe spans now delegate
+  `Span.add_link` to the wrapped span. Previously the wrapper inherited
+  OpenTelemetry's non-abstract no-op default, silently dropping links added
+  after span creation.
+- Standalone activity start requests now include a unique request ID so RPC retries are deduplicated.
 - OpenTelemetry trace and span IDs propagated by concurrent workers no longer
   interfere with each other, preserving the correct parent-child hierarchy.
 - The `google-adk` extra now depends on `mcp`, so fresh installs of
@@ -73,8 +152,6 @@ to include examples, links to docs, or any other relevant information.
 - `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
   is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
   configs at its public runner API)
-
-### Security
 
 ## [1.31.0] - 2026-07-29
 
@@ -128,6 +205,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Continue-as-new requests from workflow update handlers now fail the workflow
+  task instead of leaving the update unresolved.
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
 

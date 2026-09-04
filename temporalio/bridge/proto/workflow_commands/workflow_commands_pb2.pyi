@@ -23,6 +23,7 @@ import google.protobuf.timestamp_pb2
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -79,6 +80,7 @@ class WorkflowCommand(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     USER_METADATA_FIELD_NUMBER: builtins.int
+    EVENT_GROUP_MARKERS_FIELD_NUMBER: builtins.int
     START_TIMER_FIELD_NUMBER: builtins.int
     SCHEDULE_ACTIVITY_FIELD_NUMBER: builtins.int
     RESPOND_TO_QUERY_FIELD_NUMBER: builtins.int
@@ -106,6 +108,16 @@ class WorkflowCommand(google.protobuf.message.Message):
         """User metadata that may or may not be persisted into history depending on the command type.
         Lang layers are expected to expose the setting of the internals of this metadata on a
         per-command basis where applicable.
+        """
+    @property
+    def event_group_markers(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+    ]:
+        """Event group markers attached to the command. These are forwarded onto
+        the corresponding server-side Command, and consequently surfaced on the
+        resulting HistoryEvent. See `temporal/api/sdk/v1/event_group_marker.proto`.
         """
     @property
     def start_timer(self) -> global___StartTimer: ...
@@ -169,6 +181,10 @@ class WorkflowCommand(google.protobuf.message.Message):
         self,
         *,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        event_group_markers: collections.abc.Iterable[
+            temporalio.api.sdk.v1.event_group_marker_pb2.EventGroupMarker
+        ]
         | None = ...,
         start_timer: global___StartTimer | None = ...,
         schedule_activity: global___ScheduleActivity | None = ...,
@@ -268,6 +284,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
             b"continue_as_new_workflow_execution",
+            "event_group_markers",
+            b"event_group_markers",
             "fail_workflow_execution",
             b"fail_workflow_execution",
             "modify_workflow_properties",
@@ -602,6 +620,7 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     LOCAL_RETRY_THRESHOLD_FIELD_NUMBER: builtins.int
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
+    INCLUDE_ARGUMENTS_INTO_MARKER_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -666,6 +685,11 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
     confirmed. Lang should default this to `WAIT_CANCELLATION_COMPLETED`, even though proto
     will default to `TRY_CANCEL` automatically.
     """
+    include_arguments_into_marker: builtins.bool
+    """If set, the local activity arguments will be included in the resulting marker under the
+    `input` key. This is disabled by default to avoid increasing history size unless the lang
+    SDK explicitly chooses to expose it.
+    """
     def __init__(
         self,
         *,
@@ -688,6 +712,7 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         local_retry_threshold: google.protobuf.duration_pb2.Duration | None = ...,
         cancellation_type: global___ActivityCancellationType.ValueType = ...,
+        include_arguments_into_marker: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -721,6 +746,8 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
             b"cancellation_type",
             "headers",
             b"headers",
+            "include_arguments_into_marker",
+            b"include_arguments_into_marker",
             "local_retry_threshold",
             b"local_retry_threshold",
             "original_schedule_time",
@@ -1084,8 +1111,19 @@ class CancelWorkflowExecution(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    DETAILS_FIELD_NUMBER: builtins.int
+    @property
+    def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
         self,
+        *,
+        details: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["details", b"details"]
     ) -> None: ...
 
 global___CancelWorkflowExecution = CancelWorkflowExecution

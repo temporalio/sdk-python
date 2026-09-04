@@ -320,6 +320,14 @@ def set_test_tracer_provider() -> InMemorySpanExporter:
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     opentelemetry.trace.set_tracer_provider(provider)
+    # set_tracer_provider is set-once per process: if another test left a
+    # global provider installed (e.g. leaked from a sibling test in the same
+    # pytest-xdist worker), the call above silently no-ops and every span in
+    # this test bypasses the exporter. Fail at the cause instead.
+    assert opentelemetry.trace.get_tracer_provider() is provider, (
+        "Global tracer provider install was a no-op; a previous test in this"
+        " process left a provider set without resetting it"
+    )
     return exporter
 
 
