@@ -694,6 +694,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             first_execution_run_id=init.first_execution_run_id,
             headers=dict(init.headers),
             namespace=self._namespace,
+            original_execution_run_id=init.original_execution_run_id or act.run_id,
             parent=parent,
             root=root,
             raw_memo=dict(init.memo.fields),

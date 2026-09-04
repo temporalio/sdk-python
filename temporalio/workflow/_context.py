@@ -22,6 +22,7 @@ from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
     from ._activities import ActivityCancellationType, ActivityHandle
+    from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
     from ._workflow_ops import (
@@ -90,6 +91,13 @@ class Info:
     first_execution_run_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
+
+    original_execution_run_id: str
+    """Run ID recorded on the ``WorkflowExecutionStarted`` event.
+
+    Unlike :py:attr:`run_id`, this value is preserved across workflow resets.
+    """
+
     parent: ParentInfo | None
     root: RootInfo | None
     priority: temporalio.common.Priority
@@ -296,6 +304,7 @@ class _Runtime(ABC):
         ),
         versioning_intent: VersioningIntent | None,
         initial_versioning_behavior: ContinueAsNewVersioningBehavior | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NoReturn: ...
 
     @abstractmethod
@@ -413,6 +422,7 @@ class _Runtime(ABC):
         activity_id: str | None,
         versioning_intent: VersioningIntent | None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> ActivityHandle[Any]: ...
 
@@ -440,6 +450,7 @@ class _Runtime(ABC):
         versioning_intent: VersioningIntent | None,
         static_summary: str | None = None,
         static_details: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> ChildWorkflowHandle[Any, Any]: ...
 
@@ -457,6 +468,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: str | None,
         summary: str | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -473,6 +485,7 @@ class _Runtime(ABC):
         cancellation_type: NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
@@ -489,7 +502,11 @@ class _Runtime(ABC):
 
     @abstractmethod
     async def workflow_sleep(
-        self, duration: float, *, summary: str | None = None
+        self,
+        duration: float,
+        *,
+        summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -499,6 +516,7 @@ class _Runtime(ABC):
         *,
         timeout: float | None = None,
         timeout_summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -929,19 +947,28 @@ def uuid7() -> uuid.UUID:
     )
 
 
-async def sleep(duration: float | timedelta, *, summary: str | None = None) -> None:
+async def sleep(
+    duration: float | timedelta,
+    *,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
+) -> None:
     """Sleep for the given duration.
 
     Args:
         duration: Duration to sleep in seconds or as a timedelta.
         summary: A single-line fixed summary for this timer that may appear in UI/CLI.
             This can be in single-line Temporal markdown format.
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
     await _Runtime.current().workflow_sleep(
         duration=(
             duration.total_seconds() if isinstance(duration, timedelta) else duration
         ),
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -950,6 +977,7 @@ async def wait_condition(
     *,
     timeout: timedelta | float | None = None,
     timeout_summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> None:
     """Wait on a callback to become true.
 
@@ -968,9 +996,14 @@ async def wait_condition(
         timeout_summary: Optional simple string identifying the timer (created if ``timeout`` is
             present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
             as a timer ID.
+        event_groups: Event Groups to associate the timer command (created if
+            ``timeout`` is present) with, in addition to those active in the
+            current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,
         timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
         timeout_summary=timeout_summary,
+        event_groups=event_groups,
     )
