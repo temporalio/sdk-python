@@ -11,18 +11,20 @@ need one.
 from __future__ import annotations
 
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import timedelta
 
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.semconv.attributes.service_attributes import SERVICE_NAME
 from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 
 from temporalio.contrib.aws.lambda_worker._configure import LambdaWorkerConfig
-from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
-from temporalio.runtime import OpenTelemetryConfig, Runtime, TelemetryConfig
+from temporalio.contrib.opentelemetry import (
+    OpenTelemetryPlugin,
+    _serverless,
+    create_tracer_provider,
+)
+from temporalio.runtime import Runtime, TelemetryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -51,23 +53,15 @@ class OtelOptions:
 
 
 def _resolve_service_name(options: OtelOptions) -> str:
-    service_name = options.service_name
-    if not service_name:
-        service_name = os.environ.get("OTEL_SERVICE_NAME", "")
-    if not service_name:
-        service_name = os.environ.get("AWS_LAMBDA_FUNCTION_NAME", "")
-    if not service_name:
-        service_name = "temporal-lambda-worker"
-    return service_name
+    return _serverless.resolve_service_name(
+        options.service_name,
+        ["AWS_LAMBDA_FUNCTION_NAME"],
+        "temporal-lambda-worker",
+    )
 
 
 def _resolve_endpoint(options: OtelOptions) -> str:
-    endpoint = options.collector_endpoint
-    if not endpoint:
-        endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    if not endpoint:
-        endpoint = "http://localhost:4317"
-    return endpoint
+    return _serverless.resolve_endpoint(options.collector_endpoint)
 
 
 def apply_defaults(
@@ -135,12 +129,8 @@ def apply_defaults(
 
     # Use OTLP gRPC exporter if available, otherwise skip trace export.
     try:
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-            OTLPSpanExporter,
-        )
-
         tracer_provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
+            _serverless.build_otlp_span_processor(endpoint, insecure=True)
         )
     except ImportError:
         logger.warning(
@@ -195,21 +185,10 @@ def build_metrics_telemetry_config(
         A ``TelemetryConfig`` ready to pass to
         :py:class:`temporalio.runtime.Runtime`.
     """
-    if not endpoint:
-        endpoint = "http://localhost:4317"
-
-    otel_config = OpenTelemetryConfig(
-        url=endpoint,
+    return _serverless.build_metrics_telemetry_config(
+        endpoint=endpoint,
+        service_name=service_name,
         metric_periodicity=metric_periodicity,
-    )
-
-    global_tags: dict[str, str] = {}
-    if service_name:
-        global_tags["service_name"] = service_name
-
-    return TelemetryConfig(
-        metrics=otel_config,
-        global_tags=global_tags,
     )
 
 
