@@ -20,6 +20,15 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows (including `activity_node(...)` for running Temporal
+  activities as graph nodes), dynamic `@node` workflows, and durable
+  human-in-the-loop via the `HitlRequest` / `pending_hitl_requests` /
+  `hitl_input_response` / `hitl_confirmation_response` helpers. The plugin
+  installs ADK's platform time, uuid, and random providers as process-wide
+  defaults so ADK-generated timestamps, ids (including default `RequestInput`
+  interrupt ids), and retry jitter replay deterministically.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed
@@ -33,6 +42,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale

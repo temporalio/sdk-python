@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import inspect
+import random
 import time
 import uuid
 import warnings
@@ -34,6 +35,14 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+
+def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -> None:
+    """Rebinds an ADK platform ContextVar so ``provider`` is its default in every context."""
+    from contextvars import ContextVar
+
+    context_var = getattr(module, var_name)
+    setattr(module, var_name, ContextVar(context_var.name, default=provider))
 
 
 def _stacklevel_outside_temporalio() -> int:
@@ -103,10 +112,14 @@ def setup_deterministic_runtime():
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    This should be called at the start of a Temporal Workflow before any ADK components
-    (like SessionService) are used, if they rely on runtime.get_time() or runtime.new_uuid().
+    Installs Temporal-aware time, uuid, and random providers as the
+    process-wide defaults for ADK's ``google.adk.platform`` seams. Inside a
+    workflow they derive from ``workflow.now()`` / ``workflow.uuid4()`` /
+    ``workflow.random()`` so replays are deterministic; outside a workflow
+    they fall back to the real primitives.
     """
     try:
+        import google.adk.platform._random
         import google.adk.platform.time
         import google.adk.platform.uuid
 
@@ -121,8 +134,28 @@ def setup_deterministic_runtime():
                 return str(workflow.uuid4())
             return str(uuid.uuid4())
 
-        google.adk.platform.time.set_time_provider(_deterministic_time_provider)
-        google.adk.platform.uuid.set_id_provider(_deterministic_id_provider)
+        _local_random = random.Random()
+
+        def _deterministic_random_provider() -> random.Random:
+            if workflow.in_workflow():
+                return workflow.random()
+            return _local_random
+
+        _install_provider(
+            google.adk.platform.time,
+            "_time_provider_context_var",
+            _deterministic_time_provider,
+        )
+        _install_provider(
+            google.adk.platform.uuid,
+            "_id_provider_context_var",
+            _deterministic_id_provider,
+        )
+        _install_provider(
+            google.adk.platform._random,
+            "_random_provider_context_var",
+            _deterministic_random_provider,
+        )
     except ImportError:
         pass
     except Exception as e:
