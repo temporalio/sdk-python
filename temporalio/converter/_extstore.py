@@ -40,19 +40,26 @@ class StorageOperationMetrics:
     total_size: int = 0
     """Total size in bytes of externally stored/retrieved payloads."""
 
-    total_duration: timedelta = dataclasses.field(default_factory=timedelta)
-    """Wall-clock time spent on external storage operations."""
-
     driver_names: set[str] = dataclasses.field(default_factory=set)
     """Names of the drivers that participated in the operations."""
 
+    _spans: list[tuple[float, float]] = dataclasses.field(default_factory=list)
+    """Monotonic-clock start and end of each recorded batch."""
+
+    @property
+    def total_duration(self) -> timedelta:
+        """Wall-clock time spent on external storage operations."""
+        # Batches may run concurrently, so summing each batch's duration would
+        # double-count operations that overlapped.
+        return timedelta(seconds=_union_seconds(self._spans))
+
     def record_batch(
-        self, count: int, size: int, duration: timedelta, driver_names: set[str]
+        self, count: int, size: int, start: float, end: float, driver_names: set[str]
     ) -> None:
         """Record metrics from a batch of storage operations."""
         self.payload_count += count
         self.total_size += size
-        self.total_duration += duration
+        self._spans.append((start, end))
         self.driver_names.update(driver_names)
 
     @contextlib.contextmanager
@@ -68,6 +75,22 @@ class StorageOperationMetrics:
 _current_storage_metrics: contextvars.ContextVar[StorageOperationMetrics | None] = (
     contextvars.ContextVar("_current_storage_metrics", default=None)
 )
+
+
+def _union_seconds(spans: list[tuple[float, float]]) -> float:
+    """Total length of the union of the given monotonic-clock spans, in seconds."""
+    ordered = sorted(spans)
+    if not ordered:
+        return 0.0
+    total = 0.0
+    span_start, span_end = ordered[0]
+    for start, end in ordered[1:]:
+        if start > span_end:
+            total += span_end - span_start
+            span_start, span_end = start, end
+        elif end > span_end:
+            span_end = end
+    return total + (span_end - span_start)
 
 
 async def _gather_cancel_on_error(
@@ -624,6 +647,7 @@ class ExternalStorage:
             metrics.record_batch(
                 count,
                 size,
-                timedelta(seconds=time.monotonic() - start_time),
+                start_time,
+                time.monotonic(),
                 driver_names,
             )

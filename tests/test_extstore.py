@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Sequence
+from datetime import timedelta
 
 import pytest
 
@@ -19,7 +20,11 @@ from temporalio.converter import (
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
 )
-from temporalio.converter._extstore import _REFERENCE_ENCODING, _StorageReference
+from temporalio.converter._extstore import (
+    _REFERENCE_ENCODING,
+    StorageOperationMetrics,
+    _StorageReference,
+)
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
 
@@ -832,6 +837,35 @@ class TestBackwardCompat:
 
         decoded = await converter.decode(encoded, [str])
         assert decoded[0] == value
+
+
+def test_storage_metrics_aggregates_batches() -> None:
+    metrics = StorageOperationMetrics()
+    assert metrics.total_duration == timedelta(0)
+
+    metrics.record_batch(2, 1024, 0.0, 10.0, {"s3"})
+    metrics.record_batch(3, 2048, 5.0, 15.0, {"gcs"})
+
+    assert metrics.payload_count == 5
+    assert metrics.total_size == 3072
+    assert metrics.driver_names == {"gcs", "s3"}
+    # Concurrent batches: summing their durations would report 20 seconds.
+    assert metrics.total_duration == timedelta(seconds=15)
+
+
+def test_storage_metrics_duration_sums_disjoint_batches() -> None:
+    metrics = StorageOperationMetrics()
+    metrics.record_batch(1, 1, 0.0, 10.0, {"s3"})
+    metrics.record_batch(1, 1, 20.0, 30.0, {"s3"})
+    assert metrics.total_duration == timedelta(seconds=20)
+
+
+def test_storage_metrics_duration_merges_adjacent_and_nested_batches() -> None:
+    metrics = StorageOperationMetrics()
+    metrics.record_batch(1, 1, 0.0, 10.0, {"s3"})
+    metrics.record_batch(1, 1, 10.0, 20.0, {"s3"})
+    metrics.record_batch(1, 1, 12.0, 18.0, {"s3"})
+    assert metrics.total_duration == timedelta(seconds=20)
 
 
 if __name__ == "__main__":
