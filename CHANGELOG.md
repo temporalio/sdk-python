@@ -23,7 +23,7 @@ to include examples, links to docs, or any other relevant information.
 #### Standalone Activity operator commands
 
 - `ActivityHandle` now supports operator commands for standalone activities: `pause`,
-  `unpause`, `reset`, `update_options` and `restore_original_options`.
+  `unpause`, `update_options` and `restore_original_options`.
 
 ### Changed
 

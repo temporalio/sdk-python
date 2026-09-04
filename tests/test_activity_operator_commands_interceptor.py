@@ -14,7 +14,6 @@ from temporalio.client import (
     Interceptor,
     OutboundInterceptor,
     PauseActivityInput,
-    ResetActivityInput,
     UnpauseActivityInput,
     UpdateActivityOptionsInput,
 )
@@ -43,10 +42,6 @@ class TracingClientOutboundInterceptor(OutboundInterceptor):
         self._parent.traces.append(("unpause_activity", input))
         return await super().unpause_activity(input)
 
-    async def reset_activity(self, input: ResetActivityInput) -> None:
-        self._parent.traces.append(("reset_activity", input))
-        return await super().reset_activity(input)
-
     async def update_activity_options(self, input: UpdateActivityOptionsInput) -> Any:
         self._parent.traces.append(("update_activity_options", input))
         return await super().update_activity_options(input)
@@ -59,9 +54,6 @@ def _stub_service() -> Any:
     )
     service.unpause_activity_execution = AsyncMock(
         return_value=temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse()
-    )
-    service.reset_activity_execution = AsyncMock(
-        return_value=temporalio.api.workflowservice.v1.ResetActivityExecutionResponse()
     )
     service.update_activity_execution_options = AsyncMock(
         return_value=temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse(
@@ -94,7 +86,6 @@ async def test_interceptor_invokes_each_operator_command(
     handle = client.get_activity_handle("act-1", run_id="run-1")
     await handle.pause(reason="pause-reason")
     await handle.unpause(reason="unpause-reason", jitter=timedelta(seconds=5))
-    await handle.reset(keep_paused=True, reset_heartbeat=True)
     await handle.update_options(
         [ActivityOptionsKeys.start_to_close_timeout.value_set(timedelta(seconds=90))]
     )
@@ -103,7 +94,6 @@ async def test_interceptor_invokes_each_operator_command(
     assert [name for name, _ in interceptor.traces] == [
         "pause_activity",
         "unpause_activity",
-        "reset_activity",
         "update_activity_options",
         "update_activity_options",
     ]
@@ -119,12 +109,8 @@ async def test_interceptor_receives_command_arguments(
     handle = client.get_activity_handle("act-1")
     await handle.pause(reason="pause-reason")
     await handle.unpause(reason="unpause-reason", jitter=timedelta(seconds=5))
-    await handle.reset(keep_paused=True, reset_heartbeat=True)
 
     traces = dict(interceptor.traces)
     assert traces["pause_activity"].reason == "pause-reason"
     assert traces["unpause_activity"].reason == "unpause-reason"
     assert traces["unpause_activity"].jitter == timedelta(seconds=5)
-    assert traces["reset_activity"].keep_paused
-    assert traces["reset_activity"].reset_heartbeat
-    assert not traces["reset_activity"].restore_original_options

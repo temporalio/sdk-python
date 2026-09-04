@@ -52,7 +52,6 @@ from ._interceptor import (
     HeartbeatAsyncActivityInput,
     PauseActivityInput,
     ReportCancellationAsyncActivityInput,
-    ResetActivityInput,
     TerminateActivityInput,
     UnpauseActivityInput,
     UpdateActivityOptionsInput,
@@ -1106,49 +1105,6 @@ class ActivityHandle(Generic[ReturnType]):
                 activity_run_id=self._run_id,
                 reason=reason,
                 jitter=jitter,
-                rpc_metadata=rpc_metadata,
-                rpc_timeout=rpc_timeout,
-            )
-        )
-
-    async def reset(
-        self,
-        *,
-        keep_paused: bool = False,
-        jitter: timedelta | None = None,
-        restore_original_options: bool = False,
-        reset_heartbeat: bool = False,
-        rpc_metadata: Mapping[str, str | bytes] = {},
-        rpc_timeout: timedelta | None = None,
-    ) -> None:
-        """Reset the activity.
-
-        Resetting sets the attempt count back to the start and resets the
-        activity's timeouts.
-
-        .. warning::
-           This API is experimental.
-
-        Args:
-            keep_paused: If true and the activity is paused, it remains paused
-                after the reset.
-            jitter: If set and the activity is in backoff, it starts at a random
-                time within this duration.
-            restore_original_options: If true, restore the activity options to
-                the ones it was created with.
-            reset_heartbeat: If true, additionally discard any persisted
-                heartbeat details.
-            rpc_metadata: Headers used on the RPC call.
-            rpc_timeout: Optional RPC deadline to set for the RPC call.
-        """
-        await self._client._impl.reset_activity(
-            ResetActivityInput(
-                activity_id=self._id,
-                activity_run_id=self._run_id,
-                keep_paused=keep_paused,
-                jitter=jitter,
-                restore_original_options=restore_original_options,
-                reset_heartbeat=reset_heartbeat,
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
             )

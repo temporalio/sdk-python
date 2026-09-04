@@ -93,7 +93,6 @@ from ._interceptor import (
     PauseScheduleInput,
     QueryWorkflowInput,
     ReportCancellationAsyncActivityInput,
-    ResetActivityInput,
     SignalWorkflowInput,
     StartActivityInput,
     StartNexusOperationInput,
@@ -716,27 +715,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.jitter is not None:
             req.jitter.FromTimedelta(input.jitter)
         await self._client.workflow_service.unpause_activity_execution(
-            req,
-            retry=True,
-            metadata=input.rpc_metadata,
-            timeout=input.rpc_timeout,
-        )
-
-    async def reset_activity(self, input: ResetActivityInput) -> None:
-        """Reset an activity."""
-        req = temporalio.api.workflowservice.v1.ResetActivityExecutionRequest(
-            namespace=self._client.namespace,
-            activity_id=input.activity_id,
-            run_id=input.activity_run_id or "",
-            identity=self._client.identity,
-            request_id=str(uuid.uuid4()),
-            keep_paused=input.keep_paused,
-            restore_original_options=input.restore_original_options,
-            reset_heartbeat=input.reset_heartbeat,
-        )
-        if input.jitter is not None:
-            req.jitter.FromTimedelta(input.jitter)
-        await self._client.workflow_service.reset_activity_execution(
             req,
             retry=True,
             metadata=input.rpc_metadata,

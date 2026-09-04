@@ -151,40 +151,6 @@ async def test_unpause_resumes(client: Client, env: WorkflowEnvironment):
         await handle.terminate(reason="cleanup")
 
 
-async def test_reset(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(
-        client, task_queue=task_queue, activities=[fail_then_succeed_activity]
-    ):
-        handle = await client.start_activity(
-            fail_then_succeed_activity,
-            id=f"act-{uuid.uuid4()}",
-            task_queue=task_queue,
-            start_to_close_timeout=timedelta(seconds=60),
-            retry_policy=RetryPolicy(
-                initial_interval=timedelta(seconds=0.2),
-                backoff_coefficient=1.0,
-                maximum_interval=timedelta(seconds=0.2),
-                maximum_attempts=50,
-            ),
-        )
-
-        async def has_retried() -> None:
-            assert (await handle.describe()).attempt > 1
-
-        await assert_eventually(has_retried)
-
-        await handle.reset()
-
-        # After reset the attempt counter goes back to the start.
-        async def back_to_first_attempt() -> None:
-            assert (await handle.describe()).attempt == 1
-
-        await assert_eventually(back_to_first_attempt)
-        await handle.terminate(reason="cleanup")
-
-
 async def test_describe_paused_activity_reports_paused_status(
     client: Client, env: WorkflowEnvironment
 ):
@@ -340,49 +306,6 @@ async def test_update_options_on_paused_activity(
 
         desc = await handle.describe()
         assert desc.run_state in PAUSED_STATES
-        await handle.terminate(reason="cleanup")
-
-
-async def test_reset_keeps_paused(client: Client, env: WorkflowEnvironment):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[slow_activity]):
-        handle = await _start_running_slow_activity(client, task_queue)
-        await handle.pause(reason="hold")
-        await _assert_eventually_paused(handle)
-
-        await handle.reset(keep_paused=True)
-
-        # keep_paused leaves the activity paused after the reset.
-        desc = await handle.describe()
-        assert desc.run_state in PAUSED_STATES
-        await handle.terminate(reason="cleanup")
-
-
-async def test_reset_restores_original_options(
-    client: Client, env: WorkflowEnvironment
-):
-    _skip_if_unsupported(env)
-    task_queue = str(uuid.uuid4())
-    async with Worker(client, task_queue=task_queue, activities=[quick_activity]):
-        # Delayed start means the restore happens quickly.
-        handle = await client.start_activity(
-            quick_activity,
-            id=f"act-{uuid.uuid4()}",
-            task_queue=task_queue,
-            start_to_close_timeout=timedelta(seconds=45),
-            start_delay=timedelta(seconds=300),
-        )
-        await handle.update_options(
-            [ActivityOptionsKeys.task_queue.value_set("updated-tq")]
-        )
-
-        await handle.reset(restore_original_options=True)
-
-        async def check() -> None:
-            assert (await handle.describe()).task_queue == task_queue
-
-        await assert_eventually(check)
         await handle.terminate(reason="cleanup")
 
 

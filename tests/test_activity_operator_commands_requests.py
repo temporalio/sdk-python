@@ -27,10 +27,6 @@ class _CapturedService:
             "unpause",
             temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse(),
         )
-        self.reset_activity_execution = self._recorder(
-            "reset",
-            temporalio.api.workflowservice.v1.ResetActivityExecutionResponse(),
-        )
         self.update_activity_execution_options = self._recorder(
             "update",
             temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsResponse(
@@ -65,12 +61,10 @@ async def test_operator_commands_send_reason_and_jitter(
     handle = client.get_activity_handle("act-1")
     await handle.pause(reason="pause-reason")
     await handle.unpause(reason="unpause-reason", jitter=timedelta(seconds=5))
-    await handle.reset(jitter=timedelta(seconds=7))
 
     assert captured.requests["pause"].reason == "pause-reason"
     assert captured.requests["unpause"].reason == "unpause-reason"
     assert captured.requests["unpause"].jitter.ToTimedelta() == timedelta(seconds=5)
-    assert captured.requests["reset"].jitter.ToTimedelta() == timedelta(seconds=7)
 
 
 async def test_omitted_jitter_is_left_off_the_wire(
@@ -80,34 +74,8 @@ async def test_omitted_jitter_is_left_off_the_wire(
     # apply "no jitter" instead of its own default.
     handle = client.get_activity_handle("act-1")
     await handle.unpause()
-    await handle.reset()
 
     assert not captured.requests["unpause"].HasField("jitter")
-    assert not captured.requests["reset"].HasField("jitter")
-
-
-async def test_reset_flags_default_off(client: Client, captured: _CapturedService):
-    handle = client.get_activity_handle("act-1")
-    await handle.reset()
-
-    reset = captured.requests["reset"]
-    assert not reset.keep_paused
-    assert not reset.restore_original_options
-    assert not reset.reset_heartbeat
-
-
-async def test_reset_flags_reach_the_request(
-    client: Client, captured: _CapturedService
-):
-    handle = client.get_activity_handle("act-1")
-    await handle.reset(
-        keep_paused=True, restore_original_options=True, reset_heartbeat=True
-    )
-
-    reset = captured.requests["reset"]
-    assert reset.keep_paused
-    assert reset.restore_original_options
-    assert reset.reset_heartbeat
 
 
 async def test_restore_original_options_is_exclusive(
