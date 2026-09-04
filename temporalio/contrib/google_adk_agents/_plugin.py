@@ -38,16 +38,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 
 def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -> None:
-    """Installs a provider as the process-wide default for an ADK platform seam.
-
-    ADK's platform providers are held in ``ContextVar``s. Setting them with the
-    public ``set_*_provider`` helpers only affects the calling context, and
-    Temporal executes workflow code on executor threads whose contexts never
-    see that call — so the provider must be installed at the ContextVar
-    *default* level to be visible inside workflows. Rebinding the module's
-    ContextVar with a new default preserves the public setters' semantics
-    (a context-local ``set_*_provider`` still overrides the default).
-    """
+    """Rebinds an ADK platform ContextVar so ``provider`` is its default in every context."""
     from contextvars import ContextVar
 
     context_var = getattr(module, var_name)
