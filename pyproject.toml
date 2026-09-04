@@ -29,7 +29,7 @@ grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.26,<2", "opentelemetry-sdk>=1.26,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["openai-agents>=0.19.2,<0.20", "mcp>=1.9.4, <2"]
-google-adk = ["google-adk>=2.5.0,<3", "mcp>=1.24,<2"]
+google-adk = ["google-adk>=2.8.0,<3", "mcp>=1.24,<2"]
 langgraph = ["langgraph>=1.1.0"]
 langsmith = ["langsmith>=0.7.34,<0.9"]
 deepagents = [
@@ -284,11 +284,5 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-
-# Dev-only resolution override: the deterministic-runtime seams this plugin
-# installs (platform random provider; RequestInput/function-call ids routed
-# through the platform uuid provider) are on google-adk main but not yet in a
-# release. TODO: remove once a google-adk release contains
-# google/adk-python@8f85107c and resolve from PyPI again.
-[tool.uv.sources]
-google-adk = { git = "https://github.com/google/adk-python", rev = "8f85107cca7fa9d88eea5ca60e32b85173b4ec7c" }
+# Admit google-adk 2.8.0 (released 2026-08-26) inside the 2-week window; drop after 2026-09-10.
+exclude-newer-package = { google-adk = "2026-08-27T00:00:00Z" }

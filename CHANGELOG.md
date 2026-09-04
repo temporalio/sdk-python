@@ -42,6 +42,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
