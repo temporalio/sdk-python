@@ -1,4 +1,4 @@
-"""Tests for the standalone-activity operator commands: pause, unpause, reset and
+"""Tests for the standalone-activity operator commands: pause, unpause and
 update_options.
 """
 
