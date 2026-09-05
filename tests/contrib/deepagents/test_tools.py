@@ -32,9 +32,11 @@ with workflow.unsafe.imports_passed_through():
     from temporalio.contrib.deepagents import (  # noqa: E402
         DeepAgentsPlugin,
         activity_as_tool,
+        run_deep_agent,
         tool_as_activity,
     )
     from temporalio.contrib.deepagents._tools import warn_unwrapped_tools  # noqa: E402
+    from temporalio.contrib.deepagents.testing import mock_model_provider  # noqa: E402
 
 INVOKE_TOOL = "deepagents.invoke_tool"
 
@@ -159,6 +161,22 @@ class ToolCallIdPairingWorkflow:
         return str(result["messages"][-1].content)
 
 
+@workflow.defn
+class RepeatedToolCallWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        tool = tool_as_activity(
+            pairing_weather, start_to_close_timeout=timedelta(seconds=10)
+        )
+        agent = create_deep_agent(model="fake:model", tools=[tool])
+        result = await run_deep_agent(
+            agent,
+            {"messages": [{"role": "user", "content": "Check Paris twice."}]},
+            continue_as_new_after=10_000,
+        )
+        return str(result["messages"][-1].content)
+
+
 @pytest.mark.asyncio
 async def test_wrapped_tool_result_pairs_with_model_tool_call_id(
     env: WorkflowEnvironment,
@@ -236,3 +254,50 @@ async def test_wrapped_tool_result_pairs_with_model_tool_call_id(
         0
     ].tool_call_id
     assert "weather:Paris" in str(tool_messages[0].content)
+
+
+@pytest.mark.asyncio
+async def test_repeated_tool_calls_with_same_args_both_run(
+    env: WorkflowEnvironment,
+) -> None:
+    from langchain_core.messages import AIMessage
+
+    responses = [
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "pairing_weather",
+                    "args": {"city": "Paris"},
+                    "id": "first-call",
+                }
+            ],
+        ),
+        AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "pairing_weather",
+                    "args": {"city": "Paris"},
+                    "id": "second-call",
+                }
+            ],
+        ),
+        AIMessage(content="done"),
+    ]
+    plugin = DeepAgentsPlugin(model_provider=mock_model_provider(responses))
+    async with Worker(
+        env.client,
+        task_queue="da-repeated-tool-calls",
+        workflows=[RepeatedToolCallWorkflow],
+        plugins=[plugin],
+    ):
+        handle = await env.client.start_workflow(
+            RepeatedToolCallWorkflow.run,
+            id=f"da-repeated-tool-calls-{uuid.uuid4()}",
+            task_queue="da-repeated-tool-calls",
+        )
+        assert await handle.result() == "done"
+
+    counts = await count_scheduled_activities(handle)
+    assert counts[INVOKE_TOOL] == 2, counts
