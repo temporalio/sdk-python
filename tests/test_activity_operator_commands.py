@@ -44,14 +44,6 @@ async def quick_activity() -> str:
 
 
 @activity.defn
-async def fail_then_succeed_activity() -> str:
-    """Fails the first two attempts so retries are forced, then succeeds."""
-    if activity.info().attempt < 3:
-        raise ApplicationError("retryable failure")
-    return "done"
-
-
-@activity.defn
 async def echo_activity(word: str) -> str:
     """Takes an argument and returns a value derived from it, so a completed execution
     has both an input and a successful outcome to read back off describe."""
