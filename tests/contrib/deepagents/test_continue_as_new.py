@@ -37,7 +37,7 @@ class FakeAgent:
     async def ainvoke(self, input: Any) -> dict:
         messages = list(input.get("messages", [])) if isinstance(input, dict) else []
         messages = [*messages, "step"]
-        done = len(messages) >= 3
+        done = messages.count("step") >= 3
         return {
             "messages": messages,
             "todos": [
@@ -51,7 +51,7 @@ class ContinueAsNewWorkflow:
     @workflow.run
     async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
         # Threshold of 1 means: continue-as-new as soon as there is pending work,
-        # which the fake agent reports until the conversation reaches 3 messages.
+        # which the fake agent reports until it has appended 3 steps.
         return await run_deep_agent(
             FakeAgent(),
             input,
@@ -77,9 +77,7 @@ async def test_can_threshold_and_cache(env: WorkflowEnvironment) -> None:
         )
         result = await handle.result()
 
-    # The only way the conversation reaches >= 3 messages is if the snapshot from
-    # the pre-continue-as-new run was carried into the continued run and merged.
-    assert len(result["messages"]) >= 3, result
+    assert result["messages"] == ["start", "step", "step", "step"], result
     assert result["todos"][0]["status"] == "completed"
 
 
@@ -155,7 +153,7 @@ async def test_can_defaults_to_server_suggestion(
 
     # Carry across the suggested continue-as-new: the conversation only reaches
     # 3 messages if snapshots crossed run boundaries.
-    assert len(result["messages"]) >= 3, result
+    assert result["messages"] == ["start", "step", "step"], result
     assert result["todos"][0]["status"] == "completed"
     # The first run really did continue-as-new (not complete).
     first = env.client.get_workflow_handle(
