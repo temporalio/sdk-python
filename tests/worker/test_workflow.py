@@ -5124,10 +5124,19 @@ async def test_workflow_custom_metrics(client: Client, env: WorkflowEnvironment)
             },
             34,
         )
-        # Also check Temporal metric got its prefix
-        prom_matcher.assert_metric_exists(
-            "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
-        )
+
+        # The Core completion metric can be recorded just after the workflow result
+        # reaches the client, so allow the Prometheus endpoint to catch up.
+        async def assert_workflow_completed_metric() -> None:
+            with urlopen(url=f"http://{prom_addr}/metrics") as f:
+                prom_lines = f.read().decode("utf-8").splitlines()
+            PromMetricMatcher(prom_lines).assert_metric_exists(
+                "foo_workflow_completed",
+                {"workflow_type": "CustomMetricsWorkflow"},
+                1,
+            )
+
+        await assert_eventually(assert_workflow_completed_metric)
 
 
 async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironment):
