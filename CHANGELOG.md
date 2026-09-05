@@ -40,6 +40,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Worker heartbeats reported through a `MetricBuffer` now include correct task-slot and poller
+  counts. Previously those labelled gauges always reported `0` when buffered metrics were
+  configured, hiding the slots and pollers from the Workers UI.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
