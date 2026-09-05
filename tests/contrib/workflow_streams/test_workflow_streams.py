@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import sys
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, cast
@@ -22,6 +23,7 @@ import nexusrpc
 import nexusrpc.handler
 import pytest
 
+import temporalio.api.common.v1
 import temporalio.api.nexus.v1
 import temporalio.api.operatorservice.v1
 import temporalio.api.workflowservice.v1
@@ -47,9 +49,10 @@ from temporalio.contrib.workflow_streams import (
     WorkflowTopicHandle,
 )
 from temporalio.contrib.workflow_streams._types import _encode_payload
-from temporalio.converter import DataConverter
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
+from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import assert_eq_eventually, new_worker
@@ -65,6 +68,18 @@ def _wire_bytes(data: bytes) -> str:
     """
     payload = DataConverter.default.payload_converter.to_payloads([data])[0]
     return _encode_payload(payload)
+
+
+class FailingEncodePayloadCodec(PayloadCodec):
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        raise RuntimeError("payload codec encode failed")
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
 
 
 # ---------------------------------------------------------------------------
@@ -1399,6 +1414,92 @@ async def test_flush_retry_preserves_items_after_failures(
         assert [i.data for i in items] == [b"item-0", b"item-1", b"item-2"]
 
         await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_background_flusher_retries_failed_signal(client: Client) -> None:
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-background-flush-retry-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        stream = WorkflowStreamClient(handle, batch_interval=timedelta(milliseconds=10))
+        real_signal = handle.signal
+        first_flush_failed = asyncio.Event()
+        retry_succeeded = asyncio.Event()
+
+        async def fail_first_signal(*args: Any, **kwargs: Any) -> Any:
+            if not first_flush_failed.is_set():
+                first_flush_failed.set()
+                raise RPCError(
+                    message="simulated delivery failure",
+                    status=RPCStatusCode.UNAVAILABLE,
+                    raw_grpc_status=b"",
+                )
+            result = await real_signal(*args, **kwargs)
+            retry_succeeded.set()
+            return result
+
+        with patch.object(handle, "signal", side_effect=fail_first_signal):
+            async with stream:
+                stream.topic("events", type=bytes).publish(b"item")
+                await asyncio.wait_for(first_flush_failed.wait(), timeout=5)
+                await asyncio.wait_for(retry_succeeded.wait(), timeout=5)
+
+        items = await collect_items(client, handle, None, 0, 1)
+        assert [item.data for item in items] == [b"item"]
+
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_background_flusher_propagates_payload_codec_error(
+    client: Client,
+) -> None:
+    async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
+        handle = await client.start_workflow(
+            BasicWorkflowStreamWorkflow.run,
+            id=f"workflow-stream-background-flush-codec-error-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        config = client.config()
+        config["data_converter"] = DataConverter(
+            payload_codec=FailingEncodePayloadCodec()
+        )
+        codec_client = Client(**config)
+        stream = WorkflowStreamClient.create(
+            codec_client,
+            handle.id,
+            batch_interval=timedelta(milliseconds=10),
+        )
+        stream._flush_task = asyncio.create_task(stream._run_flusher())
+
+        stream.topic("events", type=bytes).publish(b"item", force_flush=True)
+        with pytest.raises(RuntimeError, match="payload codec encode failed"):
+            await asyncio.wait_for(stream._flush_task, timeout=1)
+
+        await handle.signal(BasicWorkflowStreamWorkflow.close)
+
+
+@pytest.mark.asyncio
+async def test_background_flusher_propagates_message_too_large(
+    client: Client,
+) -> None:
+    handle = client.get_workflow_handle("workflow-stream-message-too-large")
+    stream = WorkflowStreamClient(handle, batch_interval=timedelta(milliseconds=10))
+    error = RPCError(
+        message="grpc: received message larger than max",
+        status=RPCStatusCode.RESOURCE_EXHAUSTED,
+        raw_grpc_status=b"",
+    )
+
+    with patch.object(handle, "signal", side_effect=error):
+        flusher = asyncio.create_task(stream._run_flusher())
+        stream.topic("events", type=bytes).publish(b"item", force_flush=True)
+        with pytest.raises(RPCError, match="received message larger than max"):
+            await asyncio.wait_for(flusher, timeout=1)
 
 
 @pytest.mark.asyncio
