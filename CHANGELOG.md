@@ -20,6 +20,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `update_options` and `restore_original_options`.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed

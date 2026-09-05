@@ -50,7 +50,9 @@ from ._activity import (
     ActivityExecutionAsyncIterator,
     ActivityExecutionCount,
     ActivityExecutionDescription,
+    ActivityExecutionOptions,
     ActivityHandle,
+    ActivityOptionsUpdate,
     AsyncActivityIDReference,
 )
 from ._exceptions import (
@@ -87,6 +89,7 @@ from ._interceptor import (
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
+    PauseActivityInput,
     PauseScheduleInput,
     QueryWorkflowInput,
     ReportCancellationAsyncActivityInput,
@@ -100,7 +103,9 @@ from ._interceptor import (
     TerminateNexusOperationInput,
     TerminateWorkflowInput,
     TriggerScheduleInput,
+    UnpauseActivityInput,
     UnpauseScheduleInput,
+    UpdateActivityOptionsInput,
     UpdateScheduleInput,
     UpdateWithStartStartWorkflowInput,
     UpdateWithStartUpdateWorkflowInput,
@@ -680,6 +685,94 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Pause an activity."""
+        await self._client.workflow_service.pause_activity_execution(
+            temporalio.api.workflowservice.v1.PauseActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Unpause an activity."""
+        req = temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            reason=input.reason or "",
+        )
+        if input.jitter is not None:
+            req.jitter.FromTimedelta(input.jitter)
+        await self._client.workflow_service.unpause_activity_execution(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Update or restore an activity's options."""
+        # restore_original is exclusive to all other updates.
+        if input.restore_original and input.updates:
+            raise ValueError(
+                "restore_original cannot be combined with individual option updates"
+            )
+        req = temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+        )
+        if input.restore_original:
+            req.restore_original = True
+        else:
+            # For repeated keys, later values override previous ones.
+            by_path: dict[str, ActivityOptionsUpdate[Any]] = {}
+            for update in input.updates:
+                by_path[update.key.name] = update
+            for name, update in by_path.items():
+                req.update_mask.paths.append(name)
+                if update.value is None:
+                    continue
+                if name == "task_queue.name":
+                    req.activity_options.task_queue.name = update.value
+                elif name == "retry_policy":
+                    update.value.apply_to_proto(req.activity_options.retry_policy)
+                elif name == "priority":
+                    req.activity_options.priority.CopyFrom(update.value._to_proto())
+                elif name in (
+                    "schedule_to_close_timeout",
+                    "schedule_to_start_timeout",
+                    "start_to_close_timeout",
+                    "heartbeat_timeout",
+                    "start_delay",
+                ):
+                    getattr(req.activity_options, name).FromTimedelta(update.value)
+                else:
+                    # Reached only if a key is added without a conversion for it here.
+                    raise ValueError(f"No conversion for activity option {name!r}")
+
+        resp = await self._client.workflow_service.update_activity_execution_options(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return ActivityExecutionOptions._from_proto(resp.activity_options)
 
     async def describe_activity(
         self, input: DescribeActivityInput

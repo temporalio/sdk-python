@@ -27,7 +27,9 @@ if TYPE_CHECKING:
         ActivityExecutionAsyncIterator,
         ActivityExecutionCount,
         ActivityExecutionDescription,
+        ActivityExecutionOptions,
         ActivityHandle,
+        ActivityOptionsUpdate,
         AsyncActivityIDReference,
     )
     from ._nexus import (
@@ -253,6 +255,53 @@ class TerminateActivityInput:
     activity_id: str
     activity_run_id: str | None
     reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class PauseActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.pause_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class UnpauseActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.unpause_activity`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    reason: str | None
+    jitter: timedelta | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class UpdateActivityOptionsInput:
+    """Input for :py:meth:`OutboundInterceptor.update_activity_options`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    updates: Sequence[ActivityOptionsUpdate[Any]]
+    restore_original: bool
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
@@ -777,6 +826,33 @@ class OutboundInterceptor:
            This API is experimental.
         """
         await self.next.terminate_activity(input)
+
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.pause` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.pause_activity(input)
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.unpause` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.unpause_activity(input)
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Called for every :py:meth:`ActivityHandle.update_options` and
+        :py:meth:`ActivityHandle.restore_original_options` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.update_activity_options(input)
 
     async def describe_activity(
         self, input: DescribeActivityInput
