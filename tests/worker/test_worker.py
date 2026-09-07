@@ -384,6 +384,11 @@ class CustomSlotSupplierWorkflow:
             versioning_intent=VersioningIntent.DEFAULT,
             start_to_close_timeout=timedelta(seconds=5),
         )
+        await workflow.execute_local_activity(
+            say_hello,
+            "local",
+            start_to_close_timeout=timedelta(seconds=5),
+        )
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=SayHelloService,
@@ -405,9 +410,10 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         pytest.skip("Nexus tests don't work under Java test server")
 
     class MyPermit(SlotPermit):
-        def __init__(self, pnum: int):
+        def __init__(self, pnum: int, slot_type: str):
             super().__init__()
             self.pnum = pnum
+            self.slot_type = slot_type
 
     class MySlotSupplier(CustomSlotSupplier):
         reserves = 0
@@ -420,33 +426,39 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         seen_release_info_empty = False
         seen_release_info_nonempty = False
 
+        def __init__(self):
+            self.marked_contexts: list[SlotMarkUsedContext] = []
+            self.released_contexts: list[SlotReleaseContext] = []
+
         async def reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit:
             self.reserve_asserts(ctx)
             # Verify an async call doesn't bungle things
             await asyncio.sleep(0.01)
             self.reserves += 1
-            return MyPermit(self.reserves)
+            return MyPermit(self.reserves, ctx.slot_type)
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             self.reserve_asserts(ctx)
             return None
 
         def mark_slot_used(self, ctx: SlotMarkUsedContext) -> None:
+            self.marked_contexts.append(ctx)
             assert ctx.permit is not None
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
             assert ctx.slot_info is not None
             if isinstance(ctx.slot_info, WorkflowSlotInfo):
                 self.seen_used_slot_kinds.add("wf")
-            elif isinstance(ctx.slot_info, ActivitySlotInfo):
+            elif ctx.permit.slot_type == "activity":
                 self.seen_used_slot_kinds.add("a")
-            elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
+            elif ctx.permit.slot_type == "local-activity":
                 self.seen_used_slot_kinds.add("la")
             elif isinstance(ctx.slot_info, NexusSlotInfo):
                 self.seen_used_slot_kinds.add("nx")
             self.used += 1
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
+            self.released_contexts.append(ctx)
             assert ctx.permit is not None
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
@@ -498,12 +510,41 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
     assert ss.highest_seen_reserve_on_release >= ss.releases
-    assert ss.used == 5
+    assert ss.used == 6
     assert ss.seen_sticky_kinds == {True, False}
     assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
-    assert ss.seen_used_slot_kinds == {"wf", "a", "nx"}
+    assert ss.seen_used_slot_kinds == {"wf", "a", "la", "nx"}
     assert ss.seen_release_info_empty
     assert ss.seen_release_info_nonempty
+
+    # Supplier callback exceptions are logged and swallowed, so validate captured
+    # metadata here to ensure incorrect fields fail the test.
+    for contexts in (ss.marked_contexts, ss.released_contexts):
+        seen_kinds = set()
+        seen_sticky = set()
+        for ctx in contexts:
+            info = ctx.slot_info
+            if info is None:
+                continue
+            assert isinstance(ctx.permit, MyPermit)
+            kind = ctx.permit.slot_type
+            seen_kinds.add(kind)
+            if kind == "workflow":
+                assert isinstance(info, WorkflowSlotInfo)
+                assert info.workflow_type == "CustomSlotSupplierWorkflow"
+                seen_sticky.add(info.is_sticky)
+            elif kind == "activity":
+                assert isinstance(info, ActivitySlotInfo)
+                assert info.activity_type == "say_hello"
+            elif kind == "local-activity":
+                assert isinstance(info, LocalActivitySlotInfo)
+                assert info.activity_type == "say_hello"
+            elif kind == "nexus":
+                assert isinstance(info, NexusSlotInfo)
+                assert info.service == "SayHelloService"
+                assert info.operation == "say_hello"
+        assert seen_kinds == {"workflow", "activity", "local-activity", "nexus"}
+        assert seen_sticky == {True, False}
 
 
 @workflow.defn
