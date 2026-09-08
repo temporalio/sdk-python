@@ -376,6 +376,11 @@ requesting confirmation via `tool_context.request_confirmation(...)` flow
 through the same loop. Partial responses are fine: unanswered requests stay
 pending across `run_async` turns.
 
+Auth requests (`adk_request_credential`) are not covered by these helpers: ADK
+exchanges the credential with network I/O inside the flow, and the exchanged
+secret would be recorded in workflow history. Resolve credentials worker-side
+instead (for example inside an activity or an MCP toolset factory).
+
 > **Replay-safety note:** HITL resume matches recorded human responses against
 > generated interrupt/function-call ids, so those ids must regenerate
 > identically on replay. The plugin installs ADK's platform time/uuid/random

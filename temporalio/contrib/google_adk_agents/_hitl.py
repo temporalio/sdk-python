@@ -2,15 +2,18 @@
 
 ADK pauses a run by emitting an event that carries a special function call
 (``adk_request_input`` for human-input nodes, ``adk_request_confirmation`` for
-tool confirmation, ``adk_request_credential`` for auth) and resumes when a
-later user message answers it with a matching ``FunctionResponse``. Inside a
+tool confirmation) and resumes when a later user message answers it with a
+matching ``FunctionResponse``. Inside a
 Temporal workflow the pause maps naturally onto a durable wait: collect the
 pending requests from the events yielded by ``runner.run_async``, expose them
 via a query, wait for responses via ``workflow.wait_condition`` on a signal or
 update handler, then call ``runner.run_async`` again with the response parts.
 
 These helpers cover the wire format only; the wait topology stays ordinary
-Temporal workflow code.
+Temporal workflow code. Auth requests (``adk_request_credential``) are not
+covered: ADK exchanges the credential with network I/O inside the flow, and the
+exchanged secret would be recorded in workflow history. Resolve credentials
+worker-side instead.
 """
 
 from __future__ import annotations
@@ -26,14 +29,10 @@ from google.genai import types
 # The function-call names ADK uses on the wire for HITL pauses.
 _REQUEST_INPUT_FUNCTION_CALL_NAME = "adk_request_input"
 _REQUEST_CONFIRMATION_FUNCTION_CALL_NAME = "adk_request_confirmation"
-_REQUEST_CREDENTIAL_FUNCTION_CALL_NAME = "adk_request_credential"
 
-_KIND_BY_FUNCTION_CALL_NAME: dict[
-    str, Literal["input", "tool_confirmation", "credential"]
-] = {
+_KIND_BY_FUNCTION_CALL_NAME: dict[str, Literal["input", "tool_confirmation"]] = {
     _REQUEST_INPUT_FUNCTION_CALL_NAME: "input",
     _REQUEST_CONFIRMATION_FUNCTION_CALL_NAME: "tool_confirmation",
-    _REQUEST_CREDENTIAL_FUNCTION_CALL_NAME: "credential",
 }
 
 
@@ -47,8 +46,7 @@ class HitlRequest:
 
     Attributes:
         kind: ``"input"`` for a human-input node's ``RequestInput``,
-            ``"tool_confirmation"`` for a tool confirmation request,
-            ``"credential"`` for an auth request.
+            ``"tool_confirmation"`` for a tool confirmation request.
         interrupt_id: The id a response must reference. Pass it to
             :func:`hitl_input_response` or :func:`hitl_confirmation_response`.
         invocation_id: The ADK invocation that is paused on this request.
@@ -63,7 +61,7 @@ class HitlRequest:
             displaying what is being approved.
     """
 
-    kind: Literal["input", "tool_confirmation", "credential"]
+    kind: Literal["input", "tool_confirmation"]
     interrupt_id: str
     invocation_id: str | None = None
     author: str | None = None
@@ -84,7 +82,8 @@ def pending_hitl_requests(event: Event) -> list[HitlRequest]:
     result means the run is pausing for the returned requests; once
     ``run_async`` completes, resume by sending a new user message whose parts
     answer them (see :func:`hitl_input_response` and
-    :func:`hitl_confirmation_response`).
+    :func:`hitl_confirmation_response`). Auth requests
+    (``adk_request_credential``) are not surfaced; see the module docstring.
 
     Args:
         event: An event yielded by ``runner.run_async``.
@@ -113,13 +112,11 @@ def pending_hitl_requests(event: Event) -> list[HitlRequest]:
             message = args.get("message")
             payload = args.get("payload")
             response_schema = args.get("response_schema")
-        elif kind == "tool_confirmation":
+        else:
             confirmation = args.get("toolConfirmation") or {}
             message = confirmation.get("hint")
             payload = confirmation.get("payload")
             original_function_call = args.get("originalFunctionCall")
-        else:
-            payload = args
         requests.append(
             HitlRequest(
                 kind=kind,

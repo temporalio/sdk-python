@@ -331,6 +331,27 @@ async def _wait_for_pending(
     return await asyncio.wait_for(_poll(), timeout=20)
 
 
+def test_pending_hitl_requests_ignores_credential_requests():
+    from google.adk.events import Event
+
+    event = Event(
+        author="agent",
+        content=types.Content(
+            role="model",
+            parts=[
+                types.Part(
+                    function_call=types.FunctionCall(
+                        name="adk_request_credential", id="auth-1", args={}
+                    )
+                )
+            ],
+        ),
+        long_running_tool_ids={"auth-1"},
+    )
+    # Auth requests are deliberately not surfaced: no helper can answer them.
+    assert pending_hitl_requests(event) == []
+
+
 @pytest.mark.asyncio
 async def test_human_input_node_update_resume(client: Client):
     client = _adk_client(client)
