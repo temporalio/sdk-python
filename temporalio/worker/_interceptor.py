@@ -491,6 +491,12 @@ class WorkflowOutboundInterceptor(_SystemNexusWorkflowOutboundInterceptorBase):
         """Called for every :py:func:`temporalio.workflow.NexusClient.start_operation` call."""
         return await self.next.start_nexus_operation(input)
 
+    async def start_system_nexus_operation(
+        self, input: StartNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        """Intercept a Temporal System Nexus operation started by a workflow."""
+        return await self.next.start_system_nexus_operation(input)
+
 
 @dataclass
 class ExecuteNexusOperationStartInput:
