@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed
