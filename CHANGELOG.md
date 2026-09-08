@@ -50,6 +50,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox. ADK probes them lazily on each LLM turn, and importing an installed one
+  inside every workflow sandbox was slow enough to trip the workflow deadlock detector.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and

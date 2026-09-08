@@ -208,7 +208,13 @@ class GoogleAdkPlugin(SimplePlugin):
                 return dataclasses.replace(
                     runner,
                     restrictions=runner.restrictions.with_passthrough_modules(
-                        "google.adk", "google.genai", "mcp"
+                        "google.adk",
+                        "google.genai",
+                        "mcp",
+                        # ADK probes these optional model SDKs lazily on each LLM turn.
+                        "anthropic",
+                        "litellm",
+                        "openai",
                     ),
                 )
             return runner
