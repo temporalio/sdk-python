@@ -25,6 +25,9 @@ to include examples, links to docs, or any other relevant information.
 - System Nexus Signal-with-Start Workflow operations now use the typed
   `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
   the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+- System Nexus Signal-with-Start Workflow operations now invoke
+  `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
+  point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
 
 ### Deprecated
 
@@ -39,6 +42,9 @@ to include examples, links to docs, or any other relevant information.
 
 - `temporalio.contrib.deepagents` now runs separate tool calls independently
   when they use the same tool and arguments.
+- Cancelling an activity from a signal while the workflow itself is cancelled
+  no longer causes a nondeterminism error from duplicate activity-cancellation
+  commands.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
