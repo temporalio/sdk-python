@@ -40,6 +40,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Schedule updates now pass the conflict token returned by the server and retry
+  the describe-update loop when a concurrent update changes the schedule.
 - Cancelling an activity from a signal while the workflow itself is cancelled
   no longer causes a nondeterminism error from duplicate activity-cancellation
   commands.

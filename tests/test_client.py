@@ -16,6 +16,10 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.schedule.v1
+import temporalio.api.taskqueue.v1
+import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -324,6 +328,71 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
         with pytest.raises(RPCError) as err:
             await client.start_workflow("fake", id="fake", task_queue="fake")
     assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+
+
+async def test_schedule_update_retries_conflict_token() -> None:
+    schedule = temporalio.api.schedule.v1.Schedule(
+        spec=temporalio.api.schedule.v1.ScheduleSpec(),
+        action=temporalio.api.schedule.v1.ScheduleAction(
+            start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
+                workflow_id="workflow-id",
+                workflow_type=temporalio.api.common.v1.WorkflowType(name="workflow"),
+                task_queue=temporalio.api.taskqueue.v1.TaskQueue(name="task-queue"),
+            )
+        ),
+        policies=temporalio.api.schedule.v1.SchedulePolicies(
+            overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
+        ),
+        state=temporalio.api.schedule.v1.ScheduleState(),
+    )
+    workflow_service = mock.MagicMock()
+    workflow_service.describe_schedule = mock.AsyncMock(
+        side_effect=[
+            temporalio.api.workflowservice.v1.DescribeScheduleResponse(
+                schedule=schedule,
+                info=temporalio.api.schedule.v1.ScheduleInfo(),
+                conflict_token=b"first-token",
+            ),
+            temporalio.api.workflowservice.v1.DescribeScheduleResponse(
+                schedule=schedule,
+                info=temporalio.api.schedule.v1.ScheduleInfo(),
+                conflict_token=b"second-token",
+            ),
+        ]
+    )
+    workflow_service.update_schedule = mock.AsyncMock(
+        side_effect=[
+            RPCError(
+                "mismatched conflict token",
+                RPCStatusCode.FAILED_PRECONDITION,
+                b"",
+            ),
+            temporalio.api.workflowservice.v1.UpdateScheduleResponse(),
+        ]
+    )
+    service_client = mock.MagicMock()
+    service_client.config.identity = "test-identity"
+    service_client.workflow_service = workflow_service
+    client = Client(service_client)
+
+    updater_calls = 0
+
+    def updater(input: ScheduleUpdateInput) -> ScheduleUpdate:
+        nonlocal updater_calls
+        updater_calls += 1
+        return ScheduleUpdate(schedule=input.description.schedule)
+
+    await client.get_schedule_handle("schedule-id").update(updater)
+
+    assert updater_calls == 2
+    assert workflow_service.describe_schedule.await_count == 2
+    requests = [
+        call.args[0] for call in workflow_service.update_schedule.await_args_list
+    ]
+    assert [request.conflict_token for request in requests] == [
+        b"first-token",
+        b"second-token",
+    ]
 
 
 async def test_cancel_not_found(client: Client):
