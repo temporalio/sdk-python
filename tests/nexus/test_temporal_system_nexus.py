@@ -36,6 +36,7 @@ from temporalio.converter import (
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
+    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
@@ -261,6 +262,13 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         )
         return await super().start_signal_with_start_workflow(request)
 
+    async def start_system_nexus_operation(
+        self,
+        input: StartNexusOperationInput[Any, Any],
+    ) -> workflow.NexusOperationHandle[Any]:
+        interceptor_traces.append(("workflow.start_system_nexus_operation", input))
+        return await super().start_system_nexus_operation(input)
+
 
 def _assert_stored_payloads_include(
     driver: InMemoryTestDriver, expected_payload_data: set[bytes]
@@ -275,14 +283,19 @@ def _assert_stored_payloads_include(
 
 
 def _assert_signal_with_start_workflow_interceptor_trace() -> None:
-    assert len(interceptor_traces) == 1
-    trace_name, trace_value = interceptor_traces.pop()
+    assert len(interceptor_traces) == 2
+    trace_name, trace_value = interceptor_traces.pop(0)
     assert trace_name == "workflow.start_signal_with_start_workflow"
     request = cast(workflow_service_models.SignalWithStartWorkflowRequest, trace_value)
     assert request.id == "system-nexus-workflow-id"
     assert request.signal == "test-signal"
     assert request.workflow == "test-workflow"
     assert request.headers == {"interceptor-header": "value"}
+    trace_name, trace_value = interceptor_traces.pop()
+    assert trace_name == "workflow.start_system_nexus_operation"
+    system_input = cast(StartNexusOperationInput[Any, Any], trace_value)
+    assert system_input.input is request
+    assert system_input.headers is None
 
 
 class _MarkingPayloadVisitor(VisitorFunctions):
