@@ -43,6 +43,9 @@ to include examples, links to docs, or any other relevant information.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
+- Cancelling an activity from a signal while the workflow itself is cancelled
+  no longer causes a nondeterminism error from duplicate activity-cancellation
+  commands.
 - `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
   model request retries are handled exclusively by Temporal.
 - `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and

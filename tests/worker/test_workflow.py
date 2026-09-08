@@ -1046,6 +1046,96 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
 
 
 @workflow.defn
+class CancelActivityDuringWorkflowCancellationWorkflow:
+    def __init__(self) -> None:
+        self._activity_started = False
+        self._cancel_activity = False
+
+    @workflow.run
+    async def run(self) -> str:
+        handle = workflow.start_activity(
+            wait_cancel,
+            start_to_close_timeout=timedelta(minutes=1),
+            heartbeat_timeout=timedelta(seconds=1),
+        )
+        self._activity_started = True
+
+        async def cancel_activity() -> None:
+            await workflow.wait_condition(lambda: self._cancel_activity)
+            handle.cancel()
+
+        cancel_task = asyncio.create_task(cancel_activity())
+        try:
+            await handle
+        except ActivityError:
+            pass
+        finally:
+            cancel_task.cancel()
+        return "activity cancelled"
+
+    @workflow.signal
+    def cancel_activity(self) -> None:
+        self._cancel_activity = True
+
+    @workflow.query
+    def activity_started(self) -> bool:
+        return self._activity_started
+
+
+async def test_workflow_cancel_activity_while_workflow_cancelled(client: Client):
+    task_queue = str(uuid.uuid4())
+    runner = CustomWorkflowRunner()
+    handle = await client.start_workflow(
+        CancelActivityDuringWorkflowCancellationWorkflow.run,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+
+    async with new_worker(client, activities=[wait_cancel], task_queue=task_queue):
+        async with new_worker(
+            client,
+            CancelActivityDuringWorkflowCancellationWorkflow,
+            task_queue=task_queue,
+            workflow_runner=runner,
+            max_cached_workflows=0,
+        ):
+
+            async def activity_started() -> bool:
+                return await handle.query(
+                    CancelActivityDuringWorkflowCancellationWorkflow.activity_started
+                )
+
+            await assert_eq_eventually(True, activity_started)
+
+        # Keep the workflow worker offline so the signal and cancellation are
+        # delivered in the same activation when it resumes.
+        await handle.signal(
+            CancelActivityDuringWorkflowCancellationWorkflow.cancel_activity
+        )
+        await handle.cancel()
+
+        async with new_worker(
+            client,
+            CancelActivityDuringWorkflowCancellationWorkflow,
+            task_queue=task_queue,
+            workflow_runner=runner,
+        ):
+            assert await handle.result() == "activity cancelled"
+
+    assert not [
+        event
+        async for event in handle.fetch_history_events()
+        if event.HasField("workflow_task_failed_event_attributes")
+    ]
+    assert any(
+        {"signal_workflow", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+
+
+@workflow.defn
 class SimpleChildWorkflow:
     @workflow.run
     async def run(self, name: str) -> str:
