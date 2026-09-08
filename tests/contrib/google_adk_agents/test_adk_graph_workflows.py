@@ -67,6 +67,18 @@ async def combine_parts(left: str, right: str) -> str:
     return f"{left}+{right}"
 
 
+@activity.defn
+async def shout(text: str, /) -> str:
+    """Activity with a positional-only parameter."""
+    return text.upper()
+
+
+@activity.defn
+async def join_parts(left: str, right: str, /, sep: str = "-") -> str:
+    """Activity with positional-only parameters and a defaulted one."""
+    return f"{left}{sep}{right}"
+
+
 async def drive_graph(graph: Workflow, prompt: str) -> Any:
     """Runs an ADK graph to completion in-workflow, returning the last output."""
     runner = Runner(
@@ -177,6 +189,24 @@ class MultiParamActivityNodeWorkflow:
             combine_parts, start_to_close_timeout=timedelta(seconds=30)
         )
         graph = Workflow(name="multi", edges=[(START, prepare, combine)])
+        return await drive_graph(graph, prompt)
+
+
+@workflow.defn
+class PositionalOnlyGraphWorkflow:
+    """Positional-only activity parameters bind from node_input like any other."""
+
+    @workflow.run
+    async def run(self, prompt: str) -> str:
+        shout_node = activity_node(shout, start_to_close_timeout=timedelta(seconds=30))
+
+        def prepare(node_input: str) -> dict[str, str]:
+            return {"left": node_input, "right": "done"}
+
+        join = activity_node(join_parts, start_to_close_timeout=timedelta(seconds=30))
+        graph = Workflow(
+            name="positional_only", edges=[(START, shout_node, prepare, join)]
+        )
         return await drive_graph(graph, prompt)
 
 
@@ -296,12 +326,13 @@ def _worker(client: Client) -> Worker:
     return Worker(
         client,
         task_queue=TASK_QUEUE,
-        activities=[fetch_data, enrich_item, combine_parts],
+        activities=[fetch_data, enrich_item, combine_parts, shout, join_parts],
         workflows=[
             SequentialGraphWorkflow,
             RoutingGraphWorkflow,
             ParallelJoinGraphWorkflow,
             MultiParamActivityNodeWorkflow,
+            PositionalOnlyGraphWorkflow,
             AgentNodeGraphWorkflow,
             TimeoutGraphWorkflow,
             RetryGraphWorkflow,
@@ -370,6 +401,40 @@ async def test_graph_multi_param_activity_node(client: Client):
             execution_timeout=timedelta(seconds=30),
         )
     assert result == "L+R"
+
+
+@pytest.mark.asyncio
+async def test_graph_positional_only_activity_node(client: Client):
+    client = _adk_client(client)
+    async with _worker(client):
+        result = await client.execute_workflow(
+            PositionalOnlyGraphWorkflow.run,
+            "go",
+            id=f"graph-positional-only-{uuid.uuid4()}",
+            task_queue=TASK_QUEUE,
+            execution_timeout=timedelta(seconds=30),
+        )
+    assert result == "GO-done"
+
+
+async def test_activity_node_rejects_bad_dict_input():
+    join = activity_node(join_parts)
+
+    def missing_right(node_input: str) -> dict[str, str]:  # pyright: ignore[reportUnusedParameter]
+        return {"left": "a"}
+
+    def bogus_key(node_input: str) -> dict[str, Any]:  # pyright: ignore[reportUnusedParameter]
+        return {"left": "a", "right": "b", "bogus": 1}
+
+    # Outside a workflow the node calls the activity function directly.
+    with pytest.raises(TypeError, match=r"missing required input key\(s\) \['right'\]"):
+        await drive_graph(
+            Workflow(name="missing", edges=[(START, missing_right, join)]), "go"
+        )
+    with pytest.raises(TypeError, match=r"unexpected input key\(s\) \['bogus'\]"):
+        await drive_graph(
+            Workflow(name="unexpected", edges=[(START, bogus_key, join)]), "go"
+        )
 
 
 @pytest.mark.asyncio

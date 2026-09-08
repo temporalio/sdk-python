@@ -254,6 +254,29 @@ def activity_as_tool(activity_def: Callable, **kwargs: Any) -> Callable:
     return wrapper
 
 
+def _bind_node_input(
+    activity_def: Callable, params: list[inspect.Parameter], node_input: dict[str, Any]
+) -> list[Any]:
+    """Maps a dict node input onto the activity's positional parameters by name."""
+    unknown = sorted(set(node_input) - {p.name for p in params})
+    if unknown:
+        raise TypeError(
+            f"Activity node '{activity_def.__name__}' got unexpected input"
+            f" key(s) {unknown}."
+        )
+    missing = [
+        p.name
+        for p in params
+        if p.name not in node_input and p.default is inspect.Parameter.empty
+    ]
+    if missing:
+        raise TypeError(
+            f"Activity node '{activity_def.__name__}' is missing required input"
+            f" key(s) {missing}."
+        )
+    return [node_input.get(p.name, p.default) for p in params]
+
+
 def activity_node(
     activity_def: Callable,
     *,
@@ -291,11 +314,12 @@ def activity_node(
     from google.adk.workflow import FunctionNode
 
     sig = inspect.signature(activity_def)
+    # Activities are invoked positionally; activity.defn rejects keyword-only parameters.
     params = [
         p
         for p in sig.parameters.values()
         if p.kind
-        in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+        in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
     ]
     # Resolve hints against the activity's own module so that string
     # annotations (e.g. under `from __future__ import annotations`) still
@@ -320,9 +344,7 @@ def activity_node(
                     f" of parameter names to values, got"
                     f" {type(node_input).__name__}."
                 )
-            bound = sig.bind(**node_input)
-            bound.apply_defaults()
-            activity_args = list(bound.arguments.values())
+            activity_args = _bind_node_input(activity_def, params, node_input)
 
         if not temporalio.workflow.in_workflow():
             # Outside a workflow, like local adk runs, use the function directly.
