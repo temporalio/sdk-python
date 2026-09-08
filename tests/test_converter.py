@@ -1,0 +1,1150 @@
+from __future__ import annotations
+
+import dataclasses
+import inspect
+import ipaddress
+import logging
+import sys
+import traceback
+import typing
+from collections import deque
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum, IntEnum
+from typing import (
+    Any,
+    Dict,  # type:ignore[reportDeprecated]
+    Generic,
+    Literal,
+    NewType,
+    TypeVar,
+    cast,
+    get_args,
+    get_type_hints,
+)
+from uuid import UUID, uuid4
+
+import nexusrpc
+import pydantic
+import pytest
+import typing_extensions
+from typing_extensions import TypedDict
+
+import temporalio.api.common.v1
+import temporalio.common
+from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import NexusHandlerErrorRetryBehavior
+from temporalio.api.failure.v1 import Failure
+from temporalio.common import RawValue
+from temporalio.converter import (
+    AdvancedJSONEncoder,
+    BinaryProtoPayloadConverter,
+    CompositePayloadConverter,
+    DataConverter,
+    DefaultFailureConverterWithEncodedAttributes,
+    DefaultPayloadConverter,
+    JSONPlainPayloadConverter,
+    JSONTypeConverter,
+    JSONTypeConverterUnhandled,
+    PayloadCodec,
+    TransferTypeConverter,
+    create_payload_validation_error,
+    decode_search_attributes,
+    encode_search_attribute_values,
+    transfer_type_convertible,
+    value_to_type,
+)
+from temporalio.converter._payload_converter import (
+    _TemporalTransferTypePayloadConverter,
+)
+from temporalio.exceptions import (
+    ApplicationError,
+    FailureError,
+    NexusOperationError,
+)
+
+# StrEnum is available in 3.11+
+if sys.version_info >= (3, 11):
+    from enum import StrEnum  # type:ignore[reportUnreachable]
+
+
+class NonSerializableClass:
+    pass
+
+
+class NonSerializableEnum(Enum):
+    FOO = "foo"
+
+
+class SerializableEnum(IntEnum):
+    FOO = 1
+
+
+if sys.version_info >= (3, 11):
+
+    class SerializableStrEnum(StrEnum):  # type:ignore[reportUnreachable]
+        FOO = "foo"
+
+
+@dataclass
+class MyDataClass:
+    foo: str
+    bar: int
+    baz: SerializableEnum
+
+
+@dataclass
+class DatetimeClass:
+    datetime: datetime
+
+
+MyNewTypeStr = NewType("MyNewTypeStr", str)
+
+
+@dataclass
+class NewTypeMessage:
+    data: dict[MyNewTypeStr, str]
+
+
+@pytest.mark.parametrize(
+    "details",
+    [None, {"violations": [{"path": "some.path", "reason": "must be an int"}]}],
+)
+def test_create_payload_validation_error(details: Any) -> None:
+    err = create_payload_validation_error(details)
+
+    assert err.message == "Payload validation failed"
+    assert err.type == "PayloadValidationError"
+    assert err.non_retryable
+    assert err.details == (() if details is None else (details,))
+
+    failure = Failure()
+    DataConverter.default.failure_converter.to_failure(
+        err, DataConverter.default.payload_converter, failure
+    )
+    assert DataConverter.default.payload_converter.from_payloads(
+        failure.application_failure_info.details.payloads
+    ) == ([] if details is None else [details])
+
+
+async def test_converter_default():
+    async def assert_payload(
+        input,  # type:ignore[reportMissingParameterType]
+        expected_encoding,  # type:ignore[reportMissingParameterType]
+        expected_data,  # type:ignore[reportMissingParameterType]
+        *,
+        expected_decoded_input=None,  # type:ignore[reportMissingParameterType]
+        type_hint=None,  # type:ignore[reportMissingParameterType]
+    ):
+        payloads = await DataConverter().encode([input])
+        # Check encoding and data
+        assert len(payloads) == 1
+        if isinstance(expected_encoding, str):
+            expected_encoding = expected_encoding.encode()
+        assert payloads[0].metadata["encoding"] == expected_encoding
+        if isinstance(expected_data, str):
+            expected_data = expected_data.encode()
+        assert payloads[0].data == expected_data
+        # Decode and check
+        actual_inputs = await DataConverter().decode(payloads, [type_hint])  # type: ignore[reportArgumentType]
+        assert len(actual_inputs) == 1
+        if expected_decoded_input is None:
+            expected_decoded_input = input
+        assert type(actual_inputs[0]) is type(expected_decoded_input)
+        assert actual_inputs[0] == expected_decoded_input
+        return payloads[0]
+
+    # Basic types
+    await assert_payload(None, "binary/null", "")
+    await assert_payload(b"some binary", "binary/plain", "some binary")
+    payload = await assert_payload(
+        temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2"),
+        "json/protobuf",
+        '{"runId":"id2","workflowId":"id1"}',
+    )
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    await assert_payload(
+        {"foo": "bar", "baz": "qux"}, "json/plain", '{"baz":"qux","foo":"bar"}'
+    )
+    await assert_payload("somestr", "json/plain", '"somestr"')
+    await assert_payload(1234, "json/plain", "1234")
+    await assert_payload(12.34, "json/plain", "12.34")
+    await assert_payload(True, "json/plain", "true")
+    await assert_payload(False, "json/plain", "false")
+
+    # Unknown type
+    with pytest.raises(TypeError) as excinfo:
+        await assert_payload(NonSerializableClass(), None, None)
+    assert "not JSON serializable" in str(excinfo.value)
+
+    # Bad enum type. We do not allow non-int or non-str enums due to ambiguity
+    # in rebuilding and other confusion.
+    with pytest.raises(TypeError) as excinfo:
+        await assert_payload(NonSerializableEnum.FOO, None, None)
+    assert "not JSON serializable" in str(excinfo.value)
+
+    # Good enum no type hint
+    await assert_payload(
+        SerializableEnum.FOO, "json/plain", "1", expected_decoded_input=1
+    )
+
+    # Good enum type hint
+    await assert_payload(
+        SerializableEnum.FOO, "json/plain", "1", type_hint=SerializableEnum
+    )
+
+    # Data class without type hint is just dict
+    await assert_payload(
+        MyDataClass(foo="somestr", bar=123, baz=SerializableEnum.FOO),
+        "json/plain",
+        '{"bar":123,"baz":1,"foo":"somestr"}',
+        expected_decoded_input={"foo": "somestr", "bar": 123, "baz": 1},
+    )
+
+    # Data class with type hint reconstructs the class
+    await assert_payload(
+        MyDataClass(foo="somestr", bar=123, baz=SerializableEnum.FOO),
+        "json/plain",
+        '{"bar":123,"baz":1,"foo":"somestr"}',
+        type_hint=MyDataClass,
+    )
+
+    # Raw value
+    await assert_payload(
+        RawValue(Payload(metadata={"encoding": b"my-encoding"}, data=b"blah blah")),
+        "my-encoding",
+        "blah blah",
+        type_hint=RawValue,
+    )
+
+    # Without type hint, it is deserialized as a str
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01"',
+        expected_decoded_input="2020-01-01T01:01:01",
+    )
+
+    # With type hint, it is deserialized as a datetime
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, 1),
+        "json/plain",
+        '"2020-01-01T01:01:01.000001"',
+        type_hint=datetime,
+    )
+
+    # Timezones work
+    await assert_payload(
+        datetime(2020, 1, 1, 1, 1, 1, tzinfo=timezone(timedelta(hours=5))),
+        "json/plain",
+        '"2020-01-01T01:01:01+05:00"',
+        type_hint=datetime,
+    )
+
+    # Data class with datetime
+    await assert_payload(
+        DatetimeClass(datetime=datetime(2020, 1, 1, 1, 1, 1)),
+        "json/plain",
+        '{"datetime":"2020-01-01T01:01:01"}',
+        type_hint=DatetimeClass,
+    )
+
+    # Newtype String
+    await assert_payload(
+        MyNewTypeStr("somestr"),
+        "json/plain",
+        '"somestr"',
+        type_hint=MyNewTypeStr,
+    )
+
+    # Newtype String key
+    await assert_payload(
+        NewTypeMessage({MyNewTypeStr("key"): "value"}),
+        "json/plain",
+        '{"data":{"key":"value"}}',
+        type_hint=NewTypeMessage,
+    )
+
+
+def test_binary_proto():
+    # We have to test this separately because by default it never encodes
+    # anything since JSON proto takes precedence
+    conv = BinaryProtoPayloadConverter()
+    proto = temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
+    payload = conv.to_payload(proto)
+    assert payload
+    assert payload.metadata["encoding"] == b"binary/protobuf"
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    assert payload.data == proto.SerializeToString()
+    decoded = conv.from_payload(payload)
+    assert decoded == proto
+
+
+class TemporalTransferTypeValueConverter(
+    TransferTypeConverter[
+        "TemporalTransferTypeValue",
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    transfer_type = temporalio.api.common.v1.WorkflowExecution
+
+    def to_transfer_type(
+        self, value: TemporalTransferTypeValue
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=value.value,
+            run_id="run-id",
+        )
+
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeValue],
+    ) -> TemporalTransferTypeValue:
+        return TemporalTransferTypeValue(value=value.workflow_id)
+
+
+@transfer_type_convertible(TemporalTransferTypeValueConverter)
+@dataclass
+class TemporalTransferTypeValue:
+    value: str
+
+
+class TemporalTransferTypeValueWithoutHintConverter(
+    TransferTypeConverter[
+        "TemporalTransferTypeValueWithoutHint",
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    def to_transfer_type(
+        self, value: TemporalTransferTypeValueWithoutHint
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=value.value,
+            run_id="run-id",
+        )
+
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeValueWithoutHint],
+    ) -> TemporalTransferTypeValueWithoutHint:
+        return TemporalTransferTypeValueWithoutHint(value=value.workflow_id)
+
+
+@transfer_type_convertible(TemporalTransferTypeValueWithoutHintConverter)
+@dataclass
+class TemporalTransferTypeValueWithoutHint:
+    value: str
+
+
+T = TypeVar("T")
+
+
+@dataclass
+class TemporalTransferTypeGenericValue(Generic[T]):
+    value: T
+
+
+class TemporalTransferTypeGenericValueConverter(
+    TransferTypeConverter[
+        TemporalTransferTypeGenericValue[T],
+        temporalio.api.common.v1.WorkflowExecution,
+    ]
+):
+    transfer_type = temporalio.api.common.v1.WorkflowExecution
+
+    def to_transfer_type(
+        self, value: TemporalTransferTypeGenericValue[T]
+    ) -> temporalio.api.common.v1.WorkflowExecution:
+        return temporalio.api.common.v1.WorkflowExecution(
+            workflow_id=str(value.value),
+            run_id="run-id",
+        )
+
+    def from_transfer_type(
+        self,
+        value: temporalio.api.common.v1.WorkflowExecution,
+        type_hint: type[TemporalTransferTypeGenericValue[T]],
+    ) -> TemporalTransferTypeGenericValue[T]:
+        converted_value: str | int = value.workflow_id
+        if typing.get_args(type_hint)[0] is int:
+            converted_value = int(converted_value)
+        return TemporalTransferTypeGenericValue(value=cast(T, converted_value))
+
+
+# Register after both classes are defined so the generic type can be resolved.
+transfer_type_convertible(TemporalTransferTypeGenericValueConverter)(
+    TemporalTransferTypeGenericValue
+)
+
+
+class CustomDefaultPayloadConverter(DefaultPayloadConverter):
+    pass
+
+
+def test_temporal_transfer_type_payload_converter_wraps_user_converter():
+    data_converter = DataConverter(
+        payload_converter_class=CustomDefaultPayloadConverter
+    )
+    converter = data_converter.payload_converter
+    assert isinstance(converter, _TemporalTransferTypePayloadConverter)
+    value = TemporalTransferTypeValue("workflow-id")
+
+    payload = converter.to_payload(value)
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    assert all("temporal-wire" not in key for key in payload.metadata)
+    assert all(b"temporal-wire" not in value for value in payload.metadata.values())
+    assert converter.from_payload(payload, TemporalTransferTypeValue) == value
+
+    plain_proto_payload = converter.to_payload(
+        temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")
+    )
+    assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
+
+
+def test_temporal_transfer_type_payload_converter_without_transfer_type_hint():
+    converter = DataConverter.default.payload_converter
+    value = TemporalTransferTypeValueWithoutHint("workflow-id")
+
+    payload = converter.to_payload(value)
+
+    assert payload.metadata["encoding"] == b"json/protobuf"
+    assert (
+        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
+    )
+    assert (
+        converter.from_payload(payload, TemporalTransferTypeValueWithoutHint) == value
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "type_hint"),
+    [
+        (
+            TemporalTransferTypeGenericValue("workflow-id"),
+            TemporalTransferTypeGenericValue[str],
+        ),
+        (
+            TemporalTransferTypeGenericValue(123),
+            TemporalTransferTypeGenericValue[int],
+        ),
+    ],
+)
+def test_temporal_transfer_type_payload_converter_with_generic_value(
+    value: TemporalTransferTypeGenericValue[T],
+    type_hint: type[TemporalTransferTypeGenericValue[T]],
+):
+    converter = DataConverter.default.payload_converter
+
+    payload = converter.to_payload(value)
+
+    assert converter.from_payload(payload, type_hint) == value
+
+
+def test_transfer_type_convertible_rejects_existing_converter():
+    with pytest.raises(TypeError, match="already has a transfer type converter"):
+        transfer_type_convertible(TemporalTransferTypeValueConverter)(
+            TemporalTransferTypeValue
+        )
+
+
+def test_encode_search_attribute_values():
+    with pytest.raises(TypeError, match="of type tuple not one of"):
+        encode_search_attribute_values([("bad type",)])  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="Timezone must be present"):
+        encode_search_attribute_values([datetime.utcnow()])  # type: ignore[reportDeprecated]
+    with pytest.raises(TypeError, match="must have the same type"):
+        encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
+
+
+def test_decode_search_attributes():
+    """Tests decode from protobuf for python types"""
+
+    def payload(key, dtype, data, encoding=None):  # type:ignore[reportMissingParameterType]
+        if encoding is None:
+            encoding = {"encoding": b"json/plain"}
+        check = temporalio.api.common.v1.Payload(
+            data=bytes(data, encoding="utf-8"),
+            metadata={"type": bytes(dtype, encoding="utf-8"), **encoding},
+        )
+        return temporalio.api.common.v1.SearchAttributes(indexed_fields={key: check})
+
+    # Check basic keyword parsing works
+    kw_check = decode_search_attributes(payload("kw", "Keyword", '"test-id"'))
+    assert kw_check["kw"][0] == "test-id"
+
+    # Ensure original DT functionality works
+    dt_check = decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00"')
+    )
+    assert dt_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0)
+
+    # Check timezone aware works as server is using ISO 8601
+    dttz_check = decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00Z"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+    # Check timezone aware, hour offset
+    dttz_check = decode_search_attributes(
+        payload("dt", "Datetime", '"2020-01-01T00:00:00+00:00"')
+    )
+    assert dttz_check["dt"][0] == datetime(2020, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+
+NewIntType = NewType("NewIntType", int)
+MyDataClassAlias = MyDataClass
+
+
+@dataclass
+class NestedDataClass:
+    foo: str
+    bar: list[NestedDataClass] = dataclasses.field(default_factory=list)
+    baz: NestedDataClass | None = None
+    qux: UUID | None = None
+
+
+class MyTypedDict(TypedDict):
+    foo: str
+    bar: MyDataClass
+
+
+class MyTypedDictNotTotal(TypedDict, total=False):
+    foo: str
+    bar: MyDataClass
+
+
+# TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
+if sys.version_info <= (3, 12, 3):
+
+    class MyPydanticClass(pydantic.BaseModel):  # type: ignore[reportUnreachable]
+        foo: str
+        bar: list[MyPydanticClass]
+        baz: UUID | None = None
+
+
+def test_json_type_hints():
+    converter = JSONPlainPayloadConverter()
+
+    def ok(
+        hint: Any, value: Any, expected_result: Any = temporalio.common._arg_unset
+    ) -> None:
+        payload = converter.to_payload(value)
+        assert payload
+        converted_value = converter.from_payload(payload, hint)
+        if expected_result is not temporalio.common._arg_unset:
+            assert expected_result == converted_value
+        else:
+            assert converted_value == value
+
+    def fail(hint: Any, value: Any) -> None:
+        with pytest.raises(Exception):
+            payload = converter.to_payload(value)
+            assert payload
+            converter.from_payload(payload, hint)
+
+    # Primitives
+    ok(int, 5)
+    ok(int, 5.5, 5)
+    ok(float, 5, 5.0)
+    ok(float, 5.5)
+    ok(bool, True)
+    ok(str, "foo")
+    ok(str, "foo")
+    ok(bytes, b"foo")
+    fail(int, "1")
+    fail(float, "1")
+    fail(bool, "1")
+    fail(str, 1)
+
+    # Any
+    ok(Any, 5)
+    ok(Any, None)
+
+    # Literal
+    ok(Literal["foo"], "foo")
+    ok(Literal["foo", False], False)
+    fail(Literal["foo", "bar"], "baz")
+    ok(typing_extensions.Literal["foo"], "foo")
+    ok(typing_extensions.Literal["foo", False], False)
+    fail(typing_extensions.Literal["foo", "bar"], "baz")
+
+    # Dataclass
+    ok(MyDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(NestedDataClass, NestedDataClass("foo"))
+    ok(NestedDataClass, NestedDataClass("foo", baz=NestedDataClass("bar")))
+    ok(NestedDataClass, NestedDataClass("foo", bar=[NestedDataClass("bar")]))
+    ok(NestedDataClass, NestedDataClass("foo", qux=uuid4()))
+    # Missing required dataclass fields causes failure
+    ok(NestedDataClass, {"foo": "bar"}, NestedDataClass("bar"))
+    fail(NestedDataClass, {})
+    # Additional dataclass fields is ok
+    ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
+
+    # Optional/Union
+    ok(int | None, 5)
+    ok(int | None, None)
+    ok(MyDataClass | None, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(int | str, 5)
+    ok(int | str, "foo")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+    ok(int | None, None)
+    ok(int | None, 5)
+    fail(int | None, "1")
+    ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
+    ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+
+    # NewType
+    ok(NewIntType, 5)
+
+    # List-like
+    ok(list, [5])
+    ok(list[int], [5])
+    ok(list[MyDataClass], [MyDataClass("foo", 5, SerializableEnum.FOO)])
+    ok(Iterable[int], [5, 6])
+    ok(tuple[int, str], (5, "6"))
+    ok(tuple[int, ...], (5, 6, 7))
+    ok(set[int], {5, 6})
+    ok(set, {5, 6})
+    ok(list, ["foo"])
+    ok(deque[int], deque([5, 6]))
+    ok(Sequence[int], [5, 6])
+    fail(list[int], [1, 2, "3"])
+
+    # Dict-like
+    ok(dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
+    ok(dict, {"foo": 123})
+    ok(dict[str, Any], {"foo": 123})
+    ok(dict[Any, int], {"foo": 123})
+    ok(Mapping, {"foo": 123})
+    ok(Mapping[str, int], {"foo": 123})
+    ok(MutableMapping[str, int], {"foo": 123})
+    ok(
+        MyTypedDict,
+        MyTypedDict(foo="somestr", bar=MyDataClass("foo", 5, SerializableEnum.FOO)),
+    )
+    # TypedDict allows all sorts of dicts, even if they are missing required
+    # fields or have unknown fields. This matches Python runtime behavior of
+    # just accepting any dict.
+    ok(MyTypedDictNotTotal, {"foo": "bar"})
+    ok(MyTypedDict, {"foo": "bar", "blah": "meh"})
+
+    # Non-string dict keys are supported
+    ok(dict[int, str], {1: "1"})
+    ok(dict[float, str], {1.0: "1"})
+    ok(dict[bool, str], {True: "1"})
+
+    # On a 3.10+ dict type, None isn't returned from a key. This is potentially a bug
+    ok(dict[None, str], {"null": "1"})
+
+    # Dict has a different value for None keys
+    ok(Dict[None, str], {None: "1"})  # type:ignore[reportDeprecated]
+
+    # Alias
+    ok(MyDataClassAlias, MyDataClass("foo", 5, SerializableEnum.FOO))
+
+    # IntEnum
+    ok(SerializableEnum, SerializableEnum.FOO)
+    ok(list[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+
+    # UUID
+    ok(UUID, uuid4())
+    ok(list[UUID], [uuid4(), uuid4()])
+
+    # StrEnum is available in 3.11+
+    if sys.version_info >= (3, 11):
+        # StrEnum
+        ok(SerializableStrEnum, SerializableStrEnum.FOO)  # type:ignore[reportUnreachable]
+        ok(
+            list[SerializableStrEnum],
+            [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
+        )
+
+    # Pydantic
+    # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged
+    if sys.version_info <= (3, 12, 3):
+        ok(  # type: ignore[reportUnreachable]
+            MyPydanticClass,
+            MyPydanticClass(
+                foo="foo", bar=[MyPydanticClass(foo="baz", bar=[])], baz=uuid4()
+            ),
+        )
+        ok(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[])])
+        fail(list[MyPydanticClass], [MyPydanticClass(foo="foo", bar=[]), 5])
+
+
+# This is an example of appending the stack to every Temporal failure error
+def append_temporal_stack(exc: BaseException | None) -> None:
+    while exc:
+        # Only append if it doesn't appear already there
+        if (
+            isinstance(exc, FailureError)
+            and exc.failure
+            and exc.failure.stack_trace
+            and len(exc.args) == 1
+            and "\nStack:\n" not in exc.args[0]
+        ):
+            exc.args = (f"{exc}\nStack:\n{exc.failure.stack_trace.rstrip()}",)
+        exc = exc.__cause__
+
+
+async def test_exception_format():
+    # Cause a nested exception
+    actual_err: Exception
+    try:
+        try:
+            raise ValueError("error1")
+        except Exception as err:
+            raise RuntimeError("error2") from err
+    except Exception as err:
+        actual_err = err
+    assert actual_err
+
+    # Convert to failure and back
+    failure = Failure()
+    await DataConverter.default.encode_failure(actual_err, failure)
+    failure_error = await DataConverter.default.decode_failure(failure)
+    # Confirm type is prepended
+    assert isinstance(failure_error, ApplicationError)
+    assert "RuntimeError: error2" == str(failure_error)
+    assert isinstance(failure_error.cause, ApplicationError)
+    assert "ValueError: error1" == str(failure_error.cause)
+
+    # Append the stack and format the exception and check the output
+    append_temporal_stack(failure_error)
+    output = "".join(
+        traceback.format_exception(
+            type(failure_error), failure_error, failure_error.__traceback__
+        )
+    )
+    assert "temporalio.exceptions.ApplicationError: ValueError: error1" in output
+    assert "temporalio.exceptions.ApplicationError: RuntimeError: error" in output
+    assert output.count("\nStack:\n") == 2
+
+    # This shows how it might look for those with debugging on
+    logging.getLogger(__name__).debug(
+        "Showing appended exception", exc_info=failure_error
+    )
+
+
+# Just serializes in a "payloads" wrapper
+class SimpleCodec(PayloadCodec):
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        wrapper = Payloads(payloads=payloads)
+        return [
+            Payload(
+                metadata={"simple-codec": b"true"}, data=wrapper.SerializeToString()
+            )
+        ]
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        payloads = list(payloads)
+        if len(payloads) != 1:
+            raise RuntimeError("Expected only a single payload")
+        elif payloads[0].metadata.get("simple-codec") != b"true":
+            raise RuntimeError("Not encoded with this codec")
+        wrapper = Payloads()
+        wrapper.ParseFromString(payloads[0].data)
+        return list(wrapper.payloads)
+
+
+async def test_failure_encoded_attributes():
+    try:
+        raise ApplicationError("some message", "some detail")
+    except ApplicationError as err:
+        some_err = err
+
+    conv = DataConverter(
+        failure_converter_class=DefaultFailureConverterWithEncodedAttributes,
+        payload_codec=SimpleCodec(),
+    )
+    assert conv.payload_codec
+
+    # Check failure
+    failure = Failure()
+    conv.failure_converter.to_failure(some_err, conv.payload_converter, failure)
+    assert failure.message == "Encoded failure"
+    assert failure.stack_trace == ""
+    assert conv.payload_converter.from_payloads(
+        failure.application_failure_info.details.payloads
+    ) == ["some detail"]
+    encoded_attr = conv.payload_converter.from_payloads([failure.encoded_attributes])[0]
+    assert encoded_attr["message"] == "some message"
+    assert "test_converter" in encoded_attr["stack_trace"]
+
+    # Encode it and check encoded
+    orig_failure = Failure()
+    orig_failure.CopyFrom(failure)
+    await conv.payload_codec.encode_failure(failure)
+    assert "encoding" not in failure.encoded_attributes.metadata
+    assert "simple-codec" in failure.encoded_attributes.metadata
+    assert (
+        "encoding" not in failure.application_failure_info.details.payloads[0].metadata
+    )
+    assert (
+        "simple-codec" in failure.application_failure_info.details.payloads[0].metadata
+    )
+
+    # Decode and check
+    await conv.payload_codec.decode_failure(failure)
+    assert "encoding" in failure.encoded_attributes.metadata
+    assert "simple-codec" not in failure.encoded_attributes.metadata
+    assert "encoding" in failure.application_failure_info.details.payloads[0].metadata
+    assert (
+        "simple-codec"
+        not in failure.application_failure_info.details.payloads[0].metadata
+    )
+    assert failure == orig_failure
+
+
+@pytest.mark.parametrize(
+    "handler_type,retryable_override,expected_retryable",
+    [
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, None, None),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, True, True),
+        (nexusrpc.HandlerErrorType.BAD_REQUEST, False, False),
+        (nexusrpc.HandlerErrorType.INTERNAL, None, None),
+        (nexusrpc.HandlerErrorType.INTERNAL, True, True),
+        (nexusrpc.HandlerErrorType.NOT_FOUND, False, False),
+        (nexusrpc.HandlerErrorType.RESOURCE_EXHAUSTED, None, None),
+        (nexusrpc.HandlerErrorType.UNAVAILABLE, True, True),
+        (nexusrpc.HandlerErrorType.UPSTREAM_TIMEOUT, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHENTICATED, None, None),
+        (nexusrpc.HandlerErrorType.UNAUTHORIZED, None, None),
+    ],
+)
+async def test_nexus_handler_error_round_trip(
+    handler_type: nexusrpc.HandlerErrorType,
+    retryable_override: bool | None,
+    expected_retryable: bool | None,
+):
+    """Test round-trip conversion of nexusrpc.HandlerError through failure converter."""
+    message = f"test message for {handler_type.name}"
+    original_error = nexusrpc.HandlerError(
+        message,
+        type=handler_type,
+        retryable_override=retryable_override,
+    )
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify failure structure
+    assert failure.HasField("nexus_handler_failure_info")
+    assert failure.nexus_handler_failure_info.type == handler_type.name
+    assert failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+    # Convert back to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify result
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == handler_type
+    assert result_error.retryable_override == expected_retryable
+    assert result_error.message == message
+    assert result_error.original_failure
+    assert result_error.original_failure.details
+
+    # modify result_error.original_failure as a way of confirming that it is used
+    # when encoding the resulting failure
+    result_error.original_failure.details = {
+        "nexusHandlerFailureInfo": {
+            **result_error.original_failure.details["nexusHandlerFailureInfo"],
+            "type": "TEST TYPE",
+        }
+    }
+
+    result_failure = Failure()
+    await DataConverter.default.encode_failure(result_error, result_failure)
+    assert result_failure.HasField("nexus_handler_failure_info")
+    assert result_failure.nexus_handler_failure_info.type == "TEST TYPE"
+    assert result_failure.message == message
+
+    # Verify retryable behavior mapping
+    if retryable_override is True:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_RETRYABLE
+        )
+    elif retryable_override is False:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_NON_RETRYABLE
+        )
+    else:
+        assert (
+            result_failure.nexus_handler_failure_info.retry_behavior
+            == NexusHandlerErrorRetryBehavior.NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED
+        )
+
+
+async def test_nexus_handler_error_with_cause():
+    """Test HandlerError with a cause chain is properly converted."""
+    # Create a cause chain
+    root_cause = ValueError("root cause")
+    middle_cause = RuntimeError("middle cause")
+    middle_cause.__cause__ = root_cause
+
+    handler_error = nexusrpc.HandlerError(
+        "handler error message",
+        type=nexusrpc.HandlerErrorType.INTERNAL,
+    )
+    handler_error.__cause__ = middle_cause
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(handler_error, failure)
+
+    # Verify message and cause chain in failure
+    assert failure.message == "handler error message"
+    assert failure.HasField("cause")
+    assert failure.cause.message == "middle cause"
+    assert failure.cause.application_failure_info.type == "RuntimeError"
+    assert failure.cause.HasField("cause")
+    assert failure.cause.cause.message == "root cause"
+    assert failure.cause.cause.application_failure_info.type == "ValueError"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify cause chain with messages (ApplicationError prepends type to message in str())
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert str(result_error) == "handler error message"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, ApplicationError)
+    assert str(result_error.__cause__) == "RuntimeError: middle cause"
+    assert result_error.__cause__.__cause__ is not None
+    assert str(result_error.__cause__.__cause__) == "ValueError: root cause"
+
+
+async def test_nexus_handler_error_unknown_type_fallback():
+    """Test that unknown HandlerErrorType falls back to INTERNAL during from_failure."""
+    # Create a failure with an unknown type
+    failure = Failure()
+    failure.message = "unknown type error"
+    failure.nexus_handler_failure_info.type = "UNKNOWN_TYPE_XYZ"
+
+    # Convert to error
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Should fall back to INTERNAL with message preserved
+    assert isinstance(result_error, nexusrpc.HandlerError)
+    assert result_error.type == nexusrpc.HandlerErrorType.INTERNAL
+    assert str(result_error) == "unknown type error"
+
+
+async def test_nexus_operation_error_round_trip():
+    """Test round-trip conversion of NexusOperationError."""
+    test_cases = [
+        # (scheduled_event_id, endpoint, service, operation, operation_token)
+        (123, "my-endpoint", "MyService", "myOperation", "token-abc"),
+        (0, "", "", "", ""),  # Empty values
+        (999, "endpoint-2", "ServiceB", "op2", ""),  # Empty token
+        (1, "e", "s", "o", "very-long-token-" + "x" * 100),
+    ]
+
+    for scheduled_event_id, endpoint, service, operation, operation_token in test_cases:
+        message = "nexus operation failed"
+        original_error = NexusOperationError(
+            message,
+            scheduled_event_id=scheduled_event_id,
+            endpoint=endpoint,
+            service=service,
+            operation=operation,
+            operation_token=operation_token,
+        )
+
+        # Convert to failure
+        failure = Failure()
+        await DataConverter.default.encode_failure(original_error, failure)
+
+        # Verify failure structure and message
+        assert failure.message == message
+        assert failure.HasField("nexus_operation_execution_failure_info")
+        info = failure.nexus_operation_execution_failure_info
+        assert info.scheduled_event_id == scheduled_event_id
+        assert info.endpoint == endpoint
+        assert info.service == service
+        assert info.operation == operation
+        assert info.operation_token == operation_token
+
+        # Convert back
+        result_error = await DataConverter.default.decode_failure(failure)
+
+        # Verify result including message
+        assert isinstance(result_error, NexusOperationError)
+        assert result_error.message == message
+        assert result_error.scheduled_event_id == scheduled_event_id
+        assert result_error.endpoint == endpoint
+        assert result_error.service == service
+        assert result_error.operation == operation
+        assert result_error.operation_token == operation_token
+
+
+async def test_nexus_operation_error_with_cause():
+    """Test NexusOperationError with a HandlerError as cause."""
+    # Create NexusOperationError with HandlerError as cause
+    cause_error = nexusrpc.HandlerError(
+        "handler failed",
+        type=nexusrpc.HandlerErrorType.NOT_FOUND,
+    )
+
+    original_error = NexusOperationError(
+        "nexus operation failed",
+        scheduled_event_id=42,
+        endpoint="test-endpoint",
+        service="TestService",
+        operation="testOp",
+        operation_token="token123",
+    )
+    original_error.__cause__ = cause_error
+
+    # Convert to failure
+    failure = Failure()
+    await DataConverter.default.encode_failure(original_error, failure)
+
+    # Verify message and cause is present
+    assert failure.message == "nexus operation failed"
+    assert failure.HasField("cause")
+    assert failure.cause.HasField("nexus_handler_failure_info")
+    assert failure.cause.message == "handler failed"
+
+    # Convert back
+    result_error = await DataConverter.default.decode_failure(failure)
+
+    # Verify messages preserved
+    assert isinstance(result_error, NexusOperationError)
+    assert result_error.message == "nexus operation failed"
+    assert result_error.__cause__ is not None
+    assert isinstance(result_error.__cause__, nexusrpc.HandlerError)
+    assert result_error.__cause__.type == nexusrpc.HandlerErrorType.NOT_FOUND
+    assert str(result_error.__cause__) == "handler failed"
+
+
+class IPv4AddressPayloadConverter(CompositePayloadConverter):
+    def __init__(self) -> None:
+        # Replace default JSON plain with our own that has our type converter
+        json_converter = JSONPlainPayloadConverter(
+            encoder=IPv4AddressJSONEncoder,
+            custom_type_converters=[IPv4AddressJSONTypeConverter()],
+        )
+        super().__init__(
+            *[
+                c if not isinstance(c, JSONPlainPayloadConverter) else json_converter
+                for c in DefaultPayloadConverter.default_encoding_payload_converters
+            ]
+        )
+
+
+class IPv4AddressJSONEncoder(AdvancedJSONEncoder):
+    def default(self, o: Any) -> Any:
+        if isinstance(o, ipaddress.IPv4Address):
+            return str(o)
+        return super().default(o)
+
+
+class IPv4AddressJSONTypeConverter(JSONTypeConverter):
+    def to_typed_value(
+        self, hint: type, value: Any
+    ) -> Any | None | JSONTypeConverterUnhandled:
+        if inspect.isclass(hint) and issubclass(hint, ipaddress.IPv4Address):
+            return ipaddress.IPv4Address(value)
+        return JSONTypeConverter.Unhandled
+
+
+def test_json_type_converter_unhandled_type_public():
+    return_type = get_type_hints(JSONTypeConverter.to_typed_value)["return"]
+
+    assert JSONTypeConverterUnhandled.__name__ == "JSONTypeConverterUnhandled"
+    assert JSONTypeConverterUnhandled in get_args(return_type)
+    assert JSONTypeConverterUnhandled(JSONTypeConverter.Unhandled) is (
+        JSONTypeConverter.Unhandled
+    )
+
+
+async def test_json_type_converter():
+    addr = ipaddress.IPv4Address("1.2.3.4")
+    custom_conv = dataclasses.replace(
+        DataConverter.default, payload_converter_class=IPv4AddressPayloadConverter
+    )
+
+    # Fails to encode with default
+    with pytest.raises(TypeError):
+        await DataConverter.default.encode([addr])
+    with pytest.raises(TypeError):
+        await DataConverter.default.encode([[addr, addr]])
+
+    # But encodes with custom
+    payload = (await custom_conv.encode([addr]))[0]
+    assert '"1.2.3.4"' == payload.data.decode()
+    list_payload = (await custom_conv.encode([[addr, addr]]))[0]
+    assert '["1.2.3.4","1.2.3.4"]' == list_payload.data.decode()
+
+    # Fails to decode with default
+    with pytest.raises(TypeError):
+        await DataConverter.default.decode([payload], [ipaddress.IPv4Address])
+    with pytest.raises(TypeError):
+        await DataConverter.default.decode(
+            [list_payload], [list[ipaddress.IPv4Address]]
+        )
+
+    # But decodes with custom
+    assert addr == (await custom_conv.decode([payload], [ipaddress.IPv4Address]))[0]
+    assert [addr, addr] == (
+        await custom_conv.decode([list_payload], [list[ipaddress.IPv4Address]])
+    )[0]
+
+
+def test_value_to_type_literal_key():
+    # The type for the dictionary's *key*:
+    KeyHint = Literal[
+        "Key1",
+        "Key2",
+    ]
+
+    # The type for the dictionary's *value* (the inner dict):
+    InnerKeyHint = Literal[
+        "Inner1",
+        "Inner2",
+    ]
+    InnerValueHint = str | int | float | None
+    ValueHint = dict[InnerKeyHint, InnerValueHint]
+
+    # The full type hint for the mapping:
+    hint_with_bug = dict[KeyHint, ValueHint]
+
+    # A value that uses one of the literal keys:
+    value_to_convert = {"Key1": {"Inner1": 123.45, "Inner2": 10}}
+    custom_converters: Sequence[JSONTypeConverter] = []
+
+    # Function executes without error
+    value_to_type(hint_with_bug, value_to_convert, custom_converters)

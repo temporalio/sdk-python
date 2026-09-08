@@ -1,0 +1,43 @@
+name: Release package smoke test
+description: Install a published temporalio package and run a minimal SDK workflow.
+inputs:
+  version:
+    description: "Package version to install and verify"
+    required: true
+  index-url:
+    description: "Primary package index URL"
+    required: true
+  dependency-index-url:
+    description: "Optional dependency package index URL"
+    required: false
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+      with:
+        python-version: "3.10"
+    - name: Install package
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        INDEX_URL: ${{ inputs.index-url }}
+        DEPENDENCY_INDEX_URL: ${{ inputs.dependency-index-url }}
+      run: |
+        set -euo pipefail
+        python -m venv .venv
+        .venv/bin/python -m pip install --upgrade pip
+
+        install_args=(--version "$VERSION" --index-url "$INDEX_URL")
+        if [[ -n "$DEPENDENCY_INDEX_URL" ]]; then
+          install_args+=(--dependency-index-url "$DEPENDENCY_INDEX_URL")
+        fi
+
+        .venv/bin/python .github/scripts/install_release_package.py "${install_args[@]}"
+    - name: Run SDK smoke test
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        .venv/bin/python .github/scripts/release_smoke_package.py

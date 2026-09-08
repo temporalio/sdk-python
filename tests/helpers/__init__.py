@@ -1,0 +1,534 @@
+import asyncio
+import logging
+import logging.handlers
+import queue
+import socket
+import threading
+import time
+import uuid
+from collections.abc import Awaitable, Callable, Iterator, Sequence
+from contextlib import closing, contextmanager
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import (
+    Any,
+    TypeVar,
+    cast,
+)
+
+from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.enums.v1 import EventType as EventType
+from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.history.v1 import HistoryEvent
+from temporalio.api.operatorservice.v1 import (
+    AddSearchAttributesRequest,
+    ListSearchAttributesRequest,
+)
+from temporalio.api.update.v1 import UpdateRef
+from temporalio.api.workflow.v1 import PendingActivityInfo
+from temporalio.api.workflowservice.v1 import (
+    PauseActivityRequest,
+    PollWorkflowExecutionUpdateRequest,
+    UnpauseActivityRequest,
+)
+from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
+from temporalio.common import SearchAttributeKey
+from temporalio.converter import DataConverter
+from temporalio.service import RPCError, RPCStatusCode
+from temporalio.worker import Worker, WorkflowRunner
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+from temporalio.workflow import (
+    UpdateMethodMultiParam,
+)
+
+
+def new_worker(
+    client: Client,
+    *workflows: type,
+    activities: Sequence[Callable] = [],
+    task_queue: str | None = None,
+    workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
+    max_cached_workflows: int = 1000,
+    workflow_failure_exception_types: Sequence[type[BaseException]] = [],
+    **kwargs,  # type:ignore[reportMissingParameterType]
+) -> Worker:
+    return Worker(
+        client,
+        task_queue=task_queue or str(uuid.uuid4()),
+        workflows=workflows,
+        activities=activities,
+        workflow_runner=workflow_runner,
+        max_cached_workflows=max_cached_workflows,
+        workflow_failure_exception_types=workflow_failure_exception_types,
+        **kwargs,
+    )
+
+
+T = TypeVar("T")
+
+
+async def assert_eventually(
+    fn: Callable[[], Awaitable[T]],
+    *,
+    timeout: timedelta = timedelta(seconds=10),
+    interval: timedelta = timedelta(milliseconds=200),
+    retry_on_rpc_cancelled: bool = True,
+) -> T:
+    start_sec = time.monotonic()
+    while True:
+        try:
+            res = await fn()
+            return res
+        except AssertionError:
+            if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
+                raise
+        except RPCError as e:
+            if retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED:
+                continue
+            else:
+                raise
+        await asyncio.sleep(interval.total_seconds())
+
+
+async def assert_eq_eventually(
+    expected: T,
+    fn: Callable[[], Awaitable[T]],
+    *,
+    timeout: timedelta = timedelta(seconds=10),
+    interval: timedelta = timedelta(milliseconds=200),
+) -> None:
+    async def check() -> None:
+        assert expected == await fn()
+
+    await assert_eventually(check, timeout=timeout, interval=interval)
+
+
+async def assert_task_fail_eventually(
+    handle: WorkflowHandle, *, message_contains: str | None = None
+) -> None:
+    async def check() -> None:
+        async for evt in handle.fetch_history_events():
+            if evt.HasField("workflow_task_failed_event_attributes") and (
+                not message_contains
+                or message_contains
+                in evt.workflow_task_failed_event_attributes.failure.message
+            ):
+                return
+        assert False, "Task failure not present"
+
+    await assert_eventually(check)
+
+
+async def worker_versioning_enabled(client: Client) -> bool:
+    tq = f"worker-versioning-init-test-{uuid.uuid4()}"
+    try:
+        await client.update_worker_build_id_compatibility(
+            tq, BuildIdOpAddNewDefault("testver")
+        )
+        return True
+    except RPCError as e:
+        if e.status in [RPCStatusCode.PERMISSION_DENIED, RPCStatusCode.UNIMPLEMENTED]:
+            return False
+        raise
+
+
+async def ensure_search_attributes_present(
+    client: Client, *keys: SearchAttributeKey
+) -> None:
+    """Ensure all search attributes are present or attempt to add all."""
+    # Add search attributes if not already present
+    resp = await client.operator_service.list_search_attributes(
+        ListSearchAttributesRequest(namespace=client.namespace)
+    )
+    if not {key.name for key in keys}.issubset(resp.custom_attributes.keys()):
+        await client.operator_service.add_search_attributes(
+            AddSearchAttributesRequest(
+                namespace=client.namespace,
+                search_attributes={
+                    key.name: IndexedValueType.ValueType(key.indexed_value_type)
+                    for key in keys
+                },
+            ),
+        )
+        # Confirm now present
+        resp = await client.operator_service.list_search_attributes(
+            ListSearchAttributesRequest(namespace=client.namespace)
+        )
+        assert {key.name for key in keys}.issubset(resp.custom_attributes.keys())
+
+
+def find_free_port() -> int:
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind(("", 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
+
+
+async def workflow_update_exists(
+    client: Client, workflow_id: str, update_id: str
+) -> bool:
+    try:
+        await client.workflow_service.poll_workflow_execution_update(
+            PollWorkflowExecutionUpdateRequest(
+                namespace=client.namespace,
+                update_ref=UpdateRef(
+                    workflow_execution=WorkflowExecution(workflow_id=workflow_id),
+                    update_id=update_id,
+                ),
+            )
+        )
+        return True
+    except RPCError as err:
+        if err.status != RPCStatusCode.NOT_FOUND:
+            raise
+        return False
+
+
+# TODO: type update return value
+async def admitted_update_task(
+    client: Client,
+    handle: WorkflowHandle,
+    update_method: UpdateMethodMultiParam,
+    id: str,
+    **kwargs,  # type:ignore[reportMissingParameterType]
+) -> asyncio.Task:
+    """
+    Return an asyncio.Task for an update after waiting for it to be admitted.
+    """
+    update_task = asyncio.create_task(
+        handle.execute_update(update_method, id=id, **kwargs)
+    )
+    await assert_eq_eventually(
+        True,
+        lambda: workflow_update_exists(client, handle.id, id),
+    )
+    return update_task
+
+
+async def assert_workflow_exists_eventually(
+    client: Client,
+    workflow: Any,
+    workflow_id: str,
+) -> WorkflowHandle:
+    handle = None
+
+    async def check_workflow_exists() -> bool:
+        nonlocal handle
+        try:
+            handle = client.get_workflow_handle_for(
+                workflow,
+                workflow_id=workflow_id,
+            )
+            await handle.describe()
+            return True
+        except RPCError as err:
+            # Ignore not-found or failed precondition because child may
+            # not have started yet
+            if (
+                err.status == RPCStatusCode.NOT_FOUND
+                or err.status == RPCStatusCode.FAILED_PRECONDITION
+            ):
+                return False
+            raise
+
+    await assert_eq_eventually(True, check_workflow_exists)
+    assert handle is not None
+    return handle
+
+
+async def assert_pending_activity_exists_eventually(
+    handle: WorkflowHandle,
+    activity_id: str,
+    timeout: timedelta = timedelta(seconds=5),
+) -> PendingActivityInfo:
+    """Wait until a pending activity with the given ID exists and return it."""
+
+    async def check() -> PendingActivityInfo:
+        act_info = await get_pending_activity_info(handle, activity_id)
+        if act_info is not None:
+            return act_info
+        raise AssertionError(
+            f"Activity with ID {activity_id} not found in pending activities"
+        )
+
+    return await assert_eventually(check, timeout=timeout)
+
+
+async def assert_event_subsequence(
+    wf_handle: WorkflowHandle,
+    expected_events: list[EventType.ValueType],
+    timeout: timedelta = timedelta(seconds=5),
+) -> None:
+    """
+    Given a workflow handle and a sequence of event types, assert that the workflow's history
+    contains that subsequence of events in the order specified.
+    """
+
+    async def check():
+        history = await wf_handle.fetch_history()
+
+        _all_events = iter(history.events)
+        _expected_events = iter(expected_events)
+
+        previous_expected_event_type_name = None
+        for expected_event_type in _expected_events:
+            expected_event_type_name = EventType.Name(expected_event_type).removeprefix(
+                "EVENT_TYPE_"
+            )
+            has_expected = next(
+                (e for e in _all_events if e.event_type == expected_event_type),
+                None,
+            )
+            if not has_expected:
+                if previous_expected_event_type_name is not None:
+                    prefix = f"After {previous_expected_event_type_name}, "
+                else:
+                    prefix = ""
+                raise AssertionError(
+                    f"{prefix}expected {expected_event_type_name} in workflow {wf_handle.id}"
+                )
+            previous_expected_event_type_name = expected_event_type_name
+
+    await assert_eventually(check, timeout=timeout)
+
+
+async def get_pending_activity_info(
+    handle: WorkflowHandle,
+    activity_id: str,
+) -> PendingActivityInfo | None:
+    """Get pending activity info by ID, or None if not found."""
+    desc = await handle.describe()
+    for act in desc.raw_description.pending_activities:
+        if act.activity_id == activity_id:
+            return act
+    return None
+
+
+_wait_for_pause_events: dict[str, threading.Event] = {}
+
+
+def wait_for_pause_event(activity_id: str) -> None:
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        event.wait()
+
+
+async def async_wait_for_pause_event(activity_id: str) -> None:
+    event = _wait_for_pause_events.get(activity_id)
+    if event is not None:
+        await asyncio.get_running_loop().run_in_executor(None, event.wait)
+
+
+async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Pause the given activity and assert it becomes paused.
+
+    Registers an event before calling the pause API so cooperating test
+    activities (those that catch the pause-induced cancel via
+    wait_for_pause_release) hang until we have observed paused=true.
+    """
+    desc = await handle.describe()
+    req = PauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+
+    _wait_for_pause_events[activity_id] = threading.Event()
+    try:
+        await client.workflow_service.pause_activity(req)
+
+        async def check_paused() -> None:
+            info = await assert_pending_activity_exists_eventually(handle, activity_id)
+            assert info.paused, f"Activity {activity_id} not yet paused"
+
+        await assert_eventually(check_paused)
+    finally:
+        _wait_for_pause_events[activity_id].set()
+        del _wait_for_pause_events[activity_id]
+
+
+async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
+    """Unpause the given activity and assert it is not paused."""
+    desc = await handle.describe()
+    req = UnpauseActivityRequest(
+        namespace=client.namespace,
+        execution=WorkflowExecution(
+            workflow_id=desc.raw_description.workflow_execution_info.execution.workflow_id,
+            run_id=desc.raw_description.workflow_execution_info.execution.run_id,
+        ),
+        id=activity_id,
+    )
+    await client.workflow_service.unpause_activity(req)
+
+    # Assert eventually not paused
+    async def check_unpaused() -> None:
+        info = await assert_pending_activity_exists_eventually(handle, activity_id)
+        assert not info.paused, f"Activity {activity_id} still paused"
+
+    await assert_eventually(check_unpaused)
+
+
+async def print_history(handle: WorkflowHandle):
+    i = 1
+    async for evt in handle.fetch_history_events():
+        event = EventType.Name(evt.event_type).removeprefix("EVENT_TYPE_")
+        print(f"{i:2}: {event}")
+        i += 1
+
+
+@dataclass
+class InterleavedHistoryEvent:
+    handle: WorkflowHandle
+    event: HistoryEvent | str
+    number: int | None
+    time: datetime
+
+
+async def print_interleaved_histories(
+    handles: list[WorkflowHandle],
+    extra_events: list[tuple[WorkflowHandle, str, datetime]] | None = None,
+) -> None:
+    """
+    Print the interleaved history events from multiple workflow handles in columns.
+
+    A column entry looks like
+
+    <event_num>: <elapsed_ms> <event_type>
+
+    where <elapsed_ms> is the number of milliseconds since the first event in any of the workflows.
+    """
+    all_events: list[InterleavedHistoryEvent] = []
+    workflow_start_times: dict[WorkflowHandle, datetime] = {}
+
+    for handle in handles:
+        event_num = 1
+        first_event = True
+        async for history_event in handle.fetch_history_events():
+            event_time = history_event.event_time.ToDatetime()
+            if first_event:
+                workflow_start_times[handle] = event_time
+                first_event = False
+            all_events.append(
+                InterleavedHistoryEvent(handle, history_event, event_num, event_time)
+            )
+            event_num += 1
+
+    if extra_events:
+        for handle, event_str, event_time in extra_events:
+            # Ensure timezone-naive
+            if event_time.tzinfo is not None:
+                event_time = event_time.astimezone(timezone.utc).replace(tzinfo=None)
+            all_events.append(
+                InterleavedHistoryEvent(handle, event_str, None, event_time)
+            )
+
+    zero_time = min(workflow_start_times.values())
+
+    all_events.sort(key=lambda item: item.time)
+    col_width = 50
+
+    def _format_row(items: list[str], truncate: bool = False) -> str:
+        if truncate:
+            items = [item[: col_width - 3] for item in items]
+        return " | ".join(f"{item:<{col_width - 3}}" for item in items)
+
+    headers = [handle.id for handle in handles]
+    print("\n" + _format_row(headers, truncate=True))
+    print("-" * (col_width * len(handles) + len(handles) - 1))
+
+    for event in all_events:
+        elapsed_ms = int((event.time - zero_time).total_seconds() * 1000)
+
+        if isinstance(event.event, str):
+            event_desc = f" *: {elapsed_ms:>4} {event.event}"
+            summary = None
+        else:
+            event_type = EventType.Name(event.event.event_type).removeprefix(
+                "EVENT_TYPE_"
+            )
+            event_desc = f"{event.number:2}: {elapsed_ms:>4} {event_type}"
+
+            # Extract summary from user_metadata if present
+            summary = None
+            if event.event.HasField(
+                "user_metadata"
+            ) and event.event.user_metadata.HasField("summary"):
+                try:
+                    summary = DataConverter.default.payload_converter.from_payload(
+                        event.event.user_metadata.summary
+                    )
+                except Exception:
+                    pass  # Ignore decoding errors
+
+        row = [""] * len(handles)
+        col_idx = handles.index(event.handle)
+        row[col_idx] = event_desc[: col_width - 3]
+        print(_format_row(row))
+
+        # Print summary on new line if present
+        if summary:
+            summary_row = [""] * len(handles)
+            # Left-align with event type name (after "<event_num>: <elapsed_ms> ")
+            # Calculate the padding needed
+            if event.number is not None:
+                padding = len(f"{event.number:2}: {elapsed_ms:>4} ")
+            else:
+                padding = len(f" *: {elapsed_ms:>4} ")
+            summary_row[col_idx] = f"{' ' * padding}[{summary}]"[: col_width - 3]
+            print(_format_row(summary_row))
+
+
+class LogCapturer:
+    def __init__(self) -> None:
+        self.log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+
+    @contextmanager
+    def logs_captured(self, *loggers: logging.Logger, level: int = logging.INFO):
+        handler = logging.handlers.QueueHandler(self.log_queue)
+
+        prev_levels = [l.level for l in loggers]
+        for l in loggers:
+            l.setLevel(level)
+            l.addHandler(handler)
+        try:
+            yield self
+        finally:
+            for i, l in enumerate(loggers):
+                l.removeHandler(handler)
+                l.setLevel(prev_levels[i])
+
+    def find_log(self, starts_with: str) -> logging.LogRecord | None:
+        return self.find(lambda l: l.message.startswith(starts_with))
+
+    def find(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> logging.LogRecord | None:
+        for record in cast(list[logging.LogRecord], self.log_queue.queue):
+            if pred(record):
+                return record
+        return None
+
+    def find_all(
+        self, pred: Callable[[logging.LogRecord], bool]
+    ) -> list[logging.LogRecord]:
+        return [
+            record
+            for record in cast(list[logging.LogRecord], self.log_queue.queue)
+            if pred(record)
+        ]
+
+
+class LogHandler:
+    @staticmethod
+    @contextmanager
+    def apply(logger: logging.Logger, handler: logging.Handler) -> Iterator[None]:
+        level = logger.level
+        logger.addHandler(handler)
+        try:
+            yield
+        finally:
+            logger.removeHandler(handler)
+            logger.level = level

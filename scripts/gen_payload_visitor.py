@@ -1,0 +1,481 @@
+import subprocess
+import sys
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+from typing import cast, get_args, get_origin, get_type_hints
+
+import google.protobuf.message
+import nexusrpc
+from google.protobuf.descriptor import Descriptor, FieldDescriptor
+
+base_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(base_dir))
+
+from temporalio.api.common.v1.message_pb2 import Payload, Payloads, SearchAttributes
+from temporalio.bridge.proto.nexus import NexusTaskCompletion
+from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import (
+    WorkflowActivation,
+)
+from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import (
+    WorkflowActivationCompletion,
+)
+from temporalio.converter._payload_converter import _get_transfer_type_converter
+
+
+def discover_system_nexus_roots() -> list[Descriptor]:
+    module_path = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
+    spec = spec_from_file_location(
+        "temporalio_nexus_system_workflow_service",
+        module_path / "__init__.py",
+        submodule_search_locations=[str(module_path)],
+    )
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load generated system service from {module_path}")
+    module = module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+
+    roots: list[Descriptor] = []
+    for annotation in get_type_hints(module._services.WorkflowService).values():
+        if get_origin(annotation) is not nexusrpc.Operation:
+            continue
+        for operation_type in get_args(annotation):
+            converter = _get_transfer_type_converter(operation_type)
+            proto_type = (
+                converter.transfer_type if converter is not None else operation_type
+            )
+            if isinstance(proto_type, type) and issubclass(
+                proto_type, google.protobuf.message.Message
+            ):
+                roots.append(cast(Descriptor, proto_type.DESCRIPTOR))
+    deduped: list[Descriptor] = []
+    seen: set[str] = set()
+    for root in roots:
+        if root.full_name not in seen:
+            seen.add(root.full_name)
+            deduped.append(root)
+    return deduped
+
+
+def name_for(desc: Descriptor) -> str:
+    # Use fully-qualified name to avoid collisions; replace dots with underscores
+    return desc.full_name.replace(".", "_")
+
+
+def field_is_repeated(field: FieldDescriptor) -> bool:
+    return bool(
+        getattr(
+            field,
+            "is_repeated",
+            getattr(field, "label") == FieldDescriptor.LABEL_REPEATED,
+        )
+    )
+
+
+def emit_loop(
+    field_name: str,
+    iter_expr: str,
+    child_method: str,
+) -> str:
+    # Emit a for-loop with direct await, with optional skip guard
+    inner = (
+        f"for v in {iter_expr}:\n"
+        f"                await self._visit_{child_method}(fs, v)"
+    )
+    if field_name == "headers":
+        return f"        if not self.skip_headers:\n            {inner}"
+    elif field_name == "search_attributes":
+        return f"        if not self.skip_search_attributes:\n            {inner}"
+    else:
+        return f"        {inner}"
+
+
+def emit_singular(
+    field_name: str, access_expr: str, child_method: str, presence_word: str | None
+) -> str:
+    # Emit a direct await self._visit_...() with optional HasField check and skip guard
+    if presence_word:
+        if field_name == "headers":
+            return (
+                "        if not self.skip_headers:\n"
+                f'            {presence_word} o.HasField("{field_name}"):\n'
+                f"                await self._visit_{child_method}(fs, {access_expr})"
+            )
+        else:
+            return (
+                f'        {presence_word} o.HasField("{field_name}"):\n'
+                f"            await self._visit_{child_method}(fs, {access_expr})"
+            )
+    else:
+        if field_name == "headers":
+            return (
+                "        if not self.skip_headers:\n"
+                f"            await self._visit_{child_method}(fs, {access_expr})"
+            )
+        else:
+            return f"        await self._visit_{child_method}(fs, {access_expr})"
+
+
+class VisitorGenerator:
+    def generate(self, roots: list[Descriptor]) -> str:
+        """
+        Generate Python source code that, given a function f(Payload) -> Payload,
+        applies it to every Payload contained within a WorkflowActivation tree.
+
+        The generated code defines async visitor functions for each reachable
+        protobuf message type starting from WorkflowActivation, including support
+        for repeated fields and map entries. Payload-free roots get no-op methods
+        so the `visit` entrypoint recognizes them as supported.
+        """
+
+        for root in roots:
+            if not self.walk(root):
+                self.methods.append(
+                    f"""\
+    async def _visit_{name_for(root)}(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+"""
+                )
+
+        header = """
+from __future__ import annotations
+
+# This file is generated by gen_payload_visitor.py. Changes should be made there.
+from typing import Any
+
+import temporalio.nexus.system
+from temporalio.api.common.v1.message_pb2 import Payload
+from temporalio.bridge._visitor_functions import (
+    BoundedVisitorFunctions,
+    PayloadSequence,
+    VisitorFunctions,
+)
+
+
+class PayloadVisitor:
+    \"\"\"A visitor for payloads.
+    Applies a function to every payload in a tree of messages.
+    \"\"\"
+
+    def __init__(
+        self,
+        *,
+        skip_search_attributes: bool = False,
+        skip_headers: bool = False,
+        concurrency_limit: int = 1,
+    ):
+        \"\"\"Creates a new payload visitor.
+
+        Args:
+            skip_search_attributes: If True, search attributes are not visited.
+            skip_headers: If True, headers are not visited.
+            concurrency_limit: Maximum number of payload visits that may run
+                concurrently during a single call to visit(). Defaults to 1
+                (sequential).
+        \"\"\"
+        if concurrency_limit < 1:
+            raise ValueError("concurrency_limit must be positive")
+        self.skip_search_attributes = skip_search_attributes
+        self.skip_headers = skip_headers
+        self._concurrency_limit = concurrency_limit
+
+    async def visit(
+        self, fs: VisitorFunctions, root: Any
+    ) -> None:
+        \"\"\"Visits the given root message with the given function.\"\"\"
+        method_name = "_visit_" + root.DESCRIPTOR.full_name.replace(".", "_")
+        method = getattr(self, method_name, None)
+        if method is None:
+            raise ValueError(f"Unknown root message type: {root.DESCRIPTOR.full_name}")
+        if self._concurrency_limit == 1:
+            await method(fs, root)
+            return
+
+        bounded = BoundedVisitorFunctions(fs, self._concurrency_limit)
+        try:
+            await method(bounded, root)
+        finally:
+            await bounded.drain()
+
+    async def _visit_nexus_operation_input_payload(
+        self,
+        fs: VisitorFunctions,
+        payload: Payload,
+    ) -> None:
+        await self._visit_temporal_api_common_v1_Payload(fs, payload)
+
+"""
+
+        return header + "\n".join(self.methods)
+
+    def __init__(self):
+        # Track which message descriptors have visitor methods generated
+        self.generated: dict[str, bool] = {
+            Payload.DESCRIPTOR.full_name: True,
+            Payloads.DESCRIPTOR.full_name: True,
+        }
+        self.in_progress: set[str] = set()
+        self.methods: list[str] = [
+            """\
+    async def _visit_temporal_api_common_v1_Payload(
+        self, fs: VisitorFunctions, payload: Payload
+    ) -> None:
+        new_payload = await temporalio.nexus.system.maybe_visit_payload(
+            payload,
+            fs,
+            self.skip_search_attributes,
+        )
+        if new_payload is None:
+            await fs.visit_payload(payload)
+            return
+
+        if new_payload is not payload:
+            payload.CopyFrom(new_payload)
+        await fs.visit_system_nexus_envelope(payload)
+    """,
+            """\
+    async def _visit_temporal_api_common_v1_Payloads(self, fs: VisitorFunctions, o: Any):
+        await fs.visit_payloads(o.payloads)
+    """,
+            """\
+    async def _visit_payload_container(self, fs: VisitorFunctions, o: PayloadSequence):
+        await fs.visit_payloads(o)
+    """,
+        ]
+
+    def _collect_repeated(
+        self, child_desc: Descriptor, field: FieldDescriptor, iter_expr: str
+    ) -> tuple | None:
+        """Collect emit item for a non-map repeated field. Returns tuple or None."""
+        if child_desc.full_name == Payload.DESCRIPTOR.full_name:
+            return ("singular", field.name, iter_expr, "payload_container", None)
+        else:
+            child_needed = self.walk(child_desc)
+            if child_needed:
+                return ("loop", field.name, iter_expr, name_for(child_desc))
+            else:
+                return None
+
+    def walk(self, desc: Descriptor) -> bool:
+        key = desc.full_name
+        if key in self.generated:
+            return self.generated[key]
+        if key in self.in_progress:
+            # Break cycles; Assume the child will be needed (Used by Failure -> Cause)
+            return True
+
+        has_payload = False
+        self.in_progress.add(key)
+        is_search_attrs = desc.full_name == SearchAttributes.DESCRIPTOR.full_name
+
+        # Collect emit items before generating code.  Each item is one of:
+        #   ("loop",       field_name, iter_expr,   child_method)
+        #   ("singular",   field_name, access_expr, child_method, presence_word_or_None)
+        #   ("oneof_group",[(field_name, access_expr, child_method, if_word), ...])
+        emit_items: list = []
+
+        # Group fields by oneof to generate if/elif chains
+        oneof_fields: dict[int, list[FieldDescriptor]] = {}
+        regular_fields: list[FieldDescriptor] = []
+
+        for field in desc.fields:
+            if field.type != FieldDescriptor.TYPE_MESSAGE:
+                continue
+
+            # Skip synthetic oneofs (proto3 optional fields)
+            if field.containing_oneof is not None:
+                oneof_idx = field.containing_oneof.index
+                if oneof_idx not in oneof_fields:
+                    oneof_fields[oneof_idx] = []
+                oneof_fields[oneof_idx].append(field)
+            else:
+                regular_fields.append(field)
+
+        # Process regular fields first
+        for field in regular_fields:
+            if (
+                desc.full_name == "coresdk.workflow_commands.ScheduleNexusOperation"
+                and field.name == "input"
+            ):
+                has_payload = True
+                emit_items.append(
+                    (
+                        "system_nexus",
+                        field.name,
+                        "o.endpoint",
+                        "o.input",
+                    )
+                )
+                continue
+
+            # Repeated fields (including maps which are represented as repeated messages)
+            if field_is_repeated(field):
+                message_type = field.message_type
+                if message_type is not None and message_type.GetOptions().map_entry:
+                    val_fd = message_type.fields_by_name.get("value")
+                    if (
+                        val_fd is not None
+                        and val_fd.type == FieldDescriptor.TYPE_MESSAGE
+                    ):
+                        child_desc = val_fd.message_type
+                        assert child_desc is not None
+                        child_needed = self.walk(child_desc)
+                        if child_needed:
+                            has_payload = True
+                            emit_items.append(
+                                (
+                                    "loop",
+                                    field.name,
+                                    f"o.{field.name}.values()",
+                                    name_for(child_desc),
+                                )
+                            )
+
+                    key_fd = message_type.fields_by_name.get("key")
+                    if (
+                        key_fd is not None
+                        and key_fd.type == FieldDescriptor.TYPE_MESSAGE
+                    ):
+                        child_desc = key_fd.message_type
+                        assert child_desc is not None
+                        child_needed = self.walk(child_desc)
+                        if child_needed:
+                            has_payload = True
+                            emit_items.append(
+                                (
+                                    "loop",
+                                    field.name,
+                                    f"o.{field.name}.keys()",
+                                    name_for(child_desc),
+                                )
+                            )
+                else:
+                    assert message_type is not None
+                    item = self._collect_repeated(
+                        message_type, field, f"o.{field.name}"
+                    )
+                    if item is not None:
+                        has_payload = True
+                        emit_items.append(item)
+            else:
+                child_desc = field.message_type
+                assert child_desc is not None
+                child_has_payload = self.walk(child_desc)
+                has_payload |= child_has_payload
+                if child_has_payload:
+                    emit_items.append(
+                        (
+                            "singular",
+                            field.name,
+                            f"o.{field.name}",
+                            name_for(child_desc),
+                            "if",
+                        )
+                    )
+
+        # Process oneof fields as if/elif chains
+        for oneof_idx, fields in oneof_fields.items():
+            group = []
+            first = True
+            for field in fields:
+                child_desc = field.message_type
+                assert child_desc is not None
+                child_has_payload = self.walk(child_desc)
+                has_payload |= child_has_payload
+                if child_has_payload:
+                    if_word = "if" if first else "elif"
+                    first = False
+                    group.append(
+                        (field.name, f"o.{field.name}", name_for(child_desc), if_word)
+                    )
+            if group:
+                emit_items.append(("oneof_group", group))
+
+        self.generated[key] = has_payload
+        self.in_progress.discard(key)
+
+        if has_payload:
+            lines: list[str] = [
+                f"    async def _visit_{name_for(desc)}"
+                "(self, fs: VisitorFunctions, o: Any):"
+            ]
+            if is_search_attrs:
+                lines.append("        if self.skip_search_attributes:")
+                lines.append("            return")
+
+            for item in emit_items:
+                if item[0] == "loop":
+                    _, field_name, iter_expr, child_method = item
+                    lines.append(emit_loop(field_name, iter_expr, child_method))
+                elif item[0] == "singular":
+                    _, field_name, access_expr, child_method, presence_word = item
+                    lines.append(
+                        emit_singular(
+                            field_name, access_expr, child_method, presence_word
+                        )
+                    )
+                elif item[0] == "system_nexus":
+                    _, field_name, _endpoint_expr, payload_expr = item
+                    lines.append(
+                        f'        if o.HasField("{field_name}"):\n'
+                        "            await self._visit_nexus_operation_input_payload(\n"
+                        f"                fs, {payload_expr}\n"
+                        "            )"
+                    )
+                else:  # oneof_group
+                    for field_name, access_expr, child_method, presence_word in item[1]:
+                        lines.append(
+                            emit_singular(
+                                field_name, access_expr, child_method, presence_word
+                            )
+                        )
+
+            self.methods.append("\n".join(lines) + "\n")
+        return has_payload
+
+
+def write_bridge_visitors() -> None:
+    out_path = base_dir / "temporalio" / "bridge" / "_visitor.py"
+
+    # Build root descriptors: WorkflowActivation, WorkflowActivationCompletion,
+    # NexusTaskCompletion, and the system Nexus operation roots.
+    roots: list[Descriptor] = [
+        WorkflowActivation.DESCRIPTOR,
+        WorkflowActivationCompletion.DESCRIPTOR,
+        NexusTaskCompletion.DESCRIPTOR,
+    ] + discover_system_nexus_roots()
+
+    code = VisitorGenerator().generate(roots)
+    out_path.write_text(code)
+
+
+if __name__ == "__main__":
+    print("Generating temporalio/bridge/_visitor.py...", file=sys.stderr)
+    write_bridge_visitors()
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "ruff",
+            "check",
+            "--select",
+            "I",
+            "--fix",
+            "temporalio/bridge/_visitor.py",
+        ],
+        cwd=base_dir,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "uv",
+            "run",
+            "ruff",
+            "format",
+            "temporalio/bridge/_visitor.py",
+        ],
+        cwd=base_dir,
+        check=True,
+    )

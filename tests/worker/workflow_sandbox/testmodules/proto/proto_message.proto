@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package worker.workflow_sandbox.testmodules.proto;
+
+import "google/protobuf/duration.proto";
+
+message SomeMessage {
+  google.protobuf.Duration some_duration = 1;
+}

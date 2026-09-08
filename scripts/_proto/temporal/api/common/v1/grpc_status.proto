@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package temporal.api.common.v1;
+
+import "google/protobuf/any.proto";
+
+// From https://github.com/grpc/grpc/blob/master/src/proto/grpc/status/status.proto
+// since we don't import grpc but still need the status info
+message GrpcStatus {
+  int32 code = 1;
+  string message = 2;
+  repeated google.protobuf.Any details = 3;
+}

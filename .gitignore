@@ -1,0 +1,17 @@
+.venv
+__pycache__
+/build
+/dist
+temporalio/bridge/libtemporal_sdk_bridge.dylib.dSYM/
+temporalio/bridge/target/
+temporalio/bridge/temporal_sdk_bridge*
+/tests/helpers/golangserver/golangserver
+/tests/helpers/golangworker/golangworker
+/.idea
+/sdk-python.iml
+**/CLAUDE.md
+/.zed
+*.DS_Store
+tags
+/.claude
+tmpclaude-*
