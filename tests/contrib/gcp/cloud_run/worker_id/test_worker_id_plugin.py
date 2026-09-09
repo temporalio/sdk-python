@@ -9,13 +9,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 from temporalio.contrib.gcp.cloud_run.worker_id import (
     GoogleCloudRunMetadata,
     WorkerIDPlugin,
 )
 from temporalio.service import ConnectConfig, ServiceClient
-from temporalio.worker import WorkerConfig
 
 
 def _metadata(
@@ -77,27 +75,6 @@ class TestClientIdentity:
         assert config.identity == "my-identity"
 
 
-# ---- Worker deployment config ----
-
-
-class TestConfigureWorker:
-    def test_sets_pinned_deployment_config(self) -> None:
-        plugin = WorkerIDPlugin(
-            metadata=_metadata(instance_id="abc", name="my-pool", revision="rev-1")
-        )
-        config = plugin.configure_worker(WorkerConfig())
-        deployment_config = config.get("deployment_config")
-        assert deployment_config is not None
-        assert deployment_config.use_worker_versioning is True
-        assert (
-            deployment_config.default_versioning_behavior == VersioningBehavior.PINNED
-        )
-        assert deployment_config.version == WorkerDeploymentVersion(
-            deployment_name="my-pool",
-            build_id="rev-1",
-        )
-
-
 # ---- Metadata fetching / caching ----
 
 
@@ -125,7 +102,7 @@ class TestMetadataFetch:
             await plugin.connect_service_client(config, connect)
 
     @pytest.mark.asyncio
-    async def test_metadata_fetched_once_and_reused_by_worker(
+    async def test_metadata_fetched_from_server_at_connect(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         fetch = Mock(return_value=_metadata(instance_id="abc", revision="rev-1"))
@@ -140,9 +117,7 @@ class TestMetadataFetch:
             return _service_client()
 
         await plugin.connect_service_client(config, connect)
-        worker_config = plugin.configure_worker(WorkerConfig())
 
-        # Fetched exactly once at connect; the worker hook reuses the cached value.
+        # Fetched from the metadata server when the client connects.
         fetch.assert_called_once()
         assert config.identity == "abc@rev-1"
-        assert worker_config.get("deployment_config") is not None

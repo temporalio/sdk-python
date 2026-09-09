@@ -2,13 +2,12 @@
 
 Cloud Run runs a long-lived container rather than a per-invocation handler, so this is a small
 metadata-driven plugin -- **not** a worker wrapper. :py:class:`WorkerIDPlugin` reads Cloud Run
-instance metadata (from a worker pool or a service) and configures a normal, long-lived client and
-worker: it sets the client identity from the Cloud Run instance and enables Worker Versioning with a
-``PINNED`` deployment version derived from the Cloud Run revision.
+instance metadata (from a worker pool or a service) and sets the client identity from the Cloud Run
+instance for a normal, long-lived client and worker.
 
 For advanced or non-plugin use, :py:func:`get_google_cloud_run_metadata` returns the underlying
-:py:class:`GoogleCloudRunMetadata`, whose ``worker_identity`` and ``worker_deployment_config``
-properties expose the same values the plugin applies.
+:py:class:`GoogleCloudRunMetadata`, whose ``worker_identity`` property exposes the same value the
+plugin applies.
 
 .. warning::
     Google Cloud Run support is experimental.

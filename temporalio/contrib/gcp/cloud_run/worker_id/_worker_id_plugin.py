@@ -1,4 +1,4 @@
-"""Plugin applying Google Cloud Run worker defaults to a Temporal client and worker."""
+"""Plugin setting a Temporal client's identity from Google Cloud Run instance metadata."""
 
 from __future__ import annotations
 
@@ -13,25 +13,21 @@ from temporalio.contrib.gcp.cloud_run.worker_id._metadata import (
     get_google_cloud_run_metadata,
 )
 from temporalio.service import ConnectConfig, ServiceClient
-from temporalio.worker import WorkerConfig
 
 
 class WorkerIDPlugin(temporalio.plugin.SimplePlugin):
-    """Configure a Temporal client and worker from Google Cloud Run instance metadata.
+    """Set a Temporal client's identity from Google Cloud Run instance metadata.
 
-    Install this plugin once when connecting the client; it automatically
-    propagates to workers created from that client. It sets the client
-    **identity** to a value derived from the Cloud Run instance (unless the caller
-    already provided one) and configures the worker with a
-    :py:class:`temporalio.worker.WorkerDeploymentConfig` that enables Worker
-    Versioning with a ``PINNED`` default behavior, so each Cloud Run revision is a
-    distinct, pinned worker deployment version. Both Cloud Run worker pools and
+    Install this plugin once when connecting the client; the identity it sets
+    automatically propagates to workers created from that client. It sets the
+    client **identity** to a value derived from the Cloud Run instance, but only
+    when the caller did not already provide one. Both Cloud Run worker pools and
     services are supported.
 
     The Cloud Run instance metadata is fetched once, lazily, when the client
-    connects and then cached on the plugin. If the metadata cannot be read -- which
-    usually means the process is not running on a Cloud Run worker pool or service
-    -- connecting fails fast with a clear error rather than silently doing nothing.
+    connects. If the metadata cannot be read -- which usually means the process is
+    not running on a Cloud Run worker pool or service -- connecting fails fast with
+    a clear error rather than silently doing nothing.
 
     Unit tests and advanced callers can bypass the metadata server by passing a
     pre-built ``metadata`` object, or steer the fetch with ``getenv`` /
@@ -84,17 +80,6 @@ class WorkerIDPlugin(temporalio.plugin.SimplePlugin):
         if not config.identity or config.identity == _default_identity():
             config.identity = metadata.worker_identity
         return await super().connect_service_client(config, next)
-
-    def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
-        """Set the worker deployment config from the cached Cloud Run metadata.
-
-        The deployment config enables Worker Versioning with a ``PINNED`` default
-        behavior, deriving the deployment name and build id from the Cloud Run
-        workload name and revision.
-        """
-        config = super().configure_worker(config)
-        config["deployment_config"] = self._resolve_metadata().worker_deployment_config
-        return config
 
     def _resolve_metadata(self) -> GoogleCloudRunMetadata:
         """Return the cached Cloud Run metadata, fetching it once on first use."""

@@ -23,10 +23,9 @@ to include examples, links to docs, or any other relevant information.
 - Added the experimental `temporalio.contrib.gcp.cloud_run.worker_id` module for long-lived Temporal
   workers on Google Cloud Run worker pools and services. Register `WorkerIDPlugin` on your client
   (`plugins=[WorkerIDPlugin()]`); it propagates to workers automatically, setting the client identity
-  from the Cloud Run instance (unless one is already configured) and enabling Worker Versioning with a
-  `PINNED` deployment version derived from the Cloud Run revision (a per-workflow behavior still
-  wins). The underlying `GoogleCloudRunMetadata` helper (via `get_google_cloud_run_metadata`) exposes
-  the same values for advanced use.
+  from the Cloud Run instance (unless one is already configured). The underlying
+  `GoogleCloudRunMetadata` helper (via `get_google_cloud_run_metadata`) exposes the same value for
+  advanced use.
 
 ### Changed
 

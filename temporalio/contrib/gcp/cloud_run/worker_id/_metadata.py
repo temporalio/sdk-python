@@ -1,9 +1,9 @@
 """Read Google Cloud Run instance metadata for Temporal worker configuration.
 
 Cloud Run runs a long-lived container rather than a per-invocation handler, so this module is a
-small metadata helper -- not a worker wrapper. It derives a worker identity and a
-:py:class:`temporalio.common.WorkerDeploymentVersion` from Cloud Run instance metadata for use with
-a normal, long-lived worker. Both Cloud Run worker pools and services are supported.
+small metadata helper -- not a worker wrapper. It derives a worker identity from Cloud Run instance
+metadata for use with a normal, long-lived worker. Both Cloud Run worker pools and services are
+supported.
 
 .. warning::
     Google Cloud Run support is experimental.
@@ -15,12 +15,6 @@ import os
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-import temporalio.common
-
-if TYPE_CHECKING:
-    import temporalio.worker
 
 CLOUD_RUN_METADATA_URL = (
     "http://metadata.google.internal/computeMetadata/v1/instance/id"
@@ -63,47 +57,6 @@ class GoogleCloudRunMetadata:
         if self.name:
             return f"{self.instance_id}@{self.name}"
         return self.instance_id
-
-    @property
-    def worker_deployment_version(self) -> temporalio.common.WorkerDeploymentVersion:
-        """Worker Versioning deployment version derived from this instance's metadata.
-
-        The deployment name is the Cloud Run workload name and the build id is the Cloud Run
-        revision.
-
-        Raises:
-            ValueError: If either the name or the revision is empty, which usually means the process
-                is not running on a Cloud Run worker pool or service.
-        """
-        if not self.name or not self.revision:
-            raise ValueError(
-                "Cannot build a WorkerDeploymentVersion without both a Cloud Run deployment name "
-                "(CLOUD_RUN_WORKER_POOL or K_SERVICE) and revision (CLOUD_RUN_REVISION or "
-                "K_REVISION); this process may not be running on a Cloud Run worker pool or "
-                "service."
-            )
-        return temporalio.common.WorkerDeploymentVersion(
-            deployment_name=self.name,
-            build_id=self.revision,
-        )
-
-    @property
-    def worker_deployment_config(self) -> temporalio.worker.WorkerDeploymentConfig:
-        """Worker deployment config with Worker Versioning enabled for this instance.
-
-        Pass this straight to :py:class:`temporalio.worker.Worker` as its ``deployment_config``.
-
-        Raises:
-            ValueError: If either the name or the revision is empty, which usually means the process
-                is not running on a Cloud Run worker pool or service.
-        """
-        from temporalio.worker import WorkerDeploymentConfig
-
-        return WorkerDeploymentConfig(
-            version=self.worker_deployment_version,
-            use_worker_versioning=True,
-            default_versioning_behavior=temporalio.common.VersioningBehavior.PINNED,
-        )
 
 
 def get_google_cloud_run_metadata(

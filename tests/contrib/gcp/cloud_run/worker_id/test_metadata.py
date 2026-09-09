@@ -11,7 +11,6 @@ from typing import Any
 
 import pytest
 
-from temporalio.common import VersioningBehavior, WorkerDeploymentVersion
 from temporalio.contrib.gcp.cloud_run.worker_id import (
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
@@ -169,53 +168,6 @@ class TestWorkerIdentity:
         assert metadata.worker_identity == "abc"
 
 
-# ---- Worker deployment version ----
-
-
-class TestWorkerDeploymentVersion:
-    def test_version_from_name_and_revision(self) -> None:
-        metadata = _metadata(instance_id="abc", name="my-pool", revision="rev-1")
-        assert metadata.worker_deployment_version == WorkerDeploymentVersion(
-            deployment_name="my-pool",
-            build_id="rev-1",
-        )
-
-    def test_version_errors_when_name_empty(self) -> None:
-        metadata = _metadata(instance_id="abc", name="", revision="rev-1")
-        with pytest.raises(ValueError, match="deployment name"):
-            _ = metadata.worker_deployment_version
-
-    def test_version_errors_when_revision_empty(self) -> None:
-        metadata = _metadata(instance_id="abc", name="my-pool", revision="")
-        with pytest.raises(ValueError, match="revision"):
-            _ = metadata.worker_deployment_version
-
-
-# ---- Worker deployment config ----
-
-
-class TestWorkerDeploymentConfig:
-    def test_config_enables_pinned_versioning(self) -> None:
-        metadata = _metadata(instance_id="abc", name="my-pool", revision="rev-1")
-        config = metadata.worker_deployment_config
-        assert config.use_worker_versioning is True
-        assert config.default_versioning_behavior == VersioningBehavior.PINNED
-        assert config.version == WorkerDeploymentVersion(
-            deployment_name="my-pool",
-            build_id="rev-1",
-        )
-
-    def test_config_errors_when_name_empty(self) -> None:
-        metadata = _metadata(instance_id="abc", name="", revision="rev-1")
-        with pytest.raises(ValueError, match="deployment name"):
-            _ = metadata.worker_deployment_config
-
-    def test_config_errors_when_revision_empty(self) -> None:
-        metadata = _metadata(instance_id="abc", name="my-pool", revision="")
-        with pytest.raises(ValueError, match="revision"):
-            _ = metadata.worker_deployment_config
-
-
 # ---- HTTP fetch ----
 
 
@@ -266,7 +218,3 @@ class TestHttpFetch:
             revision="rev-7",
         )
         assert metadata.worker_identity == "instance-42@rev-7"
-        assert metadata.worker_deployment_version == WorkerDeploymentVersion(
-            deployment_name="my-pool",
-            build_id="rev-7",
-        )
