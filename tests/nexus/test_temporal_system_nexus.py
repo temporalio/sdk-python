@@ -33,6 +33,7 @@ from temporalio.converter import (
     ExternalStorage,
     JSONPlainPayloadConverter,
     PayloadCodec,
+    PayloadConverter,
     SerializationContext,
     WithSerializationContext,
     WorkflowSerializationContext,
@@ -247,11 +248,13 @@ class ContextValue:
     value: str
 
 
-converter_contexts: list[SerializationContext | None] = []
-
-
 class ContextPayloadConverter(EncodingPayloadConverter, WithSerializationContext):
-    def __init__(self, context: SerializationContext | None = None) -> None:
+    def __init__(
+        self,
+        contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self.contexts = contexts
         self.context = context
 
     @property
@@ -259,12 +262,12 @@ class ContextPayloadConverter(EncodingPayloadConverter, WithSerializationContext
         return "test-context"
 
     def with_context(self, context: SerializationContext) -> ContextPayloadConverter:
-        return ContextPayloadConverter(context)
+        return ContextPayloadConverter(self.contexts, context)
 
     def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         if not isinstance(value, ContextValue):
             return None
-        converter_contexts.append(self.context)
+        self.contexts.append(self.context)
         payload = JSONPlainPayloadConverter().to_payload(value)
         assert payload is not None
         payload.metadata["encoding"] = self.encoding.encode()
@@ -280,8 +283,9 @@ class ContextPayloadConverter(EncodingPayloadConverter, WithSerializationContext
 
 class ContextPayloadConverterSet(CompositePayloadConverter):
     def __init__(self) -> None:
+        self.contexts: list[SerializationContext | None] = []
         super().__init__(
-            ContextPayloadConverter(),
+            ContextPayloadConverter(self.contexts),
             *DefaultPayloadConverter.default_encoding_payload_converters,
         )
 
@@ -883,12 +887,12 @@ async def test_signal_with_start_uses_target_context_for_converter_and_codec(
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
-    converter_contexts.clear()
     codec_contexts: list[SerializationContext | None] = []
+    payload_converter = ContextPayloadConverterSet()
     caller_config = env.client.config()
     caller_config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
-        payload_converter_class=ContextPayloadConverterSet,
+        payload_converter_class=cast(type[PayloadConverter], lambda: payload_converter),
         payload_codec=ContextPayloadCodec(codec_contexts),
     )
     caller_client = Client(**caller_config)
@@ -910,12 +914,12 @@ async def test_signal_with_start_uses_target_context_for_converter_and_codec(
         )
 
     assert result == target_workflow_id
-    assert len(converter_contexts) >= 2
+    assert len(payload_converter.contexts) >= 2
     assert all(
         isinstance(context, WorkflowSerializationContext)
         and context.workflow_id == target_workflow_id
-        for context in converter_contexts
-    ), converter_contexts
+        for context in payload_converter.contexts
+    ), payload_converter.contexts
     assert len(codec_contexts) >= 2
     assert all(
         isinstance(context, WorkflowSerializationContext)
