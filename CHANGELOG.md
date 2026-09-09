@@ -40,8 +40,12 @@ to include examples, links to docs, or any other relevant information.
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
   annotation fails type checking rather than at runtime.
-- client.ActivityExecution and client.ActivityExecutionDescription had some fields removed or renamed
-  to match RPC API. Dataclass equality method has been disabled for these types.
+- `client.ActivityExecution` and `client.ActivityExecutionDescription` had some fields removed or renamed
+  to match RPC API.
+  - Dataclass equality method was disabled for these types.
+  - `scheduled_time` was renamed `schedule_time`.
+  - `last_failure` was changed from field to method that runs data converter on demand.
+  - `state_transition_count`, `eager_execution_requested`, `paused` and `long_poll_token`  were removed.
 - ActivityHandle.describe() long-poll token was removed.  The functionality can still be used manually
   through raw gRPC API.
 
