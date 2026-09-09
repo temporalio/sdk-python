@@ -33,9 +33,8 @@ class GoogleCloudRunMetadata:
     Attributes:
         instance_id: Unique id of this Cloud Run container instance, read from the Cloud Run
             metadata server.
-        name: Deployment name of this Cloud Run workload -- the worker pool name
-            (``CLOUD_RUN_WORKER_POOL``) or, for a service, the service name (``K_SERVICE``). May be
-            empty when the process is not running on Cloud Run.
+        name: The Cloud Run worker pool name (``CLOUD_RUN_WORKER_POOL``) or, for a service, the
+            service name (``K_SERVICE``). May be empty when the process is not running on Cloud Run.
         revision: Cloud Run revision name (``CLOUD_RUN_REVISION`` for worker pools or ``K_REVISION``
             for services). May be empty when the process is not running on Cloud Run.
     """
@@ -48,9 +47,9 @@ class GoogleCloudRunMetadata:
     def worker_identity(self) -> str:
         """Worker identity string uniquely identifying this Cloud Run instance.
 
-        The format is ``<instance_id>@<revision>``. When the revision is empty the deployment name
-        is used instead (``<instance_id>@<name>``), and when both are empty the instance id is
-        returned on its own.
+        The format is ``<instance_id>@<revision>``. When the revision is empty the worker pool or
+        service name is used instead (``<instance_id>@<name>``); when both are empty the instance id
+        is returned on its own.
         """
         if self.revision:
             return f"{self.instance_id}@{self.revision}"
@@ -67,10 +66,11 @@ def get_google_cloud_run_metadata(
 ) -> GoogleCloudRunMetadata:
     """Read metadata identifying the current Google Cloud Run instance.
 
-    Resolves the deployment name from ``CLOUD_RUN_WORKER_POOL`` (Cloud Run worker pools), falling
-    back to ``K_SERVICE`` (Cloud Run services), and the revision from ``CLOUD_RUN_REVISION`` falling
-    back to ``K_REVISION``. The unique instance id is fetched from the Cloud Run metadata server
-    with a single synchronous HTTP GET. Intended to be called once at worker startup.
+    Resolves the worker pool name from ``CLOUD_RUN_WORKER_POOL`` (Cloud Run worker pools), falling
+    back to the service name (``K_SERVICE``, Cloud Run services), and the revision from
+    ``CLOUD_RUN_REVISION`` falling back to ``K_REVISION``. The unique instance id is fetched from
+    the Cloud Run metadata server with a single synchronous HTTP GET. Intended to be called once at
+    worker startup.
 
     Args:
         timeout: Timeout, in seconds, for the request to the metadata server.

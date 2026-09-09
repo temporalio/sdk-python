@@ -60,8 +60,9 @@ the
 at `http://metadata.google.internal/computeMetadata/v1/instance/id`, which requires the
 `Metadata-Flavor: Google` request header.
 
-When the client connects, `WorkerIDPlugin` resolves the deployment name from `CLOUD_RUN_WORKER_POOL`
-(falling back to `K_SERVICE`) and the revision from `CLOUD_RUN_REVISION` (falling back to
+When the client connects, `WorkerIDPlugin` resolves the worker pool name from
+`CLOUD_RUN_WORKER_POOL` (falling back to the service name `K_SERVICE`) and the revision from
+`CLOUD_RUN_REVISION` (falling back to
 `K_REVISION`), then performs a single synchronous HTTP GET to the metadata server for the instance
 id. From that metadata the plugin sets:
 
