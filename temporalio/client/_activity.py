@@ -17,7 +17,6 @@ from typing import (
     Any,
     Generic,
     TypeVar,
-    cast,
 )
 
 from typing_extensions import Self
