@@ -724,7 +724,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     async def update_activity_options(
         self, input: UpdateActivityOptionsInput
     ) -> ActivityExecutionOptions:
-        """Update or restore an activity's options."""
+        """Update or restore an activity's options.
+
+        If ``input.updates`` names the same option more than once, the last update
+        for that option wins and its path appears once in the field mask.
+        """
         # restore_original is exclusive to all other updates.
         if input.restore_original and input.updates:
             raise ValueError(

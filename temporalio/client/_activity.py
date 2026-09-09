@@ -1263,6 +1263,9 @@ class ActivityHandle(Generic[ReturnType]):
         left as-is. An update created with
         :py:meth:`ActivityOptionsKey.value_unset` clears that option.
 
+        If ``updates`` names the same option more than once, the last update for
+        that option wins and the option is sent to the server only once.
+
         .. warning::
            This API is experimental.
 
