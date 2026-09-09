@@ -20,6 +20,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 from temporalio.converter import (
     DataConverter,
+    NexusSerializationContext,
 )
 
 if TYPE_CHECKING:
@@ -660,6 +661,7 @@ class GetNexusOperationResultInput:
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
     result_type: type[Any] | None
+    _nexus_serialization_context: NexusSerializationContext | None = None
 
 
 @dataclass

@@ -28,6 +28,10 @@ class SerializationContext(ABC):
         context type is :py:class:`ActivitySerializationContext` and the workflow ID is that of the
         currently-executing workflow. ActivitySerializationContext is also set on data converter
         operations in the activity context.
+
+        When operating on a Nexus operation payload, the context type is
+        :py:class:`NexusSerializationContext` and identifies the Nexus endpoint, service, and
+        resolved operation name.
     """
 
     pass
@@ -92,6 +96,35 @@ class ActivitySerializationContext(SerializationContext):
 
     is_local: bool
     """Whether the activity is a local activity started from a workflow."""
+
+
+@dataclass(frozen=True)
+class NexusSerializationContext(SerializationContext):
+    """Serialization context for Nexus operation payloads.
+
+    Callers receive this context when encoding inputs and decoding results or failures. Handlers
+    receive it when decoding inputs, encoding synchronous results, and encoding failures produced
+    while handling a Nexus task.
+
+    The context is not propagated to the eventual result of an asynchronous operation. Standalone
+    operation handles use the context of their start request, including when an existing operation
+    is returned, while handles created without starting an operation do not receive it.
+
+    Callers and handlers receive this context on opposite sides of failure conversion. Contextual
+    encodings should therefore be self-describing and support legacy payloads without context.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    endpoint: str
+    """Nexus endpoint name."""
+
+    service: str
+    """Nexus service name."""
+
+    operation: str
+    """Nexus operation name."""
 
 
 class WithSerializationContext(ABC):

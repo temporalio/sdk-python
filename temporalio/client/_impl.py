@@ -1549,6 +1549,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
         """Start a nexus operation and return a handle to it."""
+        nexus_context = temporalio.converter.NexusSerializationContext(
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+        )
+        data_converter = self._client.data_converter.with_context(nexus_context)
         req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
@@ -1575,7 +1581,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
 
         # Set input payload
-        encoded = await self._client.data_converter.encode([input.arg])
+        encoded = await data_converter.encode([input.arg])
         if encoded:
             req.input.CopyFrom(encoded[0])
 
@@ -1620,6 +1626,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             result_type=input.result_type,
             endpoint=input.endpoint,
             service=input.service,
+            _nexus_serialization_context=nexus_context,
         )
 
     async def describe_nexus_operation(
@@ -1637,15 +1644,28 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+        nexus_context = temporalio.converter.NexusSerializationContext(
+            endpoint=resp.info.endpoint,
+            service=resp.info.service,
+            operation=resp.info.operation,
+        )
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
             data_converter=self._client.data_converter,
+            failure_data_converter=self._client.data_converter.with_context(
+                nexus_context
+            ),
         )
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
     ) -> Any:
         """Poll for nexus operation result until it's available."""
+        data_converter = self._client.data_converter
+        if input._nexus_serialization_context is not None:
+            data_converter = data_converter.with_context(
+                input._nexus_serialization_context
+            )
         req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             operation_id=input.operation_id,
@@ -1667,16 +1687,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 match res.WhichOneof("outcome"):
                     case "result":
                         type_hints = [input.result_type] if input.result_type else None
-                        [result] = await self._client.data_converter.decode(
-                            [res.result], type_hints
-                        )
+                        [result] = await data_converter.decode([res.result], type_hints)
                         return result
 
                     case "failure":
                         raise NexusOperationFailureError(
-                            cause=await self._client.data_converter.decode_failure(
-                                res.failure
-                            )
+                            cause=await data_converter.decode_failure(res.failure)
                         )
 
                     case None:
