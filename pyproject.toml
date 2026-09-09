@@ -284,5 +284,3 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-# Admit google-adk 2.8.0 (released 2026-08-26) inside the 2-week window; drop after 2026-09-10.
-exclude-newer-package = { google-adk = "2026-08-27T00:00:00Z" }
