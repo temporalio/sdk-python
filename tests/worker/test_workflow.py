@@ -6969,9 +6969,6 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             id=workflow_id,
             task_queue=task_queue,
         )
-        if self.workflow_termination_type == "-cancellation-":
-            await handle.cancel()
-
         if self.handler_type == "-update-":
             update_method = (
                 "__does_not_exist__"
@@ -6999,6 +6996,9 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                 else UnfinishedHandlersOnWorkflowTerminationWorkflow.my_signal
             )
             await handle.signal(signal_method)  # type: ignore
+
+        if self.workflow_termination_type == "-cancellation-":
+            await handle.cancel()
 
         async with new_worker(
             self.client,
