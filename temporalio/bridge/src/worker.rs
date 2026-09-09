@@ -900,10 +900,10 @@ fn convert_versioning_strategy(
         WorkerVersioningStrategy::DeploymentBased(options) => {
             temporalio_sdk_core::WorkerVersioningStrategy::WorkerDeploymentBased(
                 temporalio_common::worker::WorkerDeploymentOptions::new(
-                    temporalio_common::worker::WorkerDeploymentVersion {
-                        deployment_name: options.version.deployment_name,
-                        build_id: options.version.build_id,
-                    },
+                    temporalio_common::worker::WorkerDeploymentVersion::builder()
+                        .deployment_name(options.version.deployment_name)
+                        .build_id(options.version.build_id)
+                        .build(),
                 )
                 .use_worker_versioning(options.use_worker_versioning)
                 .maybe_default_versioning_behavior(if options.use_worker_versioning {

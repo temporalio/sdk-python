@@ -1139,8 +1139,14 @@ async def test_schedule_trigger_immediately(
 
     # Confirm workflow result
     desc = await handle.describe()
-    assert desc.info.num_actions == 1
-    action_exec = (await handle.describe()).info.recent_actions[0].action
+
+    async def update_desc_get_action_count() -> int:
+        nonlocal desc
+        desc = await handle.describe()
+        return desc.info.num_actions
+
+    await assert_eq_eventually(1, update_desc_get_action_count)
+    action_exec = desc.info.recent_actions[0].action
     assert isinstance(action_exec, ScheduleActionExecutionStartWorkflow)
     assert (
         "some result"

@@ -114,6 +114,7 @@ EXPECTED_CLIENT_EXPORTS = [
     "StartWorkflowUpdateInput",
     "StartWorkflowUpdateWithStartInput",
     "StorageDriverActivityInfo",
+    "StorageDriverSelectContext",
     "StorageDriverStoreContext",
     "StorageDriverWorkflowInfo",
     "TLSConfig",

@@ -40,19 +40,26 @@ class StorageOperationMetrics:
     total_size: int = 0
     """Total size in bytes of externally stored/retrieved payloads."""
 
-    total_duration: timedelta = dataclasses.field(default_factory=timedelta)
-    """Wall-clock time spent on external storage operations."""
-
     driver_names: set[str] = dataclasses.field(default_factory=set)
     """Names of the drivers that participated in the operations."""
 
+    _spans: list[tuple[float, float]] = dataclasses.field(default_factory=list)
+    """Monotonic-clock start and end of each recorded batch."""
+
+    @property
+    def total_duration(self) -> timedelta:
+        """Wall-clock time spent on external storage operations."""
+        # Batches may run concurrently, so summing each batch's duration would
+        # double-count operations that overlapped.
+        return timedelta(seconds=_union_seconds(self._spans))
+
     def record_batch(
-        self, count: int, size: int, duration: timedelta, driver_names: set[str]
+        self, count: int, size: int, start: float, end: float, driver_names: set[str]
     ) -> None:
         """Record metrics from a batch of storage operations."""
         self.payload_count += count
         self.total_size += size
-        self.total_duration += duration
+        self._spans.append((start, end))
         self.driver_names.update(driver_names)
 
     @contextlib.contextmanager
@@ -68,6 +75,22 @@ class StorageOperationMetrics:
 _current_storage_metrics: contextvars.ContextVar[StorageOperationMetrics | None] = (
     contextvars.ContextVar("_current_storage_metrics", default=None)
 )
+
+
+def _union_seconds(spans: list[tuple[float, float]]) -> float:
+    """Total length of the union of the given monotonic-clock spans, in seconds."""
+    ordered = sorted(spans)
+    if not ordered:
+        return 0.0
+    total = 0.0
+    span_start, span_end = ordered[0]
+    for start, end in ordered[1:]:
+        if start > span_end:
+            total += span_end - span_start
+            span_start, span_end = start, end
+        elif end > span_end:
+            span_end = end
+    return total + (span_end - span_start)
 
 
 async def _gather_cancel_on_error(
@@ -143,7 +166,25 @@ class StorageDriverActivityInfo:
 
 @dataclass(frozen=True)
 class StorageDriverStoreContext:
-    """Context passed to :meth:`StorageDriver.store` and ``driver_selector`` calls.
+    """Context passed to :meth:`StorageDriver.store` calls.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None
+    """The workflow or activity for which this payload is being stored.
+
+    For payloads being stored on behalf of an explicit target (e.g. a child
+    workflow being started, an activity being scheduled, an external workflow
+    being signaled), this is that target's identity.  When no explicit target
+    exists the current execution context (workflow or activity) is used as the
+    target instead."""
+
+
+@dataclass(frozen=True)
+class StorageDriverSelectContext:
+    """Context passed to :attr:`ExternalStorage.driver_selector` calls.
 
     .. warning::
         This API is experimental.
@@ -257,7 +298,7 @@ class ExternalStorage:
     """
 
     driver_selector: (
-        Callable[[StorageDriverStoreContext, Payload], StorageDriver | None] | None
+        Callable[[StorageDriverSelectContext, Payload], StorageDriver | None] | None
     ) = None
     """Controls which driver stores a given payload. A callable that returns the
     driver instance to use, or ``None`` to leave the payload stored inline.
@@ -287,6 +328,14 @@ class ExternalStorage:
         compare=False,
     )
     """Store context bound to this instance via :meth:`_with_store_context`."""
+
+    _select_context: StorageDriverSelectContext = dataclasses.field(
+        default=StorageDriverSelectContext(target=None),
+        init=False,
+        repr=False,
+        compare=False,
+    )
+    """Selector context derived from :attr:`_store_context`."""
 
     _claim_converter: ClassVar[JSONProtoPayloadConverter] = JSONProtoPayloadConverter()
     _legacy_claim_converter: ClassVar[JSONPlainPayloadConverter] = (
@@ -325,7 +374,7 @@ class ExternalStorage:
         object.__setattr__(self, "_driver_map", driver_map)
 
     def _select_driver(
-        self, context: StorageDriverStoreContext, payload: Payload
+        self, context: StorageDriverSelectContext, payload: Payload
     ) -> StorageDriver | None:
         """Returns the driver to use for this payload, or None to pass through."""
         if payload.ByteSize() < self.payload_size_threshold:
@@ -354,12 +403,15 @@ class ExternalStorage:
         """Return a copy of this instance with ``ctx`` bound as the store context."""
         result = dataclasses.replace(self)
         object.__setattr__(result, "_store_context", ctx)
+        object.__setattr__(
+            result, "_select_context", StorageDriverSelectContext(target=ctx.target)
+        )
         return result
 
     async def _store_payload(self, payload: Payload) -> Payload:
         start_time = time.monotonic()
 
-        driver = self._select_driver(self._store_context, payload)
+        driver = self._select_driver(self._select_context, payload)
         if driver is None:
             return payload
 
@@ -401,7 +453,7 @@ class ExternalStorage:
 
         to_store: list[tuple[int, Payload, StorageDriver]] = []
         for index, payload in enumerate(payloads):
-            driver = self._select_driver(self._store_context, payload)
+            driver = self._select_driver(self._select_context, payload)
             if driver is None:
                 continue
             to_store.append((index, payload, driver))
@@ -595,6 +647,7 @@ class ExternalStorage:
             metrics.record_batch(
                 count,
                 size,
-                timedelta(seconds=time.monotonic() - start_time),
+                start_time,
+                time.monotonic(),
                 driver_names,
             )
