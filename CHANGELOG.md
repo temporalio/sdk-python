@@ -26,6 +26,7 @@ to include examples, links to docs, or any other relevant information.
   from the Cloud Run instance (unless one is already configured). The underlying
   `GoogleCloudRunMetadata` helper (via `get_google_cloud_run_metadata`) exposes the same value for
   advanced use.
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
 
