@@ -24,6 +24,7 @@ to include examples, links to docs, or any other relevant information.
 
 - `ActivityHandle` now supports operator commands for standalone activities: `pause`,
   `unpause`, `update_options` and `restore_original_options`.
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
 
