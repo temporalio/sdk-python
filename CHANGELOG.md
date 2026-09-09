@@ -42,7 +42,7 @@ to include examples, links to docs, or any other relevant information.
   annotation fails type checking rather than at runtime.
 - `client.ActivityExecution` and `client.ActivityExecutionDescription` had some fields removed or renamed
   to match RPC API.
-  - Dataclass equality method was disabled for these types.
+  - Dataclass parameters for these types were changed to `frozen=True, eq=False, kw_only=True`.
   - `scheduled_time` was renamed `schedule_time`.
   - `last_failure` was changed from field to method that runs data converter on demand.
   - `state_transition_count`, `eager_execution_requested`, `paused` and `long_poll_token`  were removed.
