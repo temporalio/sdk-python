@@ -122,6 +122,34 @@ class BasicTraceWorkflow:
         return
 
 
+@workflow.defn
+class SignalWithStartHeaderWorkflow:
+    def __init__(self) -> None:
+        self._signaled = False
+
+    @workflow.run
+    async def run(self) -> bool:
+        await workflow.wait_condition(lambda: self._signaled)
+        return "_tracer-data" in workflow.info().headers
+
+    @workflow.signal
+    def notify(self) -> None:
+        self._signaled = True
+
+
+@workflow.defn
+class SignalWithStartCallerWorkflow:
+    @workflow.run
+    async def run(self, target_id: str, task_queue: str) -> str:
+        handle = await workflow.signal_with_start_workflow(
+            SignalWithStartHeaderWorkflow.run,
+            id=target_id,
+            task_queue=task_queue,
+            signal=SignalWithStartHeaderWorkflow.notify,
+        )
+        return handle.id
+
+
 async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: Any):  # type: ignore[reportUnusedParameter]
     exporter = InMemorySpanExporter()
     provider = create_tracer_provider()
@@ -166,6 +194,41 @@ async def test_otel_tracing_basic(client: Client, reset_otel_tracer_provider: An
     actual_hierarchy = dump_spans(spans, with_attributes=False)
     assert actual_hierarchy == expected_hierarchy, (
         f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
+
+
+@pytest.mark.requires_local_server
+async def test_workflow_signal_with_start_propagates_trace_headers(
+    client: Client,
+    env: WorkflowEnvironment,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+    config = client.config()
+    config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    client = Client(**config)
+
+    async with new_worker(
+        client, SignalWithStartCallerWorkflow, SignalWithStartHeaderWorkflow
+    ) as worker:
+        target_id = f"signal-with-start-target-{uuid.uuid4()}"
+        with get_tracer(__name__).start_as_current_span("signal-with-start"):
+            caller = await client.start_workflow(
+                SignalWithStartCallerWorkflow.run,
+                args=[target_id, worker.task_queue],
+                id=f"signal-with-start-caller-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=3),
+            )
+            assert await caller.result() == target_id
+        assert await client.get_workflow_handle(target_id).result() is True
+    assert any(
+        span.name == "SignalWithStartWorkflow" for span in exporter.get_finished_spans()
     )
 
 

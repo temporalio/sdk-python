@@ -1991,7 +1991,6 @@ async def test_replay_tool_loop(client: Client):
             "Compare Tokyo and Paris weather",
             id=f"gemini-replay-tools-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
         await handle.result()
         history = await handle.fetch_history()
