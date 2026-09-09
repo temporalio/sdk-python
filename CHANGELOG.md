@@ -20,6 +20,14 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
+  Workflow-level metadata that allows for improved visibility into a Workflow execution's history
+  by grouping logically related Events together based on user-defined or system-inferred criteria.
+  An event group is created using `workflow.create_event_group(label)`, then attach it either per
+  call (`workflow.start_activity(..., event_groups=[group])`) or ambiently to everything issued
+  inside `with group.scope():`. Each signal and update handler is also implicitly wrapped in a
+  group of its own. Requires a server that understands the Event Groups fields.
+
 ### Changed
 
 - System Nexus Signal-with-Start Workflow operations now use the typed
