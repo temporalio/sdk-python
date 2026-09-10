@@ -1,5 +1,7 @@
 import dataclasses
+import importlib
 import sys
+from typing import Any
 
 import pytest
 
@@ -25,6 +27,45 @@ def test_workflow_sandbox_importer_invalid_module():
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"
     )
+
+
+def test_workflow_sandbox_importer_repeat_import_skips_import_machinery(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    imported: list[str] = []
+    orig_import = importlib.__import__
+
+    def recording_import(
+        name: str,
+        globals: Any = None,
+        locals: Any = None,
+        fromlist: Any = (),
+        level: int = 0,
+    ) -> Any:
+        imported.append(name)
+        return orig_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(importlib, "__import__", recording_import)
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox.testmodules.passthrough_module as passthrough
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as stateful
+
+        assert imported
+        imported.clear()
+
+        # Loaded modules are served from sys.modules without re-entering importlib
+        import typing
+
+        import tests.worker.workflow_sandbox.testmodules.passthrough_module as passthrough_again
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as stateful_again
+        from tests.worker.workflow_sandbox import testmodules
+        from tests.worker.workflow_sandbox.testmodules import stateful_module
+
+        assert passthrough_again is passthrough
+        assert stateful_again is stateful is stateful_module
+        assert getattr(testmodules, "stateful_module") is stateful
+        assert typing is sys.modules["typing"]
+    assert imported == []
 
 
 def test_workflow_sandbox_importer_passthrough_module():
