@@ -1,4 +1,5 @@
 import sys
+import warnings
 from datetime import timedelta
 from uuid import uuid4
 
@@ -52,10 +53,21 @@ async def test_replay(client: Client):
         )
         await handle.result()
 
-    await Replayer(
-        workflows=[TwoNodesWorkflow],
-        plugins=[plugin],
-    ).replay_workflow(await handle.fetch_history())
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.filterwarnings(
+            "always", message=r"Module .* was imported after initial workflow load"
+        )
+        await Replayer(
+            workflows=[TwoNodesWorkflow],
+            plugins=[plugin],
+        ).replay_workflow(await handle.fetch_history())
+
+    # Sandbox imports during an activation count toward the deadlock timeout
+    assert not [
+        str(w.message)
+        for w in recorder
+        if "was imported after initial workflow load" in str(w.message)
+    ]
 
 
 @pytest.mark.skipif(
