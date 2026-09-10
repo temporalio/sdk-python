@@ -27,8 +27,13 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
 )
 from temporalio.client import Client
 from temporalio.converter import (
+    CompositePayloadConverter,
+    DefaultPayloadConverter,
+    EncodingPayloadConverter,
     ExternalStorage,
+    JSONPlainPayloadConverter,
     PayloadCodec,
+    PayloadConverter,
     SerializationContext,
     WithSerializationContext,
     WorkflowSerializationContext,
@@ -236,6 +241,94 @@ class CaptureSystemNexusPayloadContextCodec(PayloadCodec, WithSerializationConte
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         return list(payloads)
+
+
+@dataclasses.dataclass
+class ContextValue:
+    value: str
+
+
+class ContextPayloadConverter(EncodingPayloadConverter, WithSerializationContext):
+    def __init__(
+        self,
+        contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self.contexts = contexts
+        self.context = context
+
+    @property
+    def encoding(self) -> str:
+        return "test-context"
+
+    def with_context(self, context: SerializationContext) -> ContextPayloadConverter:
+        return ContextPayloadConverter(self.contexts, context)
+
+    def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
+        if not isinstance(value, ContextValue):
+            return None
+        self.contexts.append(self.context)
+        payload = JSONPlainPayloadConverter().to_payload(value)
+        assert payload is not None
+        payload.metadata["encoding"] = self.encoding.encode()
+        return payload
+
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: type | None = None,
+    ) -> Any:
+        return JSONPlainPayloadConverter().from_payload(payload, type_hint)
+
+
+class ContextPayloadConverterSet(CompositePayloadConverter):
+    def __init__(self) -> None:
+        self.contexts: list[SerializationContext | None] = []
+        super().__init__(
+            ContextPayloadConverter(self.contexts),
+            *DefaultPayloadConverter.default_encoding_payload_converters,
+        )
+
+
+class ContextPayloadCodec(PayloadCodec, WithSerializationContext):
+    def __init__(
+        self,
+        contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self.contexts = contexts
+        self.context = context
+
+    def with_context(self, context: SerializationContext) -> ContextPayloadCodec:
+        return ContextPayloadCodec(self.contexts, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        for payload in payloads:
+            if payload.metadata.get("encoding") == b"test-context":
+                self.contexts.append(self.context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
+@workflow.defn
+class ContextSignalWithStartWorkflowCaller:
+    @workflow.run
+    async def run(self, task_queue: str) -> str:
+        handle = await workflow.signal_with_start_workflow(
+            "test-workflow",
+            ContextValue("workflow-input"),
+            id="system-nexus-workflow-id",
+            task_queue=task_queue,
+            signal="test-signal",
+            signal_args=[ContextValue("signal-input")],
+        )
+        return handle.id
 
 
 class TracingWorkflowInterceptor(Interceptor):
@@ -785,3 +878,51 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
         and context.workflow_id == target_workflow_id
         for context in captured_contexts
     )
+
+
+@pytest.mark.requires_local_server
+async def test_signal_with_start_uses_target_context_for_converter_and_codec(
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    codec_contexts: list[SerializationContext | None] = []
+    payload_converter = ContextPayloadConverterSet()
+    caller_config = env.client.config()
+    caller_config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_converter_class=cast(type[PayloadConverter], lambda: payload_converter),
+        payload_codec=ContextPayloadCodec(codec_contexts),
+    )
+    caller_client = Client(**caller_config)
+    caller_task_queue = str(uuid.uuid4())
+    target_workflow_id = "system-nexus-workflow-id"
+
+    async with Worker(
+        caller_client,
+        task_queue=caller_task_queue,
+        workflows=[ContextSignalWithStartWorkflowCaller],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        result = await caller_client.execute_workflow(
+            ContextSignalWithStartWorkflowCaller.run,
+            caller_task_queue,
+            id=str(uuid.uuid4()),
+            task_queue=caller_task_queue,
+            execution_timeout=timedelta(seconds=5),
+        )
+
+    assert result == target_workflow_id
+    assert len(payload_converter.contexts) >= 2
+    assert all(
+        isinstance(context, WorkflowSerializationContext)
+        and context.workflow_id == target_workflow_id
+        for context in payload_converter.contexts
+    ), payload_converter.contexts
+    assert len(codec_contexts) >= 2
+    assert all(
+        isinstance(context, WorkflowSerializationContext)
+        and context.workflow_id == target_workflow_id
+        for context in codec_contexts
+    ), codec_contexts
