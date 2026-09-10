@@ -77,6 +77,23 @@ class DeepAgentsWorkflowError(ApplicationError):
 # ---------------------------------------------------------------------------
 
 
+def _occurrence_cache_key(kind: str, name: str, payload: Any) -> str:
+    """Cache key giving repeated identical calls their own slot.
+
+    Keyed by per-run occurrence index (not any per-invocation id), so replay
+    and post-continue-as-new runs regenerate the carried conversation's calls
+    in order and reproduce the same keys — repeats each run their own
+    Activity while completed calls still reuse across continue-as-new.
+    Patch-gated: histories recorded under payload-only keys reused one result
+    for repeats, and replaying them with per-occurrence keys would schedule
+    an Activity the history does not have.
+    """
+    base = _serde.cache_key(kind, name, payload)
+    if workflow.patched("deepagents.cache-key-per-occurrence"):
+        return _serde.cache_key(kind, base, _serde.next_occurrence(base))
+    return base
+
+
 async def call_model(
     activity_name: str,
     activity_input: _activity.ModelActivityInput,
@@ -85,7 +102,9 @@ async def call_model(
     **opts: Any,
 ) -> _activity.ModelActivityOutput:
     """Dispatch one model call, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key(
+    # Identical inputs can be deliberate resampling (self-consistency,
+    # sub-agent fan-out); occurrence keying keeps each live call distinct.
+    key = _occurrence_cache_key(
         "model",
         activity_input.model_name,
         [activity_input.messages, activity_input.tool_schemas],
@@ -111,19 +130,7 @@ async def call_tool(
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
     """Dispatch one tool call, reusing a cached result across continue-as-new."""
-    # Repeated calls with identical name+args each get their own cache slot,
-    # keyed by per-run occurrence index. The index (not tool_call_id, which is
-    # a per-invocation nonce) keeps keys reproducible, so results still carry
-    # across continue-as-new. Patch-gated: histories recorded under the old
-    # name+args key reused one result for repeats, and replaying them with
-    # per-occurrence keys would schedule an Activity the history does not have.
-    if workflow.patched("deepagents.tool-cache-key-per-occurrence"):
-        identity = _serde.cache_key(
-            "tool", activity_input.tool_name, activity_input.args
-        )
-        key = _serde.cache_key("tool", identity, _serde.next_occurrence(identity))
-    else:
-        key = _serde.cache_key("tool", activity_input.tool_name, activity_input.args)
+    key = _occurrence_cache_key("tool", activity_input.tool_name, activity_input.args)
     hit, cached = _serde.cache_lookup(key)
     if hit:
         return _activity.ToolActivityOutput(message=cached)
@@ -145,7 +152,9 @@ async def call_backend_op(
     **opts: Any,
 ) -> _activity.BackendOpOutput:
     """Dispatch one backend op, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key(
+    # Backend ops are order-sensitive I/O: a repeated read after an
+    # intervening write must see fresh state, a repeated execute must run.
+    key = _occurrence_cache_key(
         f"backend:{activity_input.backend_ref}",
         activity_input.op,
         [activity_input.args, activity_input.kwargs],

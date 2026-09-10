@@ -52,9 +52,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `temporalio.contrib.deepagents` now runs separate tool calls independently
-  when they use the same tool and arguments. Patch-gated
-  (`deepagents.tool-cache-key-includes-call-id`), so histories recorded
+- `temporalio.contrib.deepagents` now runs repeated identical tool, model,
+  and backend-op calls independently instead of serving the first call's
+  cached result, while still reusing completed calls across continue-as-new.
+  Patch-gated (`deepagents.cache-key-per-occurrence`), so histories recorded
   before this change replay unchanged.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations

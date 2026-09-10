@@ -15,6 +15,7 @@ from __future__ import annotations
 import gc
 import sys
 import uuid
+from typing import Any
 from datetime import timedelta
 from pathlib import Path
 
@@ -313,3 +314,74 @@ async def test_builtin_tool_on_default_backend_runs_in_workflow(
     # The state-backend op stays in-workflow: model turns are the ONLY activities.
     assert counts[BACKEND_OP] == 0, counts
     assert counts["deepagents.invoke_model"] == 2, counts
+
+
+class MutatingBackend:
+    """Read result depends on op order: each read returns the write count so a
+    served-stale-cache regression is observable."""
+
+    def __init__(self) -> None:
+        self.writes = 0
+
+    def write(self, _file_path: str, _content: str) -> str:
+        self.writes += 1
+        return f"wrote:{self.writes}"
+
+    def read(self, _file_path: str) -> str:
+        return f"read-at-write-count:{self.writes}"
+
+
+class _RepeatedOpsAgent:
+    """ainvoke-shaped driver: read, write, read the SAME path — under
+    run_deep_agent so the continue-as-new result cache is active."""
+
+    def __init__(self, backend: Any) -> None:
+        self._backend = backend
+
+    async def ainvoke(self, _input: Any) -> dict:
+        first = await self._backend.read("a.txt")
+        await self._backend.write("a.txt", "x")
+        second = await self._backend.read("a.txt")
+        return {"messages": [f"{first}|{second}"], "todos": []}
+
+
+@workflow.defn
+class RepeatedBackendOpWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> str:
+        from temporalio.contrib.deepagents import run_deep_agent
+
+        backend = TemporalBackend(
+            MutatingBackend(),
+            activity_options={"start_to_close_timeout": timedelta(seconds=10)},
+        )
+        result = await run_deep_agent(
+            _RepeatedOpsAgent(backend), input, state_snapshot=state_snapshot
+        )
+        return str(result["messages"][-1])
+
+
+@pytest.mark.asyncio
+async def test_repeated_backend_op_sees_fresh_state(env: WorkflowEnvironment) -> None:
+    """A repeated identical read after an intervening write runs its own
+    Activity and sees the write — under the active CAN cache, the old
+    payload-only key served the FIRST read's stale result."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-repeated-backend-op",
+        workflows=[RepeatedBackendOpWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            RepeatedBackendOpWorkflow.run,
+            {"messages": []},
+            id=f"da-repeated-backend-op-{uuid.uuid4()}",
+            task_queue="da-repeated-backend-op",
+        )
+        out = await handle.result()
+
+    assert out == "read-at-write-count:0|read-at-write-count:1", out
+    counts = await count_scheduled_activities(handle)
+    assert counts[BACKEND_OP] == 3, counts
