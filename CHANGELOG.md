@@ -164,6 +164,9 @@ to include examples, links to docs, or any other relevant information.
   repeated identical call (the conservative direction).
 - `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 
+- Worker shutdown no longer waits forever for an activity that Core has stopped tracking, such as a
+  local activity whose cancellation was lost when its workflow run was evicted. Once activity polling
+  has shut down, any activity still executing is cancelled with `worker_shutdown` cancellation details.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
