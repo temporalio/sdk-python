@@ -106,7 +106,7 @@ class SlowFakeAgent:
             await workflow.sleep(0.001)
         messages = list(input.get("messages", [])) if isinstance(input, dict) else []
         messages = [*messages, "step"]
-        done = len(messages) >= 3
+        done = messages.count("step") >= 2
         return {
             "messages": messages,
             "todos": [
@@ -163,3 +163,31 @@ async def test_can_defaults_to_server_suggestion(
     assert desc.status is not None and desc.status.name == "CONTINUED_AS_NEW", (
         desc.status
     )
+
+
+def test_merge_snapshot_preserves_new_input_messages() -> None:
+    # External resume: a saved snapshot plus a NEW user message composes —
+    # carried history first, the new message after. (Replace semantics here
+    # would silently drop the user's latest message.)
+    from temporalio.contrib.deepagents.workflow import _merge_snapshot
+
+    merged = _merge_snapshot(
+        {"messages": ["new question"], "config": {"k": "v"}},
+        {"messages": ["old q", "old a"]},
+    )
+    assert merged["messages"] == ["old q", "old a", "new question"]
+    assert merged["config"] == {"k": "v"}
+
+    # Non-Mapping input: a bare prompt appends after the carried history.
+    merged = _merge_snapshot("new question", {"messages": ["old q", "old a"]})
+    assert merged["messages"] == ["old q", "old a", "new question"]
+
+
+def test_merge_snapshot_internal_carry_has_no_duplicates() -> None:
+    # The driver strips messages from the carried input, so the internal
+    # continue-as-new path resumes from the snapshot alone.
+    from temporalio.contrib.deepagents.workflow import _merge_snapshot
+
+    merged = _merge_snapshot({"config": {"k": "v"}}, {"messages": ["start", "step"]})
+    assert merged["messages"] == ["start", "step"]
+    assert merged["config"] == {"k": "v"}

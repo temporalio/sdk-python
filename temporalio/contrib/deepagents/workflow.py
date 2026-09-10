@@ -158,27 +158,18 @@ async def call_backend_op(
 
 
 def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
-    """Restore a snapshot's carried messages for the next turn.
+    """Prepend a snapshot's carried messages onto the next turn's input.
 
-    The carried transcript already contains the original input messages, so
-    the snapshot replaces them. Patch-gated: the old semantics PREPENDED the
-    carried messages onto the input's (duplicating the original input every
-    rollover), and the merged list feeds user agent code whose control flow
-    can branch on it — replaying a prepend-recorded continuation with replace
-    semantics can emit different commands (verified: a run that completed on
-    the duplicated length replays into a ContinueAsNew command history does
-    not have).
+    The driver's own continue-as-new re-invocation strips the input's
+    messages first (the carried transcript already contains them), so the
+    internal path resumes from the snapshot alone without duplicating the
+    original prompt, while an externally supplied ``state_snapshot`` plus a
+    fresh input message composes: carried history first, new message after.
     """
     raw_prior: Any = snapshot.get("messages") or []
     prior = list(raw_prior)
     if not prior:
         return input
-    if workflow.patched("deepagents.can-carry-replaces-input-messages"):
-        if isinstance(input, Mapping):
-            merged = dict(input)
-            merged["messages"] = prior
-            return merged
-        return {"messages": prior}
     if isinstance(input, Mapping):
         merged = dict(input)
         raw_next: Any = input.get("messages") or []
@@ -252,8 +243,18 @@ async def run_deep_agent(
         }
         # ``continue_as_new`` threads positional args into the next run via
         # ``args=``; the enclosing ``@workflow.run`` receives them as
-        # ``(input, state_snapshot)``.
-        workflow.continue_as_new(args=[input, snapshot])
+        # ``(input, state_snapshot)``. The input's messages are stripped:
+        # the snapshot already carries the full transcript (including the
+        # original input messages), so re-sending them would both duplicate
+        # the original prompt in the merged history each rollover and carry
+        # the transcript twice in the payload.
+        if isinstance(input, Mapping):
+            carry_input: Any = {k: v for k, v in input.items() if k != "messages"}
+        else:
+            # A bare prompt (string / message list) is already in the
+            # transcript; nothing else to carry.
+            carry_input = {}
+        workflow.continue_as_new(args=[carry_input, snapshot])
 
     return result
 
