@@ -8,6 +8,10 @@ through ``TemporalMcpClientSession``:
 - full parameter-schema propagation to the model (the MCP wire-format check)
 - replay determinism and exact activity-scheduling counts
 
+Only the discovery test spawns the echo server as a stdio subprocess; the
+rest connect to the same server over in-memory streams, since they exercise
+the pooling, activity, and replay logic rather than the transport.
+
 Plus the server-side pass-through paths that need no shim code:
 - Vertex AI ``Tool(mcp_servers=[McpServer(...)])`` config serialization
 - Interactions API ``MCPServerToolCallStep`` / ``MCPServerToolResultStep`` rehydration
@@ -56,7 +60,19 @@ _ECHO_SERVER = str(Path(__file__).parent / "echo_mcp_server.py")
 
 @asynccontextmanager
 async def _echo_session() -> AsyncIterator[ClientSession]:
-    """Yield a connected, initialized session to the stdio echo MCP server."""
+    """Yield an initialized session to the echo MCP server over in-memory streams."""
+    from mcp.shared.memory import create_connected_server_and_client_session
+
+    # Imported here so the sandbox's re-import of this module stays side-effect free.
+    from tests.contrib.google_genai.echo_mcp_server import mcp as echo_server
+
+    async with create_connected_server_and_client_session(echo_server) as session:
+        yield session
+
+
+@asynccontextmanager
+async def _echo_stdio_session() -> AsyncIterator[ClientSession]:
+    """Yield an initialized session to the echo server run as a stdio subprocess."""
     params = StdioServerParameters(command=sys.executable, args=[_ECHO_SERVER])
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
@@ -85,7 +101,7 @@ def _apply_mcp_plugin(
 
     Monkeypatches ``GeminiApiCaller.activities`` (so canned generate_content
     responses drive the AFC loop) while leaving the plugin's MCP activities —
-    built from ``mcp_servers`` — to hit the real stdio echo server.
+    built from ``mcp_servers`` — to hit the real echo server.
     """
     from temporalio.contrib.google_genai._gemini_activity import GeminiApiCaller
 
@@ -128,13 +144,14 @@ async def _activity_names(handle: Any) -> list[str]:
 
 
 @pytest.fixture(autouse=True)
-def _clear_mcp_connections():  # pyright: ignore[reportUnusedFunction]
+async def _close_mcp_connections():  # pyright: ignore[reportUnusedFunction]
     """Isolate the module-global MCP connection pool between tests."""
     from temporalio.contrib.google_genai import _mcp
 
     _mcp._CONNECTIONS.clear()
     yield
-    _mcp._CONNECTIONS.clear()
+    for server in list(_mcp._CONNECTIONS):
+        await _mcp._evict_connection(server)
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +193,7 @@ class McpToolWorkflow:
 
 
 async def test_mcp_tool_discovery_and_call(client: Client):
-    """The AFC loop discovers + calls an MCP tool through activities."""
+    """The AFC loop discovers + calls a tool on a stdio MCP server via activities."""
     server = "echo_basic"
     new_client, _ = _apply_mcp_plugin(
         client,
@@ -184,7 +201,7 @@ async def test_mcp_tool_discovery_and_call(client: Client):
             make_function_call_response("echo", {"message": "hello"}),
             make_text_response("Done!"),
         ],
-        mcp_servers={server: _echo_session},
+        mcp_servers={server: _echo_stdio_session},
     )
 
     async with new_worker(new_client, McpToolWorkflow) as worker:
@@ -193,7 +210,6 @@ async def test_mcp_tool_discovery_and_call(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         result = await handle.result()
         names = await _activity_names(handle)
@@ -227,7 +243,6 @@ async def test_mcp_connection_pooling(client: Client):
             args=[server, "echo twice"],
             id=f"gemini-mcp-pool-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         assert await handle.result() == "Done!"
         names = await _activity_names(handle)
@@ -255,7 +270,6 @@ async def test_mcp_full_schema_propagation(client: Client):
             args=[server, "echo hi"],
             id=f"gemini-mcp-schema-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
 
     # The first generate request carries the tool declarations the SDK built
@@ -285,7 +299,6 @@ async def test_mcp_replay(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-replay-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         await handle.result()
         history = await handle.fetch_history()
@@ -316,7 +329,6 @@ async def test_mcp_side_effects(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-side-effects-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         await handle.result()
         names = await _activity_names(handle)
@@ -356,7 +368,6 @@ async def test_mcp_via_gemini_test_server(client: Client):
             args=[server, "echo the phrase: durable execution"],
             id=f"gemini-mcp-public-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         result = await handle.result()
         names = await _activity_names(handle)
