@@ -26,16 +26,56 @@ to include examples, links to docs, or any other relevant information.
   `StrandsPlugin(sandboxes=...)`, using one shared activity set with optional
   correlated live Workflow Streams output, worker-side environment references,
   and async-context-manager factories for adapter cleanup.
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
+- Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
+- New properties and methods in ActivityExecution and ActivityExecutionDescription.
+
 ### Changed
+
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+- System Nexus Signal-with-Start Workflow operations now invoke
+  `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
+  point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+- `client.ActivityExecution` and `client.ActivityExecutionDescription` had some fields removed or renamed
+  to match RPC API.
+  - Dataclass parameters for these types were changed to `frozen=True, eq=False, kw_only=True`.
+  - `scheduled_time` was renamed `schedule_time`.
+  - `last_failure` was changed from field to method that runs data converter on demand.
+  - `state_transition_count`, `eager_execution_requested`, `paused` and `long_poll_token`  were removed.
+- ActivityHandle.describe() long-poll token was removed.  The functionality can still be used manually
+  through raw gRPC API.
+
 ### Fixed
 
+- **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
+  Previously each batch's duration was summed, over-reporting the time whenever storage operations
+  ran concurrently.
+- System Nexus Signal-with-Start workflow operations now give custom payload
+  converters the target workflow's serialization context when encoding their
+  inner request payloads.
+- Cancelling an activity from a signal while the workflow itself is cancelled
+  no longer causes a nondeterminism error from duplicate activity-cancellation
+  commands.
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+- `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
+  `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
+  the delay the server asked for was discarded on that path and the activity
+  retried on its configured interval instead.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
 
 ### Security
 
@@ -144,6 +184,10 @@ to include examples, links to docs, or any other relevant information.
   This lets types with transfer type converters delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
   contexts.
+- Added `temporalio.contrib.opentelemetry.MetricsExporter`, which drains a
+  `temporalio.runtime.MetricBuffer` on a fixed interval and exports through a
+  real OpenTelemetry `MeterProvider`, giving SDK/Core metrics access to
+  standard OTel features (views, resource, exemplars). Experimental.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the

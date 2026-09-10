@@ -32,6 +32,7 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.nexus.system.workflow_service.models
 import temporalio.worker
 import temporalio.workflow
 from temporalio.contrib.opentelemetry._tracer_provider import (
@@ -600,3 +601,15 @@ class _TracingWorkflowOutboundInterceptor(
         ):
             input.headers = _context_to_nexus_headers(input.headers or {})
             return await super().start_nexus_operation(input)
+
+    async def start_signal_with_start_workflow(
+        self,
+        request: temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowRequest,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowResponse
+    ]:
+        with self._workflow_maybe_span(
+            "SignalWithStartWorkflow", kind=opentelemetry.trace.SpanKind.CLIENT
+        ):
+            request.headers = _context_to_headers(request.headers or {})
+            return await super().start_signal_with_start_workflow(request)

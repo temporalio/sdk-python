@@ -766,7 +766,13 @@ class RegisterFilesWorkflow:
 
     @workflow.run
     async def run(self, uris: list[str]) -> str:
-        client = TemporalAsyncClient()
+        # Missing credentials is a permanent error; retrying only delays it.
+        client = TemporalAsyncClient(
+            activity_config=ActivityConfig(
+                start_to_close_timeout=timedelta(seconds=60),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        )
         # auth arg is ignored by TemporalAsyncFiles — the activity uses
         # credentials from GoogleGenAIPlugin init.  We pass a dummy here;
         # can't import google.auth.credentials in the sandbox so we
@@ -901,7 +907,6 @@ async def test_simple_generate_content(client: Client):
             "Say hello",
             id=f"gemini-simple-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert result == "Hello from Gemini!"
@@ -928,7 +933,6 @@ async def test_tool_call_single_arg(client: Client):
             "What's the weather in Tokyo?",
             id=f"gemini-tool-single-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert tool_tracker.calls == [("get_weather", {"city": "Tokyo"})]
@@ -958,7 +962,6 @@ async def test_tool_call_multi_arg(client: Client):
             "What's the weather in Paris, France?",
             id=f"gemini-tool-multi-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert tool_tracker.calls == [
@@ -988,7 +991,6 @@ async def test_tool_failure_propagation(client: Client):
                 "Weather in Nowhere?",
                 id=f"gemini-tool-fail-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
 
     assert tool_tracker.calls == [("get_weather_failure", {"city": "Nowhere"})]
@@ -1021,7 +1023,6 @@ async def test_multiple_tools_sequential(client: Client):
             "Compare Tokyo and Paris weather",
             id=f"gemini-multi-tools-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
 
     assert tool_tracker.calls == [
@@ -1047,7 +1048,6 @@ async def test_workflow_method_as_tool(client: Client):
             "Tell me about Berlin",
             id=f"gemini-wf-method-tool-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
         result = await handle.result()
         # Query must happen while worker is alive
@@ -1069,7 +1069,6 @@ async def test_streamed_generate_content(client: Client):
             "Say something",
             id=f"gemini-streamed-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     # The tracker splits the text into per-word chunks
@@ -1092,7 +1091,6 @@ async def test_http_options_headers_propagate(client: Client):
             args=["hi", {"headers": {"X-Custom": "test-value"}}],
             id=f"gemini-http-headers-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 1
@@ -1111,7 +1109,6 @@ async def test_http_options_api_version_propagates(client: Client):
             args=["hi", {"api_version": "v1"}],
             id=f"gemini-http-version-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 1
@@ -1130,7 +1127,6 @@ async def test_http_options_base_url_propagates(client: Client):
             args=["hi", {"base_url": "https://custom.example.com"}],
             id=f"gemini-http-base-url-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 1
@@ -1156,7 +1152,6 @@ async def test_http_options_multiple_fields_propagate(client: Client):
             ],
             id=f"gemini-http-multi-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 1
@@ -1177,7 +1172,6 @@ async def test_no_http_options_passes_none(client: Client):
             "hi",
             id=f"gemini-http-none-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 1
@@ -1199,7 +1193,6 @@ async def test_file_upload_str_path(client: Client):
             "/tmp/test.txt",
             id=f"gemini-file-upload-str-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.file_upload_requests) == 1
@@ -1221,7 +1214,6 @@ async def test_file_upload_bytes(client: Client):
             b"hello world",
             id=f"gemini-file-upload-bytes-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.file_upload_requests) == 1
@@ -1243,7 +1235,6 @@ async def test_file_download(client: Client):
             "files/some-file",
             id=f"gemini-file-download-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.file_download_requests) == 1
@@ -1266,7 +1257,6 @@ async def test_file_search_store_upload(client: Client):
             args=["fileSearchStores/my-store", "/tmp/doc.txt"],
             id=f"gemini-fss-upload-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.file_search_store_upload_requests) == 1
@@ -1299,7 +1289,6 @@ async def test_chat_multi_turn(client: Client):
             "Hello",
             id=f"gemini-chat-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert len(api_tracker.requests) == 2
@@ -1448,7 +1437,6 @@ async def test_full_integration_with_mock_client(client: Client):
             "test prompt",
             id=f"gemini-full-integration-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
 
     assert result["generate"] == "Real activity response"
@@ -1482,7 +1470,6 @@ async def test_register_files_without_credentials_fails(client: Client):
                 ["gs://bucket/file.txt"],
                 id=f"gemini-register-no-creds-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
 
     # The error is nested: WorkflowFailureError → ActivityError → ApplicationError
@@ -1737,7 +1724,6 @@ async def test_interaction_create(client: Client):
             "What's an interaction?",
             id=f"gemini-interaction-create-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert result == {"id": INTERACTION_ID, "status": "completed"}
@@ -1760,7 +1746,6 @@ async def test_interaction_create_stream(client: Client):
             "Stream me",
             id=f"gemini-interaction-stream-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert result == [
@@ -1783,7 +1768,6 @@ async def test_interaction_lifecycle(client: Client):
             "interactions/abc",
             id=f"gemini-interaction-lifecycle-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert result["got_id"] == INTERACTION_ID
@@ -1801,7 +1785,6 @@ async def test_agents_crud(client: Client):
             AgentsWorkflow.run,
             id=f"gemini-agents-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert result["created_id"] == "test-agent"
@@ -1825,7 +1808,6 @@ async def test_webhooks_unsupported(client: Client):
             WebhooksUnsupportedWorkflow.run,
             id=f"gemini-webhooks-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
 
     assert "client.webhooks is not supported in Temporal workflows" in result
@@ -1949,7 +1931,6 @@ async def test_replay_simple_generate(client: Client):
             "Say hello",
             id=f"gemini-replay-simple-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
         await handle.result()
         history = await handle.fetch_history()
@@ -1991,7 +1972,6 @@ async def test_replay_tool_loop(client: Client):
             "Compare Tokyo and Paris weather",
             id=f"gemini-replay-tools-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
         await handle.result()
         history = await handle.fetch_history()
@@ -2035,7 +2015,6 @@ async def test_side_effects_activity_scheduling(client: Client):
             "Compare Tokyo and Paris weather",
             id=f"gemini-side-effects-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
         await handle.result()
 

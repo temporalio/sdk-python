@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 
+from botocore.config import Config as BotocoreConfig
 from strands.models import BedrockModel, Model
+from strands.models.bedrock import DEFAULT_READ_TIMEOUT
 from strands.tools.mcp import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -21,6 +23,16 @@ from ._temporal_mcp_client import (
     build_list_tools_activity,
 )
 from ._worker_env_ref import AllowAllWorkerEnvVars
+
+
+def _default_bedrock_model() -> Model:
+    # Temporal owns retries so Botocore must not retry within an activity attempt.
+    return BedrockModel(
+        boto_client_config=BotocoreConfig(
+            read_timeout=DEFAULT_READ_TIMEOUT,
+            retries={"max_attempts": 0},
+        )
+    )
 
 
 class StrandsPlugin(SimplePlugin):
@@ -65,15 +77,15 @@ class StrandsPlugin(SimplePlugin):
     ) -> None:
         """Build the plugin from optional model, MCP, and sandbox factories.
 
-        If ``models`` is omitted, registers a single ``BedrockModel()`` factory
-        under the name ``"bedrock"``, matching Strands' own implicit default.
+        If ``models`` is omitted, registers a single ``BedrockModel`` factory
+        under the name ``"bedrock"`` with Botocore retries disabled.
 
-        A sandbox factory may instead return an async context manager when its
-        worker-local adapter needs cleanup after cache eviction or Worker shutdown.
+        A sandbox factory may return an async context manager when its worker-local
+        adapter needs cleanup after cache eviction or Worker shutdown.
         """
         default_name: str | None = None
         if models is None:
-            models = {"bedrock": lambda: BedrockModel()}
+            models = {"bedrock": _default_bedrock_model}
             default_name = "bedrock"
         activities: list[Callable] = []
         if models:

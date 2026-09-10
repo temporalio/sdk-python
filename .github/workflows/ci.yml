@@ -238,7 +238,7 @@ jobs:
       - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
       - run: uv sync --all-extras
-      - run: cargo install --locked nexgen --version 0.2.2 --features advanced --force
+      - run: cargo install --locked nexgen --version 0.2.4 --features advanced --force
       - run: poe build-develop
       - run: poe gen-protos
       - name: Check generation unchanged
@@ -288,9 +288,9 @@ jobs:
           path: junit-xml
           retention-days: 14
 
-  # Run the test suite against Temporal Cloud (skipped on forks)
+  # Run the test suite against Temporal Cloud (skipped on forks and Dependabot-triggered runs)
   cloud-test:
-    if: ${{ github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python' }}
+    if: ${{ github.actor != 'dependabot[bot]' && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:

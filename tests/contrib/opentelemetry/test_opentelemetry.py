@@ -88,6 +88,34 @@ class TracingWorkflowActionActivity:
     fail_on_non_replay_before_complete: bool = False
 
 
+@workflow.defn
+class SignalWithStartHeaderWorkflow:
+    def __init__(self) -> None:
+        self._signaled = False
+
+    @workflow.run
+    async def run(self) -> bool:
+        await workflow.wait_condition(lambda: self._signaled)
+        return "_tracer-data" in workflow.info().headers
+
+    @workflow.signal
+    def notify(self) -> None:
+        self._signaled = True
+
+
+@workflow.defn
+class SignalWithStartCallerWorkflow:
+    @workflow.run
+    async def run(self, target_id: str, task_queue: str) -> str:
+        handle = await workflow.signal_with_start_workflow(
+            SignalWithStartHeaderWorkflow.run,
+            id=target_id,
+            task_queue=task_queue,
+            signal=SignalWithStartHeaderWorkflow.notify,
+        )
+        return handle.id
+
+
 @dataclass
 class TracingWorkflowActionContinueAsNew:
     param: TracingWorkflowParam
@@ -227,6 +255,41 @@ class TracingWorkflow:
     @update.validator
     def update_validator(self) -> None:
         pass
+
+
+@pytest.mark.requires_local_server
+async def test_workflow_signal_with_start_propagates_trace_headers(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+    provider = TracerProvider()
+    exporter = InMemorySpanExporter()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    config = client.config()
+    config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=f"signal-with-start-{uuid.uuid4()}",
+        workflows=[SignalWithStartCallerWorkflow, SignalWithStartHeaderWorkflow],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ) as worker:
+        target_id = f"signal-with-start-target-{uuid.uuid4()}"
+        with tracer.start_as_current_span("signal-with-start"):
+            caller = await client.start_workflow(
+                SignalWithStartCallerWorkflow.run,
+                args=[target_id, worker.task_queue],
+                id=f"signal-with-start-caller-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert await caller.result() == target_id
+        assert await client.get_workflow_handle(target_id).result() is True
+    assert any(
+        span.name == "SignalWithStartWorkflow" for span in exporter.get_finished_spans()
+    )
 
 
 async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):

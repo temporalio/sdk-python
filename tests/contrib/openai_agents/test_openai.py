@@ -61,7 +61,7 @@ from agents.mcp import MCPServer, MCPServerStdio
 from agents.sandbox.capabilities.tools import SandboxApplyPatchTool
 from agents.tool import CustomTool
 from agents.tool_context import ToolContext
-from openai import APIStatusError, AsyncOpenAI, BaseModel
+from openai import APIStatusError, AsyncOpenAI, BaseModel, RateLimitError
 from openai.types.responses import (
     ResponseCodeInterpreterToolCall,
     ResponseCustomToolCall,
@@ -87,7 +87,10 @@ from temporalio.contrib.openai_agents import (
     StatefulMCPServerProvider,
     StatelessMCPServerProvider,
 )
-from temporalio.contrib.openai_agents._invoke_model_activity import _build_tool
+from temporalio.contrib.openai_agents._invoke_model_activity import (
+    _build_tool,
+    _raise_for_openai_status,
+)
 from temporalio.contrib.openai_agents._model_parameters import ModelSummaryProvider
 from temporalio.contrib.openai_agents._openai_runner import (
     _coerce_run_config,
@@ -106,7 +109,12 @@ from temporalio.contrib.openai_agents.testing import (
     TestModelProvider,
 )
 from temporalio.contrib.pydantic import pydantic_data_converter
-from temporalio.exceptions import ApplicationError, CancelledError, TemporalError
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    TemporalError,
+)
 from temporalio.testing import WorkflowEnvironment
 from temporalio.workflow import ActivityConfig
 from tests.contrib.openai_agents.research_agents.research_manager import (
@@ -1349,7 +1357,6 @@ async def test_output_guardrail(client: Client, use_local_model: bool):
                 OutputGuardrailWorkflow.run,
                 id=f"output-guardrail-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             result = await workflow_handle.result()
 
@@ -1404,7 +1411,6 @@ async def test_workflow_method_tools(client: Client):
             WorkflowToolWorkflow.run,
             id=f"workflow-tool-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=10),
         )
         await workflow_handle.result()
 
@@ -1427,12 +1433,21 @@ async def test_response_serialization():
     await pydantic_data_converter.encode([model_response])
 
 
-async def assert_status_retry_behavior(status: int, client: Client, should_retry: bool):
-    def status_error(status: int):
+async def assert_status_retry_behavior(
+    status: int,
+    client: Client,
+    should_retry: bool,
+    *,
+    retry_policy: RetryPolicy | None = None,
+) -> None:
+    def status_error(status: int) -> ModelResponse:
         with workflow.unsafe.imports_passed_through():
             with workflow.unsafe.sandbox_unrestricted():
                 import httpx
-            raise APIStatusError(
+            error_type: type[APIStatusError] = (
+                RateLimitError if status == 429 else APIStatusError
+            )
+            raise error_type(
                 message="Something went wrong.",
                 response=httpx.Response(
                     status_code=status, request=httpx.Request("GET", url="")
@@ -1443,7 +1458,7 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
     async with AgentEnvironment(
         model=TestModel(lambda: status_error(status)),
         model_params=ModelActivityParameters(
-            retry_policy=RetryPolicy(maximum_attempts=2),
+            retry_policy=retry_policy or RetryPolicy(maximum_attempts=2),
         ),
     ) as env:
         client = env.applied_on_client(client)
@@ -1457,10 +1472,12 @@ async def assert_status_retry_behavior(status: int, client: Client, should_retry
                 "Input",
                 id=f"workflow-tool-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
-            with pytest.raises(WorkflowFailureError):
+            with pytest.raises(WorkflowFailureError) as err:
                 await workflow_handle.result()
+            assert isinstance(err.value.cause, ActivityError)
+            assert isinstance(err.value.cause.cause, ApplicationError)
+            assert err.value.cause.cause.type == "APIStatusError"
 
             found = False
             async for event in workflow_handle.fetch_history_events():
@@ -1482,6 +1499,75 @@ async def test_exception_handling(client: Client):
     await assert_status_retry_behavior(400, client, should_retry=False)
     await assert_status_retry_behavior(403, client, should_retry=False)
     await assert_status_retry_behavior(404, client, should_retry=False)
+    await assert_status_retry_behavior(
+        429,
+        client,
+        should_retry=False,
+        retry_policy=RetryPolicy(
+            maximum_attempts=2,
+            non_retryable_error_types=["APIStatusError"],
+        ),
+    )
+
+
+def _openai_status_error(status: int, headers: dict[str, str]) -> APIStatusError:
+    import httpx
+
+    return APIStatusError(
+        message="Something went wrong.",
+        response=httpx.Response(
+            status_code=status,
+            request=httpx.Request("GET", url=""),
+            headers=headers,
+        ),
+        body=None,
+    )
+
+
+def test_retry_after_ms_propagated_when_server_requests_retry():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(
+                429, {"x-should-retry": "true", "retry-after-ms": "5000"}
+            )
+        )
+    assert not err.value.non_retryable
+    assert err.value.type == "APIStatusError"
+    assert err.value.next_retry_delay == timedelta(milliseconds=5000)
+
+
+def test_retry_after_seconds_propagated_when_server_requests_retry():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(429, {"x-should-retry": "true", "retry-after": "5"})
+        )
+    assert not err.value.non_retryable
+    assert err.value.next_retry_delay == timedelta(seconds=5)
+
+
+def test_should_retry_true_overrides_non_retryable_status():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(_openai_status_error(400, {"x-should-retry": "true"}))
+    assert not err.value.non_retryable
+
+
+def test_should_retry_false_stays_non_retryable():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(
+                429, {"x-should-retry": "false", "retry-after-ms": "5000"}
+            )
+        )
+    assert err.value.non_retryable
+    assert err.value.next_retry_delay == timedelta(milliseconds=5000)
+
+
+def test_retry_after_ms_takes_precedence_over_retry_after():
+    with pytest.raises(ApplicationError) as err:
+        _raise_for_openai_status(
+            _openai_status_error(429, {"retry-after-ms": "1500", "retry-after": "60"})
+        )
+    assert err.value.next_retry_delay == timedelta(milliseconds=1500)
 
 
 class CustomModelProvider(ModelProvider):
@@ -1510,7 +1596,6 @@ async def test_chat_completions_model(client: Client):
                 WorkflowToolWorkflow.run,
                 id=f"workflow-tool-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
 
@@ -1583,7 +1668,6 @@ async def test_alternative_model(client: Client):
                 "Hello",
                 id=f"alternative-model-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
 
@@ -1609,7 +1693,6 @@ async def test_heartbeat(client: Client, env: WorkflowEnvironment):
                 "Tell me about recursion in programming.",
                 id=f"workflow-tool-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=5.0),
             )
             await workflow_handle.result()
 
@@ -1641,7 +1724,6 @@ async def test_session(client: Client):
                 SessionWorkflow.run,
                 id=f"session-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10.0),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
 
@@ -1686,7 +1768,6 @@ async def test_lite_llm(client: Client):
                 "Tell me about recursion in programming",
                 id=f"lite-llm-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
 
@@ -2134,7 +2215,6 @@ async def test_multiple_models(client: Client):
                 False,
                 id=f"multiple-model-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
             assert provider.model_names == {None, "gpt-4o-mini"}
@@ -2159,7 +2239,6 @@ async def test_run_config_models(client: Client):
                 True,
                 id=f"run-config-model-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
 
@@ -2216,7 +2295,6 @@ async def test_dict_run_config_models(client: Client):
                 DictRunConfigWorkflow.run,
                 id=f"dict-run-config-model-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             result = await workflow_handle.result()
 
@@ -2273,7 +2351,6 @@ async def test_summary_provider(client: Client):
                 "Prompt",
                 id=f"summary-provider-model-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             await workflow_handle.result()
             async for e in workflow_handle.fetch_history_events():
@@ -2329,7 +2406,6 @@ async def test_output_type(client: Client):
                 OutputTypeWorkflow.run,
                 id=f"output-type-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
             result = await workflow_handle.result()
             assert isinstance(result, OutputType)
@@ -2778,7 +2854,6 @@ async def test_local_hello_world_agent(client: Client):
                 "Tell me about recursion in programming.",
                 id=f"hello-workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=5),
             )
             result = await handle.result()
             assert result == "test"
