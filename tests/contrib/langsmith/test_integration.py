@@ -16,13 +16,12 @@ from langsmith import traceable, tracing_context
 from temporalio import activity, common, nexus, workflow
 from temporalio.client import (
     Client,
+    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
-    WorkflowQueryFailedError,
 )
 from temporalio.contrib.langsmith import LangSmithPlugin
 from temporalio.exceptions import ApplicationError
-from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.langsmith.conftest import (
     InMemoryRunCollector,
@@ -312,22 +311,28 @@ def _make_temporal_client(
     return Client(**config)
 
 
-@traceable(name="poll_query")
-async def _poll_query(
-    handle: WorkflowHandle[Any, Any],
-    query: Callable[..., Any],
-    *,
-    expected: Any = True,
-) -> bool:
-    """Poll a workflow query until it returns the expected value."""
+async def _wait_for_workflow_idle(handle: WorkflowHandle[Any, Any]) -> None:
+    """Wait until the running workflow has no pending task, activity, child or Nexus op."""
     while True:
-        try:
-            result = await handle.query(query)
-            if result == expected:
-                return True
-        except (WorkflowQueryFailedError, RPCError):
-            pass  # Query not yet available (workflow hasn't started)
-        await asyncio.sleep(1)
+        desc = await handle.describe()
+        assert desc.status == WorkflowExecutionStatus.RUNNING, desc.status
+        raw = desc.raw_description
+        if not (
+            raw.HasField("pending_workflow_task")
+            or raw.pending_activities
+            or raw.pending_children
+            or raw.pending_nexus_operations
+        ):
+            return
+        await asyncio.sleep(0.2)
+
+
+@traceable(name="query_pipeline")
+async def _query_pipeline(
+    handle: WorkflowHandle[Any, Any], query: Callable[..., Any]
+) -> Any:
+    """Run a single workflow query under a @traceable root."""
+    return await handle.query(query)
 
 
 # ---------------------------------------------------------------------------
@@ -563,7 +568,7 @@ class TestComprehensiveTracing:
         """Full trace hierarchy with worker restart mid-workflow.
 
         user_pipeline only wraps start_workflow (completing before the worker
-        starts), so poll/signal/query traces are naturally separate root traces.
+        starts), so query/signal/update traces are naturally separate root traces.
         """
         if env.supports_time_skipping:
             pytest.skip("Time-skipping server doesn't persist headers.")
@@ -575,6 +580,8 @@ class TestComprehensiveTracing:
         temporal_client_1 = _make_temporal_client(
             client, mock_ls, add_temporal_runs=True
         )
+        # Raw-client handle (no LangSmith interceptor) for untraced readiness checks
+        raw_handle = client.get_workflow_handle(workflow_id)
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> WorkflowHandle[Any, Any]:
@@ -588,7 +595,7 @@ class TestComprehensiveTracing:
             # Start workflow — no worker yet, just a server RPC
             handle = await user_pipeline()
 
-            # Phase 1: worker picks up workflow, poll until signal wait
+            # Phase 1: worker runs the workflow up to the signal wait
             async with new_worker(
                 temporal_client_1,
                 ComprehensiveWorkflow,
@@ -602,14 +609,14 @@ class TestComprehensiveTracing:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                assert await _poll_query(
-                    handle,
-                    ComprehensiveWorkflow.is_waiting_for_signal,
-                    expected=True,
+                await _wait_for_workflow_idle(raw_handle)
+                assert await _query_pipeline(
+                    handle, ComprehensiveWorkflow.is_waiting_for_signal
                 ), "Workflow never reached signal wait point"
-                # Raw-client query (no LangSmith interceptor) — root-level trace
-                raw_handle = client.get_workflow_handle(workflow_id)
-                await raw_handle.query(ComprehensiveWorkflow.is_waiting_for_signal)
+                # Raw-client query — root-level trace
+                assert await raw_handle.query(
+                    ComprehensiveWorkflow.is_waiting_for_signal
+                )
 
             # Phase 2: fresh worker, signal to resume, complete
             temporal_client_2 = _make_temporal_client(
@@ -627,6 +634,7 @@ class TestComprehensiveTracing:
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.query(ComprehensiveWorkflow.my_query)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
+                await _wait_for_workflow_idle(raw_handle)
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
@@ -704,18 +712,15 @@ class TestComprehensiveTracing:
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
 
-        # poll_query trace (separate root, variable number of iterations)
-        poll_trace_trees = find_trace_trees(trace_trees, "poll_query")
-        assert len(poll_trace_trees) == 1
-        poll = poll_trace_trees[0]
-        assert poll.name == "poll_query"
-        poll_children = poll.children
-        for poll_child in poll_children:
-            assert poll_child.name == "QueryWorkflow:is_waiting_for_signal"
-            assert [child.name for child in poll_child.children] == [
-                "HandleQuery:is_waiting_for_signal"
-            ]
-            assert not poll_child.children[0].children
+        # query_pipeline trace: the worker-side handler nests under the client query
+        assert_trace_hierarchy(
+            find_trace_trees(trace_trees, "query_pipeline"),
+            [
+                "query_pipeline",
+                "  QueryWorkflow:is_waiting_for_signal",
+                "    HandleQuery:is_waiting_for_signal",
+            ],
+        )
 
         # Raw-client query — no parent context, appears as root
         raw_query_trace_trees = [
@@ -777,7 +782,7 @@ class TestComprehensiveTracing:
         """Same workflow with add_temporal_runs=False and worker restart.
 
         Only @traceable runs appear. Context propagation via headers still works.
-        user_pipeline only wraps start_workflow, so poll traces are separate roots.
+        user_pipeline only wraps start_workflow, so the query trace is a separate root.
         """
         if env.supports_time_skipping:
             pytest.skip("Time-skipping server doesn't persist headers.")
@@ -789,6 +794,8 @@ class TestComprehensiveTracing:
         temporal_client_1 = _make_temporal_client(
             client, mock_ls, add_temporal_runs=False
         )
+        # Raw-client handle (no LangSmith interceptor) for untraced readiness checks
+        raw_handle = client.get_workflow_handle(workflow_id)
 
         @traceable(name="user_pipeline")
         async def user_pipeline() -> WorkflowHandle[Any, Any]:
@@ -801,7 +808,7 @@ class TestComprehensiveTracing:
         with tracing_context(client=mock_ls, enabled=True):
             handle = await user_pipeline()
 
-            # Phase 1: worker picks up workflow, poll until signal wait
+            # Phase 1: worker runs the workflow up to the signal wait
             async with new_worker(
                 temporal_client_1,
                 ComprehensiveWorkflow,
@@ -815,13 +822,13 @@ class TestComprehensiveTracing:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
+                await _wait_for_workflow_idle(raw_handle)
                 # Raw-client query — no interceptor, produces nothing
-                raw_handle = client.get_workflow_handle(workflow_id)
-                await raw_handle.query(ComprehensiveWorkflow.is_waiting_for_signal)
-                assert await _poll_query(
-                    handle,
-                    ComprehensiveWorkflow.is_waiting_for_signal,
-                    expected=True,
+                assert await raw_handle.query(
+                    ComprehensiveWorkflow.is_waiting_for_signal
+                )
+                assert await _query_pipeline(
+                    handle, ComprehensiveWorkflow.is_waiting_for_signal
                 ), "Workflow never reached signal wait point"
 
             # Phase 2: fresh worker, signal to resume, complete
@@ -839,6 +846,7 @@ class TestComprehensiveTracing:
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
+                await _wait_for_workflow_idle(raw_handle)
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
@@ -883,10 +891,10 @@ class TestComprehensiveTracing:
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
 
-        # Poll query — separate root, just the @traceable wrapper, no Temporal children
-        poll_trace_trees = find_trace_trees(trace_trees, "poll_query")
-        assert len(poll_trace_trees) == 1
-        assert_trace_hierarchy(poll_trace_trees, ["poll_query"])
+        # Query — separate root, just the @traceable wrapper, no Temporal children
+        assert_trace_hierarchy(
+            find_trace_trees(trace_trees, "query_pipeline"), ["query_pipeline"]
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1252,13 +1260,7 @@ class TestBuiltinQueryFiltering:
                 task_queue=worker.task_queue,
             )
 
-            # Wait for workflow to start by polling the user query
-            assert await _poll_query(
-                handle,
-                QueryFilteringWorkflow.my_query,
-                expected="query-result",
-            ), "Workflow never started"
-
+            await _wait_for_workflow_idle(handle)
             collector.clear()
 
             # Built-in queries — should NOT be traced
