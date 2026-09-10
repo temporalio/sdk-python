@@ -227,7 +227,7 @@ class InfoWorkflow:
         return json.loads(json.dumps(ret, default=str))
 
 
-async def test_workflow_info(client: Client, env: WorkflowEnvironment):
+async def test_workflow_info(client: Client, env: WorkflowEnvironment, env_type: str):
     # TODO(cretz): Fix
     if env.supports_time_skipping:
         pytest.skip(
@@ -258,7 +258,8 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         assert info["task_queue"] == worker.task_queue
-        assert info["task_timeout"] == "0:01:00"
+        # Only the local dev server gets the 60s default from tests/conftest.py
+        assert info["task_timeout"] == ("0:01:00" if env_type == "local" else "0:00:10")
         assert info["workflow_id"] == workflow_id
         assert info["workflow_type"] == "InfoWorkflow"
 
