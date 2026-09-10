@@ -164,15 +164,16 @@ class ToolCallIdPairingWorkflow:
 @workflow.defn
 class RepeatedToolCallWorkflow:
     @workflow.run
-    async def run(self) -> str:
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> str:
         tool = tool_as_activity(
             pairing_weather, start_to_close_timeout=timedelta(seconds=10)
         )
         agent = create_deep_agent(model="fake:model", tools=[tool])
         result = await run_deep_agent(
             agent,
-            {"messages": [{"role": "user", "content": "Check Paris twice."}]},
+            input,
             continue_as_new_after=10_000,
+            state_snapshot=state_snapshot,
         )
         return str(result["messages"][-1].content)
 
@@ -294,6 +295,7 @@ async def test_repeated_tool_calls_with_same_args_both_run(
     ):
         handle = await env.client.start_workflow(
             RepeatedToolCallWorkflow.run,
+            {"messages": [{"role": "user", "content": "Check Paris twice."}]},
             id=f"da-repeated-tool-calls-{uuid.uuid4()}",
             task_queue="da-repeated-tool-calls",
         )
@@ -301,3 +303,31 @@ async def test_repeated_tool_calls_with_same_args_both_run(
 
     counts = await count_scheduled_activities(handle)
     assert counts[INVOKE_TOOL] == 2, counts
+
+
+def test_occurrence_keys_survive_continue_as_new_carry() -> None:
+    # A continued run replays the carried conversation's calls in order, so
+    # per-run occurrence counting regenerates the keys the previous run
+    # stored: repeats each get a slot AND completed work is reused after CAN
+    # (a per-invocation nonce in the key would orphan every carried entry).
+    from temporalio.contrib.deepagents import _serde
+
+    def key_for(name: str, args: dict) -> str:
+        identity = _serde.cache_key("tool", name, args)
+        return _serde.cache_key("tool", identity, _serde.next_occurrence(identity))
+
+    _serde.set_result_cache({})
+    k0 = key_for("send_email", {"to": "x"})
+    k1 = key_for("send_email", {"to": "x"})
+    assert k0 != k1  # repeats get distinct slots
+    _serde.cache_put(k0, "r0")
+    _serde.cache_put(k1, "r1")
+    snapshot = _serde.result_cache_snapshot()
+    assert snapshot is not None
+
+    # Continued run: rehydrate the cache; counters restart with it.
+    _serde.set_result_cache(snapshot)
+    assert key_for("send_email", {"to": "x"}) == k0
+    assert _serde.cache_lookup(key_for("send_email", {"to": "x"}))[1] == "r1"
+    # A genuinely new third occurrence misses and would run its Activity.
+    assert _serde.cache_lookup(key_for("send_email", {"to": "x"}))[0] is False

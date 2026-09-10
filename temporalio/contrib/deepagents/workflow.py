@@ -111,16 +111,17 @@ async def call_tool(
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
     """Dispatch one tool call, reusing a cached result across continue-as-new."""
-    # Keying by tool_call_id lets repeated calls with identical name+args each
-    # run their own Activity. Patch-gated: histories recorded under the old
-    # name+args key reused one result for such repeats, and replaying them
-    # with the new key would schedule an Activity the history does not have.
-    if workflow.patched("deepagents.tool-cache-key-includes-call-id"):
-        key = _serde.cache_key(
-            "tool",
-            activity_input.tool_call_id,
-            [activity_input.tool_name, activity_input.args],
+    # Repeated calls with identical name+args each get their own cache slot,
+    # keyed by per-run occurrence index. The index (not tool_call_id, which is
+    # a per-invocation nonce) keeps keys reproducible, so results still carry
+    # across continue-as-new. Patch-gated: histories recorded under the old
+    # name+args key reused one result for repeats, and replaying them with
+    # per-occurrence keys would schedule an Activity the history does not have.
+    if workflow.patched("deepagents.tool-cache-key-per-occurrence"):
+        identity = _serde.cache_key(
+            "tool", activity_input.tool_name, activity_input.args
         )
+        key = _serde.cache_key("tool", identity, _serde.next_occurrence(identity))
     else:
         key = _serde.cache_key("tool", activity_input.tool_name, activity_input.args)
     hit, cached = _serde.cache_lookup(key)
