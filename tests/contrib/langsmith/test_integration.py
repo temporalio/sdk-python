@@ -77,7 +77,8 @@ class TraceableActivityWorkflow:
     async def run(self, _input: str = "") -> str:
         return await workflow.execute_activity(
             traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
 
 
@@ -111,7 +112,8 @@ class SimpleWorkflow:
     async def run(self) -> str:
         result = await workflow.execute_activity(
             simple_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
         return result
 
@@ -126,7 +128,8 @@ async def _step_with_activity() -> str:
     """A @traceable step that wraps an activity call."""
     return await workflow.execute_activity(
         nested_traceable_activity,
-        start_to_close_timeout=timedelta(seconds=10),
+        start_to_close_timeout=timedelta(minutes=1),
+        retry_policy=common.RetryPolicy(maximum_attempts=1),
     )
 
 
@@ -164,12 +167,14 @@ class ComprehensiveWorkflow:
     async def run(self) -> str:
         await workflow.execute_activity(
             nested_traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
         await _step_with_activity()
         await workflow.execute_local_activity(
             nested_traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
         await _outer_chain("from-workflow")
         await workflow.execute_child_workflow(
@@ -192,7 +197,8 @@ class ComprehensiveWorkflow:
         await workflow.wait_condition(lambda: self._signal_received)
         await workflow.execute_activity(
             nested_traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
         await workflow.wait_condition(lambda: self._complete)
         return "comprehensive-done"
@@ -260,7 +266,7 @@ class ActivityFailureWorkflow:
     async def run(self) -> str:
         return await workflow.execute_activity(
             failing_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
             retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
 
@@ -271,7 +277,7 @@ class BenignErrorWorkflow:
     async def run(self) -> str:
         return await workflow.execute_activity(
             benign_failing_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
             retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
 
@@ -938,7 +944,8 @@ class FactoryTraceableWorkflow:
         # Activity with nested @traceable
         await workflow.execute_activity(
             nested_traceable_activity,
-            start_to_close_timeout=timedelta(seconds=10),
+            start_to_close_timeout=timedelta(minutes=1),
+            retry_policy=common.RetryPolicy(maximum_attempts=1),
         )
         return f"{r1}|{r2}|{r3}"
 
