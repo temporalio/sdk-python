@@ -11,8 +11,6 @@ to include examples, links to docs, or any other relevant information.
 ### Deprecated       — soon-to-be-removed features
 ### :boom: Breaking Changes — removed or backwards-incompatible features
 ### Fixed            — notable bug fixes
-
-- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 ### Security         — notable security fixes
 -->
 
@@ -53,6 +51,8 @@ to include examples, links to docs, or any other relevant information.
   through raw gRPC API.
 
 ### Fixed
+
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
