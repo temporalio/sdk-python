@@ -20,6 +20,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories with run and Workflow-chain context registered with
+  `StrandsPlugin(sandboxes=...)`, using one shared activity set with optional
+  correlated live Workflow Streams output, worker-side environment references,
+  and async-context-manager factories for adapter cleanup.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
