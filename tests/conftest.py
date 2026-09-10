@@ -59,9 +59,8 @@ def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
         print()
 
 
-@pytest.hookimpl(trylast=True)
-def pytest_runtest_teardown() -> None:
-    # Freeze survivors so later full GC passes only cover one test's allocations
+def pytest_collection_finish(session: pytest.Session) -> None:
+    # Freeze the import-time heap once so full GC passes only cover test allocations
     gc.collect()
     gc.freeze()
 
