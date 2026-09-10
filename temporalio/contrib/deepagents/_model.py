@@ -263,40 +263,22 @@ class TemporalModel(BaseChatModel):
 # create_deep_agent model patch (implicit wrapping)
 # ---------------------------------------------------------------------------
 #
-# The durability seam is ``deepagents._models.resolve_model``, which
-# ``create_deep_agent`` calls to turn a ``model=`` string (or instance) into a
-# ``BaseChatModel`` — for both the top-level agent and every ``SubAgent``
-# (``graph.py`` lines 592 and 634). We patch BOTH bindings of that function:
-# on ``deepagents.graph`` (whose module-top ``from deepagents._models import
-# resolve_model`` froze its own reference, read afresh from graph's globals on
-# each ``create_deep_agent`` call) and on ``deepagents._models`` itself — the
-# definition site — which covers every call-time importer. The middleware
-# layer is why the extra bindings matter. Two middleware seams exist:
-# ``create_summarization_tool_middleware`` resolves its model via a
-# function-level ``from deepagents._models import resolve_model`` (covered by
-# the ``_models`` binding), while ``SummarizationMiddleware`` itself delegates
-# to LangChain's summarization middleware, whose ``__init__`` resolves a name
-# string through ``init_chat_model`` — bound at the top of
-# ``langchain.agents.middleware.summarization`` — so that module's binding is
-# patched too. With either seam unpatched, a summarizer configured as a name
-# string and constructed in-workflow builds a real provider client and runs
-# compaction LLM calls inside the workflow (nondeterministic, replay-unsafe).
+# The durability seam is ``resolve_model``, which turns a ``model=`` name
+# string into a live ``BaseChatModel``. We patch every binding a string can
+# reach in-workflow:
 #
-# Patching *this* seam (not ``deepagents.create_deep_agent``) is what makes the
-# rewrite survive the user's import style. A user who writes the idiomatic
-# ``from deepagents import create_deep_agent`` binds the *original* function
-# object into their module; rebinding the ``deepagents.create_deep_agent``
-# attribute would never be seen by that already-bound reference, so string
-# models would reach the real provider inside the workflow (a hang / non-
-# determinism). ``create_deep_agent``'s body, by contrast, always looks up
-# ``resolve_model`` in the ``deepagents.graph`` globals afresh on each call, so
-# rebinding it there is observed no matter how the caller imported the factory.
-# It also preserves ``_model_spec`` (the original string), which the factory
-# reads *before* calling ``resolve_model`` for harness-profile lookup.
+# - ``deepagents.graph`` — read afresh by ``create_deep_agent`` for the main
+#   agent and every sub-agent (its module-top import froze its own binding).
+# - ``deepagents._models`` — the definition site; covers call-time importers
+#   such as ``create_summarization_tool_middleware``.
+# - ``init_chat_model`` as bound in ``langchain.agents.middleware.summarization``
+#   — the seam ``SummarizationMiddleware`` resolves a string summarizer through.
 #
-# ``create_deep_agent`` is still wrapped separately, best-effort, purely to fire
-# the construction-time warnings that need the ``tools`` / ``checkpointer``
-# kwargs (those warnings are advisory and carry no durability weight).
+# An unpatched binding means a real provider client constructed (and called)
+# inside the workflow: nondeterministic and replay-unsafe. We do NOT rebind
+# ``deepagents.create_deep_agent`` for durability — callers who already did
+# ``from deepagents import create_deep_agent`` hold the original object — only
+# a best-effort wrap to fire the advisory construction-time warnings.
 
 _original_create_deep_agent: Any = None
 _original_resolve_model: Any = None
@@ -330,17 +312,10 @@ def _wrap_model_arg(model: Any) -> Any:
 def install_model_patch() -> None:
     """Route Deep Agents' model resolution through :class:`TemporalModel`.
 
-    Patches every binding that turns a ``model="..."`` name string into a
-    live model, so each becomes a durable :class:`TemporalModel` in-workflow:
-    ``deepagents.graph.resolve_model`` (the ``create_deep_agent`` seam for the
-    main agent and every sub-agent), ``deepagents._models.resolve_model`` (the
-    definition site, read call-time by ``create_summarization_tool_middleware``),
-    and ``init_chat_model`` as bound in LangChain's summarization middleware
-    module (the seam ``SummarizationMiddleware`` resolves its summarizer
-    through). Additionally wraps ``deepagents.create_deep_agent`` to fire the
-    advisory tool / checkpointer warnings. All of it only acts when called
-    inside a workflow, so importing deepagents on a plain client / activity
-    worker is unaffected. Idempotent.
+    Patches the model-resolution bindings listed above so a name string
+    becomes a durable :class:`TemporalModel` in-workflow, and wraps
+    ``deepagents.create_deep_agent`` for the advisory warnings. No effect
+    outside workflows. Idempotent.
     """
     global _original_create_deep_agent, _original_resolve_model
     # importlib: `deepagents` is absent on Python 3.10 environments (its floor
@@ -350,8 +325,7 @@ def install_model_patch() -> None:
     _models = importlib.import_module("deepagents._models")
 
     if _original_resolve_model is None:
-        # graph's module-top import bound the same function object the
-        # definition site holds; one stored original restores both bindings.
+        # One original serves both bindings (same function object).
         _original_resolve_model = _models.resolve_model
 
         def patched_resolve_model(model: Any) -> Any:
@@ -364,10 +338,8 @@ def install_model_patch() -> None:
 
     global _original_lc_init_chat_model
     if _original_lc_init_chat_model is None:
-        # Best-effort: the module path is LangChain-internal and may move.
-        # If it does, string summarizer models fall back to a live client
-        # in-workflow — the regression test pins this so an upstream move
-        # fails loudly in CI instead of silently shipping.
+        # Best-effort: LangChain-internal path; if it moves, the regression
+        # test fails loudly rather than this crashing worker start.
         try:
             _lc_sum = importlib.import_module(
                 "langchain.agents.middleware.summarization"

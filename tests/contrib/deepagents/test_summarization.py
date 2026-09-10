@@ -1,19 +1,11 @@
-"""Summarization middleware's model resolves through the durable seam.
+"""String summarizer models must resolve to a durable ``TemporalModel``.
 
-String summarizer models used to bypass the plugin entirely:
-``SummarizationMiddleware`` delegates to LangChain's summarization middleware,
-whose ``__init__`` resolves a name string via ``init_chat_model`` (bound at
-the top of ``langchain.agents.middleware.summarization``), and
-``create_summarization_tool_middleware`` resolves via a call-time ``from
-deepagents._models import resolve_model``. Neither reads the
-``deepagents.graph`` binding the plugin patched, so a middleware constructed
-in-workflow with a name string built a real provider client and ran
-compaction LLM calls inside the workflow — nondeterministic, replay-unsafe,
-and invisible until a conversation grew past its trigger. (The DEFAULT
-stack's summarizer is unaffected: ``create_deep_agent`` resolves the agent
-model through the patched graph seam first and hands the middleware the
-already-durable instance.) The plugin now patches all three bindings; these
-tests pin the resolved type for both explicit string-model paths.
+``SummarizationMiddleware`` resolves a name string via LangChain's
+``init_chat_model`` binding, and ``create_summarization_tool_middleware`` via
+a call-time import of ``deepagents._models.resolve_model`` — neither reads
+the patched ``deepagents.graph`` seam, so in-workflow both built a real
+provider client (the default stack is unaffected: it receives the
+already-resolved agent model). One pin per seam.
 """
 
 from __future__ import annotations
@@ -45,8 +37,6 @@ with workflow.unsafe.imports_passed_through():
 class SummarizerResolutionWorkflow:
     @workflow.run
     async def run(self) -> str:
-        # The seam itself, pinned directly: in-workflow, the middleware's
-        # resolved summarizer must be a TemporalModel, not a provider client.
         middleware = SummarizationMiddleware(
             "anthropic:claude-sonnet-4-5",
             backend=StateBackend(),
@@ -75,12 +65,6 @@ async def test_summarizer_model_resolves_durable(env: WorkflowEnvironment) -> No
 class ToolMiddlewareResolutionWorkflow:
     @workflow.run
     async def run(self) -> str:
-        # The OTHER seam: create_summarization_tool_middleware resolves via a
-        # call-time `from deepagents._models import resolve_model` — the
-        # definition-site binding, which only this patch covers. Its own
-        # docstring example passes a name string, so this is a documented
-        # user path. The composed middleware keeps the resolved summarizer at
-        # `_summarization.model`.
         middleware = create_summarization_tool_middleware(
             "anthropic:claude-sonnet-4-5",
             StateBackend(),
