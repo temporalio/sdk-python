@@ -59,7 +59,7 @@ def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
         print()
 
 
-def pytest_collection_finish(session: pytest.Session) -> None:
+def pytest_collection_finish() -> None:
     # Freeze the import-time heap once so full GC passes only cover test allocations
     gc.collect()
     gc.freeze()
