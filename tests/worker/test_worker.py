@@ -1281,7 +1281,8 @@ async def wait_until_worker_deployment_visible(
                 DescribeWorkerDeploymentRequest(
                     namespace=client.namespace,
                     deployment_name=version.deployment_name,
-                )
+                ),
+                retry=True,
             )
         except RPCError:
             # Expected
@@ -1304,7 +1305,8 @@ async def set_current_deployment_version(
             deployment_name=version.deployment_name,
             version=version.to_canonical_string(),
             conflict_token=conflict_token,
-        )
+        ),
+        retry=True,
     )
 
 
@@ -1321,7 +1323,8 @@ async def set_ramping_version(
             version=version.to_canonical_string(),
             conflict_token=conflict_token,
             percentage=percentage,
-        )
+        ),
+        retry=True,
     )
     return response
 
@@ -1341,7 +1344,8 @@ async def wait_for_worker_deployment_routing_config_propagation(
             DescribeWorkerDeploymentRequest(
                 namespace=client.namespace,
                 deployment_name=deployment_name,
-            )
+            ),
+            retry=True,
         )
         routing_config = resp.worker_deployment_info.routing_config
         if (
