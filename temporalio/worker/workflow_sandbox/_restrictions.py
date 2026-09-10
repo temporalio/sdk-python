@@ -513,6 +513,8 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         # Due to how Pydantic is importing lazily inside of some classes, we choose
         # to always pass it through
         "pydantic",
+        # Same for its compiled core, which Pydantic-based libraries import lazily
+        "pydantic_core",
     }
 )
 

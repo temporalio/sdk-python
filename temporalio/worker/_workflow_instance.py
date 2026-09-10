@@ -2176,9 +2176,23 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         if temporalio.nexus.system.is_system_endpoint(input.endpoint):
+            serialization_context = temporalio.nexus.system._get_serialization_context(
+                input.service,
+                input.operation_name,
+                input.input,
+            )
+            user_payload_converter = self._workflow_context_payload_converter
+            user_failure_converter = self._workflow_context_failure_converter
+            if serialization_context is not None:
+                user_payload_converter = self._payload_converter_with_context(
+                    serialization_context
+                )
+                user_failure_converter = self._failure_converter_with_context(
+                    serialization_context
+                )
             payload_converter = temporalio.nexus.system._get_payload_converter(
-                self._workflow_context_payload_converter,
-                self._workflow_context_failure_converter,
+                user_payload_converter,
+                user_failure_converter,
             )
         else:
             payload_converter = self._context_free_payload_converter
