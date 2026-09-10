@@ -271,18 +271,21 @@ class TemporalModel(BaseChatModel):
 #   agent and every sub-agent (its module-top import froze its own binding).
 # - ``deepagents._models`` — the definition site; covers call-time importers
 #   such as ``create_summarization_tool_middleware``.
-# - ``init_chat_model`` as bound in ``langchain.agents.middleware.summarization``
-#   — the seam ``SummarizationMiddleware`` resolves a string summarizer through.
+# - ``SummarizationMiddleware.__init__`` — pre-resolves a string summarizer
+#   before the middleware delegates to LangChain's ``init_chat_model``.
 #
 # An unpatched binding means a real provider client constructed (and called)
-# inside the workflow: nondeterministic and replay-unsafe. We do NOT rebind
+# inside the workflow: nondeterministic and replay-unsafe. Every patched seam
+# is deepagents-internal and covered by this package's deepagents version
+# pin, so none is guarded: a missing seam is a broken install and fails the
+# worker at startup rather than silently reverting. We do NOT rebind
 # ``deepagents.create_deep_agent`` for durability — callers who already did
 # ``from deepagents import create_deep_agent`` hold the original object — only
 # a best-effort wrap to fire the advisory construction-time warnings.
 
 _original_create_deep_agent: Any = None
 _original_resolve_model: Any = None
-_original_lc_init_chat_model: Any = None
+_original_summarization_init: Any = None
 
 
 def _wrap_model_arg(model: Any) -> Any:
@@ -336,26 +339,21 @@ def install_model_patch() -> None:
         setattr(_graph, "resolve_model", patched_resolve_model)
         setattr(_models, "resolve_model", patched_resolve_model)
 
-    global _original_lc_init_chat_model
-    if _original_lc_init_chat_model is None:
-        # Best-effort: LangChain-internal path; if it moves, the regression
-        # test fails loudly rather than this crashing worker start.
-        try:
-            _lc_sum = importlib.import_module(
-                "langchain.agents.middleware.summarization"
-            )
-            original_init_chat_model = _lc_sum.init_chat_model
-        except (ImportError, AttributeError):
-            pass
-        else:
-            _original_lc_init_chat_model = original_init_chat_model
+    global _original_summarization_init
+    if _original_summarization_init is None:
+        _da_sum = importlib.import_module("deepagents.middleware.summarization")
+        summarization_cls = _da_sum.SummarizationMiddleware
+        original_init = summarization_cls.__init__
+        _original_summarization_init = original_init
 
-            def patched_init_chat_model(model: Any, *args: Any, **kwargs: Any) -> Any:
-                if workflow.in_workflow() and isinstance(model, str):
-                    return _wrap_model_arg(model)
-                return original_init_chat_model(model, *args, **kwargs)
+        def patched_summarization_init(
+            self: Any, model: Any, *args: Any, **kwargs: Any
+        ) -> None:
+            if workflow.in_workflow() and isinstance(model, str):
+                model = _wrap_model_arg(model)
+            original_init(self, model, *args, **kwargs)
 
-            setattr(_lc_sum, "init_chat_model", patched_init_chat_model)
+        summarization_cls.__init__ = patched_summarization_init
 
     if _original_create_deep_agent is None:
         _original_create_deep_agent = deepagents.create_deep_agent
@@ -384,12 +382,12 @@ def uninstall_model_patch() -> None:
         setattr(_graph, "resolve_model", _original_resolve_model)
         setattr(_models, "resolve_model", _original_resolve_model)
         _original_resolve_model = None
-    global _original_lc_init_chat_model
-    if _original_lc_init_chat_model is not None:
-        _lc_sum = importlib.import_module("langchain.agents.middleware.summarization")
+    global _original_summarization_init
+    if _original_summarization_init is not None:
+        _da_sum = importlib.import_module("deepagents.middleware.summarization")
 
-        setattr(_lc_sum, "init_chat_model", _original_lc_init_chat_model)
-        _original_lc_init_chat_model = None
+        _da_sum.SummarizationMiddleware.__init__ = _original_summarization_init
+        _original_summarization_init = None
     if _original_create_deep_agent is not None:
         deepagents = importlib.import_module("deepagents")
 
