@@ -9732,7 +9732,6 @@ class RandomSeedTestWorkflow:
     def __init__(self) -> None:
         self.seed_changes: list[int] = []
         self.continue_signal_received = False
-        self._ready = False
 
     @workflow.run
     async def run(self) -> dict[str, Any]:
@@ -9754,8 +9753,6 @@ class RandomSeedTestWorkflow:
             "Hi",
             schedule_to_close_timeout=timedelta(seconds=5),
         )
-
-        self._ready = True
 
         # Wait for signal to continue - this allows for workflow reset
         await workflow.wait_condition(lambda: self.continue_signal_received)
@@ -9780,10 +9777,6 @@ class RandomSeedTestWorkflow:
     def continue_workflow(self) -> None:
         self.continue_signal_received = True
 
-    @workflow.query
-    def ready(self) -> bool:
-        return self._ready
-
 
 async def test_random_seed_functionality(
     client: Client, worker: Worker, env: WorkflowEnvironment
@@ -9800,12 +9793,23 @@ async def test_random_seed_functionality(
             task_queue=worker.task_queue,
         )
 
-        # Let workflow generate some random values
-        # Wait for workflow to be ready
-        async def ready() -> bool:
-            return await handle.query(RandomSeedTestWorkflow.ready)
-
-        await assert_eq_eventually(True, ready)
+        # Reset point: the workflow task started after the activity completed
+        activity_completed = False
+        reset_event_id = 0
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type is EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
+                activity_completed = True
+            elif (
+                activity_completed
+                and event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            ):
+                reset_event_id = event.event_id
+            elif (
+                reset_event_id
+                and event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            ):
+                break
+        assert reset_event_id
 
         # Reset workflow using raw gRPC call to trigger seed change
         from temporalio.api.common.v1.message_pb2 import WorkflowExecution
@@ -9822,7 +9826,7 @@ async def test_random_seed_functionality(
                 reason="Test seed change",
                 reset_reapply_type=ResetReapplyType.RESET_REAPPLY_TYPE_UNSPECIFIED,
                 request_id=str(uuid.uuid4()),
-                workflow_task_finish_event_id=9,  # Reset to after activity completion
+                workflow_task_finish_event_id=reset_event_id,
             )
         )
 
