@@ -6671,6 +6671,10 @@ class UnfinishedHandlersWarningsWorkflow:
         await self._do_update_or_signal()
 
 
+# Outlive CI stalls: two 10s workflow task timeouts make the server fail updates fast
+_UNFINISHED_HANDLERS_TASK_TIMEOUT = timedelta(seconds=60)
+
+
 async def test_unfinished_update_handler(client: Client):
     async with new_worker(client, UnfinishedHandlersWarningsWorkflow) as worker:
         test = _UnfinishedHandlersWarningsTest(client, worker, "update")
@@ -6719,16 +6723,20 @@ class _UnfinishedHandlersWarningsTest:
         # If we don't capture warnings then -- since the unfinished handler warning is converted to
         # an exception in the test suite -- we see WFT failures when we don't wait for handlers.
         handle: asyncio.Future[WorkflowHandle] = asyncio.Future()
-        asyncio.create_task(
+        result_task = asyncio.create_task(
             self._get_workflow_result(
                 wait_all_handlers_finished=False, handle_future=handle
             )
         )
-        await assert_eq_eventually(
-            True,
-            partial(self._workflow_task_failed, workflow_id=(await handle).id),
-            timeout=timedelta(seconds=20),
-        )
+        try:
+            await assert_eq_eventually(
+                True,
+                partial(self._workflow_task_failed, workflow_id=(await handle).id),
+                timeout=timedelta(seconds=20),
+            )
+        finally:
+            result_task.cancel()
+            await asyncio.gather(result_task, return_exceptions=True)
 
     async def _workflow_task_failed(self, workflow_id: str) -> bool:
         resp = await self.client.workflow_service.get_workflow_execution_history(
@@ -6771,6 +6779,7 @@ class _UnfinishedHandlersWarningsTest:
             arg=wait_all_handlers_finished,
             id=f"wf-{uuid.uuid4()}",
             task_queue=self.worker.task_queue,
+            task_timeout=_UNFINISHED_HANDLERS_TASK_TIMEOUT,
         )
         if handle_future:
             handle_future.set_result(handle)
@@ -6968,6 +6977,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             ],
             id=workflow_id,
             task_queue=task_queue,
+            task_timeout=_UNFINISHED_HANDLERS_TASK_TIMEOUT,
         )
         if self.handler_type == "-update-":
             update_method = (
