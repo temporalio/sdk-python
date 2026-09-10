@@ -3751,6 +3751,8 @@ async def test_workflow_patch_activation_callback(client: Client):
             args=["my-patch", False],
             id=workflow_id,
             task_queue=worker.task_queue,
+            # A retried task would consult the callback again
+            task_timeout=timedelta(hours=1),
         )
 
     assert result == [True, True]
@@ -3771,6 +3773,8 @@ async def test_workflow_patch_activation_callback_can_decline(client: Client):
             args=["my-patch", False],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # A retried task would consult the callback again
+            task_timeout=timedelta(hours=1),
         )
         assert await handle.result() == [False, False]
 
@@ -3806,6 +3810,8 @@ async def test_workflow_patch_activation_callback_not_recalled_on_replay(
             args=["my-patch", True],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # A retried task would consult the callback again
+            task_timeout=timedelta(hours=1),
         )
         assert result == [False, False]
 
@@ -6606,6 +6612,8 @@ async def test_workflow_current_update(client: Client):
             CurrentUpdateWorkflow.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # Updates are rejected once the task has timed out twice
+            task_timeout=timedelta(hours=1),
         )
         update_ids = await asyncio.gather(
             handle.execute_update(CurrentUpdateWorkflow.do_update, id="update1"),
