@@ -11,6 +11,8 @@ to include examples, links to docs, or any other relevant information.
 ### Deprecated       — soon-to-be-removed features
 ### :boom: Breaking Changes — removed or backwards-incompatible features
 ### Fixed            — notable bug fixes
+
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 ### Security         — notable security fixes
 -->
 
