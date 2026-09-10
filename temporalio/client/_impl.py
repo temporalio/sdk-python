@@ -52,7 +52,6 @@ from ._activity import (
     ActivityExecutionDescription,
     ActivityExecutionOptions,
     ActivityHandle,
-    ActivityOptionsUpdate,
     AsyncActivityIDReference,
 )
 from ._exceptions import (
@@ -724,11 +723,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     async def update_activity_options(
         self, input: UpdateActivityOptionsInput
     ) -> ActivityExecutionOptions:
-        """Update or restore an activity's options.
-
-        If ``input.updates`` names the same option more than once, the last update
-        for that option wins and its path appears once in the field mask.
-        """
+        """Update or restore an activity's options."""
         # restore_original is exclusive to all other updates.
         if input.restore_original and input.updates:
             raise ValueError(
@@ -744,11 +739,15 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if input.restore_original:
             req.restore_original = True
         else:
-            # For repeated keys, later values override previous ones.
-            by_path: dict[str, ActivityOptionsUpdate[Any]] = {}
+            # The handle rejects a repeated option, but an interceptor could still add one.
+            seen: set[str] = set()
             for update in input.updates:
-                by_path[update.key.name] = update
-            for name, update in by_path.items():
+                name = update.key.name
+                if name in seen:
+                    raise ValueError(
+                        f"update_activity_options received more than one update for {name}"
+                    )
+                seen.add(name)
                 req.update_mask.paths.append(name)
                 if update.value is None:
                     continue

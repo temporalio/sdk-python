@@ -1262,8 +1262,8 @@ class ActivityHandle(Generic[ReturnType]):
         left as-is. An update created with
         :py:meth:`ActivityOptionsKey.value_unset` clears that option.
 
-        If ``updates`` names the same option more than once, the last update for
-        that option wins and the option is sent to the server only once.
+        Each option may be named at most once; naming the same option twice
+        raises :py:class:`ValueError`.
 
         .. warning::
            This API is experimental.
@@ -1277,13 +1277,21 @@ class ActivityHandle(Generic[ReturnType]):
             The activity options as resolved by the server after the update.
 
         Raises:
-            ValueError: If ``updates`` is empty.
+            ValueError: If ``updates`` is empty or names the same option twice.
         """
         if not updates:
             raise ValueError(
                 "update_options requires at least one update; use "
                 "restore_original_options() to revert options"
             )
+        seen: set[str] = set()
+        for update in updates:
+            name = update.key.name
+            if name in seen:
+                raise ValueError(
+                    f"update_options received more than one update for {name}"
+                )
+            seen.add(name)
         return await self._client._impl.update_activity_options(
             UpdateActivityOptionsInput(
                 activity_id=self._id,

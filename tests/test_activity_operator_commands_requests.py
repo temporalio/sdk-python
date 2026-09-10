@@ -115,21 +115,18 @@ async def test_value_unset_names_the_path_but_leaves_the_field_absent(
     assert not update.activity_options.HasField("heartbeat_timeout")
 
 
-async def test_a_repeated_key_resolves_to_its_last_update(
-    client: Client, captured: _CapturedService
-):
+async def test_a_repeated_key_is_rejected(client: Client, captured: _CapturedService):
     handle = client.get_activity_handle("act-1")
-    await handle.update_options(
-        [
-            ActivityOptionsKeys.heartbeat_timeout.value_set(timedelta(seconds=5)),
-            ActivityOptionsKeys.heartbeat_timeout.value_unset(),
-        ]
-    )
-
-    update = captured.requests["update"]
-    # The later unset wins, and the path is named once.
-    assert update.update_mask.paths == ["heartbeat_timeout"]
-    assert not update.activity_options.HasField("heartbeat_timeout")
+    with pytest.raises(ValueError) as err:
+        await handle.update_options(
+            [
+                ActivityOptionsKeys.heartbeat_timeout.value_set(timedelta(seconds=5)),
+                ActivityOptionsKeys.heartbeat_timeout.value_unset(),
+            ]
+        )
+    assert "more than one update for heartbeat_timeout" in str(err.value)
+    # Rejected before any request is sent.
+    assert "update" not in captured.requests
 
 
 async def test_update_options_requires_at_least_one_update(client: Client):
@@ -137,6 +134,29 @@ async def test_update_options_requires_at_least_one_update(client: Client):
     with pytest.raises(ValueError) as err:
         await handle.update_options([])
     assert "at least one update" in str(err.value)
+
+
+async def test_a_repeated_key_from_an_interceptor_is_rejected(client: Client):
+    """The handle rejects repeats, so only a hand-built input can carry one."""
+    from temporalio.client import UpdateActivityOptionsInput
+
+    with pytest.raises(ValueError) as err:
+        await client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id="act-1",
+                activity_run_id=None,
+                updates=[
+                    ActivityOptionsKeys.heartbeat_timeout.value_set(
+                        timedelta(seconds=5)
+                    ),
+                    ActivityOptionsKeys.heartbeat_timeout.value_unset(),
+                ],
+                restore_original=False,
+                rpc_metadata={},
+                rpc_timeout=None,
+            )
+        )
+    assert "more than one update for heartbeat_timeout" in str(err.value)
 
 
 async def test_restore_original_cannot_be_combined_with_updates(client: Client):
