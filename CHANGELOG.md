@@ -70,6 +70,7 @@ to include examples, links to docs, or any other relevant information.
   retried on its configured interval instead.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
 
 ### Security
 
