@@ -66,6 +66,10 @@ to include examples, links to docs, or any other relevant information.
   retried on its configured interval instead.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
+  Libraries built on Pydantic (e.g. `openai`) import it lazily, so every sandboxed workflow used to
+  re-import it during its first activation. That import counted toward the deadlock detection
+  timeout and could fail workflow tasks on slow or overloaded workers.
 
 ### Security
 
