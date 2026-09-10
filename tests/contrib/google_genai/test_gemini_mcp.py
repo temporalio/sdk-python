@@ -193,7 +193,6 @@ async def test_mcp_tool_discovery_and_call(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         result = await handle.result()
         names = await _activity_names(handle)
@@ -227,7 +226,6 @@ async def test_mcp_connection_pooling(client: Client):
             args=[server, "echo twice"],
             id=f"gemini-mcp-pool-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         assert await handle.result() == "Done!"
         names = await _activity_names(handle)
@@ -255,7 +253,6 @@ async def test_mcp_full_schema_propagation(client: Client):
             args=[server, "echo hi"],
             id=f"gemini-mcp-schema-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
 
     # The first generate request carries the tool declarations the SDK built
@@ -285,7 +282,6 @@ async def test_mcp_replay(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-replay-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         await handle.result()
         history = await handle.fetch_history()
@@ -316,7 +312,6 @@ async def test_mcp_side_effects(client: Client):
             args=[server, "echo hello"],
             id=f"gemini-mcp-side-effects-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         await handle.result()
         names = await _activity_names(handle)
@@ -356,7 +351,6 @@ async def test_mcp_via_gemini_test_server(client: Client):
             args=[server, "echo the phrase: durable execution"],
             id=f"gemini-mcp-public-{uuid4()}",
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
         )
         result = await handle.result()
         names = await _activity_names(handle)
