@@ -27,6 +27,7 @@ from typing import (
     NoReturn,
     cast,
 )
+from unittest.mock import patch
 from urllib.request import urlopen
 
 import pydantic
@@ -36,6 +37,7 @@ from typing_extensions import Protocol, runtime_checkable
 
 import temporalio.activity
 import temporalio.api.sdk.v1
+import temporalio.bridge.worker
 import temporalio.client
 import temporalio.converter
 import temporalio.converter._extstore
@@ -1133,6 +1135,67 @@ async def test_workflow_cancel_activity_while_workflow_cancelled(client: Client)
         )
         for activation, _ in runner._pairs
     )
+
+
+@workflow.defn
+class OrphanedLocalActivityWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_local_activity(
+            "wait_forever_local_activity",
+            start_to_close_timeout=timedelta(minutes=5),
+        )
+
+
+async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
+    client: Client,
+):
+    started = asyncio.Event()
+    details: list[temporalio.activity.ActivityCancellationDetails | None] = []
+
+    @activity.defn(name="wait_forever_local_activity")
+    async def wait_forever_local_activity() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            details.append(activity.cancellation_details())
+
+    # Delay the next poll so run invalidation drops the queued cancel before dispatch
+    orig_poll = temporalio.bridge.worker.Worker.poll_activity_task
+    delay_next_poll = False
+
+    async def slow_poll(self: temporalio.bridge.worker.Worker):
+        nonlocal delay_next_poll
+        if delay_next_poll:
+            delay_next_poll = False
+            await asyncio.sleep(3)
+        task = await orig_poll(self)
+        if task.HasField("start") and task.start.is_local:
+            delay_next_poll = True
+        return task
+
+    with patch.object(temporalio.bridge.worker.Worker, "poll_activity_task", slow_poll):
+        worker = new_worker(
+            client,
+            OrphanedLocalActivityWorkflow,
+            activities=[wait_forever_local_activity],
+        )
+        run_task = asyncio.create_task(worker.run())
+        handle = await client.start_workflow(
+            OrphanedLocalActivityWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=1),
+        )
+        await started.wait()
+        # Terminating fails the workflow task heartbeat, which evicts the run
+        await handle.terminate()
+        await asyncio.sleep(4)
+        await asyncio.wait_for(worker.shutdown(), 20)
+        await run_task
+    assert len(details) == 1 and details[0]
+    assert details[0].worker_shutdown or details[0].cancel_requested
 
 
 @workflow.defn

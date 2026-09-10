@@ -195,6 +195,19 @@ class _ActivityWorker:
     # Only call this after run()/drain_poll_queue() have returned. This will not
     # raise an exception.
     async def wait_all_completed(self) -> None:
+        # Core tracks no activities once polling has shut down, so cancel stragglers
+        for task_token, activity in self._running_activities.items():
+            if not activity.done:
+                logger.warning(
+                    "Cancelling activity %s still running after worker shutdown",
+                    task_token,
+                )
+                activity.cancellation_details.details = (
+                    temporalio.activity.ActivityCancellationDetails(
+                        worker_shutdown=True
+                    )
+                )
+                activity.cancel(cancelled_by_request=True)
         running_tasks = [v.task for v in self._running_activities.values() if v.task]
         if running_tasks:
             await asyncio.gather(*running_tasks, return_exceptions=False)
