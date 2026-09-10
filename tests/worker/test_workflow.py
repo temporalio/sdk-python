@@ -5344,11 +5344,12 @@ async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironmen
 
 
 async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
-    async def do_stuff(buffer: MetricBuffer) -> None:
+    async def do_stuff(buffer: MetricBuffer) -> float:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
         new_client = await env.connect_client(
             runtime=runtime,
         )
+        start = time.monotonic()
         async with new_worker(new_client, HelloWorkflow) as worker:
             await new_client.execute_workflow(
                 HelloWorkflow.run,
@@ -5356,21 +5357,23 @@ async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+        worker_seconds = time.monotonic() - start
         # Also, add some manual types beyond the defaults tested in other tests
         runtime.metric_meter.create_histogram_float("my-histogram-float").record(1.23)
         runtime.metric_meter.create_histogram_timedelta(
             "my-histogram-timedelta"
         ).record(timedelta(days=2, seconds=3, milliseconds=4))
         runtime.metric_meter.create_gauge_float("my-gauge-float").set(4.56)
+        return worker_seconds
 
     # Create a buffer, do stuff, check the metrics
     buffer = MetricBuffer(10000)
-    await do_stuff(buffer)
+    worker_seconds = await do_stuff(buffer)
     updates = buffer.retrieve_updates()
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
-        # Took more than 3ms
-        and u.value > 3
+        # Milliseconds, bounded by how long the worker ran
+        and 0 < u.value <= worker_seconds * 1000
         and isinstance(u.value, int)
         and u.metric.unit == "ms"
         for u in updates
@@ -5397,12 +5400,12 @@ async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
 
     # Do it again with seconds
     buffer = MetricBuffer(10000, duration_format=MetricBufferDurationFormat.SECONDS)
-    await do_stuff(buffer)
+    worker_seconds = await do_stuff(buffer)
     updates = buffer.retrieve_updates()
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
-        # Took less than 3s
-        and u.value < 3
+        # Seconds, bounded by how long the worker ran
+        and 0 < u.value <= worker_seconds
         and isinstance(u.value, float)
         and u.metric.unit == "s"
         for u in updates
@@ -9730,7 +9733,6 @@ class RandomSeedTestWorkflow:
     def __init__(self) -> None:
         self.seed_changes: list[int] = []
         self.continue_signal_received = False
-        self._ready = False
 
     @workflow.run
     async def run(self) -> dict[str, Any]:
@@ -9752,8 +9754,6 @@ class RandomSeedTestWorkflow:
             "Hi",
             schedule_to_close_timeout=timedelta(seconds=5),
         )
-
-        self._ready = True
 
         # Wait for signal to continue - this allows for workflow reset
         await workflow.wait_condition(lambda: self.continue_signal_received)
@@ -9778,10 +9778,6 @@ class RandomSeedTestWorkflow:
     def continue_workflow(self) -> None:
         self.continue_signal_received = True
 
-    @workflow.query
-    def ready(self) -> bool:
-        return self._ready
-
 
 async def test_random_seed_functionality(
     client: Client, worker: Worker, env: WorkflowEnvironment
@@ -9798,12 +9794,23 @@ async def test_random_seed_functionality(
             task_queue=worker.task_queue,
         )
 
-        # Let workflow generate some random values
-        # Wait for workflow to be ready
-        async def ready() -> bool:
-            return await handle.query(RandomSeedTestWorkflow.ready)
-
-        await assert_eq_eventually(True, ready)
+        # Reset point: the workflow task started after the activity completed
+        activity_completed = False
+        reset_event_id = 0
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type is EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
+                activity_completed = True
+            elif (
+                activity_completed
+                and event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            ):
+                reset_event_id = event.event_id
+            elif (
+                reset_event_id
+                and event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            ):
+                break
+        assert reset_event_id
 
         # Reset workflow using raw gRPC call to trigger seed change
         from temporalio.api.common.v1.message_pb2 import WorkflowExecution
@@ -9820,7 +9827,7 @@ async def test_random_seed_functionality(
                 reason="Test seed change",
                 reset_reapply_type=ResetReapplyType.RESET_REAPPLY_TYPE_UNSPECIFIED,
                 request_id=str(uuid.uuid4()),
-                workflow_task_finish_event_id=9,  # Reset to after activity completion
+                workflow_task_finish_event_id=reset_event_id,
             )
         )
 
