@@ -266,9 +266,21 @@ class TemporalModel(BaseChatModel):
 # The durability seam is ``deepagents._models.resolve_model``, which
 # ``create_deep_agent`` calls to turn a ``model=`` string (or instance) into a
 # ``BaseChatModel`` — for both the top-level agent and every ``SubAgent``
-# (``graph.py`` lines 592 and 634). We patch it on the ``deepagents.graph``
-# module, where ``create_deep_agent``'s body resolves the ``resolve_model`` name
-# at call time.
+# (``graph.py`` lines 592 and 634). We patch BOTH bindings of that function:
+# on ``deepagents.graph`` (whose module-top ``from deepagents._models import
+# resolve_model`` froze its own reference, read afresh from graph's globals on
+# each ``create_deep_agent`` call) and on ``deepagents._models`` itself — the
+# definition site — which covers every call-time importer. The middleware
+# layer is why the extra bindings matter. Two middleware seams exist:
+# ``create_summarization_tool_middleware`` resolves its model via a
+# function-level ``from deepagents._models import resolve_model`` (covered by
+# the ``_models`` binding), while ``SummarizationMiddleware`` itself delegates
+# to LangChain's summarization middleware, whose ``__init__`` resolves a name
+# string through ``init_chat_model`` — bound at the top of
+# ``langchain.agents.middleware.summarization`` — so that module's binding is
+# patched too. With either seam unpatched, a summarizer configured as a name
+# string and constructed in-workflow builds a real provider client and runs
+# compaction LLM calls inside the workflow (nondeterministic, replay-unsafe).
 #
 # Patching *this* seam (not ``deepagents.create_deep_agent``) is what makes the
 # rewrite survive the user's import style. A user who writes the idiomatic
@@ -288,6 +300,7 @@ class TemporalModel(BaseChatModel):
 
 _original_create_deep_agent: Any = None
 _original_resolve_model: Any = None
+_original_lc_init_chat_model: Any = None
 
 
 def _wrap_model_arg(model: Any) -> Any:
@@ -317,21 +330,29 @@ def _wrap_model_arg(model: Any) -> Any:
 def install_model_patch() -> None:
     """Route Deep Agents' model resolution through :class:`TemporalModel`.
 
-    Patches ``deepagents.graph.resolve_model`` (the seam ``create_deep_agent``
-    uses for the main agent *and* every sub-agent) so a bare ``model="..."``
-    string becomes a durable :class:`TemporalModel`, and additionally wraps
-    ``deepagents.create_deep_agent`` to fire the advisory tool / checkpointer
-    warnings. Both only act when called inside a workflow, so importing
-    deepagents on a plain client / activity worker is unaffected. Idempotent.
+    Patches every binding that turns a ``model="..."`` name string into a
+    live model, so each becomes a durable :class:`TemporalModel` in-workflow:
+    ``deepagents.graph.resolve_model`` (the ``create_deep_agent`` seam for the
+    main agent and every sub-agent), ``deepagents._models.resolve_model`` (the
+    definition site, read call-time by ``create_summarization_tool_middleware``),
+    and ``init_chat_model`` as bound in LangChain's summarization middleware
+    module (the seam ``SummarizationMiddleware`` resolves its summarizer
+    through). Additionally wraps ``deepagents.create_deep_agent`` to fire the
+    advisory tool / checkpointer warnings. All of it only acts when called
+    inside a workflow, so importing deepagents on a plain client / activity
+    worker is unaffected. Idempotent.
     """
     global _original_create_deep_agent, _original_resolve_model
     # importlib: `deepagents` is absent on Python 3.10 environments (its floor
     # is 3.11), so static imports here fail type-checking there.
     deepagents = importlib.import_module("deepagents")
     _graph = importlib.import_module("deepagents.graph")
+    _models = importlib.import_module("deepagents._models")
 
     if _original_resolve_model is None:
-        _original_resolve_model = _graph.resolve_model
+        # graph's module-top import bound the same function object the
+        # definition site holds; one stored original restores both bindings.
+        _original_resolve_model = _models.resolve_model
 
         def patched_resolve_model(model: Any) -> Any:
             if workflow.in_workflow():
@@ -339,6 +360,30 @@ def install_model_patch() -> None:
             return _original_resolve_model(model)
 
         setattr(_graph, "resolve_model", patched_resolve_model)
+        setattr(_models, "resolve_model", patched_resolve_model)
+
+    global _original_lc_init_chat_model
+    if _original_lc_init_chat_model is None:
+        # Best-effort: the module path is LangChain-internal and may move.
+        # If it does, string summarizer models fall back to a live client
+        # in-workflow — the regression test pins this so an upstream move
+        # fails loudly in CI instead of silently shipping.
+        try:
+            _lc_sum = importlib.import_module(
+                "langchain.agents.middleware.summarization"
+            )
+            original_init_chat_model = _lc_sum.init_chat_model
+        except (ImportError, AttributeError):
+            pass
+        else:
+            _original_lc_init_chat_model = original_init_chat_model
+
+            def patched_init_chat_model(model: Any, *args: Any, **kwargs: Any) -> Any:
+                if workflow.in_workflow() and isinstance(model, str):
+                    return _wrap_model_arg(model)
+                return original_init_chat_model(model, *args, **kwargs)
+
+            setattr(_lc_sum, "init_chat_model", patched_init_chat_model)
 
     if _original_create_deep_agent is None:
         _original_create_deep_agent = deepagents.create_deep_agent
@@ -362,9 +407,17 @@ def uninstall_model_patch() -> None:
     global _original_create_deep_agent, _original_resolve_model
     if _original_resolve_model is not None:
         _graph = importlib.import_module("deepagents.graph")
+        _models = importlib.import_module("deepagents._models")
 
         setattr(_graph, "resolve_model", _original_resolve_model)
+        setattr(_models, "resolve_model", _original_resolve_model)
         _original_resolve_model = None
+    global _original_lc_init_chat_model
+    if _original_lc_init_chat_model is not None:
+        _lc_sum = importlib.import_module("langchain.agents.middleware.summarization")
+
+        setattr(_lc_sum, "init_chat_model", _original_lc_init_chat_model)
+        _original_lc_init_chat_model = None
     if _original_create_deep_agent is not None:
         deepagents = importlib.import_module("deepagents")
 
