@@ -202,11 +202,13 @@ class _ActivityWorker:
                     "Cancelling activity %s still running after worker shutdown",
                     task_token,
                 )
-                activity.cancellation_details.details = (
-                    temporalio.activity.ActivityCancellationDetails(
-                        worker_shutdown=True
+                # Cancellation details are set once, so keep any already received
+                if not activity.cancellation_details.details:
+                    activity.cancellation_details.details = (
+                        temporalio.activity.ActivityCancellationDetails(
+                            worker_shutdown=True
+                        )
                     )
-                )
                 activity.cancel(cancelled_by_request=True)
         running_tasks = [v.task for v in self._running_activities.values() if v.task]
         if running_tasks:

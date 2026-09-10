@@ -43,6 +43,7 @@ import temporalio.converter
 import temporalio.converter._extstore
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
+import temporalio.worker._workflow
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -55,7 +56,10 @@ from temporalio.api.workflowservice.v1 import (
     PollWorkflowExecutionUpdateResponse,
     ResetStickyTaskQueueRequest,
 )
-from temporalio.bridge.proto.workflow_activation import WorkflowActivation
+from temporalio.bridge.proto.workflow_activation import (
+    RemoveFromCache,
+    WorkflowActivation,
+)
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
 from temporalio.client import (
     AsyncActivityCancelledError,
@@ -1151,6 +1155,7 @@ async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
     client: Client,
 ):
     started = asyncio.Event()
+    workflow_poll_shut_down = asyncio.Event()
     details: list[temporalio.activity.ActivityCancellationDetails | None] = []
 
     @activity.defn(name="wait_forever_local_activity")
@@ -1161,21 +1166,35 @@ async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
         except asyncio.CancelledError:
             details.append(activity.cancellation_details())
 
-    # Delay the next poll so run invalidation drops the queued cancel before dispatch
-    orig_poll = temporalio.bridge.worker.Worker.poll_activity_task
-    delay_next_poll = False
+    # Hold the next poll until Core has evicted the run, so its queued cancel is never delivered
+    bridge_worker = temporalio.bridge.worker.Worker
+    orig_poll_activity = bridge_worker.poll_activity_task
+    orig_poll_workflow = bridge_worker.poll_workflow_activation
+    hold_next_poll = False
 
-    async def slow_poll(self: temporalio.bridge.worker.Worker):
-        nonlocal delay_next_poll
-        if delay_next_poll:
-            delay_next_poll = False
-            await asyncio.sleep(3)
-        task = await orig_poll(self)
+    async def poll_activity_task(self: temporalio.bridge.worker.Worker):
+        nonlocal hold_next_poll
+        if hold_next_poll:
+            hold_next_poll = False
+            await workflow_poll_shut_down.wait()
+        task = await orig_poll_activity(self)
         if task.HasField("start") and task.start.is_local:
-            delay_next_poll = True
+            hold_next_poll = True
         return task
 
-    with patch.object(temporalio.bridge.worker.Worker, "poll_activity_task", slow_poll):
+    async def poll_workflow_activation(self: temporalio.bridge.worker.Worker):
+        try:
+            return await orig_poll_workflow(self)
+        except temporalio.bridge.worker.PollShutdownError:  # type: ignore[reportPrivateLocalImportUsage]
+            workflow_poll_shut_down.set()
+            raise
+
+    with (
+        patch.object(bridge_worker, "poll_activity_task", poll_activity_task),
+        patch.object(
+            bridge_worker, "poll_workflow_activation", poll_workflow_activation
+        ),
+    ):
         worker = new_worker(
             client,
             OrphanedLocalActivityWorkflow,
@@ -1186,16 +1205,72 @@ async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
             OrphanedLocalActivityWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            task_timeout=timedelta(seconds=1),
+            task_timeout=timedelta(seconds=3),
         )
         await started.wait()
         # Terminating fails the workflow task heartbeat, which evicts the run
         await handle.terminate()
-        await asyncio.sleep(4)
         await asyncio.wait_for(worker.shutdown(), 20)
         await run_task
-    assert len(details) == 1 and details[0]
-    assert details[0].worker_shutdown or details[0].cancel_requested
+    assert details == [
+        temporalio.activity.ActivityCancellationDetails(worker_shutdown=True)
+    ]
+
+
+async def test_worker_shutdown_keeps_details_of_local_activity_ignoring_cancel(
+    client: Client,
+):
+    started = asyncio.Event()
+    cancel_seen = asyncio.Event()
+    details: list[temporalio.activity.ActivityCancellationDetails | None] = []
+
+    @activity.defn(name="wait_forever_local_activity")
+    async def wait_forever_local_activity() -> None:
+        started.set()
+        while True:
+            try:
+                await asyncio.sleep(1000)
+            except asyncio.CancelledError:
+                details.append(activity.cancellation_details())
+                cancel_seen.set()
+                if activity.is_worker_shutdown():
+                    raise
+
+    # Finish evicting only after the cancel reached the activity, so Core drops it afterwards
+    workflow_worker = temporalio.worker._workflow._WorkflowWorker
+    orig_evict = workflow_worker._handle_cache_eviction
+
+    async def handle_cache_eviction(
+        self: temporalio.worker._workflow._WorkflowWorker,
+        act: WorkflowActivation,
+        job: RemoveFromCache,
+    ):
+        await cancel_seen.wait()
+        await orig_evict(self, act, job)
+
+    with patch.object(workflow_worker, "_handle_cache_eviction", handle_cache_eviction):
+        worker = new_worker(
+            client,
+            OrphanedLocalActivityWorkflow,
+            activities=[wait_forever_local_activity],
+        )
+        run_task = asyncio.create_task(worker.run())
+        handle = await client.start_workflow(
+            OrphanedLocalActivityWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=3),
+        )
+        await started.wait()
+        # Terminating fails the workflow task heartbeat, which evicts the run
+        await handle.terminate()
+        await asyncio.wait_for(cancel_seen.wait(), 20)
+        await asyncio.wait_for(worker.shutdown(), 20)
+        await run_task
+    assert (
+        details
+        == [temporalio.activity.ActivityCancellationDetails(cancel_requested=True)] * 2
+    )
 
 
 @workflow.defn
