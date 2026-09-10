@@ -52,6 +52,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Worker shutdown no longer waits forever for an activity that Core has stopped tracking, such as a
+  local activity whose cancellation was lost when its workflow run was evicted. Once activity polling
+  has shut down, any activity still executing is cancelled, with `worker_shutdown` cancellation
+  details if it has none yet.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
