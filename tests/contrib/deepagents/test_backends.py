@@ -15,9 +15,9 @@ from __future__ import annotations
 import gc
 import sys
 import uuid
-from typing import Any
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
