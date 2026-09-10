@@ -114,7 +114,6 @@ from ._nexus import (
     NexusOperationExecutionAsyncIterator,
     NexusOperationExecutionCount,
     NexusOperationExecutionDescription,
-    NexusOperationFailureError,
     NexusOperationHandle,
 )
 from ._schedule import (
@@ -1659,13 +1658,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> Any:
+    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
         """Poll for nexus operation result until it's available."""
-        data_converter = self._client.data_converter
-        if input._nexus_serialization_context is not None:
-            data_converter = data_converter.with_context(
-                input._nexus_serialization_context
-            )
         req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             operation_id=input.operation_id,
@@ -1684,20 +1678,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         timeout=input.rpc_timeout,
                     )
                 )
-                match res.WhichOneof("outcome"):
-                    case "result":
-                        type_hints = [input.result_type] if input.result_type else None
-                        [result] = await data_converter.decode([res.result], type_hints)
-                        return result
-
-                    case "failure":
-                        raise NexusOperationFailureError(
-                            cause=await data_converter.decode_failure(res.failure)
-                        )
-
-                    case None:
-                        # poll again
-                        pass
+                if res.WhichOneof("outcome") is not None:
+                    return res
             except RPCError as err:
                 match err.status:
                     case RPCStatusCode.DEADLINE_EXCEEDED:

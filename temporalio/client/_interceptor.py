@@ -18,10 +18,7 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from temporalio.converter import (
-    DataConverter,
-    NexusSerializationContext,
-)
+from temporalio.converter import DataConverter
 
 if TYPE_CHECKING:
     from ._activity import (
@@ -660,8 +657,6 @@ class GetNexusOperationResultInput:
     run_id: str | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
-    result_type: type[Any] | None
-    _nexus_serialization_context: NexusSerializationContext | None = None
 
 
 @dataclass
@@ -1005,8 +1000,10 @@ class OutboundInterceptor:
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> Any:
+    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
         """Called for every :py:meth:`NexusOperationHandle.result` call.
+
+        The raw response is decoded by the handle after interception.
 
         .. warning::
            This API is experimental and unstable.

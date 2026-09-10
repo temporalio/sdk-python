@@ -22,6 +22,7 @@ from nexusrpc.handler import (
 )
 
 import temporalio.api.enums.v1
+import temporalio.api.workflowservice.v1
 from temporalio import nexus, workflow
 from temporalio.client import (
     CancelNexusOperationInput,
@@ -867,7 +868,7 @@ class _RecordingOutboundInterceptor(OutboundInterceptor):
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> Any:
+    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
         self._parent.result_calls.append(input)
         return await super().get_nexus_operation_result(input)
 
@@ -980,7 +981,6 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         result_input = interceptor.result_calls[0]
         assert isinstance(result_input, GetNexusOperationResultInput)
         assert result_input.operation_id == op_id
-        assert result_input.result_type == EchoOutput
 
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)
