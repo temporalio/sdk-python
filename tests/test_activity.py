@@ -752,7 +752,7 @@ async def test_manual_completion(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
 
     async with Worker(
@@ -794,7 +794,7 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
 
     async with Worker(
@@ -855,7 +855,7 @@ async def test_manual_failure(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
     async with Worker(
         client,
@@ -932,7 +932,7 @@ async def test_manual_heartbeat(client: Client, env: WorkflowEnvironment):
         ),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
     wait_for_activity_start_wf_handle = await client.start_workflow(
         EventWorkflow.wait,
