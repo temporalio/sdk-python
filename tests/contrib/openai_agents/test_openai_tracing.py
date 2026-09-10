@@ -10,6 +10,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client
 from temporalio.contrib.openai_agents import _temporal_openai_agents
 from temporalio.contrib.openai_agents.testing import (
@@ -24,7 +25,7 @@ from tests.contrib.openai_agents.test_openai import (
     ResearchWorkflow,
     research_mock_model,
 )
-from tests.helpers import assert_eq_eventually, new_worker
+from tests.helpers import assert_event_subsequence, new_worker
 
 
 class MemoryTracingProcessor(TracingProcessor):
@@ -242,11 +243,22 @@ async def simple_no_context_activity() -> str:
     return "success"
 
 
+async def wait_for_activity_processed(client: Client, workflow_id: str) -> None:
+    """Wait, via an untraced history poll, until the workflow task that handled the activity result completed."""
+    await assert_event_subsequence(
+        client.get_workflow_handle(workflow_id),
+        [
+            EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED,
+            EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED,
+        ],
+        timeout=timedelta(seconds=10),
+    )
+
+
 @workflow.defn
 class TraceWorkflow:
     def __init__(self) -> None:
         self._proceed = False
-        self._ready = False
 
     @workflow.run
     async def run(self):
@@ -256,13 +268,8 @@ class TraceWorkflow:
                 simple_no_context_activity,
                 start_to_close_timeout=timedelta(seconds=10),
             )
-            self._ready = True
             await workflow.wait_condition(lambda: self._proceed)
         return "done"
-
-    @workflow.query
-    def ready(self) -> bool:
-        return self._ready
 
     @workflow.signal
     def proceed(self) -> None:
@@ -273,7 +280,6 @@ class TraceWorkflow:
 class SelfTracingWorkflow:
     def __init__(self) -> None:
         self._proceed = False
-        self._ready = False
 
     @workflow.run
     async def run(self):
@@ -284,13 +290,8 @@ class SelfTracingWorkflow:
                     simple_no_context_activity,
                     start_to_close_timeout=timedelta(seconds=10),
                 )
-                self._ready = True
                 await workflow.wait_condition(lambda: self._proceed)
         return "done"
-
-    @workflow.query
-    def ready(self) -> bool:
-        return self._ready
 
     @workflow.signal
     def proceed(self) -> None:
@@ -366,11 +367,7 @@ async def test_external_trace_to_workflow_spans(
             max_cached_workflows=0,
             task_queue=task_queue,
         ):
-            # Wait for workflow to be ready
-            async def ready() -> bool:
-                return await workflow_handle.query(TraceWorkflow.ready)
-
-            await assert_eq_eventually(True, ready)
+            await wait_for_activity_processed(client, workflow_handle.id)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -458,11 +455,7 @@ async def test_external_trace_and_span_to_workflow_spans(
             max_cached_workflows=0,
             task_queue=task_queue,
         ):
-            # Wait for workflow to be ready
-            async def ready() -> bool:
-                return await workflow_handle.query(TraceWorkflow.ready)
-
-            await assert_eq_eventually(True, ready)
+            await wait_for_activity_processed(client, workflow_handle.id)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -554,11 +547,7 @@ async def test_workflow_only_trace_to_spans(
             )
             workflow_id = workflow_handle.id
 
-            # Wait for workflow to be ready
-            async def ready() -> bool:
-                return await workflow_handle.query(SelfTracingWorkflow.ready)
-
-            await assert_eq_eventually(True, ready)
+            await wait_for_activity_processed(client, workflow_handle.id)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -805,7 +794,6 @@ async def test_otel_tracing_in_runner(
 class OtelSpanWorkflow:
     def __init__(self) -> None:
         self._proceed = False
-        self._ready = False
 
     @workflow.run
     async def run(self):
@@ -818,13 +806,8 @@ class OtelSpanWorkflow:
                     simple_no_context_activity,
                     start_to_close_timeout=timedelta(seconds=10),
                 )
-                self._ready = True
                 await workflow.wait_condition(lambda: self._proceed)
         return "done"
-
-    @workflow.query
-    def ready(self) -> bool:
-        return self._ready
 
     @workflow.signal
     def proceed(self) -> None:
@@ -868,11 +851,7 @@ async def test_sdk_trace_to_otel_span_parenting(
                 )
                 workflow_id = workflow_handle.id
 
-                # Wait for workflow to be ready
-                async def ready() -> bool:
-                    return await workflow_handle.query(OtelSpanWorkflow.ready)
-
-                await assert_eq_eventually(True, ready)
+                await wait_for_activity_processed(client, workflow_handle.id)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(

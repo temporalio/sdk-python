@@ -19,7 +19,7 @@ from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin, graph
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
-from tests.helpers import assert_eq_eventually
+from tests.helpers import wait_for_workflow_idle
 
 SummaryFn = Callable[[tuple[Any, ...], dict[str, Any]], "str | None"]
 
@@ -235,26 +235,16 @@ class WorkflowNodeSummaryWorkflow:
     def __init__(self) -> None:
         self.app = graph("wf-node-graph").compile()
         self._done = False
-        self._invoked = False
 
     @workflow.run
     async def run(self, input: str) -> Any:
         result = await self.app.ainvoke({"value": input})
-        self._invoked = True
         await workflow.wait_condition(lambda: self._done)
         return result
 
     @workflow.signal
     def finish(self) -> None:
         self._done = True
-
-    @workflow.query
-    def ran(self) -> bool:
-        return workflow.get_current_details() != ""
-
-    @workflow.query
-    def invoked(self) -> bool:
-        return self._invoked
 
 
 async def test_workflow_node_sets_current_details(
@@ -285,9 +275,7 @@ async def test_workflow_node_sets_current_details(
             id=f"wf-node-{uuid.uuid4()}",
             task_queue=task_queue,
         )
-        await assert_eq_eventually(
-            True, lambda: handle.query(WorkflowNodeSummaryWorkflow.ran)
-        )
+        await wait_for_workflow_idle(handle)
         md: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
             "__temporal_workflow_metadata",
             result_type=temporalio.api.sdk.v1.WorkflowMetadata,
@@ -328,9 +316,7 @@ async def test_workflow_node_clears_current_details_on_empty(
             id=f"wf-node-clear-{uuid.uuid4()}",
             task_queue=task_queue,
         )
-        await assert_eq_eventually(
-            True, lambda: handle.query(WorkflowNodeSummaryWorkflow.invoked)
-        )
+        await wait_for_workflow_idle(handle)
         md: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
             "__temporal_workflow_metadata",
             result_type=temporalio.api.sdk.v1.WorkflowMetadata,

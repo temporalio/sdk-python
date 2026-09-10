@@ -31,7 +31,12 @@ from temporalio.api.workflowservice.v1 import (
     PollWorkflowExecutionUpdateRequest,
     UnpauseActivityRequest,
 )
-from temporalio.client import BuildIdOpAddNewDefault, Client, WorkflowHandle
+from temporalio.client import (
+    BuildIdOpAddNewDefault,
+    Client,
+    WorkflowExecutionStatus,
+    WorkflowHandle,
+)
 from temporalio.common import SearchAttributeKey
 from temporalio.converter import DataConverter
 from temporalio.service import RPCError, RPCStatusCode
@@ -101,6 +106,37 @@ async def assert_eq_eventually(
         assert expected == await fn()
 
     await assert_eventually(check, timeout=timeout, interval=interval)
+
+
+async def wait_for_workflow_idle(
+    handle: WorkflowHandle[Any, Any],
+    *,
+    timeout: timedelta = timedelta(seconds=10),
+    interval: timedelta = timedelta(milliseconds=200),
+) -> None:
+    """Wait until the running workflow has no pending workflow task, activity, child or Nexus op.
+
+    Pass a handle from a client without tracing interceptors so the probe itself is untraced.
+    """
+    # The time-skipping test server never reports pending_workflow_task, so this can return early there.
+    deadline = time.monotonic() + timeout.total_seconds()
+    while True:
+        desc = await handle.describe()
+        assert desc.status == WorkflowExecutionStatus.RUNNING, (
+            f"Workflow {handle.id} is {desc.status}, not RUNNING"
+        )
+        raw = desc.raw_description
+        if not (
+            raw.HasField("pending_workflow_task")
+            or raw.pending_activities
+            or raw.pending_children
+            or raw.pending_nexus_operations
+        ):
+            return
+        assert time.monotonic() < deadline, (
+            f"Workflow {handle.id} still has pending work after {timeout}"
+        )
+        await asyncio.sleep(interval.total_seconds())
 
 
 async def assert_task_fail_eventually(
