@@ -1804,6 +1804,7 @@ class NexusOperationTestWorkflow:
             ).start_operation(
                 NexusOperationTestServiceHandler.operation,
                 input="nexus-data",
+                summary="nexus-summary",
             ),
             workflow.create_nexus_client(
                 service=NexusOperationTestServiceHandler,
@@ -1811,6 +1812,7 @@ class NexusOperationTestWorkflow:
             ).start_operation(
                 NexusOperationTestServiceHandler.operation,
                 input="nexus-data",
+                summary="nexus-summary",
             ),
         )
         return list(await asyncio.gather(hmac_handle, zlib_handle))
@@ -1872,7 +1874,7 @@ class NexusFailureConverterWithContext(
 async def test_workflow_nexus_payload_codec_selects_codec_from_context(
     env: WorkflowEnvironment,
 ):
-    """Nexus context selects codecs for workflow inputs and results."""
+    """Nexus context selects codecs for workflow inputs, summaries, and results."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
@@ -1917,6 +1919,7 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
 
         history = await handle.fetch_history()
         scheduled_endpoints: dict[int, str] = {}
+        encoded_summaries: dict[str, temporalio.api.common.v1.Payload] = {}
         encoded_results: dict[str, temporalio.api.common.v1.Payload] = {}
         for event in history.events:
             if event.HasField("nexus_operation_scheduled_event_attributes"):
@@ -1924,6 +1927,11 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
                 assert scheduled_attrs.service == "NexusOperationTestServiceHandler"
                 assert scheduled_attrs.operation == "operation"
                 scheduled_endpoints[event.event_id] = scheduled_attrs.endpoint
+                assert event.HasField("user_metadata")
+                assert event.user_metadata.HasField("summary")
+                encoded_summaries[scheduled_attrs.endpoint] = (
+                    event.user_metadata.summary
+                )
             elif event.HasField("nexus_operation_completed_event_attributes"):
                 completed_attrs = event.nexus_operation_completed_event_attributes
                 endpoint = scheduled_endpoints[completed_attrs.scheduled_event_id]
@@ -1932,6 +1940,17 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
             hmac_endpoint_name,
             zlib_endpoint_name,
         }
+        assert {
+            endpoint: payload.metadata["encoding"]
+            for endpoint, payload in encoded_summaries.items()
+        } == {
+            hmac_endpoint_name: NexusContextPayloadCodecSelector.HMAC_ENCODING,
+            zlib_endpoint_name: NexusContextPayloadCodecSelector.ZLIB_ENCODING,
+        }
+        assert (
+            encoded_summaries[hmac_endpoint_name].data
+            != encoded_summaries[zlib_endpoint_name].data
+        )
         assert {
             endpoint: payload.metadata["encoding"]
             for endpoint, payload in encoded_results.items()
@@ -1958,6 +1977,10 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
                     [scheduled_attrs.input]
                 )
                 scheduled_attrs.input.CopyFrom(decoded)
+                [decoded] = await payload_codec.with_context(context).decode(
+                    [event.user_metadata.summary]
+                )
+                event.user_metadata.summary.CopyFrom(decoded)
             elif event.HasField("nexus_operation_completed_event_attributes"):
                 completed_attrs = event.nexus_operation_completed_event_attributes
                 context = scheduled_contexts[completed_attrs.scheduled_event_id]

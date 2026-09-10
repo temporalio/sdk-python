@@ -2175,6 +2175,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ),
             )
 
+        # TODO: Extend system endpoint converter handling for worker callbacks.
         if temporalio.nexus.system.is_system_endpoint(input.endpoint):
             serialization_context = temporalio.nexus.system._get_serialization_context(
                 input.service,
@@ -2194,7 +2195,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 user_payload_converter,
                 user_failure_converter,
             )
-            summary_payload_converter = payload_converter
             failure_converter = self._context_free_failure_converter
         else:
             serialization_context = temporalio.converter.NexusSerializationContext(
@@ -2205,7 +2205,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             payload_converter = self._payload_converter_with_context(
                 serialization_context
             )
-            summary_payload_converter = self._context_free_payload_converter
             failure_converter = self._failure_converter_with_context(
                 serialization_context
             )
@@ -2215,7 +2214,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             input,
             operation_handle_fn(),
             payload_converter,
-            summary_payload_converter,
             failure_converter,
         )
         handle._apply_schedule_command()
@@ -3665,7 +3663,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         input: StartNexusOperationInput[Any, OutputT],
         fn: Coroutine[Any, Any, OutputT],
         payload_converter: temporalio.converter.PayloadConverter,
-        summary_payload_converter: temporalio.converter.PayloadConverter,
         failure_converter: temporalio.converter.FailureConverter,
     ):
         self._instance = instance
@@ -3675,7 +3672,6 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
-        self._summary_payload_converter = summary_payload_converter
         self._failure_converter = failure_converter
 
     @property
@@ -3738,7 +3734,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
 
         if self._input.summary:
             command.user_metadata.summary.CopyFrom(
-                self._summary_payload_converter.to_payload(self._input.summary)
+                self._payload_converter.to_payload(self._input.summary)
             )
 
     def _apply_cancel_command(

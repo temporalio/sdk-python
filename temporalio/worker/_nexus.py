@@ -247,12 +247,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
     def _data_converter_for_nexus_task(
         self, endpoint: str, service: str, operation: str
     ) -> temporalio.converter.DataConverter:
-        service_handler = self._handler.service_handlers.get(service)
-        if (
-            service_handler is None
-            or operation not in service_handler.service.operation_definitions
-        ):
-            return self._data_converter
         return self._data_converter.with_context(
             temporalio.converter.NexusSerializationContext(
                 endpoint=endpoint,
