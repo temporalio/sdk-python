@@ -5343,11 +5343,12 @@ async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironmen
 
 
 async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
-    async def do_stuff(buffer: MetricBuffer) -> None:
+    async def do_stuff(buffer: MetricBuffer) -> float:
         runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
         new_client = await env.connect_client(
             runtime=runtime,
         )
+        start = time.monotonic()
         async with new_worker(new_client, HelloWorkflow) as worker:
             await new_client.execute_workflow(
                 HelloWorkflow.run,
@@ -5355,21 +5356,23 @@ async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
+        worker_seconds = time.monotonic() - start
         # Also, add some manual types beyond the defaults tested in other tests
         runtime.metric_meter.create_histogram_float("my-histogram-float").record(1.23)
         runtime.metric_meter.create_histogram_timedelta(
             "my-histogram-timedelta"
         ).record(timedelta(days=2, seconds=3, milliseconds=4))
         runtime.metric_meter.create_gauge_float("my-gauge-float").set(4.56)
+        return worker_seconds
 
     # Create a buffer, do stuff, check the metrics
     buffer = MetricBuffer(10000)
-    await do_stuff(buffer)
+    worker_seconds = await do_stuff(buffer)
     updates = buffer.retrieve_updates()
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
-        # Took more than 3ms
-        and u.value > 3
+        # Milliseconds, bounded by how long the worker ran
+        and 0 < u.value <= worker_seconds * 1000
         and isinstance(u.value, int)
         and u.metric.unit == "ms"
         for u in updates
@@ -5396,12 +5399,12 @@ async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
 
     # Do it again with seconds
     buffer = MetricBuffer(10000, duration_format=MetricBufferDurationFormat.SECONDS)
-    await do_stuff(buffer)
+    worker_seconds = await do_stuff(buffer)
     updates = buffer.retrieve_updates()
     assert any(
         u.metric.name == "temporal_workflow_task_execution_latency"
-        # Took less than 3s
-        and u.value < 3
+        # Seconds, bounded by how long the worker ran
+        and 0 < u.value <= worker_seconds
         and isinstance(u.value, float)
         and u.metric.unit == "s"
         for u in updates
