@@ -314,6 +314,14 @@ def activity_node(
     from google.adk.workflow import FunctionNode
 
     sig = inspect.signature(activity_def)
+    if any(
+        p.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+        for p in sig.parameters.values()
+    ):
+        raise TypeError(
+            f"Activity '{activity_def.__name__}' has *args or **kwargs; activity_node"
+            " needs named parameters to bind node_input."
+        )
     # Activities are invoked positionally; activity.defn rejects keyword-only parameters.
     params = [
         p

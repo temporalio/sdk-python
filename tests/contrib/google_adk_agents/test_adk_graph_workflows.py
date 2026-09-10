@@ -417,6 +417,15 @@ async def test_graph_positional_only_activity_node(client: Client):
     assert result == "GO-done"
 
 
+def test_activity_node_rejects_variadic_activities():
+    @activity.defn
+    async def collect(*values: str) -> str:
+        return ",".join(values)
+
+    with pytest.raises(TypeError, match=r"\*args or \*\*kwargs"):
+        activity_node(collect)
+
+
 async def test_activity_node_rejects_bad_dict_input():
     join = activity_node(join_parts)
 
