@@ -769,7 +769,7 @@ class RegisterFilesWorkflow:
         # Missing credentials is a permanent error; retrying only delays it.
         client = TemporalAsyncClient(
             activity_config=ActivityConfig(
-                start_to_close_timeout=timedelta(seconds=30),
+                start_to_close_timeout=timedelta(seconds=60),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         )
