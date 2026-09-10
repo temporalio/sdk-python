@@ -1,4 +1,5 @@
 import asyncio
+import gc
 import multiprocessing.context
 import os
 import sys
@@ -56,6 +57,13 @@ def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
     """Print a newline so that custom printed output starts on new line."""
     if item.config.getoption("-s"):
         print()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_teardown() -> None:
+    # Freeze survivors so later full GC passes only cover one test's allocations
+    gc.collect()
+    gc.freeze()
 
 
 def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
