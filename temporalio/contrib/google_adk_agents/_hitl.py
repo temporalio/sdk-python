@@ -100,6 +100,8 @@ def pending_hitl_requests(event: Event) -> list[HitlRequest]:
         function_call = part.function_call
         if not function_call or not function_call.id:
             continue
+        if function_call.id not in event.long_running_tool_ids:
+            continue
         kind = _KIND_BY_FUNCTION_CALL_NAME.get(function_call.name or "")
         if kind is None:
             continue

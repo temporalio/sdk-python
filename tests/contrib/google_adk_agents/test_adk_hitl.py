@@ -331,6 +331,26 @@ async def _wait_for_pending(
     return await asyncio.wait_for(_poll(), timeout=20)
 
 
+def test_pending_hitl_requests_only_reports_long_running_calls():
+    from google.adk.events import Event
+
+    def request(call_id: str) -> types.Part:
+        return types.Part(
+            function_call=types.FunctionCall(
+                name="adk_request_input", id=call_id, args={"message": call_id}
+            )
+        )
+
+    event = Event(
+        author="agent",
+        content=types.Content(
+            role="model", parts=[request("pending"), request("done")]
+        ),
+        long_running_tool_ids={"pending"},
+    )
+    assert [r.interrupt_id for r in pending_hitl_requests(event)] == ["pending"]
+
+
 def test_pending_hitl_requests_ignores_credential_requests():
     from google.adk.events import Event
 
