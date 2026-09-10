@@ -27,10 +27,16 @@ from temporalio import workflow
 from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalModel
 from temporalio.worker import Worker
 
-with workflow.unsafe.imports_passed_through():
-    from deepagents.backends import StateBackend
-    from deepagents.middleware import SummarizationMiddleware
-    from deepagents.middleware.summarization import create_summarization_tool_middleware
+# Bind deepagents symbols off importorskip modules: static imports cannot
+# resolve on Python 3.10 environments, where deepagents is absent.
+_backends_mod = pytest.importorskip("deepagents.backends")
+_middleware_mod = pytest.importorskip("deepagents.middleware")
+_summarization_mod = pytest.importorskip("deepagents.middleware.summarization")
+StateBackend = _backends_mod.StateBackend
+SummarizationMiddleware = _middleware_mod.SummarizationMiddleware
+create_summarization_tool_middleware = (
+    _summarization_mod.create_summarization_tool_middleware
+)
 
 
 @workflow.defn
