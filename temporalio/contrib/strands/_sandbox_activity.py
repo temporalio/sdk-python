@@ -3,8 +3,14 @@ from __future__ import annotations
 import asyncio
 import base64
 import inspect
-from collections.abc import AsyncGenerator, Awaitable, Callable
-from contextlib import asynccontextmanager
+import logging
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Collection,
+)
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any
@@ -22,11 +28,13 @@ from temporalio.contrib.workflow_streams import WorkflowStreamClient
 from temporalio.exceptions import ApplicationError
 
 from ._heartbeat_decorator import auto_heartbeater
+from ._worker_env_ref import AllowAllWorkerEnvVars, _WorkerEnvRefResolver
 
 SANDBOX_TIMEOUT_ERROR_TYPE = "StrandsSandboxTimeoutError"
 SANDBOX_PATH_NOT_FOUND_ERROR_TYPE = "StrandsSandboxPathNotFoundError"
 SANDBOX_NOT_FOUND_ERROR_TYPE = "StrandsSandboxNotFoundError"
 _SANDBOX_CACHE_IDLE_TIMEOUT = timedelta(minutes=5)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -61,7 +69,21 @@ class SandboxWorkflowContext:
         return self.chain.first_execution_run_id
 
 
-SandboxFactory = Callable[[SandboxWorkflowContext], Sandbox | Awaitable[Sandbox]]
+@dataclass(frozen=True)
+class SandboxStreamEvent:
+    """A correlated output chunk from a sandbox execution Activity."""
+
+    sandbox_name: str
+    execution_id: str
+    attempt: int
+    sequence: int
+    chunk: StreamChunk
+
+
+_SandboxFactoryResult = Sandbox | AbstractAsyncContextManager[Sandbox]
+SandboxFactory = Callable[
+    [SandboxWorkflowContext], _SandboxFactoryResult | Awaitable[_SandboxFactoryResult]
+]
 _SandboxKey = tuple[str, SandboxWorkflowChain]
 
 
@@ -125,13 +147,19 @@ class _SandboxRecord:
         self._idle_timeout = idle_timeout
         self._inflight = 0
         self._idle_handle: asyncio.TimerHandle | None = None
+        self._sandbox_context_manager: AbstractAsyncContextManager[Sandbox] | None = (
+            None
+        )
         self._sandbox_task = asyncio.create_task(self._create(factory))
 
     async def _create(self, factory: SandboxFactory) -> Sandbox:
-        sandbox = factory(self._context)
-        if inspect.isawaitable(sandbox):
-            return await sandbox
-        return sandbox
+        result = factory(self._context)
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, Sandbox):
+            return result
+        self._sandbox_context_manager = result
+        return await result.__aenter__()
 
     def acquire(self) -> None:
         self._inflight += 1
@@ -168,7 +196,9 @@ class _SandboxRecord:
         try:
             await self._sandbox_task
         except BaseException:
-            pass
+            return
+        if self._sandbox_context_manager is not None:
+            await self._sandbox_context_manager.__aexit__(None, None, None)
 
 
 class SandboxActivities:
@@ -178,6 +208,7 @@ class SandboxActivities:
         self,
         factories: dict[str, SandboxFactory],
         idle_timeout: timedelta | None = None,
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Store named Workflow-scoped worker-side sandbox factories."""
         self._factories = dict(factories)
@@ -187,6 +218,8 @@ class SandboxActivities:
         if self._idle_timeout <= timedelta(0):
             raise ValueError("Sandbox cache idle timeout must be positive")
         self._records: dict[_SandboxKey, _SandboxRecord] = {}
+        self._closing_records: set[asyncio.Task[None]] = set()
+        self._worker_env_refs = _WorkerEnvRefResolver(resolvable_worker_env_vars)
 
     @asynccontextmanager
     async def _sandbox(
@@ -242,6 +275,14 @@ class SandboxActivities:
     def _evict(self, key: _SandboxKey, record: _SandboxRecord) -> None:
         if self._has_record(key, record):
             del self._records[key]
+            task = asyncio.create_task(record.aclose())
+            self._closing_records.add(task)
+            task.add_done_callback(self._record_closed)
+
+    def _record_closed(self, task: asyncio.Task[None]) -> None:
+        self._closing_records.discard(task)
+        if not task.cancelled() and (error := task.exception()) is not None:
+            logger.error("Failed closing a sandbox adapter", exc_info=error)
 
     async def aclose(self) -> None:
         """Cancel cache timers and discard all worker-local sandbox adapters."""
@@ -249,6 +290,8 @@ class SandboxActivities:
         self._records.clear()
         for record in records:
             await record.aclose()
+        if self._closing_records:
+            await asyncio.gather(*self._closing_records, return_exceptions=True)
 
     def activities(self) -> list[Callable[..., Any]]:
         """Build one stable activity set that dispatches by sandbox name."""
@@ -262,10 +305,11 @@ class SandboxActivities:
                         input.command,
                         timeout=input.timeout,
                         cwd=input.cwd,
-                        env=input.env,
+                        env=self._worker_env_refs.resolve(input.env),
                         **input.kwargs,
                     ),
                     timeout=input.timeout,
+                    sandbox_name=input.sandbox_name,
                     streaming_topic=input.streaming_topic,
                     streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
                 )
@@ -282,10 +326,11 @@ class SandboxActivities:
                         input.language,
                         timeout=input.timeout,
                         cwd=input.cwd,
-                        env=input.env,
+                        env=self._worker_env_refs.resolve(input.env),
                         **input.kwargs,
                     ),
                     timeout=input.timeout,
+                    sandbox_name=input.sandbox_name,
                     streaming_topic=input.streaming_topic,
                     streaming_batch_interval_seconds=input.streaming_batch_interval_seconds,
                 )
@@ -345,6 +390,7 @@ class SandboxActivities:
         stream: AsyncGenerator[StreamChunk | ExecutionResult, None],
         *,
         timeout: float | None,
+        sandbox_name: str,
         streaming_topic: str | None,
         streaming_batch_interval_seconds: float,
     ) -> list[_StreamItem]:
@@ -358,12 +404,27 @@ class SandboxActivities:
             client = WorkflowStreamClient.from_within_activity(
                 batch_interval=timedelta(seconds=streaming_batch_interval_seconds),
             )
-            topic = client.topic(streaming_topic, type=StreamChunk)
+            topic = client.topic(streaming_topic, type=SandboxStreamEvent)
+            info = activity.info()
+            if not info.workflow_run_id:
+                raise RuntimeError("Sandbox activities must be started by a Workflow")
+            sequence = 0
             async with client:
                 async for item in stream:
                     items.append(_StreamItem(_item_to_json(item)))
                     if isinstance(item, StreamChunk):
-                        topic.publish(item)
+                        topic.publish(
+                            SandboxStreamEvent(
+                                sandbox_name=sandbox_name,
+                                execution_id=(
+                                    f"{info.workflow_run_id}:{info.activity_id}"
+                                ),
+                                attempt=info.attempt,
+                                sequence=sequence,
+                                chunk=item,
+                            )
+                        )
+                        sequence += 1
             return items
         except SandboxTimeoutError as err:
             raise _timeout_error(err, timeout) from err
@@ -374,13 +435,10 @@ def _activity_name(operation: str) -> str:
 
 
 def _timeout_error(err: SandboxTimeoutError, timeout: float | None) -> ApplicationError:
-    # A timeout is the deterministic outcome the caller asked for, so retrying
-    # just repeats it. Surface it to workflow code on the first attempt instead.
     return ApplicationError(
         str(err),
         timeout,
         type=SANDBOX_TIMEOUT_ERROR_TYPE,
-        non_retryable=True,
     )
 
 

@@ -229,6 +229,14 @@ created. A later run in the same chain reuses a warm entry without calling the
 factory again. After eviction, the next factory call receives the Run ID of the
 run that recreates the entry.
 
+The first execution Run ID is supplied by workflow code because Activity
+metadata only identifies the current run. Treat sandbox activities as trusted
+worker endpoints: workflow code with access to their task queue can call them
+directly and choose this value. Do not share the task queue between mutually
+untrusted workflows. If Workflow IDs can be reused, the backing environment
+lookup must also prevent a new execution from reconnecting to an old execution's
+environment, for example by expiring old environments before ID reuse.
+
 Factories may be synchronous or asynchronous. Synchronous factories must only
 construct a lightweight adapter and must not block the activity event loop;
 use an asynchronous factory for remote lookup or provisioning. A factory may
@@ -238,9 +246,26 @@ connects to an already-running container; it does not create one.
 
 Worker-local adapters are reused until they have been idle for five minutes.
 Set `sandbox_cache_idle_timeout` on `StrandsPlugin` to change that duration.
-Eviction only drops the local adapter. Provisioning, teardown, and cleanup of
-orphaned backing environments remain the application's responsibility; use a
-backend TTL or reaper for workflows that are terminated before normal cleanup.
+Return an async context manager from the factory when an adapter owns clients,
+sockets, subprocess handles, tunnels, or leases. Its exit method runs after
+cache eviction and Worker shutdown. Returning a plain `Sandbox` only drops the
+adapter from the cache:
+
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def build_managed_sandbox(context: SandboxWorkflowContext):
+    adapter = await connect_to_sandbox(context)
+    try:
+        yield adapter
+    finally:
+        await adapter.aclose()
+```
+
+In either case, provisioning, teardown, and cleanup of orphaned backing
+environments remain the application's responsibility; use a backend TTL or
+reaper for workflows that are terminated before normal cleanup.
 
 That cache is per worker *process*, while successive sandbox activities from one
 workflow are routed independently across the task queue. With more than one
@@ -253,14 +278,14 @@ Reset does not roll back commands or filesystem mutations already performed in
 the external sandbox, just as it does not roll back other Activity side effects.
 Account for that when resetting a Workflow that uses a sandbox.
 
-`SandboxTimeoutError` and any `FileNotFoundError` raised by a sandbox filesystem
-operation — including its `SandboxPathNotFoundError` subclass — cross the
-activity boundary as non-retryable failures and are re-raised inside the
-workflow with the sandbox's own message, so a command that exceeds its
-`timeout` or a path that does not exist surfaces to the agent on the first
-attempt instead of retrying. Factory failures and other sandbox failures,
-including the `OSError` that Strands documents for a failed `write_file`, are
-retried under the `retry_policy` you pass to `TemporalSandbox`.
+`SandboxTimeoutError` is serialized as an Activity failure and retried under the
+`retry_policy` you pass to `TemporalSandbox`. If retries are exhausted, it is
+reconstructed inside the workflow with the sandbox's own message. Any
+`FileNotFoundError` raised by a sandbox filesystem operation — including its
+`SandboxPathNotFoundError` subclass — is non-retryable because the requested path
+is absent, and is reconstructed in the same way. Factory failures and other
+sandbox failures, including the `OSError` that Strands documents for a failed
+`write_file`, are also retryable.
 
 Like all Temporal Activities, sandbox operations have at-least-once execution
 semantics. A worker can finish a command or filesystem mutation and fail before
@@ -282,8 +307,7 @@ workflow. The activity publishes each `StreamChunk` as it arrives; the final
 ```python
 from datetime import timedelta
 
-from strands.sandbox import StreamChunk
-from temporalio.contrib.strands import TemporalSandbox
+from temporalio.contrib.strands import SandboxStreamEvent, TemporalSandbox
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 
 # workflow __init__
@@ -296,27 +320,55 @@ self.sandbox = TemporalSandbox(
 
 # external client
 async for item in WorkflowStreamClient.create(client, workflow_id).subscribe(
-    ["sandbox-events"], result_type=StreamChunk
+    ["sandbox-events"], result_type=SandboxStreamEvent
 ):
-    print(item.data.stream_type, item.data.data)
+    event = item.data
+    print(event.execution_id, event.sequence, event.chunk.data)
 ```
 
-The topic is an observer-facing merged log. If sandbox executions overlap,
-their chunks may interleave. Use different `streaming_topic` values when the
-consumer needs separate logs; workflow code still receives the correctly
-separated, complete buffered result for each call. Because publications are
-observer-facing side effects of an activity attempt, a failed attempt that
-Temporal retries may leave chunks in the topic before the retry publishes its
-own output.
+Each `SandboxStreamEvent` includes the sandbox name, an execution ID composed of
+the Workflow Run ID and Activity ID, the Activity attempt, chunk sequence, and
+`StreamChunk`. Events from concurrent executions may interleave on a shared
+topic; group them by `execution_id` and `attempt`, then order them by `sequence`.
+Workflow code still receives the correctly separated, complete buffered result
+for each call. Because publications are observer-facing side effects of an
+Activity attempt, a failed attempt may leave chunks in the topic before a retry
+publishes its own output.
 
 Streaming is disabled by default. When `streaming_topic=None`, sandbox
 activities do not construct a `WorkflowStreamClient` and the workflow does not
 need to host a `WorkflowStream`.
 
-All arguments and results cross Temporal's payload boundary and enter workflow
-history. Keep command output and files within the server's configured payload
-size limits; use external storage for large artifacts. In particular, `env`
-values are recorded in history and must not contain secrets.
+All sandbox Activity arguments and results are serialized into workflow history.
+Keep command output and files within the server's configured payload size limits;
+use external storage for large artifacts.
+
+Do not put secret values directly in `env`, because those values are serialized
+into workflow history. Use `temporal_worker_env_ref()` to serialize only the
+name of a worker environment variable, then allow that name on every worker that
+runs the sandbox activities:
+
+```python
+from temporalio.contrib.strands import temporal_worker_env_ref
+
+# workflow
+await sandbox.execute(
+    "build",
+    env={"API_KEY": temporal_worker_env_ref("BUILD_API_KEY")},
+)
+
+# worker
+plugin = StrandsPlugin(
+    sandboxes={"build": build_sandbox},
+    resolvable_worker_env_vars=["BUILD_API_KEY"],
+)
+```
+
+Names are matched exactly. A reference to a name the worker does not allow is
+passed to the sandbox unchanged; an allowed but unset variable resolves to an
+empty string. `AllowAllWorkerEnvVars()` permits any name, but should only be used
+when all workflow code on the task queue is trusted to read every environment
+variable available to that worker.
 
 ## Tools
 

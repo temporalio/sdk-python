@@ -1,10 +1,9 @@
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Callable, Collection
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 
 from strands.models import BedrockModel, Model
-from strands.sandbox import Sandbox
 from strands.tools.mcp import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -15,15 +14,13 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
-from ._sandbox_activity import (
-    SandboxActivities,
-    SandboxWorkflowContext,
-)
+from ._sandbox_activity import SandboxActivities, SandboxFactory
 from ._temporal_mcp_client import (
     _evict_connection,
     build_call_tool_activity,
     build_list_tools_activity,
 )
+from ._worker_env_ref import AllowAllWorkerEnvVars
 
 
 class StrandsPlugin(SimplePlugin):
@@ -51,6 +48,9 @@ class StrandsPlugin(SimplePlugin):
     awaitably. Worker-local adapters are cached by sandbox name and Workflow
     chain until ``sandbox_cache_idle_timeout`` elapses. Use the same name in
     workflow-side ``TemporalSandbox(name)`` instances.
+
+    ``resolvable_worker_env_vars`` controls which worker environment variables
+    sandbox command ``env`` references may resolve immediately before execution.
     """
 
     def __init__(
@@ -58,21 +58,18 @@ class StrandsPlugin(SimplePlugin):
         *,
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
-        sandboxes: dict[
-            str,
-            Callable[
-                [SandboxWorkflowContext],
-                Sandbox | Awaitable[Sandbox],
-            ],
-        ]
-        | None = None,
+        sandboxes: dict[str, SandboxFactory] | None = None,
         mcp_connection_idle_timeout: timedelta | None = None,
         sandbox_cache_idle_timeout: timedelta | None = None,
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Build the plugin from optional model, MCP, and sandbox factories.
 
         If ``models`` is omitted, registers a single ``BedrockModel()`` factory
         under the name ``"bedrock"``, matching Strands' own implicit default.
+
+        A sandbox factory may instead return an async context manager when its
+        worker-local adapter needs cleanup after cache eviction or Worker shutdown.
         """
         default_name: str | None = None
         if models is None:
@@ -84,7 +81,11 @@ class StrandsPlugin(SimplePlugin):
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
 
         sandbox_activities = (
-            SandboxActivities(sandboxes, sandbox_cache_idle_timeout)
+            SandboxActivities(
+                sandboxes,
+                sandbox_cache_idle_timeout,
+                resolvable_worker_env_vars,
+            )
             if sandboxes
             else None
         )

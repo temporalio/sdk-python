@@ -1,5 +1,6 @@
 import asyncio
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -10,17 +11,21 @@ from strands import SandboxPathNotFoundError, SandboxTimeoutError, tool
 from strands.sandbox import ExecutionResult, FileInfo, OutputFile, Sandbox, StreamChunk
 
 import temporalio.contrib.strands._sandbox_activity
+import temporalio.contrib.strands._worker_env_ref
 import temporalio.exceptions
 import temporalio.testing
 from temporalio import workflow
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.strands import (
+    AllowAllWorkerEnvVars,
+    SandboxStreamEvent,
     SandboxWorkflowChain,
     SandboxWorkflowContext,
     StrandsPlugin,
     TemporalAgent,
     TemporalSandbox,
+    temporal_worker_env_ref,
 )
 from temporalio.contrib.workflow_streams import WorkflowStream, WorkflowStreamClient
 from temporalio.worker import Replayer, Worker
@@ -102,7 +107,7 @@ class SandboxWorkflow:
                 "echo hi",
                 timeout=2,
                 cwd="/work",
-                env={"VISIBLE": "history"},
+                env={"SECRET": temporal_worker_env_ref("STRANDS_TEST_SECRET")},
                 future_option=True,
             )
         ]
@@ -132,8 +137,12 @@ class SandboxWorkflow:
         )
 
 
-async def test_sandbox_operations_are_durable_and_cached(client: Client):
+async def test_sandbox_operations_are_durable_and_cached(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
     task_queue = f"test_sandbox-{uuid4()}"
+    secret = f"secret-{uuid4()}"
+    monkeypatch.setenv("STRANDS_TEST_SECRET", secret)
     constructed: list[RecordingSandbox] = []
     contexts: list[SandboxWorkflowContext] = []
 
@@ -143,7 +152,11 @@ async def test_sandbox_operations_are_durable_and_cached(client: Client):
         constructed.append(sandbox)
         return sandbox
 
-    plugin = StrandsPlugin(models={}, sandboxes={"recording": factory})
+    plugin = StrandsPlugin(
+        models={},
+        sandboxes={"recording": factory},
+        resolvable_worker_env_vars=["STRANDS_TEST_SECRET"],
+    )
     async with Worker(
         client,
         task_queue=task_queue,
@@ -179,7 +192,7 @@ async def test_sandbox_operations_are_durable_and_cached(client: Client):
             "echo hi",
             2,
             "/work",
-            {"VISIBLE": "history"},
+            {"SECRET": secret},
             {"future_option": True},
         ),
         (
@@ -199,6 +212,9 @@ async def test_sandbox_operations_are_durable_and_cached(client: Client):
     ]
 
     history = await handle.fetch_history()
+    assert secret.encode() not in b"".join(
+        event.SerializeToString() for event in history.events
+    )
     assert get_activities(history) == [
         "strands-sandbox-execute",
         "strands-sandbox-execute-code",
@@ -367,10 +383,15 @@ class IdleSandboxWorkflow:
 async def test_sandbox_cache_evicts_when_idle(client: Client):
     task_queue = f"test_sandbox_idle-{uuid4()}"
     contexts: list[SandboxWorkflowContext] = []
+    closed: list[SandboxWorkflowContext] = []
 
-    def factory(context: SandboxWorkflowContext) -> RecordingSandbox:
+    @asynccontextmanager
+    async def factory(context: SandboxWorkflowContext):
         contexts.append(context)
-        return RecordingSandbox()
+        try:
+            yield RecordingSandbox()
+        finally:
+            closed.append(context)
 
     plugin = StrandsPlugin(
         models={},
@@ -392,6 +413,7 @@ async def test_sandbox_cache_evicts_when_idle(client: Client):
 
     assert len(contexts) == 2
     assert contexts[0] == contexts[1]
+    assert closed == contexts
 
 
 class SlowSandbox(RecordingSandbox):
@@ -596,6 +618,39 @@ def test_sandbox_cache_idle_timeout_must_be_positive() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("resolvable", "expected"),
+    [
+        (["STRANDS_TEST_SECRET"], "Bearer secret"),
+        (AllowAllWorkerEnvVars(), "Bearer secret"),
+        (["OTHER_SECRET"], "Bearer temporal.worker_env_ref:{STRANDS_TEST_SECRET}"),
+    ],
+    ids=["allowed", "allow_all", "not_allowed"],
+)
+def test_sandbox_worker_env_refs_respect_worker_allowlist(
+    monkeypatch: pytest.MonkeyPatch,
+    resolvable: Any,
+    expected: str,
+) -> None:
+    monkeypatch.setenv("STRANDS_TEST_SECRET", "secret")
+    resolver = temporalio.contrib.strands._worker_env_ref._WorkerEnvRefResolver(
+        resolvable
+    )
+
+    assert resolver.resolve(
+        {"AUTHORIZATION": f"Bearer {temporal_worker_env_ref('STRANDS_TEST_SECRET')}"}
+    ) == {"AUTHORIZATION": expected}
+
+
+def test_sandbox_worker_env_vars_rejects_a_single_string() -> None:
+    with pytest.raises(TypeError, match="collection of environment variable names"):
+        StrandsPlugin(
+            models={},
+            sandboxes={"recording": lambda _: RecordingSandbox()},
+            resolvable_worker_env_vars="STRANDS_TEST_SECRET",  # type: ignore[arg-type]
+        )
+
+
 def test_sandbox_factories_share_one_activity_set() -> None:
     plugin = StrandsPlugin(
         models={},
@@ -667,7 +722,7 @@ class StreamingSandboxWorkflow:
         )
 
 
-async def test_sandbox_streaming_publishes_raw_chunks(client: Client):
+async def test_sandbox_streaming_publishes_correlated_events(client: Client):
     task_queue = f"test_sandbox_streaming-{uuid4()}"
     workflow_id = f"test_sandbox_streaming-{uuid4()}"
     plugin = StrandsPlugin(
@@ -686,12 +741,12 @@ async def test_sandbox_streaming_publishes_raw_chunks(client: Client):
             task_queue=task_queue,
         )
         stream = WorkflowStreamClient.create(client, workflow_id)
-        events: list[StreamChunk] = []
+        events: list[SandboxStreamEvent] = []
 
         async def collect() -> None:
             async for stream_item in stream.subscribe(
                 ["sandbox-events"],
-                result_type=StreamChunk,
+                result_type=SandboxStreamEvent,
                 poll_cooldown=timedelta(milliseconds=50),
             ):
                 events.append(stream_item.data)
@@ -702,7 +757,13 @@ async def test_sandbox_streaming_publishes_raw_chunks(client: Client):
         assert await handle.result()
         await asyncio.wait_for(collect_task, timeout=10)
 
-    assert events == [
+    assert [event.sandbox_name for event in events] == ["recording"] * 2
+    assert handle.result_run_id
+    assert events[0].execution_id.startswith(f"{handle.result_run_id}:")
+    assert events[1].execution_id == events[0].execution_id
+    assert [event.attempt for event in events] == [1, 1]
+    assert [event.sequence for event in events] == [0, 1]
+    assert [event.chunk for event in events] == [
         StreamChunk("out"),
         StreamChunk("err", "stderr"),
     ]
@@ -800,7 +861,7 @@ class SandboxFileTimeoutWorkflow:
         return messages
 
 
-async def test_sandbox_file_timeouts_are_non_retryable_and_reconstructed(
+async def test_sandbox_file_timeouts_are_retryable_and_reconstructed(
     client: Client,
 ):
     task_queue = f"test_sandbox_file_timeouts-{uuid4()}"
@@ -820,7 +881,7 @@ async def test_sandbox_file_timeouts_are_non_retryable_and_reconstructed(
         )
 
     assert result == ["Execution timed out after 90 seconds"] * 4
-    assert sandbox.attempts == {"read": 1, "write": 1, "remove": 1, "list": 1}
+    assert sandbox.attempts == {"read": 3, "write": 3, "remove": 3, "list": 3}
 
 
 @workflow.defn
@@ -851,13 +912,13 @@ class SandboxErrorWorkflow:
         else:
             read_message = ""
 
-        # No retry policy: a timeout must surface on the first attempt rather
-        # than retrying under Temporal's unlimited-attempt default. The
-        # schedule-to-close timeout bounds the failure if that ever regresses.
         failing = TemporalSandbox(
             "failing",
             start_to_close_timeout=timedelta(seconds=5),
             schedule_to_close_timeout=timedelta(seconds=15),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=1), maximum_attempts=2
+            ),
         )
         try:
             await failing.execute("command", timeout=4)
@@ -909,4 +970,4 @@ async def test_sandbox_retries_and_reconstructs_errors(client: Client):
     )
     assert factory_attempts == 2
     assert retried.attempts == 2
-    assert failing.attempts == 1
+    assert failing.attempts == 2
