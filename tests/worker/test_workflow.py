@@ -946,7 +946,7 @@ class CancelActivityWorkflow:
         if params.local:
             handle = workflow.start_local_activity_method(
                 ActivityWaitCancelNotify.wait_cancel,
-                schedule_to_close_timeout=timedelta(seconds=5),
+                schedule_to_close_timeout=timedelta(minutes=1),
                 cancellation_type=workflow.ActivityCancellationType[
                     params.cancellation_type
                 ],
@@ -955,7 +955,7 @@ class CancelActivityWorkflow:
             handle = workflow.start_activity_method(
                 ActivityWaitCancelNotify.wait_cancel,
                 schedule_to_close_timeout=timedelta(seconds=5),
-                heartbeat_timeout=timedelta(seconds=1),
+                heartbeat_timeout=timedelta(seconds=5),
                 cancellation_type=workflow.ActivityCancellationType[
                     params.cancellation_type
                 ],
@@ -976,14 +976,22 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
-    # Need short task timeout to timeout LA task and longer assert timeout
-    # so the task can timeout
-    task_timeout = timedelta(seconds=1)
+    # Core completes the task holding a local activity at 80% of this timeout
+    task_timeout = timedelta(seconds=5)
     assert_timeout = timedelta(seconds=10)
     activity_inst = ActivityWaitCancelNotify()
 
+    async def wait_cancel_complete() -> None:
+        await asyncio.wait_for(
+            activity_inst.wait_cancel_complete.wait(), assert_timeout.total_seconds()
+        )
+        activity_inst.wait_cancel_complete.clear()
+
     async with new_worker(
-        client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
+        client,
+        CancelActivityWorkflow,
+        activities=[activity_inst.wait_cancel],
+        max_heartbeat_throttle_interval=timedelta(milliseconds=300),
     ) as worker:
         # Try cancel - confirm error and activity was sent the cancel
         handle = await client.start_workflow(
@@ -1003,7 +1011,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await assert_eq_eventually(
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
         await handle.cancel()
 
         # Wait cancel - confirm no error due to graceful cancel handling
@@ -1022,7 +1030,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             activity_result,
             timeout=assert_timeout,
         )
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
         await handle.cancel()
 
         # Abandon - confirm error and that activity stays running
@@ -1042,7 +1050,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await asyncio.sleep(0.5)
         assert not activity_inst.wait_cancel_complete.is_set()
         await handle.cancel()
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
 
 
 @workflow.defn
