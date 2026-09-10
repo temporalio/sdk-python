@@ -69,28 +69,22 @@ def test_workflow_sandbox_importer_repeat_import_skips_import_machinery(
 
 
 def test_workflow_sandbox_importer_repeat_import_leaves_module_getattr_to_importlib():
+    pkg_name = "tests.worker.workflow_sandbox.testmodules.dynamic_attr_package"
     with Importer(restrictions, RestrictionContext()).applied():
-        import tests.worker.workflow_sandbox.testmodules.dynamic_attr_package as dyn_pkg
-        from tests.worker.workflow_sandbox.testmodules.dynamic_attr_package import (
-            dynamic_value,
-        )
-
-        assert dynamic_value == 42
+        dyn_pkg = importlib.import_module(pkg_name)
+        assert dyn_pkg.dynamic_value == 42
         before = len(dyn_pkg.getattr_calls)
-        # importlib's fromlist hasattr plus the IMPORT_FROM lookup, same as without the sandbox
-        from tests.worker.workflow_sandbox.testmodules.dynamic_attr_package import (  # noqa: F811
-            dynamic_value,
-        )
 
-        assert dynamic_value == 42
+        # importlib's fromlist hasattr plus the attribute read, same as without the sandbox
+        pkg = __import__(pkg_name, fromlist=["dynamic_value"])
+        assert pkg.dynamic_value == 42
         assert dyn_pkg.getattr_calls[before:] == ["dynamic_value", "dynamic_value"]
 
-        # A missing name is probed once by importlib and once by IMPORT_FROM, not more
+        # A missing name is probed once by importlib and once by the read, not more
         before = len(dyn_pkg.getattr_calls)
-        with pytest.raises(ImportError):
-            from tests.worker.workflow_sandbox.testmodules.dynamic_attr_package import (  # type: ignore[attr-defined]
-                missing_value,
-            )
+        pkg = __import__(pkg_name, fromlist=["missing_value"])
+        with pytest.raises(AttributeError):
+            getattr(pkg, "missing_value")
         assert dyn_pkg.getattr_calls[before:] == ["missing_value", "missing_value"]
 
 
