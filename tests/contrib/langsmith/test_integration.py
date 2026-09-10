@@ -1261,7 +1261,6 @@ class TestBuiltinQueryFiltering:
             )
 
             await _wait_for_workflow_idle(handle)
-            collector.clear()
 
             # Built-in queries — should NOT be traced
             await handle.query("__temporal_workflow_metadata")
@@ -1272,10 +1271,11 @@ class TestBuiltinQueryFiltering:
             await handle.signal(QueryFilteringWorkflow.complete)
             assert await handle.result() == "done"
 
-        # Built-in queries should be absent; only user query and signal remain.
+        # The built-in query leaves no run; everything else the worker did is here.
         assert_trace_hierarchy(
             build_trace_trees(collector),
             [
+                "RunWorkflow:QueryFilteringWorkflow",
                 "HandleQuery:my_query",
                 "HandleSignal:complete",
             ],
