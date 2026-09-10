@@ -61,6 +61,7 @@ T = TypeVar("T")
 _RETRYABLE_RPC_STATUS_CODES: frozenset[RPCStatusCode] = frozenset(
     {
         RPCStatusCode.ABORTED,
+        RPCStatusCode.CANCELLED,
         RPCStatusCode.DATA_LOSS,
         RPCStatusCode.INTERNAL,
         RPCStatusCode.OUT_OF_RANGE,
