@@ -258,7 +258,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
         assert uuid.UUID(info["run_id"]).version == 7
         assert info["run_timeout"] is None
         assert info["task_queue"] == worker.task_queue
-        assert info["task_timeout"] == "0:00:10"
+        assert info["task_timeout"] == "0:01:00"
         assert info["workflow_id"] == workflow_id
         assert info["workflow_type"] == "InfoWorkflow"
 
