@@ -1417,7 +1417,10 @@ async def test_flush_retry_preserves_items_after_failures(
 
 
 @pytest.mark.asyncio
-async def test_background_flusher_retries_failed_signal(client: Client) -> None:
+@pytest.mark.parametrize("status", [RPCStatusCode.UNAVAILABLE, RPCStatusCode.CANCELLED])
+async def test_background_flusher_retries_failed_signal(
+    client: Client, status: RPCStatusCode
+) -> None:
     async with new_worker(client, BasicWorkflowStreamWorkflow) as worker:
         handle = await client.start_workflow(
             BasicWorkflowStreamWorkflow.run,
@@ -1430,17 +1433,16 @@ async def test_background_flusher_retries_failed_signal(client: Client) -> None:
         first_flush_failed = asyncio.Event()
         retry_succeeded = asyncio.Event()
 
-        async def fail_first_signal(*args: Any, **kwargs: Any) -> Any:
+        async def fail_first_signal(*args: Any, **kwargs: Any) -> None:
             if not first_flush_failed.is_set():
                 first_flush_failed.set()
                 raise RPCError(
                     message="simulated delivery failure",
-                    status=RPCStatusCode.UNAVAILABLE,
+                    status=status,
                     raw_grpc_status=b"",
                 )
-            result = await real_signal(*args, **kwargs)
+            await real_signal(*args, **kwargs)
             retry_succeeded.set()
-            return result
 
         with patch.object(handle, "signal", side_effect=fail_first_signal):
             async with stream:
