@@ -549,8 +549,12 @@ def _already_imported(
     if mod is None:
         return None
     if fromlist:
-        if hasattr(mod, "__path__") and any(
-            not isinstance(x, str) or x == "*" or not hasattr(mod, x) for x in fromlist
+        # Only statically stored attributes count; module __getattr__ stays with importlib
+        mod_dict = getattr(mod, "__dict__", None)
+        if not isinstance(mod_dict, dict):
+            return None
+        if "__path__" in mod_dict and any(
+            not isinstance(x, str) or x == "*" or x not in mod_dict for x in fromlist
         ):
             return None
         return mod
