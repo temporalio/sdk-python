@@ -52,6 +52,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Schedule updates now pass the conflict token returned by the server and retry
+  the describe-update loop when a concurrent update changes the schedule.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
