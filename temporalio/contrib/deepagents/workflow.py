@@ -158,16 +158,39 @@ async def call_backend_op(
 
 
 def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
-    """Restore a snapshot's carried messages for the next turn."""
+    """Restore a snapshot's carried messages for the next turn.
+
+    The carried transcript already contains the original input messages, so
+    the snapshot replaces them. Patch-gated: the old semantics PREPENDED the
+    carried messages onto the input's (duplicating the original input every
+    rollover), and the merged list feeds user agent code whose control flow
+    can branch on it — replaying a prepend-recorded continuation with replace
+    semantics can emit different commands (verified: a run that completed on
+    the duplicated length replays into a ContinueAsNew command history does
+    not have).
+    """
     raw_prior: Any = snapshot.get("messages") or []
     prior = list(raw_prior)
     if not prior:
         return input
+    if workflow.patched("deepagents.can-carry-replaces-input-messages"):
+        if isinstance(input, Mapping):
+            merged = dict(input)
+            merged["messages"] = prior
+            return merged
+        return {"messages": prior}
     if isinstance(input, Mapping):
         merged = dict(input)
-        merged["messages"] = prior
+        raw_next: Any = input.get("messages") or []
+        merged["messages"] = [*prior, *list(raw_next)]
         return merged
-    return {"messages": prior}
+    return {"messages": [*prior, *_as_message_list(input)]}
+
+
+def _as_message_list(input: Any) -> list[Any]:
+    if isinstance(input, (list, tuple)):
+        return list(input)
+    return [input]
 
 
 async def run_deep_agent(

@@ -57,6 +57,9 @@ to include examples, links to docs, or any other relevant information.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
+  input messages when carrying state through continue-as-new. Patch-gated
+  (`deepagents.can-carry-replaces-input-messages`), so histories recorded
+  before this change replay unchanged.
 - Cancelling an activity from a signal while the workflow itself is cancelled
   no longer causes a nondeterminism error from duplicate activity-cancellation
   commands.
