@@ -46,6 +46,11 @@ to include examples, links to docs, or any other relevant information.
 ### :boom: Breaking Changes
 
 - The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: because the ADK platform providers now take effect
+  inside workflows, ADK-generated ids and retry jitter draw from the workflow's deterministic
+  random stream. A workflow started under an earlier release that calls `workflow.random()` or
+  `workflow.uuid4()` after ADK code may not replay deterministically across the upgrade; drain
+  such workflows or use worker versioning.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
