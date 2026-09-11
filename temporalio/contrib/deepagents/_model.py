@@ -263,31 +263,29 @@ class TemporalModel(BaseChatModel):
 # create_deep_agent model patch (implicit wrapping)
 # ---------------------------------------------------------------------------
 #
-# The durability seam is ``deepagents._models.resolve_model``, which
-# ``create_deep_agent`` calls to turn a ``model=`` string (or instance) into a
-# ``BaseChatModel`` — for both the top-level agent and every ``SubAgent``
-# (``graph.py`` lines 592 and 634). We patch it on the ``deepagents.graph``
-# module, where ``create_deep_agent``'s body resolves the ``resolve_model`` name
-# at call time.
+# The durability seam is ``resolve_model``, which turns a ``model=`` name
+# string into a live ``BaseChatModel``. We patch every binding a string can
+# reach in-workflow:
 #
-# Patching *this* seam (not ``deepagents.create_deep_agent``) is what makes the
-# rewrite survive the user's import style. A user who writes the idiomatic
-# ``from deepagents import create_deep_agent`` binds the *original* function
-# object into their module; rebinding the ``deepagents.create_deep_agent``
-# attribute would never be seen by that already-bound reference, so string
-# models would reach the real provider inside the workflow (a hang / non-
-# determinism). ``create_deep_agent``'s body, by contrast, always looks up
-# ``resolve_model`` in the ``deepagents.graph`` globals afresh on each call, so
-# rebinding it there is observed no matter how the caller imported the factory.
-# It also preserves ``_model_spec`` (the original string), which the factory
-# reads *before* calling ``resolve_model`` for harness-profile lookup.
+# - ``deepagents.graph`` — read afresh by ``create_deep_agent`` for the main
+#   agent and every sub-agent (its module-top import froze its own binding).
+# - ``deepagents._models`` — the definition site; covers call-time importers
+#   such as ``create_summarization_tool_middleware``.
+# - ``SummarizationMiddleware.__init__`` — pre-resolves a string summarizer
+#   before the middleware delegates to LangChain's ``init_chat_model``.
 #
-# ``create_deep_agent`` is still wrapped separately, best-effort, purely to fire
-# the construction-time warnings that need the ``tools`` / ``checkpointer``
-# kwargs (those warnings are advisory and carry no durability weight).
+# An unpatched binding means a real provider client constructed (and called)
+# inside the workflow: nondeterministic and replay-unsafe. Every patched seam
+# is deepagents-internal and covered by this package's deepagents version
+# pin, so none is guarded: a missing seam is a broken install and fails the
+# worker at startup rather than silently reverting. We do NOT rebind
+# ``deepagents.create_deep_agent`` for durability — callers who already did
+# ``from deepagents import create_deep_agent`` hold the original object — only
+# a best-effort wrap to fire the advisory construction-time warnings.
 
 _original_create_deep_agent: Any = None
 _original_resolve_model: Any = None
+_original_summarization_init: Any = None
 
 
 def _wrap_model_arg(model: Any) -> Any:
@@ -317,21 +315,21 @@ def _wrap_model_arg(model: Any) -> Any:
 def install_model_patch() -> None:
     """Route Deep Agents' model resolution through :class:`TemporalModel`.
 
-    Patches ``deepagents.graph.resolve_model`` (the seam ``create_deep_agent``
-    uses for the main agent *and* every sub-agent) so a bare ``model="..."``
-    string becomes a durable :class:`TemporalModel`, and additionally wraps
-    ``deepagents.create_deep_agent`` to fire the advisory tool / checkpointer
-    warnings. Both only act when called inside a workflow, so importing
-    deepagents on a plain client / activity worker is unaffected. Idempotent.
+    Patches the model-resolution bindings listed above so a name string
+    becomes a durable :class:`TemporalModel` in-workflow, and wraps
+    ``deepagents.create_deep_agent`` for the advisory warnings. No effect
+    outside workflows. Idempotent.
     """
     global _original_create_deep_agent, _original_resolve_model
     # importlib: `deepagents` is absent on Python 3.10 environments (its floor
     # is 3.11), so static imports here fail type-checking there.
     deepagents = importlib.import_module("deepagents")
     _graph = importlib.import_module("deepagents.graph")
+    _models = importlib.import_module("deepagents._models")
 
     if _original_resolve_model is None:
-        _original_resolve_model = _graph.resolve_model
+        # One original serves both bindings (same function object).
+        _original_resolve_model = _models.resolve_model
 
         def patched_resolve_model(model: Any) -> Any:
             if workflow.in_workflow():
@@ -339,6 +337,23 @@ def install_model_patch() -> None:
             return _original_resolve_model(model)
 
         setattr(_graph, "resolve_model", patched_resolve_model)
+        setattr(_models, "resolve_model", patched_resolve_model)
+
+    global _original_summarization_init
+    if _original_summarization_init is None:
+        _da_sum = importlib.import_module("deepagents.middleware.summarization")
+        summarization_cls = _da_sum.SummarizationMiddleware
+        original_init = summarization_cls.__init__
+        _original_summarization_init = original_init
+
+        def patched_summarization_init(
+            self: Any, model: Any, *args: Any, **kwargs: Any
+        ) -> None:
+            if workflow.in_workflow() and isinstance(model, str):
+                model = _wrap_model_arg(model)
+            original_init(self, model, *args, **kwargs)
+
+        summarization_cls.__init__ = patched_summarization_init
 
     if _original_create_deep_agent is None:
         _original_create_deep_agent = deepagents.create_deep_agent
@@ -362,9 +377,17 @@ def uninstall_model_patch() -> None:
     global _original_create_deep_agent, _original_resolve_model
     if _original_resolve_model is not None:
         _graph = importlib.import_module("deepagents.graph")
+        _models = importlib.import_module("deepagents._models")
 
         setattr(_graph, "resolve_model", _original_resolve_model)
+        setattr(_models, "resolve_model", _original_resolve_model)
         _original_resolve_model = None
+    global _original_summarization_init
+    if _original_summarization_init is not None:
+        _da_sum = importlib.import_module("deepagents.middleware.summarization")
+
+        _da_sum.SummarizationMiddleware.__init__ = _original_summarization_init
+        _original_summarization_init = None
     if _original_create_deep_agent is not None:
         deepagents = importlib.import_module("deepagents")
 
