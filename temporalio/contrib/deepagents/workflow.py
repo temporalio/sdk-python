@@ -24,6 +24,7 @@ from temporalio.exceptions import ApplicationError
 
 # Reserved key under which the CAN result cache rides inside a state snapshot.
 _CACHE_KEY = "__temporal_cache__"
+_INPUT_CARRIED_KEY = "__temporal_input_in_transcript__"
 
 # Checkpointer classes that keep their state in the workflow's own memory and are
 # therefore rehydrated for free by deterministic replay. Anything else does its
@@ -160,11 +161,15 @@ async def call_backend_op(
 def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
     """Prepend a snapshot's carried messages onto the next turn's input.
 
-    The driver's own continue-as-new re-invocation strips the input's
-    messages first (the carried transcript already contains them), so the
-    internal path resumes from the snapshot alone without duplicating the
-    original prompt, while an externally supplied ``state_snapshot`` plus a
-    fresh input message composes: carried history first, new message after.
+    The driver's own continue-as-new re-invocation avoids duplicating the
+    original prompt: a Mapping input travels without its "messages" key, and
+    a bare (non-Mapping) prompt travels as-is with a snapshot marker telling
+    this merge not to re-append it (the type must survive for the user's
+    ``@workflow.run`` signature). An externally supplied ``state_snapshot``
+    plus a fresh input still composes: carried history first, new input
+    after. Agents are expected to return the accumulated transcript in
+    ``result["messages"]`` (as deepagents/LangGraph reducers do) — the carry
+    only strips input messages when the transcript is non-empty.
     """
     raw_prior: Any = snapshot.get("messages") or []
     prior = list(raw_prior)
@@ -175,6 +180,10 @@ def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
         raw_next: Any = input.get("messages") or []
         merged["messages"] = [*prior, *list(raw_next)]
         return merged
+    if snapshot.get(_INPUT_CARRIED_KEY):
+        # Internal continue-as-new of a bare prompt: the prompt is already in
+        # the transcript; the input rode along only to preserve its type.
+        return {"messages": prior}
     return {"messages": [*prior, *_as_message_list(input)]}
 
 
@@ -209,6 +218,10 @@ async def run_deep_agent(
     its signature is ``(input, state_snapshot=None)`` — because that is how the
     carried state is threaded into the next run.
     """
+    # The carry across continue-as-new derives from the ORIGINAL input:
+    # re-threading the merged input would hand a dict to str-typed run
+    # signatures and re-prepend carried messages on every later boundary.
+    original_input = input
     # Resume path: rehydrate the result cache and fold carried messages in.
     if state_snapshot is not None:
         _serde.set_result_cache(dict(state_snapshot.get(_CACHE_KEY) or {}))
@@ -237,23 +250,29 @@ async def run_deep_agent(
             workflow.info().get_current_history_length() >= continue_as_new_after
         )
     if should_continue and _has_pending_work(result):
-        snapshot = {
-            "messages": _extract_messages(result),
+        carried = _extract_messages(result)
+        snapshot: dict[str, Any] = {
+            "messages": carried,
             _CACHE_KEY: _serde.result_cache_snapshot() or {},
         }
         # ``continue_as_new`` threads positional args into the next run via
         # ``args=``; the enclosing ``@workflow.run`` receives them as
-        # ``(input, state_snapshot)``. The input's messages are stripped:
-        # the snapshot already carries the full transcript (including the
-        # original input messages), so re-sending them would both duplicate
-        # the original prompt in the merged history each rollover and carry
-        # the transcript twice in the payload.
-        if isinstance(input, Mapping):
-            carry_input: Any = {k: v for k, v in input.items() if k != "messages"}
-        else:
-            # A bare prompt (string / message list) is already in the
-            # transcript; nothing else to carry.
-            carry_input = {}
+        # ``(input, state_snapshot)``, so the carried input must keep the
+        # user's declared input TYPE (a dict cannot decode into a run method
+        # typed for a bare-string prompt). When the transcript already
+        # carries the conversation (including the original input messages),
+        # a Mapping input travels without its "messages" key, and a
+        # non-Mapping input travels as-is with a snapshot marker telling
+        # _merge_snapshot not to re-append it. An EMPTY transcript re-sends
+        # the input unchanged so the original prompt is never lost.
+        carry_input: Any = original_input
+        if carried:
+            if isinstance(original_input, Mapping):
+                carry_input = {
+                    k: v for k, v in original_input.items() if k != "messages"
+                }
+            else:
+                snapshot[_INPUT_CARRIED_KEY] = True
         workflow.continue_as_new(args=[carry_input, snapshot])
 
     return result

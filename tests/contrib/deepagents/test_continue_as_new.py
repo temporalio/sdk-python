@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from temporalio.client import WorkflowExecutionStatus
 from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
@@ -23,6 +24,7 @@ pytestmark = pytest.mark.skipif(
 )
 from temporalio import workflow
 from temporalio.contrib.deepagents import DeepAgentsPlugin, _serde, run_deep_agent
+from temporalio.contrib.deepagents.workflow import _merge_snapshot
 from temporalio.worker import Worker
 
 
@@ -169,8 +171,6 @@ def test_merge_snapshot_preserves_new_input_messages() -> None:
     # External resume: a saved snapshot plus a NEW user message composes —
     # carried history first, the new message after. (Replace semantics here
     # would silently drop the user's latest message.)
-    from temporalio.contrib.deepagents.workflow import _merge_snapshot
-
     merged = _merge_snapshot(
         {"messages": ["new question"], "config": {"k": "v"}},
         {"messages": ["old q", "old a"]},
@@ -186,8 +186,160 @@ def test_merge_snapshot_preserves_new_input_messages() -> None:
 def test_merge_snapshot_internal_carry_has_no_duplicates() -> None:
     # The driver strips messages from the carried input, so the internal
     # continue-as-new path resumes from the snapshot alone.
-    from temporalio.contrib.deepagents.workflow import _merge_snapshot
-
     merged = _merge_snapshot({"config": {"k": "v"}}, {"messages": ["start", "step"]})
     assert merged["messages"] == ["start", "step"]
     assert merged["config"] == {"k": "v"}
+
+
+class BareInputAgent:
+    """ainvoke-shaped agent for a BARE-STRING input: first turn folds the
+    prompt into the transcript; finishes after three steps."""
+
+    async def ainvoke(self, input: Any) -> dict:
+        if isinstance(input, dict):
+            messages = list(input.get("messages", []))
+        else:
+            messages = [input]
+        messages = [*messages, "step"]
+        done = messages.count("step") >= 3
+        return {
+            "messages": messages,
+            "todos": [
+                {"content": "work", "status": "completed" if done else "pending"}
+            ],
+        }
+
+
+@workflow.defn
+class BareInputCanWorkflow:
+    @workflow.run
+    async def run(self, input: str, state_snapshot: dict | None = None) -> dict:
+        # A STR-typed run signature: the carried input must decode as str
+        # after every continue-as-new, or the workflow stalls on task retry.
+        return await run_deep_agent(
+            BareInputAgent(),
+            input,
+            continue_as_new_after=1,
+            state_snapshot=state_snapshot,
+        )
+
+
+@pytest.mark.asyncio
+async def test_bare_string_input_survives_continue_as_new(
+    env: WorkflowEnvironment,
+) -> None:
+    """A bare-prompt input with a str-typed run signature crosses multiple
+    continue-as-new boundaries: the type survives (no decode failure) and the
+    prompt appears exactly once in the final transcript."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-can-bare",
+        workflows=[BareInputCanWorkflow],
+        plugins=[plugin],
+    ):
+        handle = await env.client.start_workflow(
+            BareInputCanWorkflow.run,
+            "start",
+            id=f"da-can-bare-{uuid.uuid4()}",
+            task_queue="da-can-bare",
+        )
+        result = await handle.result()
+
+    assert result["messages"] == ["start", "step", "step", "step"], result
+    first = env.client.get_workflow_handle(
+        handle.id, run_id=handle.first_execution_run_id
+    )
+    desc = await first.describe()
+    assert desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW, desc.status
+
+
+@pytest.mark.asyncio
+async def test_can_args_do_not_carry_messages(env: WorkflowEnvironment) -> None:
+    """The continue-as-new command's carried input omits "messages" — the
+    transcript rides only in the snapshot (single copy in the payload)."""
+    import json
+
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-can-args",
+        workflows=[ContinueAsNewWorkflow],
+        plugins=[plugin],
+    ):
+        handle = await env.client.start_workflow(
+            ContinueAsNewWorkflow.run,
+            {"messages": ["start"], "config": {"k": "v"}},
+            id=f"da-can-args-{uuid.uuid4()}",
+            task_queue="da-can-args",
+        )
+        await handle.result()
+        first = env.client.get_workflow_handle(
+            handle.id, run_id=handle.first_execution_run_id
+        )
+        hist = await first.fetch_history()
+        can_events = [
+            e
+            for e in hist.events
+            if e.HasField("workflow_execution_continued_as_new_event_attributes")
+        ]
+        assert can_events, "first run did not continue-as-new"
+        payloads = can_events[
+            0
+        ].workflow_execution_continued_as_new_event_attributes.input.payloads
+        carried_input = json.loads(payloads[0].data)
+        snapshot = json.loads(payloads[1].data)
+
+    assert "messages" not in carried_input, carried_input
+    assert carried_input.get("config") == {"k": "v"}
+    assert snapshot["messages"], snapshot
+
+
+class NoMessagesAgent:
+    """Reports pending work WITHOUT any messages on the first turn — the
+    transcript stays empty across the boundary."""
+
+    async def ainvoke(self, input: Any) -> dict:
+        messages = list(input.get("messages", [])) if isinstance(input, dict) else []
+        # Second run (prompt re-sent) completes; first run returns no messages.
+        if messages:
+            return {
+                "messages": [*messages, "answered"],
+                "todos": [{"content": "work", "status": "completed"}],
+            }
+        return {"messages": [], "todos": [{"content": "work", "status": "pending"}]}
+
+
+@workflow.defn
+class EmptyTranscriptCanWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
+        return await run_deep_agent(
+            NoMessagesAgent(),
+            input,
+            continue_as_new_after=1,
+            state_snapshot=state_snapshot,
+        )
+
+
+@pytest.mark.asyncio
+async def test_empty_transcript_can_preserves_prompt(
+    env: WorkflowEnvironment,
+) -> None:
+    """When a turn ends with pending todos but an EMPTY transcript, the
+    original input is re-sent across the boundary rather than lost."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-can-empty",
+        workflows=[EmptyTranscriptCanWorkflow],
+        plugins=[plugin],
+    ):
+        result = await env.client.execute_workflow(
+            EmptyTranscriptCanWorkflow.run,
+            {"messages": ["the question"]},
+            id=f"da-can-empty-{uuid.uuid4()}",
+            task_queue="da-can-empty",
+        )
+
+    assert result["messages"] == ["the question", "answered"], result
