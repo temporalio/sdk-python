@@ -8,7 +8,7 @@ from collections.abc import (
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -16,6 +16,7 @@ from typing import (
 )
 
 import temporalio.api.common.v1
+import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 from temporalio.converter import DataConverter
@@ -657,6 +658,26 @@ class GetNexusOperationResultInput:
     run_id: str | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    result_type: type[Any] | None
+    _data_converter: DataConverter = field(repr=False, compare=False)
+
+
+@dataclass
+class GetNexusOperationResultOutput:
+    """Output for :py:meth:`OutboundInterceptor.get_nexus_operation_result`.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    raw_result: temporalio.api.common.v1.Payload | None
+    """Raw result payload if the operation succeeded."""
+
+    raw_failure: temporalio.api.failure.v1.Failure | None
+    """Raw failure if the operation failed."""
+
+    data_converter: DataConverter = field(repr=False, compare=False)
+    """Data converter for decoding the result or failure."""
 
 
 @dataclass
@@ -1000,10 +1021,11 @@ class OutboundInterceptor:
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
+    ) -> GetNexusOperationResultOutput:
         """Called for every :py:meth:`NexusOperationHandle.result` call.
 
-        The raw response is decoded by the handle after interception.
+        The returned result or failure can be decoded with the output's
+        :py:attr:`GetNexusOperationResultOutput.data_converter`.
 
         .. warning::
            This API is experimental and unstable.

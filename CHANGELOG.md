@@ -45,6 +45,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The experimental `OutboundInterceptor.get_nexus_operation_result` method now returns
+  `GetNexusOperationResultOutput`, containing the raw result or failure and the data
+  converter used to decode it.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale

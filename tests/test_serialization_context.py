@@ -31,7 +31,11 @@ from temporalio import activity, workflow
 from temporalio.client import (
     AsyncActivityHandle,
     Client,
+    GetNexusOperationResultInput,
+    GetNexusOperationResultOutput,
+    Interceptor,
     NexusOperationFailureError,
+    OutboundInterceptor,
     WorkflowFailureError,
     WorkflowUpdateFailedError,
 )
@@ -1692,6 +1696,35 @@ async def test_decode_context_matches_encode_context(
 # Test nexus payload codec
 
 
+class _NexusResultDecodingInterceptor(Interceptor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.decoded_results: list[Any] = []
+
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
+        return _NexusResultDecodingOutboundInterceptor(next, self)
+
+
+class _NexusResultDecodingOutboundInterceptor(OutboundInterceptor):
+    def __init__(
+        self, next: OutboundInterceptor, parent: _NexusResultDecodingInterceptor
+    ) -> None:
+        super().__init__(next)
+        self._parent = parent
+
+    async def get_nexus_operation_result(
+        self, input: GetNexusOperationResultInput
+    ) -> GetNexusOperationResultOutput:
+        output = await super().get_nexus_operation_result(input)
+        if output.raw_result is not None:
+            type_hints = [input.result_type] if input.result_type else None
+            [result] = await output.data_converter.decode(
+                [output.raw_result], type_hints
+            )
+            self._parent.decoded_results.append(result)
+        return output
+
+
 class NexusContextPayloadCodecSelector(PayloadCodec, WithSerializationContext):
     HMAC_ENCODING = b"binary/nexus-context-hmac"
     ZLIB_ENCODING = b"binary/nexus-context-zlib"
@@ -2022,6 +2055,10 @@ async def test_standalone_nexus_payload_codec_selects_codec_from_context(
             {hmac_context: "hmac", zlib_context: "zlib"}
         ),
     )
+    result_interceptor = _NexusResultDecodingInterceptor()
+    config["interceptors"] = list(config.get("interceptors") or []) + [
+        result_interceptor
+    ]
     client = Client(**config)
 
     async with Worker(
@@ -2053,6 +2090,10 @@ async def test_standalone_nexus_payload_codec_selects_codec_from_context(
         )
         assert hmac_standalone_result == "standalone-hmac"
         assert zlib_standalone_result == "standalone-zlib"
+        assert set(result_interceptor.decoded_results) == {
+            "standalone-hmac",
+            "standalone-zlib",
+        }
 
 
 @pytest.mark.requires_local_server

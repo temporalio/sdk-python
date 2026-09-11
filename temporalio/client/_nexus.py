@@ -1138,38 +1138,40 @@ class NexusOperationHandle(Generic[ReturnType]):
             RPCError: Operation result could not be fetched for some reason.
         """
         if self._known_outcome is temporalio.common._arg_unset:
+            # TODO: Use server-provided Nexus serialization context once available
+            # so reconstructed handles can also decode with context.
+            data_converter = self._client.data_converter
+            if self._nexus_serialization_context is not None:
+                data_converter = data_converter.with_context(
+                    self._nexus_serialization_context
+                )
             response = await self._client._impl.get_nexus_operation_result(
                 GetNexusOperationResultInput(
                     operation_id=self._operation_id,
                     run_id=self._run_id,
                     rpc_metadata=rpc_metadata,
                     rpc_timeout=rpc_timeout,
+                    result_type=self._result_type,
+                    _data_converter=data_converter,
                 )
             )
-
-            data_converter = self._client.data_converter
-            if self._nexus_serialization_context is not None:
-                data_converter = data_converter.with_context(
-                    self._nexus_serialization_context
+            if response.raw_result is not None:
+                type_hints = [self._result_type] if self._result_type else None
+                [result] = await response.data_converter.decode(
+                    [response.raw_result], type_hints
                 )
-            match response.WhichOneof("outcome"):
-                case "result":
-                    type_hints = [self._result_type] if self._result_type else None
-                    [result] = await data_converter.decode(
-                        [response.result], type_hints
+                self._known_outcome = result
+                return cast(ReturnType, result)
+            elif response.raw_failure is not None:
+                operation_failure = NexusOperationFailureError(
+                    cause=await response.data_converter.decode_failure(
+                        response.raw_failure
                     )
-                    self._known_outcome = result
-                    return cast(ReturnType, result)
-                case "failure":
-                    operation_failure = NexusOperationFailureError(
-                        cause=await data_converter.decode_failure(response.failure)
-                    )
-                    self._known_outcome = operation_failure
-                    raise operation_failure
-                case None:
-                    raise RuntimeError(
-                        "Nexus operation result response did not contain an outcome"
-                    )
+                )
+                self._known_outcome = operation_failure
+                raise operation_failure
+            else:
+                raise RuntimeError("Nexus operation result did not contain an outcome")
         elif isinstance(self._known_outcome, NexusOperationFailureError):
             raise self._known_outcome
         else:

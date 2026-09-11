@@ -22,7 +22,6 @@ from nexusrpc.handler import (
 )
 
 import temporalio.api.enums.v1
-import temporalio.api.workflowservice.v1
 from temporalio import nexus, workflow
 from temporalio.client import (
     CancelNexusOperationInput,
@@ -30,6 +29,7 @@ from temporalio.client import (
     CountNexusOperationsInput,
     DescribeNexusOperationInput,
     GetNexusOperationResultInput,
+    GetNexusOperationResultOutput,
     Interceptor,
     ListNexusOperationsInput,
     NexusOperationExecutionDescription,
@@ -868,9 +868,11 @@ class _RecordingOutboundInterceptor(OutboundInterceptor):
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
+    ) -> GetNexusOperationResultOutput:
         self._parent.result_calls.append(input)
-        return await super().get_nexus_operation_result(input)
+        output = await super().get_nexus_operation_result(input)
+        self._parent.result_outputs.append(output)
+        return output
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         self._parent.cancel_calls.append(input)
@@ -899,6 +901,7 @@ class _RecordingInterceptor(Interceptor):
         self.start_calls: list[StartNexusOperationInput] = []
         self.describe_calls: list[DescribeNexusOperationInput] = []
         self.result_calls: list[GetNexusOperationResultInput] = []
+        self.result_outputs: list[GetNexusOperationResultOutput] = []
         self.cancel_calls: list[CancelNexusOperationInput] = []
         self.terminate_calls: list[TerminateNexusOperationInput] = []
         self.list_calls: list[ListNexusOperationsInput] = []
@@ -981,6 +984,24 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         result_input = interceptor.result_calls[0]
         assert isinstance(result_input, GetNexusOperationResultInput)
         assert result_input.operation_id == op_id
+        assert result_input.result_type == EchoOutput
+        assert len(interceptor.result_outputs) == 1
+        assert interceptor.result_outputs[0].raw_result is None
+        assert interceptor.result_outputs[0].raw_failure is not None
+
+        # Successful raw results and their data converter are also available.
+        value = f"interceptor-success-{uuid.uuid4()}"
+        handle = await nexus_client.start_operation(
+            StandaloneTestService.echo_sync,
+            EchoInput(value=value),
+            id=str(uuid.uuid4()),
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+        result = await handle.result()
+        assert result == EchoOutput(value=value)
+        assert len(interceptor.result_outputs) == 2
+        assert interceptor.result_outputs[1].raw_result is not None
+        assert interceptor.result_outputs[1].raw_failure is None
 
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)

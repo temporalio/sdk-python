@@ -80,6 +80,7 @@ from ._interceptor import (
     FailAsyncActivityInput,
     FetchWorkflowHistoryEventsInput,
     GetNexusOperationResultInput,
+    GetNexusOperationResultOutput,
     GetWorkerBuildIdCompatibilityInput,
     GetWorkerTaskReachabilityInput,
     HeartbeatAsyncActivityInput,
@@ -1658,7 +1659,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> temporalio.api.workflowservice.v1.PollNexusOperationExecutionResponse:
+    ) -> GetNexusOperationResultOutput:
         """Poll for nexus operation result until it's available."""
         req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
             namespace=self._client.namespace,
@@ -1678,8 +1679,21 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         timeout=input.rpc_timeout,
                     )
                 )
-                if res.WhichOneof("outcome") is not None:
-                    return res
+                match res.WhichOneof("outcome"):
+                    case "result":
+                        return GetNexusOperationResultOutput(
+                            raw_result=res.result,
+                            raw_failure=None,
+                            data_converter=input._data_converter,
+                        )
+                    case "failure":
+                        return GetNexusOperationResultOutput(
+                            raw_result=None,
+                            raw_failure=res.failure,
+                            data_converter=input._data_converter,
+                        )
+                    case None:
+                        continue
             except RPCError as err:
                 match err.status:
                     case RPCStatusCode.DEADLINE_EXCEEDED:
