@@ -318,17 +318,23 @@ async def test_builtin_tool_on_default_backend_runs_in_workflow(
 
 class MutatingBackend:
     """Read result depends on op order: each read returns the write count so a
-    served-stale-cache regression is observable."""
+    served-stale-cache regression is observable.
 
-    def __init__(self) -> None:
-        self.writes = 0
+    State lives on the CLASS, not the instance: the workflow constructs (and
+    re-registers) a fresh instance on every replayed activation under
+    ``max_cached_workflows=0``, and an instance-level counter would be reset
+    by a replay landing between the write and the second read. Real backends
+    keep their state externally (disk, shell) for the same reason.
+    """
+
+    writes = 0
 
     def write(self, _file_path: str, _content: str) -> str:
-        self.writes += 1
-        return f"wrote:{self.writes}"
+        type(self).writes += 1
+        return f"wrote:{type(self).writes}"
 
     def read(self, _file_path: str) -> str:
-        return f"read-at-write-count:{self.writes}"
+        return f"read-at-write-count:{type(self).writes}"
 
 
 class _RepeatedOpsAgent:
@@ -366,6 +372,7 @@ async def test_repeated_backend_op_sees_fresh_state(env: WorkflowEnvironment) ->
     """A repeated identical read after an intervening write runs its own
     Activity and sees the write — under the active CAN cache, the old
     payload-only key served the FIRST read's stale result."""
+    MutatingBackend.writes = 0
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
