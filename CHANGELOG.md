@@ -60,8 +60,7 @@ to include examples, links to docs, or any other relevant information.
 ### Fixed
 
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
-  the workflow sandbox. ADK probes them lazily on each LLM turn, and importing an installed one
-  inside every workflow sandbox was slow enough to trip the workflow deadlock detector.
+  the workflow sandbox.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
