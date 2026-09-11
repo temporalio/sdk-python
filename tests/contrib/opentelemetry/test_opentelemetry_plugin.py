@@ -14,12 +14,14 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
 )
 from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 from opentelemetry.trace import (
+    StatusCode,
     get_tracer,
 )
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowFailureError
+from temporalio.common import RetryPolicy
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.contrib.opentelemetry._id_generator import TemporalIdGenerator
 from temporalio.exceptions import ApplicationError
@@ -547,6 +549,70 @@ async def test_otel_tracing_with_added_spans(
     assert actual_hierarchy == expected_hierarchy, (
         f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
     )
+
+
+@activity.defn
+async def fail_first_attempt_activity() -> str:
+    if activity.info().attempt == 1:
+        raise ApplicationError("intentional failure on attempt 1")
+    return "done"
+
+
+@workflow.defn
+class RetryingActivityWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            fail_first_attempt_activity,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=10), maximum_attempts=2
+            ),
+        )
+
+
+async def test_otel_tracing_activity_attempts(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        RetryingActivityWorkflow,
+        activities=[fail_first_attempt_activity],
+        max_cached_workflows=0,
+    ) as worker:
+        with get_tracer(__name__).start_as_current_span("Retry test"):
+            await new_client.execute_workflow(
+                RetryingActivityWorkflow.run,
+                id=f"retry-workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+
+    spans = exporter.get_finished_spans()
+    assert dump_spans(spans, with_attributes=False) == [
+        "Retry test",
+        "  StartWorkflow:RetryingActivityWorkflow",
+        "    RunWorkflow:RetryingActivityWorkflow",
+        "      StartActivity:fail_first_attempt_activity",
+        "        RunActivity:fail_first_attempt_activity",
+        "        RunActivity:fail_first_attempt_activity",
+    ]
+    # One RunActivity span per attempt, each carrying its attempt number.
+    attempts = [s for s in spans if s.name == "RunActivity:fail_first_attempt_activity"]
+    assert [(s.attributes or {})["temporalActivityAttempt"] for s in attempts] == [1, 2]
+    assert attempts[0].status.status_code == StatusCode.ERROR
+    assert attempts[1].status.status_code != StatusCode.ERROR
+    assert len([s for s in spans if s.name.startswith("StartActivity:")]) == 1
 
 
 task_fail_once_workflow_has_failed = False
