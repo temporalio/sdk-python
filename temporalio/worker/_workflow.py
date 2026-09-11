@@ -251,6 +251,27 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             ]
             if our_tasks:
                 await asyncio.wait(our_tasks)
+            # Core does not emit eviction jobs for workflows left in the cache
+            # when polling stops. Close them on their owning loop before GC can
+            # resume their cleanup on an unrelated thread or event loop.
+            evictions = []
+            for run_id in list(self._running_workflows):
+                job = temporalio.bridge.proto.workflow_activation.RemoveFromCache(
+                    message="Worker shutdown",
+                    reason=temporalio.bridge.proto.workflow_activation.RemoveFromCache.LANG_REQUESTED,
+                )
+                activation = temporalio.bridge.proto.workflow_activation.WorkflowActivation(
+                    run_id=run_id,
+                    jobs=[
+                        temporalio.bridge.proto.workflow_activation.WorkflowActivationJob(
+                            remove_from_cache=job
+                        )
+                    ],
+                )
+                evictions.append(
+                    self._handle_cache_eviction(activation, job, report_to_core=False)
+                )
+            await asyncio.gather(*evictions)
             # Shutdown the thread pool executor if we created it
             if not self._workflow_task_executor_user_provided:
                 self._workflow_task_executor.shutdown()
@@ -536,6 +557,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         job: temporalio.bridge.proto.workflow_activation.RemoveFromCache,
+        *,
+        report_to_core: bool = True,
     ) -> None:
         logger.debug(
             "Evicting workflow with run ID %s, message: %s", act.run_id, job.message
@@ -634,18 +657,19 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         # Remove from map and send completion
         if act.run_id in self._running_workflows:
             del self._running_workflows[act.run_id]
-        try:
-            await self._bridge_worker().complete_workflow_activation(
-                temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
-                    run_id=act.run_id,
-                    successful=temporalio.bridge.proto.workflow_completion.Success(),
+        if report_to_core:
+            try:
+                await self._bridge_worker().complete_workflow_activation(
+                    temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(
+                        run_id=act.run_id,
+                        successful=temporalio.bridge.proto.workflow_completion.Success(),
+                    )
                 )
-            )
-        except Exception:
-            logger.exception(
-                "Failed completing eviction activation on workflow with run ID %s",
-                act.run_id,
-            )
+            except Exception:
+                logger.exception(
+                    "Failed completing eviction activation on workflow with run ID %s",
+                    act.run_id,
+                )
 
         # Run eviction hook if present
         if self._on_eviction_hook is not None:

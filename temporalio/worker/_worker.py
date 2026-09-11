@@ -922,6 +922,9 @@ class Worker:
         shut down as it runs.
 
         This will not return until the worker has completed shutting down.
+        Cached workflows are safely evicted before the workflow executor stops,
+        unless safe workflow eviction was explicitly disabled. This only closes
+        local workflow tasks; it does not cancel workflows on the server.
         """
         self._shutdown_event.set()
         await self._shutdown_complete_event.wait()

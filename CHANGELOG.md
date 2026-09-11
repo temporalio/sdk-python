@@ -52,6 +52,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Safely evict cached workflows during worker shutdown so asynchronous cleanup finishes before the workflow executor stops.
+
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.

@@ -10127,3 +10127,52 @@ async def test_workflow_cancel_no_shielded_future_log(
     assert not any(
         "exception in shielded future" in record.message for record in caplog.records
     )
+
+
+shutdown_cleanup_results: dict[str, bool] = {}
+
+
+@workflow.defn(sandboxed=False)
+class ShutdownAsyncCleanupWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        try:
+            await workflow.wait_condition(lambda: False)
+        finally:
+            await asyncio.sleep(0)
+            shutdown_cleanup_results[workflow.info().workflow_id] = (
+                workflow.unsafe.is_replaying()
+            )
+
+    @workflow.query
+    def ready(self) -> bool:
+        return True
+
+
+@pytest.mark.parametrize("user_executor", [False, True])
+async def test_worker_shutdown_cleans_cached_workflows(
+    client: Client, user_executor: bool
+):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        async with new_worker(
+            client,
+            ShutdownAsyncCleanupWorkflow,
+            workflow_task_executor=executor if user_executor else None,
+        ) as worker:
+            handles = [
+                await client.start_workflow(
+                    ShutdownAsyncCleanupWorkflow.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                for _ in range(3)
+            ]
+            for handle in handles:
+                assert await handle.query(ShutdownAsyncCleanupWorkflow.ready)
+                assert handle.id not in shutdown_cleanup_results
+
+        for handle in handles:
+            assert shutdown_cleanup_results.pop(handle.id)
+            assert (await handle.describe()).status == WorkflowExecutionStatus.RUNNING
+        if user_executor:
+            assert executor.submit(lambda: True).result()
