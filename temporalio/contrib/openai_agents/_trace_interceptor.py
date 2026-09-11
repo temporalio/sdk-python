@@ -429,11 +429,8 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             input=input,
             span_name="temporal:startChildWorkflow",
             data={"workflow": input.workflow},
-        ) as (context, finish_on_completion):
-            handle = await context.run(
-                asyncio.create_task,
-                self.next.start_child_workflow(input=input),
-            )
+        ) as (_, finish_on_completion):
+            handle = await self.next.start_child_workflow(input=input)
             finish_on_completion(handle)
             return handle
 

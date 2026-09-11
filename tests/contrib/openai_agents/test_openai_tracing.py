@@ -28,6 +28,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client
 from temporalio.common import RetryPolicy
 from temporalio.contrib.openai_agents import _temporal_openai_agents
@@ -46,6 +47,7 @@ from temporalio.exceptions import (
     CancelledError,
     ChildWorkflowError,
 )
+from temporalio.worker import Replayer
 from temporalio.worker.workflow_sandbox import (
     SandboxedWorkflowRunner,
     SandboxRestrictions,
@@ -1446,3 +1448,99 @@ async def test_callback_context_without_otel(
         )
         == add_temporal_spans
     )
+
+
+@workflow.defn
+class ConcurrentTraceCommandsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        child_start = asyncio.create_task(
+            workflow.start_child_workflow(CallbackChildWorkflow.run)
+        )
+        await asyncio.sleep(0)
+        activity_handle = workflow.start_activity(
+            simple_no_context_activity,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        child_handle = await child_start
+        await activity_handle
+        await child_handle
+
+
+@pytest.mark.parametrize("use_otel_instrumentation", [False, True])
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_tracing_preserves_child_command_order(
+    client: Client, use_otel_instrumentation: bool, replay: bool
+) -> None:
+    set_test_tracer_provider()
+    runner = SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules(
+            "agents", "openai", "mcp", "opentelemetry"
+        )
+    )
+    async with new_worker(
+        client,
+        ConcurrentTraceCommandsWorkflow,
+        CallbackChildWorkflow,
+        activities=[simple_no_context_activity],
+        workflow_runner=runner,
+    ) as worker:
+        original_handle = await client.start_workflow(
+            ConcurrentTraceCommandsWorkflow.run,
+            id=f"command-order-original-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await original_handle.result()
+    history = await original_handle.fetch_history()
+    command_events = (
+        EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED,
+        EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+    )
+    original_order = [
+        event.event_type
+        for event in history.events
+        if event.event_type in command_events
+    ]
+    print(f"Command history: {original_handle.id}")
+    print(f"Original command order: {[EventType.Name(e) for e in original_order]}")
+
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        use_otel_instrumentation=use_otel_instrumentation,
+    ) as env:
+        if replay:
+            await Replayer(
+                workflows=[ConcurrentTraceCommandsWorkflow, CallbackChildWorkflow],
+                workflow_runner=runner,
+                namespace=client.namespace,
+                plugins=[env.openai_agents_plugin],
+            ).replay_workflow(history=history)
+            print("History replay with tracing: passed")
+        else:
+            client = env.applied_on_client(client)
+            if not use_otel_instrumentation:
+                get_trace_provider().set_processors([MemoryTracingProcessor()])
+            async with new_worker(
+                client,
+                ConcurrentTraceCommandsWorkflow,
+                CallbackChildWorkflow,
+                activities=[simple_no_context_activity],
+                workflow_runner=runner,
+            ) as worker:
+                with env.openai_agents_plugin.tracing_context(), trace("Commands"):
+                    traced_handle = await client.start_workflow(
+                        ConcurrentTraceCommandsWorkflow.run,
+                        id=f"command-order-traced-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                    )
+                    await traced_handle.result()
+            traced_history = await traced_handle.fetch_history()
+            traced_order = [
+                event.event_type
+                for event in traced_history.events
+                if event.event_type in command_events
+            ]
+            print(f"Command history: {traced_handle.id}")
+            print(f"Traced command order: {[EventType.Name(e) for e in traced_order]}")
+            assert traced_order == original_order
