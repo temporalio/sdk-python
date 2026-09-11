@@ -60,6 +60,9 @@ to include examples, links to docs, or any other relevant information.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
+- System Nexus Signal-with-Start workflow operations now give custom payload
+  converters the target workflow's serialization context when encoding their
+  inner request payloads.
 - Cancelling an activity from a signal while the workflow itself is cancelled
   no longer causes a nondeterminism error from duplicate activity-cancellation
   commands.
@@ -71,6 +74,7 @@ to include examples, links to docs, or any other relevant information.
   retried on its configured interval instead.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
 
 ### Security
 

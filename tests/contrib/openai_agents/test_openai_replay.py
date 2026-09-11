@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,10 @@ async def test_replay(file_name: str) -> None:
     with (Path(__file__).with_name("histories") / file_name).open("r") as f:
         history_json = f.read()
 
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.filterwarnings(
+            "always", message=r"Module .* was imported after initial workflow load"
+        )
         await Replayer(
             workflows=[
                 ResearchWorkflow,
@@ -44,3 +49,10 @@ async def test_replay(file_name: str) -> None:
             ],
             plugins=[OpenAIAgentsPlugin()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
+
+    # Sandbox imports during an activation count toward the deadlock timeout
+    assert not [
+        str(w.message)
+        for w in recorder
+        if "was imported after initial workflow load" in str(w.message)
+    ]
