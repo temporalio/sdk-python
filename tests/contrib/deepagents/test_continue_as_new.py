@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import sys
 import uuid
+from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from temporalio.client import WorkflowExecutionStatus
+from temporalio.common import RetryPolicy
 from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
@@ -295,27 +298,54 @@ async def test_can_args_do_not_carry_messages(env: WorkflowEnvironment) -> None:
     assert snapshot["messages"], snapshot
 
 
+class DiskCountingBackend:
+    """Each read appends to a log and reports the total (disk state survives
+    sandbox re-imports, replays, and continue-as-new)."""
+
+    def __init__(self, root: str) -> None:
+        self._log = Path(root) / "reads.log"
+
+    def read(self, _file_path: str) -> str:
+        with self._log.open("a") as f:
+            f.write("r\n")
+        return f"read:{len(self._log.read_text().splitlines())}"
+
+
 class NoMessagesAgent:
-    """Reports pending work WITHOUT any messages on the first turn — the
-    transcript stays empty across the boundary."""
+    """Returns an EMPTY transcript with pending todos on the first turn, then
+    answers. Turn tracking lives on disk via an activity-backed counter — the
+    agent object is re-created each run/replay, so in-memory state cannot
+    distinguish turns."""
+
+    def __init__(self, backend: Any) -> None:
+        self._backend = backend
 
     async def ainvoke(self, input: Any) -> dict:
+        turn = int((await self._backend.read("turn")).split(":")[1])
+        if turn == 1:
+            return {"messages": [], "todos": [{"content": "w", "status": "pending"}]}
         messages = list(input.get("messages", [])) if isinstance(input, dict) else []
-        # Second run (prompt re-sent) completes; first run returns no messages.
-        if messages:
-            return {
-                "messages": [*messages, "answered"],
-                "todos": [{"content": "work", "status": "completed"}],
-            }
-        return {"messages": [], "todos": [{"content": "work", "status": "pending"}]}
+        return {
+            "messages": [*messages, "answered"],
+            "todos": [{"content": "w", "status": "completed"}],
+        }
 
 
 @workflow.defn
 class EmptyTranscriptCanWorkflow:
     @workflow.run
     async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
+        from temporalio.contrib.deepagents import TemporalBackend
+
+        backend = TemporalBackend(
+            DiskCountingBackend(input["root"]),
+            activity_options={
+                "start_to_close_timeout": timedelta(seconds=30),
+                "retry_policy": RetryPolicy(maximum_attempts=1),
+            },
+        )
         return await run_deep_agent(
-            NoMessagesAgent(),
+            NoMessagesAgent(backend),
             input,
             continue_as_new_after=1,
             state_snapshot=state_snapshot,
@@ -324,22 +354,29 @@ class EmptyTranscriptCanWorkflow:
 
 @pytest.mark.asyncio
 async def test_empty_transcript_can_preserves_prompt(
-    env: WorkflowEnvironment,
+    env: WorkflowEnvironment, tmp_path: Any
 ) -> None:
-    """When a turn ends with pending todos but an EMPTY transcript, the
-    original input is re-sent across the boundary rather than lost."""
+    """A turn ending with pending todos and an EMPTY transcript still carries
+    the conversation across a REAL continue-as-new boundary."""
     plugin = DeepAgentsPlugin()
     async with Worker(
         env.client,
         task_queue="da-can-empty",
         workflows=[EmptyTranscriptCanWorkflow],
         plugins=[plugin],
+        max_cached_workflows=0,
     ):
-        result = await env.client.execute_workflow(
+        handle = await env.client.start_workflow(
             EmptyTranscriptCanWorkflow.run,
-            {"messages": ["the question"]},
+            {"messages": ["the question"], "root": str(tmp_path)},
             id=f"da-can-empty-{uuid.uuid4()}",
             task_queue="da-can-empty",
         )
+        result = await handle.result()
+        first = env.client.get_workflow_handle(
+            handle.id, run_id=handle.first_execution_run_id
+        )
+        desc = await first.describe()
 
+    assert desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW, desc.status
     assert result["messages"] == ["the question", "answered"], result

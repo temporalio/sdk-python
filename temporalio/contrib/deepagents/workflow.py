@@ -180,9 +180,11 @@ def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
         raw_next: Any = input.get("messages") or []
         merged["messages"] = [*prior, *list(raw_next)]
         return merged
-    if snapshot.get(_INPUT_CARRIED_KEY):
-        # Internal continue-as-new of a bare prompt: the prompt is already in
-        # the transcript; the input rode along only to preserve its type.
+    if _INPUT_CARRIED_KEY in snapshot and snapshot[_INPUT_CARRIED_KEY] == input:
+        # Internal continue-as-new of a bare prompt: this exact input is
+        # already in the transcript; it rode along only to preserve its type.
+        # A DIFFERENT bare input (an externally harvested snapshot plus a
+        # fresh prompt) falls through and composes as usual.
         return {"messages": prior}
     return {"messages": [*prior, *_as_message_list(input)]}
 
@@ -251,6 +253,13 @@ async def run_deep_agent(
         )
     if should_continue and _has_pending_work(result):
         carried = _extract_messages(result)
+        if not carried:
+            # A turn may report pending todos with an empty/pruned transcript;
+            # the conversation the agent SAW must still cross the boundary.
+            if isinstance(input, Mapping):
+                carried = _extract_messages(input)
+            else:
+                carried = _as_message_list(input)
         snapshot: dict[str, Any] = {
             "messages": carried,
             _CACHE_KEY: _serde.result_cache_snapshot() or {},
@@ -272,7 +281,7 @@ async def run_deep_agent(
                     k: v for k, v in original_input.items() if k != "messages"
                 }
             else:
-                snapshot[_INPUT_CARRIED_KEY] = True
+                snapshot[_INPUT_CARRIED_KEY] = original_input
         workflow.continue_as_new(args=[carry_input, snapshot])
 
     return result
