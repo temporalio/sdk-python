@@ -411,7 +411,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         cancellation: nexusrpc.handler.OperationTaskCancellation,
         request_deadline: datetime | None,
         endpoint: str,
-        data_converter: temporalio.converter.DataConverter | None = None,
+        data_converter: temporalio.converter.DataConverter,
     ) -> temporalio.api.nexus.v1.StartOperationResponse:
         """Invoke the Nexus handler's start_operation method and construct the StartOperationResponse.
 
@@ -419,9 +419,6 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
         All other exceptions are handled by a caller of this function.
         """
-        data_converter = data_converter or self._data_converter_for_nexus_task(
-            endpoint, start_request.service, start_request.operation
-        )
         # Create the worker shutdown event if not created
         if not self._worker_shutdown_event:
             self._worker_shutdown_event = temporalio.common._CompositeEvent(

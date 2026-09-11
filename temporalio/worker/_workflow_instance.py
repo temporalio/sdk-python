@@ -2175,7 +2175,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ),
             )
 
-        # TODO: Extend system endpoint converter handling for worker callbacks.
         if temporalio.nexus.system.is_system_endpoint(input.endpoint):
             serialization_context = temporalio.nexus.system._get_serialization_context(
                 input.service,
@@ -2195,7 +2194,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 user_payload_converter,
                 user_failure_converter,
             )
-            failure_converter = self._context_free_failure_converter
+            failure_converter = user_failure_converter
         else:
             serialization_context = temporalio.converter.NexusSerializationContext(
                 endpoint=input.endpoint,

@@ -102,16 +102,19 @@ class ActivitySerializationContext(SerializationContext):
 class NexusSerializationContext(SerializationContext):
     """Serialization context for Nexus operation payloads.
 
-    Callers receive this context when encoding inputs and decoding results or failures. Handlers
-    receive it when decoding inputs, encoding synchronous results, and encoding failures produced
-    while handling a Nexus task.
+    Callers receive this context when encoding inputs and decoding results or failures. The context
+    is not propagated to a handler that completes an asynchronous operation. Handlers receive it
+    when decoding inputs, encoding synchronous results, and encoding failures produced while
+    handling a Nexus task.
 
-    The context is not propagated to the eventual result of an asynchronous operation. Standalone
-    operation handles use the context of their start request, including when an existing operation
-    is returned, while handles created without starting an operation do not receive it.
+    A standalone operation handle retains the context used to start the operation and uses it to
+    decode the result, including when the start request returns an existing operation. A handle
+    created with :py:meth:`temporalio.client.Client.get_nexus_operation_handle` has no endpoint,
+    service, or operation information and therefore decodes without Nexus context.
 
-    Callers and handlers receive this context on opposite sides of failure conversion. Contextual
-    encodings should therefore be self-describing and support legacy payloads without context.
+    A failure encoded by a handler is later decoded by a caller. Because some operation paths may
+    lack this context, contextual encodings must be self-describing and decoders must continue to
+    accept payloads encoded without context.
 
     .. warning::
         This API is experimental and unstable.

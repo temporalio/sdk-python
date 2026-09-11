@@ -9,11 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import hashlib
-import hmac
 import json
 import uuid
-import zlib
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -32,7 +29,6 @@ from temporalio.client import (
     AsyncActivityHandle,
     Client,
     GetNexusOperationResultInput,
-    GetNexusOperationResultOutput,
     Interceptor,
     NexusOperationFailureError,
     OutboundInterceptor,
@@ -1714,40 +1710,33 @@ class _NexusResultDecodingOutboundInterceptor(OutboundInterceptor):
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> GetNexusOperationResultOutput:
-        output = await super().get_nexus_operation_result(input)
-        if output.raw_result is not None:
-            type_hints = [input.result_type] if input.result_type else None
-            [result] = await output.data_converter.decode(
-                [output.raw_result], type_hints
-            )
-            self._parent.decoded_results.append(result)
-        return output
+    ) -> Any:
+        result = await super().get_nexus_operation_result(input)
+        self._parent.decoded_results.append(result)
+        return result
 
 
-class NexusContextPayloadCodecSelector(PayloadCodec, WithSerializationContext):
-    HMAC_ENCODING = b"binary/nexus-context-hmac"
-    ZLIB_ENCODING = b"binary/nexus-context-zlib"
-    HMAC_KEY = b"nexus-context-test-key"
+class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
+    MARKER_KEY = "nexus-context-marker"
 
     def __init__(
         self,
-        codecs: dict[NexusSerializationContext, Literal["hmac", "zlib"]],
+        markers: dict[NexusSerializationContext, bytes],
         context: SerializationContext | None = None,
     ):
-        self.codecs = codecs
+        self.markers = markers
         self.context = context
 
     def with_context(
         self, context: SerializationContext
-    ) -> NexusContextPayloadCodecSelector:
-        return NexusContextPayloadCodecSelector(self.codecs, context)
+    ) -> NexusContextMarkerPayloadCodec:
+        return NexusContextMarkerPayloadCodec(self.markers, context)
 
-    def _codec(self) -> Literal["hmac", "zlib"] | None:
+    def _marker(self) -> bytes | None:
         if not isinstance(self.context, NexusSerializationContext):
             return None
         try:
-            return self.codecs[self.context]
+            return self.markers[self.context]
         except KeyError:
             raise AssertionError(
                 f"No Nexus payload codec configured for {self.context!r}"
@@ -1756,59 +1745,33 @@ class NexusContextPayloadCodecSelector(PayloadCodec, WithSerializationContext):
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        codec = self._codec()
-        if codec is None:
+        marker = self._marker()
+        if marker is None:
             return list(payloads)
         encoded = []
         for payload in payloads:
-            serialized = payload.SerializeToString(deterministic=True)
-            if codec == "hmac":
-                signature = hmac.new(self.HMAC_KEY, serialized, hashlib.sha256).digest()
-                encoded.append(
-                    temporalio.api.common.v1.Payload(
-                        metadata={"encoding": self.HMAC_ENCODING},
-                        data=signature + serialized,
-                    )
-                )
-            else:
-                encoded.append(
-                    temporalio.api.common.v1.Payload(
-                        metadata={"encoding": self.ZLIB_ENCODING},
-                        data=zlib.compress(serialized),
-                    )
-                )
+            marked_payload = temporalio.api.common.v1.Payload()
+            marked_payload.CopyFrom(payload)
+            marked_payload.metadata[self.MARKER_KEY] = marker
+            encoded.append(marked_payload)
         return encoded
 
     async def decode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
-        codec = self._codec()
-        if codec is None:
+        marker = self._marker()
+        if marker is None:
             return list(payloads)
         decoded = []
         for payload in payloads:
-            encoding = payload.metadata.get("encoding")
-            if encoding not in (self.HMAC_ENCODING, self.ZLIB_ENCODING):
+            actual_marker = payload.metadata.get(self.MARKER_KEY)
+            if actual_marker is None:
                 decoded.append(payload)
                 continue
-            expected_encoding = (
-                self.HMAC_ENCODING if codec == "hmac" else self.ZLIB_ENCODING
-            )
-            assert encoding == expected_encoding
-            if codec == "hmac":
-                digest_size = hashlib.sha256().digest_size
-                signature, serialized = (
-                    payload.data[:digest_size],
-                    payload.data[digest_size:],
-                )
-                assert hmac.compare_digest(
-                    signature,
-                    hmac.new(self.HMAC_KEY, serialized, hashlib.sha256).digest(),
-                )
-            else:
-                serialized = zlib.decompress(payload.data)
+            assert actual_marker == marker
             decoded_payload = temporalio.api.common.v1.Payload()
-            decoded_payload.ParseFromString(serialized)
+            decoded_payload.CopyFrom(payload)
+            del decoded_payload.metadata[self.MARKER_KEY]
             decoded.append(decoded_payload)
         return decoded
 
@@ -1829,11 +1792,11 @@ class NexusOperationTestServiceHandler:
 @workflow.defn
 class NexusOperationTestWorkflow:
     @workflow.run
-    async def run(self, hmac_endpoint_name: str, zlib_endpoint_name: str) -> list[str]:
-        hmac_handle, zlib_handle = await asyncio.gather(
+    async def run(self, red_endpoint_name: str, blue_endpoint_name: str) -> list[str]:
+        red_handle, blue_handle = await asyncio.gather(
             workflow.create_nexus_client(
                 service=NexusOperationTestServiceHandler,
-                endpoint=hmac_endpoint_name,
+                endpoint=red_endpoint_name,
             ).start_operation(
                 NexusOperationTestServiceHandler.operation,
                 input="nexus-data",
@@ -1841,14 +1804,14 @@ class NexusOperationTestWorkflow:
             ),
             workflow.create_nexus_client(
                 service=NexusOperationTestServiceHandler,
-                endpoint=zlib_endpoint_name,
+                endpoint=blue_endpoint_name,
             ).start_operation(
                 NexusOperationTestServiceHandler.operation,
                 input="nexus-data",
                 summary="nexus-summary",
             ),
         )
-        return list(await asyncio.gather(hmac_handle, zlib_handle))
+        return list(await asyncio.gather(red_handle, blue_handle))
 
 
 @workflow.defn
@@ -1904,28 +1867,28 @@ class NexusFailureConverterWithContext(
 
 
 @pytest.mark.requires_local_server
-async def test_workflow_nexus_payload_codec_selects_codec_from_context(
+async def test_workflow_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
-    """Nexus context selects codecs for workflow inputs, summaries, and results."""
+    """Nexus payload codecs get context for workflow inputs, summaries, and results."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "workflow-nexus-context-codec-task-queue"
-    hmac_endpoint_name = "workflow-hmac-nexus-endpoint"
-    zlib_endpoint_name = "workflow-zlib-nexus-endpoint"
-    hmac_context = NexusSerializationContext(
-        endpoint=hmac_endpoint_name,
+    red_endpoint_name = "workflow-red-nexus-endpoint"
+    blue_endpoint_name = "workflow-blue-nexus-endpoint"
+    red_context = NexusSerializationContext(
+        endpoint=red_endpoint_name,
         service="NexusOperationTestServiceHandler",
         operation="operation",
     )
-    zlib_context = NexusSerializationContext(
-        endpoint=zlib_endpoint_name,
+    blue_context = NexusSerializationContext(
+        endpoint=blue_endpoint_name,
         service="NexusOperationTestServiceHandler",
         operation="operation",
     )
-    payload_codec = NexusContextPayloadCodecSelector(
-        {hmac_context: "hmac", zlib_context: "zlib"}
+    payload_codec = NexusContextMarkerPayloadCodec(
+        {red_context: b"red", blue_context: b"blue"}
     )
     config = env.client.config()
     config["data_converter"] = dataclasses.replace(
@@ -1940,11 +1903,11 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
         workflows=[NexusOperationTestWorkflow],
         nexus_service_handlers=[NexusOperationTestServiceHandler()],
     ) as worker:
-        await env.create_nexus_endpoint(hmac_endpoint_name, worker.task_queue)
-        await env.create_nexus_endpoint(zlib_endpoint_name, worker.task_queue)
+        await env.create_nexus_endpoint(red_endpoint_name, worker.task_queue)
+        await env.create_nexus_endpoint(blue_endpoint_name, worker.task_queue)
         handle = await client.start_workflow(
             NexusOperationTestWorkflow.run,
-            args=[hmac_endpoint_name, zlib_endpoint_name],
+            args=[red_endpoint_name, blue_endpoint_name],
             id=str(uuid.uuid4()),
             task_queue=worker.task_queue,
         )
@@ -1970,31 +1933,23 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
                 endpoint = scheduled_endpoints[completed_attrs.scheduled_event_id]
                 encoded_results[endpoint] = completed_attrs.result
         assert set(scheduled_endpoints.values()) == {
-            hmac_endpoint_name,
-            zlib_endpoint_name,
+            red_endpoint_name,
+            blue_endpoint_name,
         }
         assert {
-            endpoint: payload.metadata["encoding"]
+            endpoint: payload.metadata[NexusContextMarkerPayloadCodec.MARKER_KEY]
             for endpoint, payload in encoded_summaries.items()
         } == {
-            hmac_endpoint_name: NexusContextPayloadCodecSelector.HMAC_ENCODING,
-            zlib_endpoint_name: NexusContextPayloadCodecSelector.ZLIB_ENCODING,
+            red_endpoint_name: b"red",
+            blue_endpoint_name: b"blue",
         }
-        assert (
-            encoded_summaries[hmac_endpoint_name].data
-            != encoded_summaries[zlib_endpoint_name].data
-        )
         assert {
-            endpoint: payload.metadata["encoding"]
+            endpoint: payload.metadata[NexusContextMarkerPayloadCodec.MARKER_KEY]
             for endpoint, payload in encoded_results.items()
         } == {
-            hmac_endpoint_name: NexusContextPayloadCodecSelector.HMAC_ENCODING,
-            zlib_endpoint_name: NexusContextPayloadCodecSelector.ZLIB_ENCODING,
+            red_endpoint_name: b"red",
+            blue_endpoint_name: b"blue",
         }
-        assert (
-            encoded_results[hmac_endpoint_name].data
-            != encoded_results[zlib_endpoint_name].data
-        )
 
         scheduled_contexts: dict[int, NexusSerializationContext] = {}
         for event in history.events:
@@ -2028,31 +1983,31 @@ async def test_workflow_nexus_payload_codec_selects_codec_from_context(
 
 
 @pytest.mark.requires_local_server
-async def test_standalone_nexus_payload_codec_selects_codec_from_context(
+async def test_standalone_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
-    """Nexus context selects codecs for standalone inputs and results."""
+    """Nexus payload codecs get context for standalone inputs and results."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "standalone-nexus-context-codec-task-queue"
-    hmac_endpoint_name = "standalone-hmac-nexus-endpoint"
-    zlib_endpoint_name = "standalone-zlib-nexus-endpoint"
-    hmac_context = NexusSerializationContext(
-        endpoint=hmac_endpoint_name,
+    red_endpoint_name = "standalone-red-nexus-endpoint"
+    blue_endpoint_name = "standalone-blue-nexus-endpoint"
+    red_context = NexusSerializationContext(
+        endpoint=red_endpoint_name,
         service="NexusOperationTestServiceHandler",
         operation="operation",
     )
-    zlib_context = NexusSerializationContext(
-        endpoint=zlib_endpoint_name,
+    blue_context = NexusSerializationContext(
+        endpoint=blue_endpoint_name,
         service="NexusOperationTestServiceHandler",
         operation="operation",
     )
     config = env.client.config()
     config["data_converter"] = dataclasses.replace(
         DataConverter.default,
-        payload_codec=NexusContextPayloadCodecSelector(
-            {hmac_context: "hmac", zlib_context: "zlib"}
+        payload_codec=NexusContextMarkerPayloadCodec(
+            {red_context: b"red", blue_context: b"blue"}
         ),
     )
     result_interceptor = _NexusResultDecodingInterceptor()
@@ -2066,33 +2021,33 @@ async def test_standalone_nexus_payload_codec_selects_codec_from_context(
         task_queue=task_queue,
         nexus_service_handlers=[NexusOperationTestServiceHandler()],
     ) as worker:
-        await env.create_nexus_endpoint(hmac_endpoint_name, worker.task_queue)
-        await env.create_nexus_endpoint(zlib_endpoint_name, worker.task_queue)
-        hmac_standalone_result, zlib_standalone_result = await asyncio.gather(
+        await env.create_nexus_endpoint(red_endpoint_name, worker.task_queue)
+        await env.create_nexus_endpoint(blue_endpoint_name, worker.task_queue)
+        red_standalone_result, blue_standalone_result = await asyncio.gather(
             client.create_nexus_client(
                 service=NexusOperationTestServiceHandler,
-                endpoint=hmac_endpoint_name,
+                endpoint=red_endpoint_name,
             ).execute_operation(
                 NexusOperationTestServiceHandler.operation,
-                "standalone-hmac",
+                "standalone-red",
                 id=str(uuid.uuid4()),
                 schedule_to_close_timeout=timedelta(seconds=10),
             ),
             client.create_nexus_client(
                 service=NexusOperationTestServiceHandler,
-                endpoint=zlib_endpoint_name,
+                endpoint=blue_endpoint_name,
             ).execute_operation(
                 NexusOperationTestServiceHandler.operation,
-                "standalone-zlib",
+                "standalone-blue",
                 id=str(uuid.uuid4()),
                 schedule_to_close_timeout=timedelta(seconds=10),
             ),
         )
-        assert hmac_standalone_result == "standalone-hmac"
-        assert zlib_standalone_result == "standalone-zlib"
+        assert red_standalone_result == "standalone-red"
+        assert blue_standalone_result == "standalone-blue"
         assert set(result_interceptor.decoded_results) == {
-            "standalone-hmac",
-            "standalone-zlib",
+            "standalone-red",
+            "standalone-blue",
         }
 
 

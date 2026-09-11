@@ -29,7 +29,6 @@ from temporalio.client import (
     CountNexusOperationsInput,
     DescribeNexusOperationInput,
     GetNexusOperationResultInput,
-    GetNexusOperationResultOutput,
     Interceptor,
     ListNexusOperationsInput,
     NexusOperationExecutionDescription,
@@ -868,11 +867,11 @@ class _RecordingOutboundInterceptor(OutboundInterceptor):
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
-    ) -> GetNexusOperationResultOutput:
+    ) -> Any:
         self._parent.result_calls.append(input)
-        output = await super().get_nexus_operation_result(input)
-        self._parent.result_outputs.append(output)
-        return output
+        result = await super().get_nexus_operation_result(input)
+        self._parent.result_outputs.append(result)
+        return result
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         self._parent.cancel_calls.append(input)
@@ -901,7 +900,7 @@ class _RecordingInterceptor(Interceptor):
         self.start_calls: list[StartNexusOperationInput] = []
         self.describe_calls: list[DescribeNexusOperationInput] = []
         self.result_calls: list[GetNexusOperationResultInput] = []
-        self.result_outputs: list[GetNexusOperationResultOutput] = []
+        self.result_outputs: list[Any] = []
         self.cancel_calls: list[CancelNexusOperationInput] = []
         self.terminate_calls: list[TerminateNexusOperationInput] = []
         self.list_calls: list[ListNexusOperationsInput] = []
@@ -985,11 +984,11 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert isinstance(result_input, GetNexusOperationResultInput)
         assert result_input.operation_id == op_id
         assert result_input.result_type == EchoOutput
-        assert len(interceptor.result_outputs) == 1
-        assert interceptor.result_outputs[0].raw_result is None
-        assert interceptor.result_outputs[0].raw_failure is not None
+        assert result_input.endpoint == endpoint_name
+        assert result_input.service == "StandaloneTestService"
+        assert result_input.operation == "blocking_async"
 
-        # Successful raw results and their data converter are also available.
+        # Interceptors receive successfully decoded results.
         value = f"interceptor-success-{uuid.uuid4()}"
         handle = await nexus_client.start_operation(
             StandaloneTestService.echo_sync,
@@ -999,9 +998,7 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         )
         result = await handle.result()
         assert result == EchoOutput(value=value)
-        assert len(interceptor.result_outputs) == 2
-        assert interceptor.result_outputs[1].raw_result is not None
-        assert interceptor.result_outputs[1].raw_failure is None
+        assert interceptor.result_outputs == [EchoOutput(value=value)]
 
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)
