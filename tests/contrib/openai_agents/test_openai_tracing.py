@@ -1,21 +1,53 @@
+import asyncio
 import uuid
 from datetime import timedelta
 from typing import Any
 
+import opentelemetry.context
 import opentelemetry.trace
-from agents import Span, Trace, TracingProcessor, custom_span, trace
+import pytest
+from agents import (
+    Agent,
+    Runner,
+    Span,
+    Trace,
+    TracingProcessor,
+    custom_span,
+    function_tool,
+    trace,
+)
 from agents.tracing import get_trace_provider
+from agents.tracing.provider import DefaultTraceProvider
+from openinference.instrumentation.openai_agents._processor import (
+    OpenInferenceTracingProcessor,
+)
+from openinference.semconv.trace import SpanAttributes
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client
+from temporalio.common import RetryPolicy
 from temporalio.contrib.openai_agents import _temporal_openai_agents
+from temporalio.contrib.openai_agents._temporal_trace_provider import (
+    TemporalTraceProvider,
+)
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    ResponseBuilders,
+    TestModel,
 )
 from temporalio.contrib.opentelemetry import create_tracer_provider
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    CancelledError,
+    ChildWorkflowError,
+)
+from temporalio.worker import Replayer
 from temporalio.worker.workflow_sandbox import (
     SandboxedWorkflowRunner,
     SandboxRestrictions,
@@ -51,31 +83,50 @@ class MemoryTracingProcessor(TracingProcessor):
         pass
 
 
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
 def test_otel_instrumentation_lifecycle_does_not_nest() -> None:
-    from openinference.instrumentation.openai_agents._processor import (
-        OpenInferenceTracingProcessor,
-    )
-    from opentelemetry import trace
-
+    exporter = set_test_tracer_provider()
     original = OpenInferenceTracingProcessor.on_trace_start
-    _temporal_openai_agents._install_otel_instrumentation(trace.get_tracer_provider())
+    original_end = OpenInferenceTracingProcessor.on_trace_end
+    _temporal_openai_agents._install_otel_instrumentation(
+        opentelemetry.trace.get_tracer_provider()
+    )
     try:
         installed_patch = OpenInferenceTracingProcessor.on_trace_start
+        installed_end = OpenInferenceTracingProcessor.on_trace_end
         assert installed_patch is not original
+        assert installed_end is not original_end
 
         _temporal_openai_agents._install_otel_instrumentation(
-            trace.get_tracer_provider()
+            opentelemetry.trace.get_tracer_provider()
         )
         try:
             assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
+            assert OpenInferenceTracingProcessor.on_trace_end is installed_end
         finally:
             _temporal_openai_agents._uninstall_otel_instrumentation()
 
         assert OpenInferenceTracingProcessor.on_trace_start is installed_patch
+        assert OpenInferenceTracingProcessor.on_trace_end is installed_end
+        previous_context = opentelemetry.context.get_current()
+        with pytest.raises(ValueError, match="trace body failed"):
+            with trace("Standalone trace"):
+                with custom_span("Standalone child"):
+                    raise ValueError("trace body failed")
+        assert opentelemetry.context.get_current() is previous_context
+        processor = openinference_processor()
+        assert not processor._root_spans
+        assert not processor._otel_spans
+        assert not processor._tokens
+        assert {span.name for span in exporter.get_finished_spans()} == {
+            "Standalone trace",
+            "Standalone child",
+        }
     finally:
         _temporal_openai_agents._uninstall_otel_instrumentation()
 
     assert OpenInferenceTracingProcessor.on_trace_start is original
+    assert OpenInferenceTracingProcessor.on_trace_end is original_end
 
 
 async def test_tracing(client: Client):
@@ -521,9 +572,11 @@ async def test_external_trace_and_span_to_workflow_spans(
     )
 
 
+@pytest.mark.parametrize("add_temporal_spans", [False, True])
 async def test_workflow_only_trace_to_spans(
     client: Client,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+    add_temporal_spans: bool,
 ):
     """Test: Workflow-only trace -> spans (with worker restart)."""
     exporter = set_test_tracer_provider()
@@ -533,7 +586,7 @@ async def test_workflow_only_trace_to_spans(
     # First worker: Start workflow (no external trace context)
     async with AgentEnvironment(
         model=research_mock_model(),
-        add_temporal_spans=False,
+        add_temporal_spans=add_temporal_spans,
         use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
@@ -563,7 +616,7 @@ async def test_workflow_only_trace_to_spans(
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
         model=research_mock_model(),
-        add_temporal_spans=False,
+        add_temporal_spans=add_temporal_spans,
         use_otel_instrumentation=True,
     ) as env:
         new_client = env.applied_on_client(client)
@@ -579,8 +632,16 @@ async def test_workflow_only_trace_to_spans(
             await workflow_handle.signal(SelfTracingWorkflow.proceed)
             result = await workflow_handle.result()
             assert result == "done"
+            processor = openinference_processor()
 
     spans = exporter.get_finished_spans()
+    print_otel_spans(spans)
+    assert not processor._root_spans
+    assert not processor._otel_spans
+    assert not processor._tokens
+    span_ids = {span.context.span_id for span in spans if span.context}
+    assert len(span_ids) == len(spans)
+    assert all(not span.parent or span.parent.span_id in span_ids for span in spans)
 
     assert len(spans) >= 2  # Workflow trace + workflow span
 
@@ -677,7 +738,7 @@ async def test_otel_tracing_in_runner(
             ResearchWorkflow,
             max_cached_workflows=0,
         ) as worker:
-            with trace("Research workflow"):
+            with env.openai_agents_plugin.tracing_context(), trace("Research workflow"):
                 workflow_handle = await client.start_workflow(
                     ResearchWorkflow.run,
                     "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
@@ -859,7 +920,7 @@ async def test_sdk_trace_to_otel_span_parenting(
             ),
         ) as worker:
             # Start SDK trace in client, then start workflow within that trace
-            with trace("Client SDK trace"):
+            with env.openai_agents_plugin.tracing_context(), trace("Client SDK trace"):
                 workflow_handle = await new_client.start_workflow(
                     OtelSpanWorkflow.run,
                     id=f"sdk-trace-otel-span-workflow-{uuid.uuid4()}",
@@ -953,3 +1014,533 @@ async def test_sdk_trace_to_otel_span_parenting(
     assert len(span_ids) == len(set(span_ids)), (
         f"All spans should have unique IDs, got: {span_ids}"
     )
+
+
+def openinference_processor() -> OpenInferenceTracingProcessor:
+    provider = get_trace_provider()
+    if isinstance(provider, TemporalTraceProvider):
+        provider = provider._original_provider
+    assert isinstance(provider, DefaultTraceProvider)
+    return next(
+        processor
+        for processor in provider._multi_processor._processors
+        if isinstance(processor, OpenInferenceTracingProcessor)
+    )
+
+
+@function_tool
+async def trace_test_tool() -> str:
+    return "tool result"
+
+
+@workflow.defn
+class AgentToolTraceWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        result = await Runner.run(
+            starting_agent=Agent(name="Trace agent", tools=[trace_test_tool]),
+            input="Call the tool.",
+        )
+        return str(result.final_output)
+
+
+@pytest.mark.parametrize("max_cached_workflows", [1000, 0])
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_otel_remote_context_preserves_root(
+    client: Client,
+    caplog: pytest.LogCaptureFixture,
+    max_cached_workflows: int,
+) -> None:
+    exporter = set_test_tracer_provider()
+    roots: list[tuple[int, int, str]] = []
+    retained: list[tuple[int, int, int]] = []
+    restored: list[bool] = []
+    async with AgentEnvironment(
+        model=TestModel.returning_responses(
+            [
+                response
+                for _ in range(3)
+                for response in (
+                    ResponseBuilders.tool_call(arguments="{}", name="trace_test_tool"),
+                    ResponseBuilders.output_message("done"),
+                )
+            ]
+        ),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            AgentToolTraceWorkflow,
+            max_cached_workflows=max_cached_workflows,
+        ) as worker:
+            with opentelemetry.trace.get_tracer(__name__).start_as_current_span(
+                "Outer span"
+            ):
+                parent_context = opentelemetry.context.get_current()
+                for index in range(3):
+                    with env.openai_agents_plugin.tracing_context():
+                        processor = openinference_processor()
+                        with trace(f"Client trace {index}"):
+                            root = opentelemetry.trace.get_current_span()
+                            session_id = f"session-{index}"
+                            root.set_attribute(SpanAttributes.SESSION_ID, session_id)
+                            context = root.get_span_context()
+                            roots.append(
+                                (context.trace_id, context.span_id, session_id)
+                            )
+                            assert (
+                                await client.execute_workflow(
+                                    AgentToolTraceWorkflow.run,
+                                    id=str(uuid.uuid4()),
+                                    task_queue=worker.task_queue,
+                                )
+                                == "done"
+                            )
+                        restored.append(
+                            opentelemetry.context.get_current() is parent_context
+                        )
+                        retained.append(
+                            (
+                                len(processor._root_spans),
+                                len(processor._otel_spans),
+                                len(processor._tokens),
+                            )
+                        )
+
+    spans = exporter.get_finished_spans()
+    spans_by_id = {span.context.span_id: span for span in spans if span.context}
+    missing_parents = [
+        span.name
+        for span in spans
+        if span.parent and span.parent.span_id not in spans_by_id
+    ]
+    print_otel_spans(spans)
+    print(f"Client roots: {roots}")
+    print(f"Missing parents: {missing_parents}")
+    print(f"Retained roots/spans/tokens: {retained}")
+    print(f"Caller context restored: {restored}")
+    for trace_id, span_id, session_id in roots:
+        assert span_id in spans_by_id, "The original client root was not exported"
+        root_span = spans_by_id[span_id]
+        assert root_span.context and root_span.context.trace_id == trace_id
+        assert root_span.attributes
+        assert root_span.attributes[SpanAttributes.SESSION_ID] == session_id
+    assert len(spans_by_id) == len(spans)
+    assert not missing_parents
+    assert retained == [(0, 0, 0)] * 3
+    assert all(restored)
+    for span in spans:
+        if span.name == "trace_test_tool":
+            assert span.parent
+            assert spans_by_id[span.parent.span_id].name == "turn"
+    assert "Failed to detach context" not in caplog.text
+
+
+@workflow.defn
+class CallbackChildWorkflow:
+    @workflow.run
+    async def run(self, outcome: str = "success") -> str:
+        if outcome == "failure":
+            raise ApplicationError("Child failed", non_retryable=True)
+        if outcome == "cancel":
+            await workflow.wait_condition(lambda: False)
+        return "success"
+
+
+@activity.defn
+async def callback_outcome_activity(outcome: str) -> str:
+    if outcome == "failure":
+        raise ApplicationError("Activity failed", non_retryable=True)
+    if outcome == "cancel":
+        await asyncio.Future()
+    return "success"
+
+
+@workflow.defn
+class CallbackSpanWorkflow:
+    @workflow.run
+    async def run(self, outcome: str = "success") -> dict[str, Any]:
+        observations: list[dict[str, Any]] = []
+        errors: list[str] = []
+        with custom_span("Callback caller") as caller:
+            otel_caller = opentelemetry.trace.get_current_span().get_span_context()
+            for operation in ("activity", "local_activity", "child_workflow"):
+                handle: asyncio.Future[Any]
+                if operation == "activity" and outcome == "success":
+                    handle = workflow.start_activity(
+                        simple_no_context_activity,
+                        start_to_close_timeout=timedelta(seconds=30),
+                    )
+                elif operation == "local_activity" and outcome == "success":
+                    handle = workflow.start_local_activity(
+                        simple_no_context_activity,
+                        start_to_close_timeout=timedelta(seconds=30),
+                    )
+                elif operation == "child_workflow":
+                    handle = await workflow.start_child_workflow(
+                        CallbackChildWorkflow.run,
+                        arg=outcome,
+                    )
+                else:
+                    start = (
+                        workflow.start_activity
+                        if operation == "activity"
+                        else workflow.start_local_activity
+                    )
+                    handle = start(
+                        callback_outcome_activity,
+                        arg=outcome,
+                        start_to_close_timeout=timedelta(seconds=30),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
+                    )
+                for phase in ("scheduled", "completed"):
+                    if phase == "completed":
+                        if outcome == "cancel":
+                            handle.cancel()
+                        try:
+                            await handle
+                        except (
+                            ActivityError,
+                            ApplicationError,
+                            ChildWorkflowError,
+                            CancelledError,
+                            asyncio.CancelledError,
+                        ):
+                            errors.append(operation)
+                    current = get_trace_provider().get_current_span()
+                    observations.append(
+                        {
+                            "operation": operation,
+                            "phase": phase,
+                            "agent_span": current.span_id if current else None,
+                            "otel_span": opentelemetry.trace.get_current_span()
+                            .get_span_context()
+                            .span_id,
+                        }
+                    )
+                with custom_span(f"After {operation}"):
+                    pass
+        return {
+            "agent_span": caller.span_id,
+            "otel_span": otel_caller.span_id,
+            "observations": observations,
+            "errors": errors,
+        }
+
+
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_otel_callback_spans_restore_context(
+    client: Client,
+    caplog: pytest.LogCaptureFixture,
+    max_cached_workflows: int = 1000,
+) -> None:
+    exporter = set_test_tracer_provider()
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            CallbackSpanWorkflow,
+            CallbackChildWorkflow,
+            activities=[simple_no_context_activity],
+            max_cached_workflows=max_cached_workflows,
+            workflow_runner=SandboxedWorkflowRunner(
+                SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+            ),
+        ) as worker:
+            with env.openai_agents_plugin.tracing_context():
+                processor = openinference_processor()
+                with trace("Callback trace"):
+                    result = await client.execute_workflow(
+                        CallbackSpanWorkflow.run,
+                        id=str(uuid.uuid4()),
+                        task_queue=worker.task_queue,
+                    )
+    spans = exporter.get_finished_spans()
+    print_otel_spans(spans)
+    print(f"Callback contexts: {result}")
+    print(
+        "Retained roots/spans/tokens:",
+        len(processor._root_spans),
+        len(processor._otel_spans),
+        len(processor._tokens),
+    )
+    assert "Failed to detach context" not in caplog.text
+    for observation in result["observations"]:
+        assert observation["agent_span"] == result["agent_span"]
+        assert observation["otel_span"] == result["otel_span"]
+    assert not processor._root_spans
+    assert not processor._otel_spans
+    assert not processor._tokens
+    assert len(spans) == len({span.context.span_id for span in spans if span.context})
+    for span in spans:
+        if span.name.startswith("After "):
+            assert span.parent and span.parent.span_id == result["otel_span"]
+
+
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_otel_callback_replay(
+    client: Client,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    await test_otel_callback_spans_restore_context(
+        client=client,
+        caplog=caplog,
+        max_cached_workflows=0,
+    )
+
+
+@pytest.mark.parametrize("outcome", ["failure", "cancel"])
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_otel_callback_failure_and_cancellation(
+    client: Client,
+    caplog: pytest.LogCaptureFixture,
+    outcome: str,
+) -> None:
+    exporter = set_test_tracer_provider()
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            CallbackSpanWorkflow,
+            CallbackChildWorkflow,
+            activities=[simple_no_context_activity, callback_outcome_activity],
+            workflow_runner=SandboxedWorkflowRunner(
+                SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+            ),
+        ) as worker:
+            with env.openai_agents_plugin.tracing_context():
+                processor = openinference_processor()
+                with trace("Callback outcome trace"):
+                    result = await client.execute_workflow(
+                        CallbackSpanWorkflow.run,
+                        arg=outcome,
+                        id=str(uuid.uuid4()),
+                        task_queue=worker.task_queue,
+                    )
+    print(f"Callback outcome {outcome}: {result}")
+    print_otel_spans(exporter.get_finished_spans())
+    assert result["errors"] == ["activity", "local_activity", "child_workflow"]
+    for observation in result["observations"]:
+        assert observation["agent_span"] == result["agent_span"]
+        assert observation["otel_span"] == result["otel_span"]
+    assert not processor._root_spans
+    assert not processor._otel_spans
+    assert not processor._tokens
+    assert "Failed to detach context" not in caplog.text
+
+
+@activity.defn
+async def inspect_otel_context_activity() -> tuple[int, int, str]:
+    context = opentelemetry.trace.get_current_span().get_span_context()
+    return context.trace_id, int(context.trace_flags), context.trace_state.to_header()
+
+
+@workflow.defn
+class InspectOtelContextWorkflow:
+    @workflow.run
+    async def run(self) -> tuple[int, int, str]:
+        return await workflow.execute_activity(
+            inspect_otel_context_activity,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+
+
+@pytest.mark.parametrize("sampled", [True, False])
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_otel_remote_sampling_context(
+    client: Client,
+    caplog: pytest.LogCaptureFixture,
+    sampled: bool,
+) -> None:
+    exporter = set_test_tracer_provider()
+    id_generator = RandomIdGenerator()
+    remote_context = opentelemetry.trace.SpanContext(
+        trace_id=id_generator.generate_trace_id(),
+        span_id=id_generator.generate_span_id(),
+        is_remote=True,
+        trace_flags=opentelemetry.trace.TraceFlags(
+            opentelemetry.trace.TraceFlags.SAMPLED
+            if sampled
+            else opentelemetry.trace.TraceFlags.DEFAULT
+        ),
+        trace_state=opentelemetry.trace.TraceState([("vendor", "state")]),
+    )
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            InspectOtelContextWorkflow,
+            activities=[inspect_otel_context_activity],
+        ) as worker:
+            with env.openai_agents_plugin.tracing_context():
+                processor = openinference_processor()
+                with opentelemetry.trace.use_span(
+                    opentelemetry.trace.NonRecordingSpan(remote_context)
+                ):
+                    with trace("Remote sampling"):
+                        result = await client.execute_workflow(
+                            InspectOtelContextWorkflow.run,
+                            id=str(uuid.uuid4()),
+                            task_queue=worker.task_queue,
+                        )
+    print(f"Remote sampling {sampled}: {result}")
+    assert result == (
+        remote_context.trace_id,
+        int(remote_context.trace_flags),
+        remote_context.trace_state.to_header(),
+    )
+    assert bool(exporter.get_finished_spans()) == sampled
+    assert not processor._root_spans
+    assert not processor._otel_spans
+    assert not processor._tokens
+    assert "Failed to detach context" not in caplog.text
+
+
+@pytest.mark.parametrize("add_temporal_spans", [True, False])
+async def test_callback_context_without_otel(
+    client: Client, add_temporal_spans: bool
+) -> None:
+    processor = MemoryTracingProcessor()
+    processor.trace_events = []
+    processor.span_events = []
+    get_trace_provider().set_processors([processor])
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        add_temporal_spans=add_temporal_spans,
+    ) as env:
+        client = env.applied_on_client(client)
+        async with new_worker(
+            client,
+            CallbackSpanWorkflow,
+            CallbackChildWorkflow,
+            activities=[simple_no_context_activity],
+            workflow_runner=SandboxedWorkflowRunner(
+                SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+            ),
+        ) as worker:
+            with trace("Native callback trace"):
+                result = await client.execute_workflow(
+                    CallbackSpanWorkflow.run,
+                    id=str(uuid.uuid4()),
+                    task_queue=worker.task_queue,
+                )
+    print(f"Native tracing, temporal spans {add_temporal_spans}: {result}")
+    assert result["agent_span"] != "no-op"
+    for observation in result["observations"]:
+        assert observation["agent_span"] == result["agent_span"]
+    started = {span.span_id for span, start in processor.span_events if start}
+    ended = {span.span_id for span, start in processor.span_events if not start}
+    assert started == ended
+    assert (
+        any(
+            span.span_data.export().get("name") == "temporal:startActivity"
+            for span, _ in processor.span_events
+        )
+        == add_temporal_spans
+    )
+
+
+@workflow.defn
+class ConcurrentTraceCommandsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        child_start = asyncio.create_task(
+            workflow.start_child_workflow(CallbackChildWorkflow.run)
+        )
+        await asyncio.sleep(0)
+        activity_handle = workflow.start_activity(
+            simple_no_context_activity,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        child_handle = await child_start
+        await activity_handle
+        await child_handle
+
+
+@pytest.mark.parametrize("use_otel_instrumentation", [False, True])
+@pytest.mark.parametrize("replay", [False, True])
+@pytest.mark.usefixtures("reset_otel_tracer_provider")
+async def test_tracing_preserves_child_command_order(
+    client: Client, use_otel_instrumentation: bool, replay: bool
+) -> None:
+    set_test_tracer_provider()
+    runner = SandboxedWorkflowRunner(
+        SandboxRestrictions.default.with_passthrough_modules(
+            "agents", "openai", "mcp", "opentelemetry"
+        )
+    )
+    async with new_worker(
+        client,
+        ConcurrentTraceCommandsWorkflow,
+        CallbackChildWorkflow,
+        activities=[simple_no_context_activity],
+        workflow_runner=runner,
+    ) as worker:
+        original_handle = await client.start_workflow(
+            ConcurrentTraceCommandsWorkflow.run,
+            id=f"command-order-original-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await original_handle.result()
+    history = await original_handle.fetch_history()
+    command_events = (
+        EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED,
+        EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+    )
+    original_order = [
+        event.event_type
+        for event in history.events
+        if event.event_type in command_events
+    ]
+    print(f"Command history: {original_handle.id}")
+    print(f"Original command order: {[EventType.Name(e) for e in original_order]}")
+
+    async with AgentEnvironment(
+        model=research_mock_model(),
+        use_otel_instrumentation=use_otel_instrumentation,
+    ) as env:
+        if replay:
+            await Replayer(
+                workflows=[ConcurrentTraceCommandsWorkflow, CallbackChildWorkflow],
+                workflow_runner=runner,
+                namespace=client.namespace,
+                plugins=[env.openai_agents_plugin],
+            ).replay_workflow(history=history)
+            print("History replay with tracing: passed")
+        else:
+            client = env.applied_on_client(client)
+            if not use_otel_instrumentation:
+                get_trace_provider().set_processors([MemoryTracingProcessor()])
+            async with new_worker(
+                client,
+                ConcurrentTraceCommandsWorkflow,
+                CallbackChildWorkflow,
+                activities=[simple_no_context_activity],
+                workflow_runner=runner,
+            ) as worker:
+                with env.openai_agents_plugin.tracing_context(), trace("Commands"):
+                    traced_handle = await client.start_workflow(
+                        ConcurrentTraceCommandsWorkflow.run,
+                        id=f"command-order-traced-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                    )
+                    await traced_handle.result()
+            traced_history = await traced_handle.fetch_history()
+            traced_order = [
+                event.event_type
+                for event in traced_history.events
+                if event.event_type in command_events
+            ]
+            print(f"Command history: {traced_handle.id}")
+            print(f"Traced command order: {[EventType.Name(e) for e in traced_order]}")
+            assert traced_order == original_order
