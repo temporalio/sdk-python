@@ -90,9 +90,9 @@ async def assert_eventually(
             if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
                 raise
         except RPCError as e:
-            if retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED:
-                continue
-            else:
+            if not (retry_on_rpc_cancelled and e.status == RPCStatusCode.CANCELLED):
+                raise
+            if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
                 raise
         await asyncio.sleep(interval.total_seconds())
 
@@ -142,7 +142,7 @@ async def wait_for_workflow_idle(
             if present
         ]
         assert not pending, (
-            f"Workflow {handle.id} still has pending {', '.join(pending)}"
+            f"Workflow {handle.id} still has pending {', '.join(pending)} after {timeout}"
         )
 
     await assert_eventually(check, timeout=timeout, interval=interval)
