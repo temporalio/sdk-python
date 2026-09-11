@@ -31,6 +31,7 @@ pytest.importorskip("langchain_core")
 from temporalio import workflow
 from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalBackend
 from temporalio.contrib.deepagents._tools import (
+    lookup_backend,
     register_backend,
     registered_backends,
 )
@@ -150,6 +151,21 @@ def test_temporal_backend_unregisters_on_gc() -> None:
     del wrapper
     gc.collect()
     assert ref not in registered_backends()
+
+
+def test_temporal_backend_gc_keeps_ref_resolvable_for_inflight_activity() -> None:
+    # A backend_op activity scheduled just before a cache eviction can start
+    # AFTER the evicted wrapper is collected, and the replay that would
+    # re-register the ref only happens once that activity completes. The
+    # activity-side lookup must therefore still resolve a retired ref.
+    inner = RecordingBackend()
+    before = set(registered_backends())
+    wrapper = TemporalBackend(inner)
+    (ref,) = set(registered_backends()) - before
+    del wrapper
+    gc.collect()
+    assert ref not in registered_backends()
+    assert lookup_backend(ref) is inner
 
 
 def test_temporal_backend_gc_keeps_reregistered_ref() -> None:
