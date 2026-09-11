@@ -39,9 +39,14 @@ from temporalio.contrib.deepagents.testing import mock_model_provider
 from temporalio.worker import Replayer
 
 with workflow.unsafe.imports_passed_through():
-    from deepagents import create_deep_agent
     from langchain_core.messages import AIMessage
     from langchain_core.tools import tool
+
+# Bind deepagents symbols off the module importorskip returns: a static
+# `from deepagents import ...` cannot resolve on Python 3.10 (deepagents
+# needs >= 3.11), and with the package absent the type checkers mis-resolve
+# the name against this same-named test directory.
+create_deep_agent = pytest.importorskip("deepagents").create_deep_agent
 
 _HISTORY = Path(__file__).parent / "histories" / "legacy_dedup_repeated_tool_calls.json"
 
