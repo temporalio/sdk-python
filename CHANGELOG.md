@@ -37,6 +37,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`; 2.8.0 is the
+  first release with the `google.adk.platform._random` seam the plugin now installs a provider for.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
@@ -52,6 +58,15 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `GoogleAdkPlugin` now applies its deterministic time, id, and random providers inside
+  workflow tasks. ADK reads them from `contextvars` and workflow tasks run on worker threads
+  whose context is empty, so on a standard `Worker` or `Replayer` ADK-generated session,
+  event, invocation, and function-call ids came from wall-clock time and `uuid.uuid4()`; only
+  debug mode, which runs tasks inline, saw the deterministic values. The providers are now
+  installed as process-wide defaults that fall back to the real clock and RNG outside a
+  workflow. As with `workflow.uuid4()` and `workflow.random()`, ADK id generation and
+  `get_random()` inside a query handler or update validator now raise `ReadOnlyContextError`
+  rather than returning a random value.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.

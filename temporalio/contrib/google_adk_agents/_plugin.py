@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import inspect
+import random
+import threading
 import time
 import uuid
 import warnings
@@ -96,37 +99,113 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
         )
 
 
-def setup_deterministic_runtime():
-    """Configures ADK runtime for Temporal determinism.
+def _deterministic_time_provider() -> float:
+    if workflow.in_workflow():
+        return workflow.time()
+    return time.time()
+
+
+def _deterministic_id_provider() -> str:
+    if workflow.in_workflow():
+        return str(workflow.uuid4())
+    return str(uuid.uuid4())
+
+
+# ADK's own default is one process-wide random.Random, and its
+# set_random_provider docstring asks providers to return an existing instance
+# so RNG state carries across get_random() calls; keep one for outside
+# workflows too.
+_random_outside_workflow = random.Random()
+
+
+def _deterministic_random_provider() -> random.Random:
+    if workflow.in_workflow():
+        return workflow.random()
+    return _random_outside_workflow
+
+
+_install_provider_lock = threading.Lock()
+
+
+def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -> None:
+    """Rebinds an ADK platform ContextVar to one whose default is ``provider``.
+
+    ADK's ``set_*_provider`` functions set a value in the calling context only.
+    Workflow tasks run on worker threads, which start with an empty
+    contextvars context, so a value set from the worker's event loop never
+    reaches them and ADK falls back to its wall-clock and random defaults
+    there. A ContextVar's default, unlike a set value, is visible from every
+    context, so the module's variable is replaced with one that defaults to
+    ``provider``. ADK's ``set_*_provider`` and ``reset_*_provider`` operate on
+    the new variable from then on; a value set on the old one beforehand is
+    orphaned, so it is warned about. A no-op when ``provider`` is already the
+    default.
+    """
+    current: contextvars.ContextVar[Callable[[], Any]] = getattr(module, var_name)
+    try:
+        default = contextvars.Context().run(current.get)
+    except LookupError:
+        default = None
+    if default is provider:
+        return
+    if current.get(default) is not default:
+        warnings.warn(
+            f"Replacing the {module.__name__} provider set in this context before "
+            "GoogleAdkPlugin installed its deterministic providers; it will not "
+            "take effect. Set ADK provider overrides after the worker starts or "
+            "from workflow code.",
+            UserWarning,
+            stacklevel=_stacklevel_outside_temporalio(),
+        )
+    setattr(module, var_name, contextvars.ContextVar(current.name, default=provider))
+
+
+def setup_deterministic_runtime() -> None:
+    """Installs Temporal's deterministic time, id, and random providers for ADK.
 
     .. warning::
         This function is experimental and may change in future versions.
         Use with caution in production environments.
 
-    This should be called at the start of a Temporal Workflow before any ADK components
-    (like SessionService) are used, if they rely on runtime.get_time() or runtime.new_uuid().
+    The providers become the process-wide defaults of ADK's
+    ``google.adk.platform`` time, uuid, and random seams, so they apply inside
+    workflow tasks (which run on worker threads with an empty contextvars
+    context) as well as in the calling context. Inside a workflow they return
+    ``workflow.time()``, ``workflow.uuid4()``, and ``workflow.random()``, so
+    ADK-generated ids and retry jitter are reproducible on replay; like those
+    functions, id and random generation raise
+    :class:`temporalio.workflow.ReadOnlyContextError` in query handlers and
+    update validators. Outside a workflow in the same process (activities,
+    client code) they fall back to ``time.time()``, ``uuid.uuid4()``, and a
+    process-wide ``random.Random``.
+
+    Overrides through ADK's ``set_*_provider`` functions must be made after
+    this runs (after the worker starts, or from workflow code); one made
+    earlier is replaced, with a warning.
+
+    :class:`GoogleAdkPlugin` calls this when a worker or replayer starts.
+    Calling it again is a no-op.
     """
-    try:
-        import google.adk.platform.time
-        import google.adk.platform.uuid
+    import google.adk.platform._random
+    import google.adk.platform.time
+    import google.adk.platform.uuid
 
-        # Define safer, context-aware providers
-        def _deterministic_time_provider() -> float:
-            if workflow.in_workflow():
-                return workflow.now().timestamp()
-            return time.time()
-
-        def _deterministic_id_provider() -> str:
-            if workflow.in_workflow():
-                return str(workflow.uuid4())
-            return str(uuid.uuid4())
-
-        google.adk.platform.time.set_time_provider(_deterministic_time_provider)
-        google.adk.platform.uuid.set_id_provider(_deterministic_id_provider)
-    except ImportError:
-        pass
-    except Exception as e:
-        print(f"Warning: Failed to set deterministic runtime providers: {e}")
+    with _install_provider_lock:
+        _install_provider(
+            google.adk.platform.time,
+            "_time_provider_context_var",
+            _deterministic_time_provider,
+        )
+        _install_provider(
+            google.adk.platform.uuid,
+            "_id_provider_context_var",
+            _deterministic_id_provider,
+        )
+        _install_provider(
+            google.adk.platform._random,
+            "_random_provider_context_var",
+            _deterministic_random_provider,
+        )
 
 
 class GoogleAdkPlugin(SimplePlugin):
@@ -139,6 +218,9 @@ class GoogleAdkPlugin(SimplePlugin):
     This plugin configures:
     - Pydantic Payload Converter (required for ADK objects).
     - Sandbox Passthrough for google.adk and google.genai modules.
+    - ADK's time, id, and random providers, so ADK-generated ids and retry
+      jitter come from the workflow's deterministic clock and random stream
+      (see :func:`setup_deterministic_runtime`).
 
     At worker and replayer configuration time it also warns when the global
     OpenTelemetry meter or tracer provider is not replay-safe, since ADK

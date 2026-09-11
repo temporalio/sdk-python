@@ -38,13 +38,14 @@ ADK provides: (from the [ADK overview](https://google.github.io/adk-docs/#learn-
 ### OpenTelemetry Integration
 - Automatic instrumentation for ADK components when exporters are provided
 - Tracing integration that works within Temporal's execution context
-- Support for custom span exporters
 
 ### Key Features
 
 #### 1. Deterministic Runtime
-- Replaces `time.time()` with `workflow.now()` when in workflow context
-- Replaces `uuid.uuid4()` with `workflow.uuid4()` for deterministic IDs
+- Installs ADK's `google.adk.platform` time, uuid, and random providers as process-wide defaults, so they apply inside workflow tasks (which run on worker threads with an empty `contextvars` context)
+- Inside a workflow the providers return `workflow.time()`, `workflow.uuid4()`, and `workflow.random()`, so ADK-generated session, event, invocation, and function-call ids and retry jitter are reproducible on replay. Like those functions, ADK id generation and `get_random()` raise `ReadOnlyContextError` inside query handlers and update validators
+- Outside a workflow in the same process (activities, client code) they fall back to the standard library
+- Overrides through ADK's `set_*_provider` functions must be made after the Worker starts or from workflow code; one made earlier is replaced (with a warning) when the plugin installs its providers
 - Automatic setup when using `GoogleAdkPlugin`
 
 #### 2. Activity-Based Model Execution
