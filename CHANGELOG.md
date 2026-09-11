@@ -20,6 +20,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `update_options` and `restore_original_options`.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
@@ -62,6 +66,8 @@ to include examples, links to docs, or any other relevant information.
   cache — including the stale-result behavior this entry describes — and that
   a chain upgraded mid-continue-as-new re-executes rather than reuses a
   repeated identical call (the conservative direction).
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
+
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
