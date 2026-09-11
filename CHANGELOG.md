@@ -20,6 +20,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `temporalio.contrib.opentelemetry`: `RunActivity` spans now carry a
+  `temporalActivityAttempt` attribute with the Activity attempt number, in both
+  `OpenTelemetryPlugin` and `TracingInterceptor`. The SDK already creates one
+  `RunActivity` span per attempt; the attribute lets tracing backends tell
+  retries apart.
+
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.

@@ -370,7 +370,12 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         info = temporalio.activity.info()
-        attributes: dict[str, str] = {"temporalActivityID": info.activity_id}
+        attributes: dict[str, opentelemetry.util.types.AttributeValue] = {
+            "temporalActivityID": info.activity_id,
+            # One RunActivity span is created per attempt; the attempt number
+            # lets tracing backends tell retries apart.
+            "temporalActivityAttempt": info.attempt,
+        }
         if info.workflow_id:
             attributes["temporalWorkflowID"] = info.workflow_id
         if info.workflow_run_id:

@@ -425,6 +425,15 @@ async def test_opentelemetry_tracing(client: Client, env: WorkflowEnvironment):
         "SignalWorkflow:signal",
         "StartWorkflowUpdate:update",
     ]
+    # Each RunActivity span records its attempt number; the first activity
+    # failed once, so its two spans are attempts 1 and 2.
+    attempts = [
+        (span.attributes or {})["temporalActivityAttempt"]
+        for span in exporter.get_finished_spans()
+        if span.name == "RunActivity:tracing_activity"
+    ]
+    assert attempts[:2] == [1, 2]
+    assert all(attempt == 1 for attempt in attempts[2:])
 
 
 async def test_opentelemetry_tracing_update_with_start(
