@@ -16,6 +16,8 @@ from typing import (
     cast,
 )
 
+import pytest
+
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
 from temporalio.api.enums.v1 import IndexedValueType
@@ -116,27 +118,34 @@ async def wait_for_workflow_idle(
 ) -> None:
     """Wait until the running workflow has no pending workflow task, activity, child or Nexus op.
 
-    Pass a handle from a client without tracing interceptors so the probe itself is untraced.
+    Use as an untraced readiness probe before a traced query, signal or update: pass a handle
+    from a client without tracing interceptors. Fails fast if the workflow is no longer running.
+
+    Limits: a workflow blocked only on a timer also counts as idle, and the time-skipping test
+    server never reports ``pending_workflow_task``, so this returns immediately there.
     """
-    # The time-skipping test server never reports pending_workflow_task, so this can return early there.
-    deadline = time.monotonic() + timeout.total_seconds()
-    while True:
+
+    async def check() -> None:
         desc = await handle.describe()
-        assert desc.status == WorkflowExecutionStatus.RUNNING, (
-            f"Workflow {handle.id} is {desc.status}, not RUNNING"
-        )
+        if desc.status != WorkflowExecutionStatus.RUNNING:
+            status = desc.status.name if desc.status is not None else "UNKNOWN"
+            pytest.fail(f"Workflow {handle.id} is {status}, not RUNNING")
         raw = desc.raw_description
-        if not (
-            raw.HasField("pending_workflow_task")
-            or raw.pending_activities
-            or raw.pending_children
-            or raw.pending_nexus_operations
-        ):
-            return
-        assert time.monotonic() < deadline, (
-            f"Workflow {handle.id} still has pending work after {timeout}"
+        pending = [
+            name
+            for name, present in (
+                ("workflow task", raw.HasField("pending_workflow_task")),
+                ("activities", bool(raw.pending_activities)),
+                ("child workflows", bool(raw.pending_children)),
+                ("Nexus operations", bool(raw.pending_nexus_operations)),
+            )
+            if present
+        ]
+        assert not pending, (
+            f"Workflow {handle.id} still has pending {', '.join(pending)}"
         )
-        await asyncio.sleep(interval.total_seconds())
+
+    await assert_eventually(check, timeout=timeout, interval=interval)
 
 
 async def assert_task_fail_eventually(

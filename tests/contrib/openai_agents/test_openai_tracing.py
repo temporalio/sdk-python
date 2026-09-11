@@ -244,7 +244,11 @@ async def simple_no_context_activity() -> str:
 
 
 async def wait_for_activity_processed(client: Client, workflow_id: str) -> None:
-    """Wait, via an untraced history poll, until the workflow task that handled the activity result completed."""
+    """Wait, via an untraced history poll, until the workflow task that handled the activity result completed.
+
+    Assumes the workflow's first completed activity is the one right before its park point, which
+    holds for every workflow in this module.
+    """
     await assert_event_subsequence(
         client.get_workflow_handle(workflow_id),
         [
