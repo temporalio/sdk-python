@@ -101,7 +101,7 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
 
 def _deterministic_time_provider() -> float:
     if workflow.in_workflow():
-        return workflow.now().timestamp()
+        return workflow.time()
     return time.time()
 
 
@@ -136,19 +136,28 @@ def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -
     reaches them and ADK falls back to its wall-clock and random defaults
     there. A ContextVar's default, unlike a set value, is visible from every
     context, so the module's variable is replaced with one that defaults to
-    ``provider``. It keeps its name, and ADK's ``set_*_provider`` and
-    ``reset_*_provider`` keep working on it. A no-op when ``provider`` is
-    already the default.
+    ``provider``. ADK's ``set_*_provider`` and ``reset_*_provider`` operate on
+    the new variable from then on; a value set on the old one beforehand is
+    orphaned, so it is warned about. A no-op when ``provider`` is already the
+    default.
     """
     current: contextvars.ContextVar[Callable[[], Any]] = getattr(module, var_name)
     try:
-        installed = contextvars.Context().run(current.get) is provider
+        default = contextvars.Context().run(current.get)
     except LookupError:
-        installed = False
-    if not installed:
-        setattr(
-            module, var_name, contextvars.ContextVar(current.name, default=provider)
+        default = None
+    if default is provider:
+        return
+    if current.get(default) is not default:
+        warnings.warn(
+            f"Replacing the {module.__name__} provider set in this context before "
+            "GoogleAdkPlugin installed its deterministic providers; it will not "
+            "take effect. Set ADK provider overrides after the worker starts or "
+            "from workflow code.",
+            UserWarning,
+            stacklevel=_stacklevel_outside_temporalio(),
         )
+    setattr(module, var_name, contextvars.ContextVar(current.name, default=provider))
 
 
 def setup_deterministic_runtime() -> None:
@@ -162,10 +171,17 @@ def setup_deterministic_runtime() -> None:
     ``google.adk.platform`` time, uuid, and random seams, so they apply inside
     workflow tasks (which run on worker threads with an empty contextvars
     context) as well as in the calling context. Inside a workflow they return
-    ``workflow.now()``, ``workflow.uuid4()``, and ``workflow.random()``, so
-    ADK-generated ids and retry jitter are reproducible on replay; outside a
-    workflow they fall back to ``time.time()``, ``uuid.uuid4()``, and a
+    ``workflow.time()``, ``workflow.uuid4()``, and ``workflow.random()``, so
+    ADK-generated ids and retry jitter are reproducible on replay; like those
+    functions, id and random generation raise
+    :class:`temporalio.workflow.ReadOnlyContextError` in query handlers and
+    update validators. Outside a workflow in the same process (activities,
+    client code) they fall back to ``time.time()``, ``uuid.uuid4()``, and a
     process-wide ``random.Random``.
+
+    Overrides through ADK's ``set_*_provider`` functions must be made after
+    this runs (after the worker starts, or from workflow code); one made
+    earlier is replaced, with a warning.
 
     :class:`GoogleAdkPlugin` calls this when a worker or replayer starts.
     Calling it again is a no-op.

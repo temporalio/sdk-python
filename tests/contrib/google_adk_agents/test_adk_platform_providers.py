@@ -11,6 +11,7 @@ import contextvars
 import random
 import time
 import uuid
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
@@ -22,8 +23,7 @@ from google.adk.platform import uuid as adk_uuid
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.contrib.google_adk_agents import GoogleAdkPlugin
-from temporalio.contrib.google_adk_agents._plugin import setup_deterministic_runtime
+from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, _plugin
 from temporalio.worker import (
     Replayer,
     UnsandboxedWorkflowRunner,
@@ -77,7 +77,7 @@ class PlatformProviderWorkflow:
         rng.setstate(state)
         readings = PlatformProviderReadings(
             adk_time=adk_time.get_time(),
-            workflow_time=workflow.now().timestamp(),
+            workflow_time=workflow.time(),
             adk_id=adk_id,
             expected_id=str(workflow.uuid4()),
             random_is_workflow_random=adk_random.get_random() is rng,
@@ -135,7 +135,7 @@ async def test_providers_apply_inside_workflow_tasks(
 
 def test_providers_are_defaults_visible_from_new_threads() -> None:
     reset_adk_providers_to_shipped_state()
-    setup_deterministic_runtime()
+    _plugin.setup_deterministic_runtime()
 
     def read_providers() -> tuple[object, object, object]:
         # A new thread starts with an empty context; make that explicit so the
@@ -153,37 +153,67 @@ def test_providers_are_defaults_visible_from_new_threads() -> None:
             read_providers
         ).result()
 
-    assert time_provider is not adk_time._default_time_provider
-    assert id_provider is not adk_uuid._default_id_provider
-    assert random_provider is not adk_random._default_random_provider
+    assert time_provider is _plugin._deterministic_time_provider
+    assert id_provider is _plugin._deterministic_id_provider
+    assert random_provider is _plugin._deterministic_random_provider
 
 
 def test_providers_fall_back_outside_workflow() -> None:
-    setup_deterministic_runtime()
+    _plugin.setup_deterministic_runtime()
 
+    assert (
+        adk_time._time_provider_context_var.get()
+        is _plugin._deterministic_time_provider
+    )
     assert adk_time.get_time() == pytest.approx(time.time(), abs=5)
+    assert adk_uuid._id_provider_context_var.get() is _plugin._deterministic_id_provider
     assert uuid.UUID(adk_uuid.new_uuid()).version == 4
+    assert (
+        adk_random._random_provider_context_var.get()
+        is _plugin._deterministic_random_provider
+    )
+    # One shared instance, so RNG state carries across calls as ADK expects.
     rng = adk_random.get_random()
     assert isinstance(rng, random.Random)
-    # One shared instance, so RNG state carries across calls as ADK expects.
+    assert rng is _plugin._random_outside_workflow
     assert adk_random.get_random() is rng
 
 
 def test_setup_deterministic_runtime_is_idempotent() -> None:
-    setup_deterministic_runtime()
+    _plugin.setup_deterministic_runtime()
     time_var = adk_time._time_provider_context_var
     id_var = adk_uuid._id_provider_context_var
     random_var = adk_random._random_provider_context_var
 
-    setup_deterministic_runtime()
+    _plugin.setup_deterministic_runtime()
 
     assert adk_time._time_provider_context_var is time_var
     assert adk_uuid._id_provider_context_var is id_var
     assert adk_random._random_provider_context_var is random_var
 
 
+def test_install_warns_when_replacing_provider_set_before_install() -> None:
+    reset_adk_providers_to_shipped_state()
+
+    def set_then_install() -> None:
+        adk_time.set_time_provider(lambda: 1.0)
+        with pytest.warns(UserWarning, match="set in this context before"):
+            _plugin.setup_deterministic_runtime()
+        # The earlier override lives on the replaced variable and is ignored.
+        assert adk_time.get_time() != 1.0
+
+    # Run in a copied context so the override does not leak into other tests.
+    contextvars.copy_context().run(set_then_install)
+
+    # Installing over untouched seams is silent.
+    reset_adk_providers_to_shipped_state()
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        _plugin.setup_deterministic_runtime()
+
+
 def test_adk_setters_still_override_in_calling_context() -> None:
-    setup_deterministic_runtime()
+    _plugin.setup_deterministic_runtime()
 
     def override_and_read() -> float:
         adk_time.set_time_provider(lambda: 1.0)
