@@ -56,6 +56,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- OpenAI Agents tracing preserves caller spans across workers and restores context
+  after activity, local-activity, and child-workflow completion callbacks.
 - `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
