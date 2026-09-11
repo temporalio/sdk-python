@@ -2,8 +2,10 @@
 
 ``run_deep_agent(continue_as_new_after=...)`` keeps a long conversation from
 bloating workflow history: once the current turn finishes past the threshold and
-there is still pending work, it snapshots the accumulated messages plus the
-model/tool result cache and continues into a fresh run. These tests use a plain
+there is still pending work, it snapshots the accumulated messages and continues
+into a fresh run. (The legacy result cache is retired for new executions —
+see ``deepagents.retire-result-cache``; ``test_state_snapshot_roundtrip`` below
+covers the _serde plumbing that only the legacy replay branch still uses.) These tests use a plain
 fake agent (no LangChain needed) so they boot a real Temporal server and exercise
 the continue-as-new machinery end to end.
 """
@@ -88,8 +90,9 @@ async def test_can_threshold_and_cache(env: WorkflowEnvironment) -> None:
 
 
 def test_state_snapshot_roundtrip() -> None:
-    # The result cache carried in a snapshot rehydrates to the same hits, so work
-    # done before a continue-as-new is reused, not recomputed, afterwards.
+    # LEGACY-branch plumbing (deepagents.retire-result-cache unpatched): a
+    # carried cache rehydrates to the same hits during replay of pre-change
+    # histories. Delete alongside the patch's deprecate_patch cleanup.
     _serde.set_result_cache({})
     key = _serde.cache_key("model", "fake:model", [["m"], []])
     _serde.cache_put(key, {"dumped": "message"})

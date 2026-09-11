@@ -30,6 +30,7 @@ pytest.importorskip("deepagents")
 pytest.importorskip("langchain_core")
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalBackend
 from temporalio.contrib.deepagents._tools import (
     register_backend,
@@ -364,7 +365,12 @@ class RepeatedBackendOpWorkflow:
 
         backend = TemporalBackend(
             MutatingBackend(input["root"]),
-            activity_options={"start_to_close_timeout": timedelta(seconds=10)},
+            # No retries: the disk log grows per activity ATTEMPT and the
+            # assertions are exact counts.
+            activity_options={
+                "start_to_close_timeout": timedelta(seconds=30),
+                "retry_policy": RetryPolicy(maximum_attempts=1),
+            },
         )
         result = await run_deep_agent(
             _RepeatedOpsAgent(backend), input, state_snapshot=state_snapshot

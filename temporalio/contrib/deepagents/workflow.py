@@ -3,8 +3,9 @@
 Everything here runs *inside* the workflow. The dispatch helpers
 (:func:`call_model` / :func:`call_tool` / :func:`call_backend_op`) are the single
 choke point through which the in-workflow model / tool / backend stubs reach
-their activities; they also consult the continue-as-new result cache so work
-done before a ``continue_as_new`` is reused rather than repeated after it.
+their activities. Every dispatch runs its own Activity; only executions
+recorded before the ``deepagents.retire-result-cache`` patch consult the
+legacy continue-as-new result cache during replay.
 
 :func:`run_deep_agent` is the optional driver that adds continue-as-new
 state-carry around a native ``agent.ainvoke(...)`` — plain ``agent.ainvoke(...)``

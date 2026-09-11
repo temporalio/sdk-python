@@ -46,18 +46,20 @@ with workflow.unsafe.imports_passed_through():
 _HISTORY = Path(__file__).parent / "histories" / "legacy_dedup_repeated_tool_calls.json"
 
 
-@tool
-def pairing_weather(city: str) -> str:
+@tool("pairing_weather")
+def legacy_replay_pairing_weather(city: str) -> str:
     """Return the weather for a city."""
     return f"weather:{city}"
 
 
-@workflow.defn
-class RepeatedToolCallWorkflow:
+# Distinct Python symbols from test_tools.py's same-named definitions; the
+# DEFN name must match the workflow type recorded in the fixture history.
+@workflow.defn(name="RepeatedToolCallWorkflow")
+class LegacyReplayToolCallWorkflow:
     @workflow.run
     async def run(self) -> str:
         t = tool_as_activity(
-            pairing_weather, start_to_close_timeout=timedelta(seconds=10)
+            legacy_replay_pairing_weather, start_to_close_timeout=timedelta(seconds=10)
         )
         agent = create_deep_agent(model="fake:model", tools=[t])
         result = await run_deep_agent(
@@ -88,6 +90,84 @@ RESPONSES: list[Any] = [
 @pytest.mark.asyncio
 async def test_legacy_dedup_history_replays() -> None:
     plugin = DeepAgentsPlugin(model_provider=mock_model_provider(RESPONSES))
-    replayer = Replayer(workflows=[RepeatedToolCallWorkflow], plugins=[plugin])
+    replayer = Replayer(workflows=[LegacyReplayToolCallWorkflow], plugins=[plugin])
     history = WorkflowHistory.from_json("legacy-replay", _HISTORY.read_text())
+    await replayer.replay_workflow(history)
+
+
+with workflow.unsafe.imports_passed_through():
+    from langchain_core.tools import tool as _lc_tool
+
+from temporalio.contrib.deepagents import _activity
+from temporalio.contrib.deepagents._tools import register_tool
+from temporalio.contrib.deepagents.workflow import call_tool
+
+_CAN_HISTORY = (
+    Path(__file__).parent / "histories" / "legacy_cache_carried_across_can.json"
+)
+
+
+@_lc_tool("legacy_echo")
+def legacy_replay_echo(x: int) -> str:
+    """Echo a number."""
+    return f"echo:{x}"
+
+
+register_tool(legacy_replay_echo)
+
+
+class _SameCallAgent:
+    async def ainvoke(self, input: Any) -> dict:
+        messages = list(input.get("messages", [])) if isinstance(input, dict) else []
+        await call_tool(
+            _activity.ToolActivityInput(
+                tool_name="legacy_echo", tool_call_id="tc-1", args={"x": 1}
+            ),
+            summary="tool:legacy_echo",
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        done = len(messages) >= 1
+        return {
+            "messages": [*messages, "turn"],
+            "todos": [{"content": "w", "status": "completed" if done else "pending"}],
+        }
+
+
+@workflow.defn(name="LegacyCanDedupWorkflow")
+class LegacyReplayCanDedupWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
+        from temporalio.contrib.deepagents import run_deep_agent
+
+        return await run_deep_agent(
+            _SameCallAgent(),
+            input,
+            continue_as_new_after=1,
+            state_snapshot=state_snapshot,
+        )
+
+
+@pytest.mark.asyncio
+async def test_legacy_carried_cache_history_replays() -> None:
+    """The legacy rehydrate-and-hit path replays: this continued-run history
+    was recorded pre-change with the SAME tool call re-issued after the
+    boundary and served from the CARRIED cache — it contains zero
+    invoke_tool activities, so replay only succeeds if the unpatched branch
+    seeds the cache from the inbound snapshot and serves the hit."""
+    import json
+
+    events = json.loads(_CAN_HISTORY.read_text())["events"]
+    scheduled = [
+        e
+        for e in events
+        if e.get("activityTaskScheduledEventAttributes", {})
+        .get("activityType", {})
+        .get("name")
+        == "deepagents.invoke_tool"
+    ]
+    assert scheduled == [], "fixture must contain a fully cache-served run"
+
+    plugin = DeepAgentsPlugin()
+    replayer = Replayer(workflows=[LegacyReplayCanDedupWorkflow], plugins=[plugin])
+    history = WorkflowHistory.from_json("legacy-can-replay", _CAN_HISTORY.read_text())
     await replayer.replay_workflow(history)
