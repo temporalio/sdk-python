@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 
 from temporalio.client import WorkflowExecutionStatus
+from temporalio.common import RetryPolicy
 from temporalio.testing import WorkflowEnvironment
 
 pytestmark = pytest.mark.skipif(
@@ -192,7 +193,7 @@ class _CrossBoundaryAgent:
 
     async def ainvoke(self, input: Any) -> dict:
         out = await self._backend.read("state.txt")
-        done = out >= "read:2"
+        done = int(out.split(":")[1]) >= 2
         return {
             "messages": [*list(input.get("messages", [])), out],
             "todos": [
@@ -209,7 +210,12 @@ class CrossBoundaryOpWorkflow:
 
         backend = TemporalBackend(
             DiskCountingBackend(input["root"]),
-            activity_options={"start_to_close_timeout": timedelta(seconds=10)},
+            # No retries: the disk counter increments per activity ATTEMPT, so
+            # a retry would skew the exact read-count assertions.
+            activity_options={
+                "start_to_close_timeout": timedelta(seconds=30),
+                "retry_policy": RetryPolicy(maximum_attempts=1),
+            },
         )
         return await run_deep_agent(
             _CrossBoundaryAgent(backend),

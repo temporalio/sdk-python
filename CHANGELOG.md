@@ -57,8 +57,11 @@ to include examples, links to docs, or any other relevant information.
   continue-as-new result cache is retired for new executions (a continued run
   resumes from the carried transcript and never re-executes prior dispatches,
   so a carried cache entry could only serve stale results). Patch-gated
-  (`deepagents.cache-key-per-occurrence`), so histories recorded before this
-  change replay unchanged.
+  (`deepagents.retire-result-cache`), so histories recorded before this change
+  replay unchanged; note that deferring the patch keeps the full legacy dedup
+  cache — including the stale-result behavior this entry describes — and that
+  a chain upgraded mid-continue-as-new re-executes rather than reuses a
+  repeated identical call (the conservative direction).
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.

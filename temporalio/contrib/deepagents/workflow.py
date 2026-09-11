@@ -77,6 +77,15 @@ class DeepAgentsWorkflowError(ApplicationError):
 # ---------------------------------------------------------------------------
 
 
+def _legacy_lookup(kind: str, name: str, payload: Any) -> tuple[str | None, bool, Any]:
+    """Legacy-cache lookup: ``(key, hit, value)``; key is None on new executions."""
+    if not _legacy_result_cache():
+        return None, False, None
+    key = _serde.cache_key(kind, name, payload)
+    hit, value = _serde.cache_lookup(key)
+    return key, hit, value
+
+
 def _legacy_result_cache() -> bool:
     """Whether this execution uses the legacy continue-as-new result cache.
 
@@ -93,7 +102,7 @@ def _legacy_result_cache() -> bool:
     replaying them without the cache would emit commands history does not
     have.
     """
-    return not workflow.patched("deepagents.cache-key-per-occurrence")
+    return not workflow.patched("deepagents.retire-result-cache")
 
 
 async def call_model(
@@ -104,16 +113,13 @@ async def call_model(
     **opts: Any,
 ) -> _activity.ModelActivityOutput:
     """Dispatch one model call as its own Activity."""
-    legacy_key: str | None = None
-    if _legacy_result_cache():
-        legacy_key = _serde.cache_key(
-            "model",
-            activity_input.model_name,
-            [activity_input.messages, activity_input.tool_schemas],
-        )
-        hit, cached = _serde.cache_lookup(legacy_key)
-        if hit:
-            return _activity.ModelActivityOutput(message=cached)
+    legacy_key, hit, cached = _legacy_lookup(
+        "model",
+        activity_input.model_name,
+        [activity_input.messages, activity_input.tool_schemas],
+    )
+    if hit:
+        return _activity.ModelActivityOutput(message=cached)
     output = await workflow.execute_activity(
         activity_name,
         activity_input,
@@ -133,14 +139,11 @@ async def call_tool(
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
     """Dispatch one tool call as its own Activity."""
-    legacy_key: str | None = None
-    if _legacy_result_cache():
-        legacy_key = _serde.cache_key(
-            "tool", activity_input.tool_name, activity_input.args
-        )
-        hit, cached = _serde.cache_lookup(legacy_key)
-        if hit:
-            return _activity.ToolActivityOutput(message=cached)
+    legacy_key, hit, cached = _legacy_lookup(
+        "tool", activity_input.tool_name, activity_input.args
+    )
+    if hit:
+        return _activity.ToolActivityOutput(message=cached)
     output = await workflow.execute_activity(
         _activity.INVOKE_TOOL,
         activity_input,
@@ -160,16 +163,13 @@ async def call_backend_op(
     **opts: Any,
 ) -> _activity.BackendOpOutput:
     """Dispatch one backend op as its own Activity."""
-    legacy_key: str | None = None
-    if _legacy_result_cache():
-        legacy_key = _serde.cache_key(
-            f"backend:{activity_input.backend_ref}",
-            activity_input.op,
-            [activity_input.args, activity_input.kwargs],
-        )
-        hit, cached = _serde.cache_lookup(legacy_key)
-        if hit:
-            return _activity.BackendOpOutput(result=cached)
+    legacy_key, hit, cached = _legacy_lookup(
+        f"backend:{activity_input.backend_ref}",
+        activity_input.op,
+        [activity_input.args, activity_input.kwargs],
+    )
+    if hit:
+        return _activity.BackendOpOutput(result=cached)
     output = await workflow.execute_activity(
         _activity.BACKEND_OP,
         activity_input,
@@ -234,7 +234,14 @@ async def run_deep_agent(
     """
     # Resume path: rehydrate the result cache and fold carried messages in.
     if state_snapshot is not None:
-        _serde.set_result_cache(dict(state_snapshot.get(_CACHE_KEY) or {}))
+        # Only legacy executions consult the carried cache; on new
+        # executions the inbound legacy entries are dead weight, and at the
+        # upgrade hop a repeated identical call re-executes (conservative
+        # direction) rather than being served a possibly-stale carried result.
+        if _legacy_result_cache():
+            _serde.set_result_cache(dict(state_snapshot.get(_CACHE_KEY) or {}))
+        else:
+            _serde.set_result_cache({})
         input = _merge_snapshot(input, state_snapshot)
     else:
         _serde.set_result_cache({})
