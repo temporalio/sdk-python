@@ -93,8 +93,9 @@ class OpenAIAgentsContextPropagationInterceptor(
             payload_converter: The payload converter to use for serializing/deserializing
                 trace context. Defaults to the default Temporal payload converter.
             add_temporal_spans: Whether to add temporal-specific spans to traces.
-            start_traces: Whether to start new traces if none exist. This will cause duplication if the underlying
-                trace provider actually process start events. Primarily designed for use with Open Telemetry integration.
+            start_traces: Whether to emit start events for reconstructed context.
+                Keep disabled when the processor records spans, to avoid duplicating
+                the caller's spans.
         """
         super().__init__()
         self._payload_converter = payload_converter
@@ -465,7 +466,7 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             context.run(self.root().set_header_from_context, input=input)
 
             def finish_on_completion(handle: asyncio.Future[Any]) -> None:
-                # The callback must own the Context that created the processor's token.
+                # Tokens cannot be detached in a copy of their original Context.
                 handle.add_done_callback(
                     lambda _: span_scope.__exit__(None, None, None), context=context
                 )
