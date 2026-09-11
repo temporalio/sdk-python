@@ -145,6 +145,9 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
             dev_server_extra_args=[
                 "--dynamic-config-value",
                 "system.forceSearchAttributesCacheRefreshOnRead=true",
+                # Keep a stalled first workflow task from timing out and retrying on slow CI
+                "--dynamic-config-value",
+                'history.defaultWorkflowTaskTimeout="60s"',
                 "--dynamic-config-value",
                 f"limit.historyCount.suggestContinueAsNew={CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT}",
                 "--dynamic-config-value",
