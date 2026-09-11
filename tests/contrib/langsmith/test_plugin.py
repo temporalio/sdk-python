@@ -17,16 +17,16 @@ from tests.contrib.langsmith.conftest import (
     find_trace_trees,
 )
 from tests.contrib.langsmith.test_integration import (
+    _IDLE_TIMEOUT,
     ComprehensiveWorkflow,
     NexusService,
     TraceableActivityWorkflow,
     _make_client_and_collector,
     _query_pipeline,
-    _wait_for_workflow_idle,
     nested_traceable_activity,
     traceable_activity,
 )
-from tests.helpers import new_worker
+from tests.helpers import new_worker, wait_for_workflow_idle
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.helpers.trace import assert_trace_hierarchy
 
@@ -103,13 +103,13 @@ class TestPluginIntegration:
                 )
                 # Raw-client handle (no LangSmith interceptor) for untraced readiness checks
                 raw_handle = client.get_workflow_handle(workflow_id)
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 assert await _query_pipeline(
                     handle, ComprehensiveWorkflow.is_waiting_for_signal
                 ), "Workflow never reached signal wait point"
                 await handle.query(ComprehensiveWorkflow.my_query)
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 await handle.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )

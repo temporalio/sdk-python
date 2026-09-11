@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import uuid
 from collections.abc import Callable
 from datetime import timedelta
@@ -16,7 +15,6 @@ from langsmith import traceable, tracing_context
 from temporalio import activity, common, nexus, workflow
 from temporalio.client import (
     Client,
-    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
 )
@@ -29,7 +27,7 @@ from tests.contrib.langsmith.conftest import (
     find_trace_trees,
     make_mock_ls_client,
 )
-from tests.helpers import new_worker
+from tests.helpers import new_worker, wait_for_workflow_idle
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.helpers.trace import assert_trace_hierarchy
 
@@ -317,20 +315,9 @@ def _make_temporal_client(
     return Client(**config)
 
 
-async def _wait_for_workflow_idle(handle: WorkflowHandle[Any, Any]) -> None:
-    """Wait until the running workflow has no pending task, activity, child or Nexus op."""
-    while True:
-        desc = await handle.describe()
-        assert desc.status == WorkflowExecutionStatus.RUNNING, desc.status
-        raw = desc.raw_description
-        if not (
-            raw.HasField("pending_workflow_task")
-            or raw.pending_activities
-            or raw.pending_children
-            or raw.pending_nexus_operations
-        ):
-            return
-        await asyncio.sleep(0.2)
+# CI has stalled workflow tasks for tens of seconds; give the untraced idle probe
+# most of the 60s per-test budget instead of the helper's 10s default.
+_IDLE_TIMEOUT = timedelta(seconds=30)
 
 
 @traceable(name="query_pipeline")
@@ -615,7 +602,7 @@ class TestComprehensiveTracing:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 assert await _query_pipeline(
                     handle, ComprehensiveWorkflow.is_waiting_for_signal
                 ), "Workflow never reached signal wait point"
@@ -640,7 +627,7 @@ class TestComprehensiveTracing:
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.query(ComprehensiveWorkflow.my_query)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
@@ -828,7 +815,7 @@ class TestComprehensiveTracing:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 # Raw-client query — no interceptor, produces nothing
                 assert await raw_handle.query(
                     ComprehensiveWorkflow.is_waiting_for_signal
@@ -852,7 +839,7 @@ class TestComprehensiveTracing:
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
                 await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await _wait_for_workflow_idle(raw_handle)
+                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
@@ -1267,7 +1254,7 @@ class TestBuiltinQueryFiltering:
                 task_queue=worker.task_queue,
             )
 
-            await _wait_for_workflow_idle(handle)
+            await wait_for_workflow_idle(handle, timeout=_IDLE_TIMEOUT)
 
             # Built-in queries — should NOT be traced
             await handle.query("__temporal_workflow_metadata")
