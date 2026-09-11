@@ -336,34 +336,9 @@ _result_cache: contextvars.ContextVar[dict[str, Any] | None] = contextvars.Conte
 )
 
 
-_call_occurrences: contextvars.ContextVar[dict[str, int] | None] = (
-    contextvars.ContextVar("_deepagents_call_occurrences", default=None)
-)
-
-
 def set_result_cache(cache: dict[str, Any] | None) -> None:
     """Seed the workflow-scoped result cache (e.g. carried across CAN)."""
     _result_cache.set(dict(cache) if cache else {})
-    # Occurrence counters restart with the cache: a continued run replays the
-    # carried conversation's calls in order, so per-run counting reproduces
-    # the same keys the previous run stored.
-    _call_occurrences.set({})
-
-
-def next_occurrence(identity: str) -> int:
-    """0-based count of prior calls this run with the same ``identity``.
-
-    Deterministic under replay (workflow code increments in execution order),
-    so a repeated identical call gets its own cache slot while replay and
-    post-continue-as-new runs regenerate the same sequence of keys.
-    """
-    counts = _call_occurrences.get()
-    if counts is None:
-        counts = {}
-        _call_occurrences.set(counts)
-    n = counts.get(identity, 0)
-    counts[identity] = n + 1
-    return n
 
 
 def result_cache_snapshot() -> dict[str, Any] | None:

@@ -77,21 +77,23 @@ class DeepAgentsWorkflowError(ApplicationError):
 # ---------------------------------------------------------------------------
 
 
-def _occurrence_cache_key(kind: str, name: str, payload: Any) -> str:
-    """Cache key giving repeated identical calls their own slot.
+def _legacy_result_cache() -> bool:
+    """Whether this execution uses the legacy continue-as-new result cache.
 
-    Keyed by per-run occurrence index (not any per-invocation id), so replay
-    and post-continue-as-new runs regenerate the carried conversation's calls
-    in order and reproduce the same keys — repeats each run their own
-    Activity while completed calls still reuse across continue-as-new.
-    Patch-gated: histories recorded under payload-only keys reused one result
-    for repeats, and replaying them with per-occurrence keys would schedule
-    an Activity the history does not have.
+    New executions do not cache at all: repeated identical calls are
+    legitimate work (a re-issued tool call, a deliberate model resample, a
+    re-read after a write), and under the resume-from-transcript
+    continue-as-new semantics a continued run never re-executes prior
+    dispatches — so a carried cache entry could only ever serve a stale
+    result to a genuinely new call. Replay of a single run needs no cache:
+    history supplies recorded activity results.
+
+    Patch-gated because histories recorded under the legacy cache contain
+    dedup decisions (a repeated call answered with no activity scheduled);
+    replaying them without the cache would emit commands history does not
+    have.
     """
-    base = _serde.cache_key(kind, name, payload)
-    if workflow.patched("deepagents.cache-key-per-occurrence"):
-        return _serde.cache_key(kind, base, _serde.next_occurrence(base))
-    return base
+    return not workflow.patched("deepagents.cache-key-per-occurrence")
 
 
 async def call_model(
@@ -101,17 +103,17 @@ async def call_model(
     summary: str,
     **opts: Any,
 ) -> _activity.ModelActivityOutput:
-    """Dispatch one model call, reusing a cached result across continue-as-new."""
-    # Identical inputs can be deliberate resampling (self-consistency,
-    # sub-agent fan-out); occurrence keying keeps each live call distinct.
-    key = _occurrence_cache_key(
-        "model",
-        activity_input.model_name,
-        [activity_input.messages, activity_input.tool_schemas],
-    )
-    hit, cached = _serde.cache_lookup(key)
-    if hit:
-        return _activity.ModelActivityOutput(message=cached)
+    """Dispatch one model call as its own Activity."""
+    legacy_key: str | None = None
+    if _legacy_result_cache():
+        legacy_key = _serde.cache_key(
+            "model",
+            activity_input.model_name,
+            [activity_input.messages, activity_input.tool_schemas],
+        )
+        hit, cached = _serde.cache_lookup(legacy_key)
+        if hit:
+            return _activity.ModelActivityOutput(message=cached)
     output = await workflow.execute_activity(
         activity_name,
         activity_input,
@@ -119,7 +121,8 @@ async def call_model(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.message)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.message)
     return output
 
 
@@ -129,11 +132,15 @@ async def call_tool(
     summary: str,
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
-    """Dispatch one tool call, reusing a cached result across continue-as-new."""
-    key = _occurrence_cache_key("tool", activity_input.tool_name, activity_input.args)
-    hit, cached = _serde.cache_lookup(key)
-    if hit:
-        return _activity.ToolActivityOutput(message=cached)
+    """Dispatch one tool call as its own Activity."""
+    legacy_key: str | None = None
+    if _legacy_result_cache():
+        legacy_key = _serde.cache_key(
+            "tool", activity_input.tool_name, activity_input.args
+        )
+        hit, cached = _serde.cache_lookup(legacy_key)
+        if hit:
+            return _activity.ToolActivityOutput(message=cached)
     output = await workflow.execute_activity(
         _activity.INVOKE_TOOL,
         activity_input,
@@ -141,7 +148,8 @@ async def call_tool(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.message)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.message)
     return output
 
 
@@ -151,17 +159,17 @@ async def call_backend_op(
     summary: str,
     **opts: Any,
 ) -> _activity.BackendOpOutput:
-    """Dispatch one backend op, reusing a cached result across continue-as-new."""
-    # Backend ops are order-sensitive I/O: a repeated read after an
-    # intervening write must see fresh state, a repeated execute must run.
-    key = _occurrence_cache_key(
-        f"backend:{activity_input.backend_ref}",
-        activity_input.op,
-        [activity_input.args, activity_input.kwargs],
-    )
-    hit, cached = _serde.cache_lookup(key)
-    if hit:
-        return _activity.BackendOpOutput(result=cached)
+    """Dispatch one backend op as its own Activity."""
+    legacy_key: str | None = None
+    if _legacy_result_cache():
+        legacy_key = _serde.cache_key(
+            f"backend:{activity_input.backend_ref}",
+            activity_input.op,
+            [activity_input.args, activity_input.kwargs],
+        )
+        hit, cached = _serde.cache_lookup(legacy_key)
+        if hit:
+            return _activity.BackendOpOutput(result=cached)
     output = await workflow.execute_activity(
         _activity.BACKEND_OP,
         activity_input,
@@ -169,7 +177,8 @@ async def call_backend_op(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.result)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.result)
     return output
 
 
@@ -251,10 +260,9 @@ async def run_deep_agent(
             workflow.info().get_current_history_length() >= continue_as_new_after
         )
     if should_continue and _has_pending_work(result):
-        snapshot = {
-            "messages": _extract_messages(result),
-            _CACHE_KEY: _serde.result_cache_snapshot() or {},
-        }
+        snapshot: dict[str, Any] = {"messages": _extract_messages(result)}
+        if _legacy_result_cache():
+            snapshot[_CACHE_KEY] = _serde.result_cache_snapshot() or {}
         # ``continue_as_new`` threads positional args into the next run via
         # ``args=``; the enclosing ``@workflow.run`` receives them as
         # ``(input, state_snapshot)``.

@@ -52,11 +52,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `temporalio.contrib.deepagents` now runs repeated identical tool, model,
-  and backend-op calls independently instead of serving the first call's
-  cached result, while still reusing completed calls across continue-as-new.
-  Patch-gated (`deepagents.cache-key-per-occurrence`), so histories recorded
-  before this change replay unchanged.
+- `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
+  model, and backend-op calls: each dispatch runs its own Activity, and the
+  continue-as-new result cache is retired for new executions (a continued run
+  resumes from the carried transcript and never re-executes prior dispatches,
+  so a carried cache entry could only serve stale results). Patch-gated
+  (`deepagents.cache-key-per-occurrence`), so histories recorded before this
+  change replay unchanged.
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
