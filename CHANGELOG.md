@@ -27,6 +27,10 @@ to include examples, links to docs, or any other relevant information.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
+  and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
+  synchronous results, and failures. Asynchronous handler results and detached standalone handles
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
 
 ### Changed
 
@@ -36,6 +40,8 @@ to include examples, links to docs, or any other relevant information.
 - System Nexus Signal-with-Start Workflow operations now invoke
   `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
+- The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
+  operation.
 
 ### Deprecated
 

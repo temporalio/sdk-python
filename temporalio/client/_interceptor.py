@@ -18,9 +18,7 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from temporalio.converter import (
-    DataConverter,
-)
+from temporalio.converter import DataConverter
 
 if TYPE_CHECKING:
     from ._activity import (
@@ -657,6 +655,9 @@ class GetNexusOperationResultInput:
 
     operation_id: str
     run_id: str | None
+    endpoint: str
+    service: str
+    operation: str
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
     result_type: type[Any] | None
