@@ -632,6 +632,7 @@ async def test_temporal_operation_update_workflow(
 
         async def check_updates_on_completed_workflows_fail():
             """The handler workflow already finished at this point, further updaes should just fail"""
+            await target_handle.result()
             wf_handle = await client.start_workflow(
                 UpdateWorkflowCaller.run,
                 Input(
