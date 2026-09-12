@@ -56,6 +56,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
   model, and backend-op calls: each dispatch runs its own Activity, and the
   continue-as-new result cache is retired for new executions (a continued run
