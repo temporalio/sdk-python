@@ -2,8 +2,10 @@
 
 ``run_deep_agent(continue_as_new_after=...)`` keeps a long conversation from
 bloating workflow history: once the current turn finishes past the threshold and
-there is still pending work, it snapshots the accumulated messages plus the
-model/tool result cache and continues into a fresh run. These tests use a plain
+there is still pending work, it snapshots the accumulated messages and continues
+into a fresh run. (The legacy result cache is retired for new executions —
+see ``deepagents.retire-result-cache``; ``test_state_snapshot_roundtrip`` below
+covers the _serde plumbing that only the legacy replay branch still uses.) These tests use a plain
 fake agent (no LangChain needed) so they boot a real Temporal server and exercise
 the continue-as-new machinery end to end.
 """
@@ -27,8 +29,8 @@ pytestmark = pytest.mark.skipif(
 )
 from temporalio import workflow
 from temporalio.contrib.deepagents import DeepAgentsPlugin, _serde, run_deep_agent
-from temporalio.contrib.deepagents.workflow import _merge_snapshot
-from temporalio.worker import Worker
+from temporalio.contrib.deepagents.workflow import _CACHE_KEY, _merge_snapshot
+from temporalio.worker import Replayer, Worker
 
 
 class FakeAgent:
@@ -87,8 +89,9 @@ async def test_can_threshold_and_cache(env: WorkflowEnvironment) -> None:
 
 
 def test_state_snapshot_roundtrip() -> None:
-    # The result cache carried in a snapshot rehydrates to the same hits, so work
-    # done before a continue-as-new is reused, not recomputed, afterwards.
+    # LEGACY-branch plumbing (deepagents.retire-result-cache unpatched): a
+    # carried cache rehydrates to the same hits during replay of pre-change
+    # histories. Delete alongside the patch's deprecate_patch cleanup.
     _serde.set_result_cache({})
     key = _serde.cache_key("model", "fake:model", [["m"], []])
     _serde.cache_put(key, {"dumped": "message"})
@@ -259,8 +262,7 @@ async def test_bare_string_input_survives_continue_as_new(
 
 @pytest.mark.asyncio
 async def test_can_args_do_not_carry_messages(env: WorkflowEnvironment) -> None:
-    """The continue-as-new command's carried input omits "messages" — the
-    transcript rides only in the snapshot (single copy in the payload)."""
+    """Continue-as-new carries one transcript and produces replayable histories."""
     import json
 
     plugin = DeepAgentsPlugin()
@@ -296,6 +298,11 @@ async def test_can_args_do_not_carry_messages(env: WorkflowEnvironment) -> None:
     assert "messages" not in carried_input, carried_input
     assert carried_input.get("config") == {"k": "v"}
     assert snapshot["messages"], snapshot
+    assert _CACHE_KEY not in snapshot
+
+    replayer = Replayer(workflows=[ContinueAsNewWorkflow], plugins=[DeepAgentsPlugin()])
+    await replayer.replay_workflow(hist)
+    await replayer.replay_workflow(await handle.fetch_history())
 
 
 class DiskCountingBackend:
@@ -380,3 +387,81 @@ async def test_empty_transcript_can_preserves_prompt(
 
     assert desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW, desc.status
     assert result["messages"] == ["the question", "answered"], result
+
+
+class _CrossBoundaryAgent:
+    """ainvoke-shaped driver issuing the SAME read every run; reports pending
+    until the second read has observably executed."""
+
+    def __init__(self, backend: Any) -> None:
+        self._backend = backend
+
+    async def ainvoke(self, input: Any) -> dict:
+        out = await self._backend.read("state.txt")
+        done = int(out.split(":")[1]) >= 2
+        return {
+            "messages": [*list(input.get("messages", [])), out],
+            "todos": [
+                {"content": "work", "status": "completed" if done else "pending"}
+            ],
+        }
+
+
+@workflow.defn
+class CrossBoundaryOpWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> dict:
+        from temporalio.contrib.deepagents import TemporalBackend
+
+        backend = TemporalBackend(
+            DiskCountingBackend(input["root"]),
+            # No retries: the disk counter increments per activity ATTEMPT, so
+            # a retry would skew the exact read-count assertions.
+            activity_options={
+                "start_to_close_timeout": timedelta(seconds=30),
+                "retry_policy": RetryPolicy(maximum_attempts=1),
+            },
+        )
+        return await run_deep_agent(
+            _CrossBoundaryAgent(backend),
+            input,
+            continue_as_new_after=1,
+            state_snapshot=state_snapshot,
+        )
+
+
+@pytest.mark.asyncio
+async def test_identical_op_reruns_across_continue_as_new(
+    env: WorkflowEnvironment, tmp_path: Any
+) -> None:
+    """An identical backend op issued on BOTH sides of a continue-as-new
+    boundary executes on both sides. Under the legacy carried cache the
+    post-boundary call was served the pre-boundary result (the continued run
+    resumes from the transcript — it never re-executes prior dispatches, so
+    a carried hit could only ever be stale)."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-cross-boundary",
+        workflows=[CrossBoundaryOpWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            CrossBoundaryOpWorkflow.run,
+            {"messages": [], "root": str(tmp_path)},
+            id=f"da-cross-boundary-{uuid.uuid4()}",
+            task_queue="da-cross-boundary",
+        )
+        result = await handle.result()
+
+    # The read really executed in the continued run: disk shows two reads and
+    # the carried transcript holds each run's distinct observation.
+    assert (tmp_path / "reads.log").read_text().splitlines() == ["r", "r"]
+    assert result["messages"][-2:] == ["read:1", "read:2"], result
+    # The chain really crossed a boundary.
+    first = env.client.get_workflow_handle(
+        handle.id, run_id=handle.first_execution_run_id
+    )
+    desc = await first.describe()
+    assert desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW, desc.status
