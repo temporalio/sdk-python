@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 import uuid
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
@@ -101,3 +102,62 @@ async def test_temporal_model_explicit(env: WorkflowEnvironment) -> None:
     assert out == "Bonjour."
     counts = await count_scheduled_activities(handle)
     assert counts[INVOKE_MODEL] == 1, counts
+
+
+class _ResampleAgent:
+    """ainvoke-shaped driver: the SAME prompt sent twice through a
+    TemporalModel — deliberate resampling — under run_deep_agent so the
+    continue-as-new result cache is active."""
+
+    def __init__(self) -> None:
+        self.model = TemporalModel(model="fake:model")
+
+    async def ainvoke(self, _input: Any) -> dict:
+        first = await self.model.ainvoke([HumanMessage(content="same prompt")])
+        second = await self.model.ainvoke([HumanMessage(content="same prompt")])
+        return {
+            "messages": [f"{first.content}|{second.content}"],
+            "todos": [],
+        }
+
+
+@workflow.defn
+class ResampleWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> str:
+        from temporalio.contrib.deepagents import run_deep_agent
+
+        result = await run_deep_agent(
+            _ResampleAgent(), input, state_snapshot=state_snapshot
+        )
+        return str(result["messages"][-1])
+
+
+@pytest.mark.asyncio
+async def test_repeated_identical_model_call_resamples(
+    env: WorkflowEnvironment,
+) -> None:
+    """Two identical live model calls each run their own Activity and can
+    return different responses (deliberate resampling) — under the active
+    CAN cache, the old input-only key served the FIRST response twice."""
+    plugin = DeepAgentsPlugin(
+        model_provider=mock_model_provider(["first answer", "second answer"]),
+    )
+    async with Worker(
+        env.client,
+        task_queue="da-model-resample",
+        workflows=[ResampleWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            ResampleWorkflow.run,
+            {"messages": []},
+            id=f"da-model-resample-{uuid.uuid4()}",
+            task_queue="da-model-resample",
+        )
+        out = await handle.result()
+
+    assert out == "first answer|second answer", out
+    counts = await count_scheduled_activities(handle)
+    assert counts["deepagents.invoke_model"] == 2, counts

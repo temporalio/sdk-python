@@ -294,9 +294,10 @@ class LongResearchAgent:
 Pass `continue_as_new_after=N` instead to trigger on a fixed history-event
 count.
 
-- **Carries forward:** the accumulated messages and the model/tool result cache
-  (so an LLM/tool call completed before the continue-as-new is *not* re-run
-  after it). Your `@workflow.run` must accept `state_snapshot=None` as shown.
+- **Carries forward:** the accumulated messages. Repeated identical calls are
+  NOT deduplicated: a call the agent re-issues after the boundary runs its own
+  Activity, so a genuinely new identical request is never served a stale prior
+  result. Your `@workflow.run` must accept `state_snapshot=None` as shown.
 - **Does not carry forward:** anything held only in an in-memory checkpointer's
   own structures beyond the messages/todos snapshot. The default in-workflow
   `InMemorySaver` is rehydrated for free by deterministic replay; a durable

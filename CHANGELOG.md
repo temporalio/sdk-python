@@ -56,6 +56,16 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
+  model, and backend-op calls: each dispatch runs its own Activity, and the
+  continue-as-new result cache is retired for new executions (a continued run
+  resumes from the carried transcript and never re-executes prior dispatches,
+  so a carried cache entry could only serve stale results). Patch-gated
+  (`deepagents.retire-result-cache`), so histories recorded before this change
+  replay unchanged; note that deferring the patch keeps the full legacy dedup
+  cache — including the stale-result behavior this entry describes — and that
+  a chain upgraded mid-continue-as-new re-executes rather than reuses a
+  repeated identical call (the conservative direction).
 - `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
 
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.

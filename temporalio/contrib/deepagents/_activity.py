@@ -338,9 +338,9 @@ class DeepAgentActivities:
     @_auto_heartbeater
     async def backend_op(self, input: BackendOpInput) -> BackendOpOutput:
         """Run one operation against a registered (real-I/O) backend."""
-        from temporalio.contrib.deepagents._tools import registered_backends
+        from temporalio.contrib.deepagents._tools import lookup_backend
 
-        backend = registered_backends().get(input.backend_ref)
+        backend = lookup_backend(input.backend_ref)
         if backend is None:
             raise ApplicationError(
                 f"Backend {input.backend_ref!r} is not registered on this worker.",
