@@ -258,7 +258,9 @@ class Importer:
                 sys.modules[full_name] = new_mod
                 new_spec.loader.exec_module(new_mod)
 
-        mod = importlib.__import__(name, globals, locals, fromlist, level)
+        mod = _already_imported(name, full_name, fromlist, level)
+        if mod is None:
+            mod = importlib.__import__(name, globals, locals, fromlist, level)
         # Check for restrictions if necessary and apply
         if mod.__name__ not in self.modules_checked_for_restrictions:
             self.modules_checked_for_restrictions.add(mod.__name__)
@@ -537,6 +539,36 @@ def _get_thread_local_builtin(name: str) -> _ThreadLocalCallable:
         ret = _ThreadLocalCallable(getattr(builtins, name))
         _thread_local_builtins[name] = ret
     return ret
+
+
+def _already_imported(
+    name: str, full_name: str, fromlist: Sequence[str], level: int
+) -> types.ModuleType | None:
+    # Mirrors importlib.__import__ for loaded modules without taking module locks
+    mod = _fully_imported(full_name)
+    if mod is None:
+        return None
+    if fromlist:
+        # Only statically stored attributes count; module __getattr__ stays with importlib
+        mod_dict = getattr(mod, "__dict__", None)
+        if not isinstance(mod_dict, dict):
+            return None
+        if "__path__" in mod_dict and any(
+            not isinstance(x, str) or x == "*" or x not in mod_dict for x in fromlist
+        ):
+            return None
+        return mod
+    if level != 0:
+        return None
+    top = name.partition(".")[0]
+    return mod if top == full_name else _fully_imported(top)
+
+
+def _fully_imported(name: str) -> types.ModuleType | None:
+    mod = sys.modules.get(name)
+    if mod is None or getattr(getattr(mod, "__spec__", None), "_initializing", False):
+        return None
+    return mod
 
 
 def _resolve_module_name(
