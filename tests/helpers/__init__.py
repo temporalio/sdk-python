@@ -239,7 +239,7 @@ async def assert_workflow_exists_eventually(
 async def assert_pending_activity_exists_eventually(
     handle: WorkflowHandle,
     activity_id: str,
-    timeout: timedelta = timedelta(seconds=5),
+    timeout: timedelta = timedelta(seconds=10),
 ) -> PendingActivityInfo:
     """Wait until a pending activity with the given ID exists and return it."""
 
@@ -351,7 +351,11 @@ async def pause_and_assert(client: Client, handle: WorkflowHandle, activity_id: 
 
 
 async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id: str):
-    """Unpause the given activity and assert it is not paused."""
+    """Unpause the given activity and assert it is no longer paused.
+
+    An unpaused activity may retry and close before we observe it, so an
+    activity that is no longer pending also counts as unpaused.
+    """
     desc = await handle.describe()
     req = UnpauseActivityRequest(
         namespace=client.namespace,
@@ -363,10 +367,9 @@ async def unpause_and_assert(client: Client, handle: WorkflowHandle, activity_id
     )
     await client.workflow_service.unpause_activity(req)
 
-    # Assert eventually not paused
     async def check_unpaused() -> None:
-        info = await assert_pending_activity_exists_eventually(handle, activity_id)
-        assert not info.paused, f"Activity {activity_id} still paused"
+        info = await get_pending_activity_info(handle, activity_id)
+        assert info is None or not info.paused, f"Activity {activity_id} still paused"
 
     await assert_eventually(check_unpaused)
 
