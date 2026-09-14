@@ -1,9 +1,7 @@
 """Read Google Cloud Run instance metadata for Temporal worker configuration.
 
-Cloud Run runs a long-lived container rather than a per-invocation handler, so this module is a
-small metadata helper -- not a worker wrapper. It derives a worker identity from Cloud Run instance
-metadata for use with a normal, long-lived worker. Both Cloud Run worker pools and services are
-supported.
+Helpers for deriving a worker identity from Cloud Run instance metadata. Both Cloud Run worker pools
+and services are supported.
 
 .. warning::
     Google Cloud Run support is experimental.

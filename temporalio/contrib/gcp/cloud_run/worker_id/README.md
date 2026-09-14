@@ -2,11 +2,9 @@
 
 > ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
-A plugin for running [Temporal](https://temporal.io) workers on Google Cloud Run. Cloud Run runs a
-long-lived container -- there is no per-invocation handler to wrap -- so this is **not** a worker
-wrapper. Instead, `WorkerIDPlugin` reads Cloud Run instance metadata and sets the client identity
-for a normal, long-lived client and worker. Both Cloud Run **worker pools** and **services** are
-supported.
+A plugin for running [Temporal](https://temporal.io) workers on Google Cloud Run. `WorkerIDPlugin`
+reads Cloud Run instance metadata and sets the client identity. Both Cloud Run **worker pools** and
+**services** are supported.
 
 Register the plugin once when connecting the client and it sets the client **identity** to a value
 derived from the Cloud Run instance (unless you already passed an `identity`).
@@ -70,9 +68,8 @@ id. From that metadata the plugin sets:
   Temporal tooling. It falls back to `<instance_id>@<name>`, then to just `<instance_id>`, when the
   revision or name is unavailable. An `identity` you pass to `Client.connect` always wins.
 
-Because the metadata server is only reachable from within Cloud Run, connecting elsewhere **fails
-fast** with a clear error rather than silently doing nothing. The plugin uses only the Python
-standard library and adds no new dependencies.
+The metadata server is only reachable from within Cloud Run, so connecting elsewhere raises an
+error. The plugin uses only the Python standard library and adds no new dependencies.
 
 ## Advanced / non-plugin use
 

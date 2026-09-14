@@ -25,9 +25,8 @@ class WorkerIDPlugin(temporalio.plugin.SimplePlugin):
     services are supported.
 
     The Cloud Run instance metadata is fetched once, lazily, when the client
-    connects. If the metadata cannot be read -- which usually means the process is
-    not running on a Cloud Run worker pool or service -- connecting fails fast with
-    a clear error rather than silently doing nothing.
+    connects. If it cannot be read (usually because the process is not running on
+    Cloud Run), connecting raises an error.
 
     Unit tests and advanced callers can bypass the metadata server by passing a
     pre-built ``metadata`` object, or steer the fetch with ``getenv`` /
