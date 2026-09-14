@@ -30,6 +30,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- Standalone Activities are now generally available (GA). (Standalone Activities as Nexus operations
+  and Standalone Activities operator commands remain experimental.)
 - System Nexus Signal-with-Start Workflow operations now use the typed
   `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
   the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
