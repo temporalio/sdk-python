@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import abc
+import contextvars
 from collections.abc import Mapping
 from contextlib import contextmanager
 from typing import Any, Protocol
@@ -222,6 +223,30 @@ class OpenAIAgentsContextPropagationInterceptor(
         self.trace_context_from_header_contents(span_info)
         self.span_context_from_header_contents(span_info)
 
+    def _start_handle_span(
+        self, span_name: str, data: dict[str, Any], input: _InputWithHeaders
+    ) -> tuple[Span | None, contextvars.Context]:
+        """Start a span that a handle's done callback finishes later.
+
+        The span is started, and the header set from it, in a copy of the
+        current contextvars Context, which is returned for the callback to run
+        in. asyncio otherwise runs the callback in a Context of its own, where a
+        processor that attached context at span start (OpenInference's
+        OpenTelemetry bridge) cannot detach it. Starting in a copy also keeps the
+        span from staying current in the caller's Context.
+        """
+        context = contextvars.copy_context()
+
+        def start() -> Span | None:
+            span: Span | None = None
+            if self._add_temporal_spans and get_trace_provider().get_current_trace():
+                span = custom_span(name=span_name, data=data)
+                span.start(mark_as_current=True)
+            self.set_header_from_context(input)
+            return span
+
+        return context.run(start), context
+
     @contextmanager
     def maybe_span(self, span_name: str, data: dict[str, Any] | None):
         """Context manager that conditionally creates a span.
@@ -398,48 +423,32 @@ class _ContextPropagationWorkflowOutboundInterceptor(
     def start_activity(
         self, input: temporalio.worker.StartActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        trace = get_trace_provider().get_current_trace()
-        span: Span | None = None
-        if trace and self.root()._add_temporal_spans:
-            span = custom_span(
-                name="temporal:startActivity", data={"activity": input.activity}
-            )
-            span.start(mark_as_current=True)
-
-        self.root().set_header_from_context(input)
+        span, context = self.root()._start_handle_span(
+            "temporal:startActivity", {"activity": input.activity}, input
+        )
         handle = self.next.start_activity(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
+            handle.add_done_callback(lambda _: span.finish(), context=context)  # type: ignore
         return handle
 
     async def start_child_workflow(
         self, input: temporalio.worker.StartChildWorkflowInput
     ) -> temporalio.workflow.ChildWorkflowHandle:
-        trace = get_trace_provider().get_current_trace()
-        span: Span | None = None
-        if trace and self.root()._add_temporal_spans:
-            span = custom_span(
-                name="temporal:startChildWorkflow", data={"workflow": input.workflow}
-            )
-            span.start(mark_as_current=True)
-        self.root().set_header_from_context(input)
+        span, context = self.root()._start_handle_span(
+            "temporal:startChildWorkflow", {"workflow": input.workflow}, input
+        )
         handle = await self.next.start_child_workflow(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
+            handle.add_done_callback(lambda _: span.finish(), context=context)  # type: ignore
         return handle
 
     def start_local_activity(
         self, input: temporalio.worker.StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle:
-        trace = get_trace_provider().get_current_trace()
-        span: Span | None = None
-        if trace and self.root()._add_temporal_spans:
-            span = custom_span(
-                name="temporal:startLocalActivity", data={"activity": input.activity}
-            )
-            span.start(mark_as_current=True)
-        self.root().set_header_from_context(input)
+        span, context = self.root()._start_handle_span(
+            "temporal:startLocalActivity", {"activity": input.activity}, input
+        )
         handle = self.next.start_local_activity(input)
         if span:
-            handle.add_done_callback(lambda _: span.finish())  # type: ignore
+            handle.add_done_callback(lambda _: span.finish(), context=context)  # type: ignore
         return handle

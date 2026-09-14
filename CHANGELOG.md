@@ -86,6 +86,13 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
+- `temporalio.contrib.openai_agents`: finishing a `temporal:startActivity`,
+  `temporal:startChildWorkflow` or `temporal:startLocalActivity` span no longer makes
+  OpenTelemetry log `Failed to detach context` errors when `use_otel_instrumentation` is
+  enabled. The span is now started and finished in one `contextvars` Context. It also no
+  longer stays the current span after the call returns, so spans created afterwards in the
+  same context, such as the tool calls that follow a model call within an agent turn, are
+  parented to the enclosing span instead of to the finished activity span.
 
 ### Security
 

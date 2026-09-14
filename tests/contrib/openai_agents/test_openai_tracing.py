@@ -1,9 +1,11 @@
+import logging
 import uuid
 from datetime import timedelta
 from typing import Any
 
 import opentelemetry.trace
-from agents import Span, Trace, TracingProcessor, custom_span, trace
+import pytest
+from agents import Agent, Runner, Span, Trace, TracingProcessor, custom_span, trace
 from agents.tracing import get_trace_provider
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -14,14 +16,19 @@ from temporalio.client import Client
 from temporalio.contrib.openai_agents import _temporal_openai_agents
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    ResponseBuilders,
+    TestModel,
 )
+from temporalio.contrib.openai_agents.workflow import activity_as_tool
 from temporalio.contrib.opentelemetry import create_tracer_provider
 from temporalio.worker.workflow_sandbox import (
     SandboxedWorkflowRunner,
     SandboxRestrictions,
 )
 from tests.contrib.openai_agents.test_openai import (
+    HelloWorldAgent,
     ResearchWorkflow,
+    hello_mock_model,
     research_mock_model,
 )
 from tests.helpers import assert_eq_eventually, new_worker
@@ -235,6 +242,78 @@ async def test_tracing(client: Client):
             processor.span_events[-8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
+
+
+@activity.defn
+async def lookup_account(account_id: str) -> str:
+    return f"account {account_id}"
+
+
+@workflow.defn
+class ToolTracingWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        agent = Agent[str](
+            name="Account agent",
+            instructions="Look up the account.",
+            tools=[
+                activity_as_tool(
+                    lookup_account, start_to_close_timeout=timedelta(seconds=10)
+                )
+            ],
+        )
+        result = await Runner.run(agent, "Look up account 1")
+        return result.final_output
+
+
+async def test_tool_span_parented_to_turn(client: Client):
+    """A tool call that follows a model call in the same turn is a sibling of the
+    model call's temporal:startActivity span, not its child."""
+    model = TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call('{"account_id": "1"}', "lookup_account"),
+            ResponseBuilders.output_message("done"),
+        ]
+    )
+    async with AgentEnvironment(model=model) as env:
+        client = env.applied_on_client(client)
+        processor = MemoryTracingProcessor()
+        get_trace_provider().set_processors([processor])
+
+        async with new_worker(
+            client, ToolTracingWorkflow, activities=[lookup_account]
+        ) as worker:
+            with trace("Tool workflow") as t:
+                await client.execute_workflow(
+                    ToolTracingWorkflow.run,
+                    id=f"tool-tracing-workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=120),
+                )
+
+    # MemoryTracingProcessor's lists are shared across tests; keep only this trace
+    spans = {
+        s.span_id: s
+        for s, started in processor.span_events
+        if started and s.trace_id == t.trace_id
+    }
+
+    def name(span: Span[Any]) -> str | None:
+        return span.span_data.export().get("name")
+
+    def parent_name(span: Span[Any]) -> str | None:
+        return name(spans[span.parent_id]) if span.parent_id else None
+
+    tool_span = next(s for s in spans.values() if s.span_data.type == "function")
+    assert parent_name(tool_span) == "turn"
+
+    # Model calls (one per turn) stay under their turn; the tool's activity stays under the tool
+    start_spans = [s for s in spans.values() if name(s) == "temporal:startActivity"]
+    assert sorted(parent_name(s) or "" for s in start_spans) == [
+        "lookup_account",
+        "turn",
+        "turn",
+    ]
 
 
 @activity.defn
@@ -953,3 +1032,61 @@ async def test_sdk_trace_to_otel_span_parenting(
     assert len(span_ids) == len(set(span_ids)), (
         f"All spans should have unique IDs, got: {span_ids}"
     )
+
+
+async def test_otel_span_finished_from_handle_callback(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+    caplog: pytest.LogCaptureFixture,
+):
+    """A temporal:startActivity span is finished from the activity handle's done
+    callback, which asyncio runs in a copy of the caller's Context. OpenInference
+    must still be able to detach the OTEL context it attached at span start."""
+    exporter = set_test_tracer_provider()
+    caplog.set_level(logging.ERROR, logger="opentelemetry.context")
+
+    async with AgentEnvironment(
+        model=hello_mock_model(),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client,
+            HelloWorldAgent,
+            max_cached_workflows=0,
+        ) as worker:
+            with trace("Hello trace"):
+                result = await client.execute_workflow(
+                    HelloWorldAgent.run,
+                    "Tell me about recursion in programming.",
+                    id=f"hello-otel-workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=60),
+                )
+    assert result == "test"
+
+    detach_errors = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == "opentelemetry.context"
+        and record.getMessage().startswith("Failed to detach context")
+    ]
+    assert not detach_errors
+
+    spans = exporter.get_finished_spans()
+    print_otel_spans(spans)
+    span_by_id = {span.context.span_id: span for span in spans if span.context}
+
+    def parent_of(span: ReadableSpan) -> ReadableSpan:
+        assert span.parent is not None, f"'{span.name}' should have a parent"
+        return span_by_id[span.parent.span_id]
+
+    # Model call: agent -> turn -> temporal:startActivity -> temporal:executeActivity
+    execute_activity_spans = [s for s in spans if s.name == "temporal:executeActivity"]
+    assert len(execute_activity_spans) == 1
+    start_activity_span = parent_of(execute_activity_spans[0])
+    assert start_activity_span.name == "temporal:startActivity"
+    turn_span = parent_of(start_activity_span)
+    assert turn_span.name == "turn"
+    assert parent_of(turn_span).name == "Assistant"
