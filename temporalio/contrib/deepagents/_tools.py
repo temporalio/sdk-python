@@ -55,6 +55,11 @@ if TYPE_CHECKING:
 
 _TOOL_REGISTRY: dict[str, "BaseTool"] = {}
 _BACKEND_REGISTRY: dict[str, Any] = {}
+# Recently retired backends (insertion-ordered, oldest evicted first). Keeps a
+# GC'd wrapper's backend reachable for the eviction -> activity-start window;
+# see _unregister_backend. Bounded so retired backends cannot accumulate.
+_RETIRED_BACKENDS: dict[str, Any] = {}
+_RETIRED_BACKENDS_MAX = 512
 # Serializes registration against the GC-time unregister in
 # _unregister_backend, which may run on another thread.
 _BACKEND_REGISTRY_LOCK = threading.Lock()
@@ -154,7 +159,7 @@ def register_backend(ref: str, backend: Any) -> None:
 
 
 def _unregister_backend(ref: str, inner: Any) -> None:
-    """Drop ``ref`` from the registry if it still maps to ``inner``.
+    """Retire ``ref`` from the registry if it still maps to ``inner``.
 
     GC hook for :class:`TemporalBackend` (via ``weakref.finalize``): a wrapper
     is typically constructed per workflow run, so without cleanup a long-lived
@@ -162,15 +167,39 @@ def _unregister_backend(ref: str, inner: Any) -> None:
     load-bearing: refs are deterministic per run, so after a cache eviction a
     replay re-registers the *same* ref with a fresh inner backend — the evicted
     wrapper's finalizer must not remove that live registration.
+
+    Retired entries move to the bounded :data:`_RETIRED_BACKENDS` store instead
+    of vanishing: a ``backend_op`` activity scheduled just before a cache
+    eviction can be delivered *after* the evicted wrapper is collected, and the
+    replay that would re-register the ref only happens once that very activity
+    completes. :func:`lookup_backend` still resolves the ref in that window.
     """
     with _BACKEND_REGISTRY_LOCK:
         if _BACKEND_REGISTRY.get(ref) is inner:
             del _BACKEND_REGISTRY[ref]
+            _RETIRED_BACKENDS.pop(ref, None)
+            _RETIRED_BACKENDS[ref] = inner
+            while len(_RETIRED_BACKENDS) > _RETIRED_BACKENDS_MAX:
+                _RETIRED_BACKENDS.pop(next(iter(_RETIRED_BACKENDS)))
 
 
 def registered_backends() -> dict[str, Any]:
     """Return the live backend registry (read by the plugin at worker build)."""
     return _BACKEND_REGISTRY
+
+
+def lookup_backend(ref: str) -> Any | None:
+    """Resolve ``ref`` for a ``backend_op`` activity.
+
+    Prefers the live registry, then falls back to recently retired entries so
+    an activity dispatched before a cache eviction still resolves (see
+    :func:`_unregister_backend`).
+    """
+    with _BACKEND_REGISTRY_LOCK:
+        backend = _BACKEND_REGISTRY.get(ref)
+        if backend is not None:
+            return backend
+        return _RETIRED_BACKENDS.get(ref)
 
 
 # ---------------------------------------------------------------------------
