@@ -84,7 +84,6 @@ class OpenAIAgentsContextPropagationInterceptor(
         self,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
         add_temporal_spans: bool = True,
-        start_traces: bool = False,
     ) -> None:
         """Initialize the interceptor with a payload converter.
 
@@ -92,12 +91,9 @@ class OpenAIAgentsContextPropagationInterceptor(
             payload_converter: The payload converter to use for serializing/deserializing
                 trace context. Defaults to the default Temporal payload converter.
             add_temporal_spans: Whether to add temporal-specific spans to traces.
-            start_traces: Whether to start new traces if none exist. This will cause duplication if the underlying
-                trace provider actually process start events. Primarily designed for use with Open Telemetry integration.
         """
         super().__init__()
         self._payload_converter = payload_converter
-        self._start_traces = start_traces
         self._add_temporal_spans = add_temporal_spans
 
     def intercept_client(
@@ -188,11 +184,7 @@ class OpenAIAgentsContextPropagationInterceptor(
                 span_info["traceName"],
                 trace_id=span_info["traceId"],
             )
-
-            if self._start_traces:
-                current_trace.start(mark_as_current=True)
-            else:
-                Scope.set_current_trace(current_trace)
+            Scope.set_current_trace(current_trace)
 
     def span_context_from_header_contents(self, span_info: dict[str, Any]):
         """Initialize span context from header contents.
@@ -205,10 +197,7 @@ class OpenAIAgentsContextPropagationInterceptor(
             current_span = get_trace_provider().create_span(
                 span_data=CustomSpanData(name="", data={}), span_id=span_info["spanId"]
             )
-            if self._start_traces:
-                current_span.start(mark_as_current=True)
-            else:
-                Scope.set_current_span(current_span)
+            Scope.set_current_span(current_span)
 
     def context_from_header(
         self,

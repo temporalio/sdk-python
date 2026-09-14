@@ -86,6 +86,12 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
+- `OpenAIAgentsPlugin(use_otel_instrumentation=True)`: spans started in workflows and
+  activities now parent directly to the caller's OpenTelemetry span instead of to a copy of
+  the caller's Agents SDK trace and span started on the worker. The copies were never finished
+  and, when client and worker shared a process, displaced the caller's own spans, leaving
+  `temporal:startWorkflow` and `temporal:startActivity` spans with a parent that was never
+  exported and dropping the client's root span.
 
 ### Security
 

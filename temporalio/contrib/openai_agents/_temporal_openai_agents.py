@@ -426,7 +426,6 @@ class OpenAIAgentsPlugin(SimplePlugin):
 
             interceptor = OTelOpenAIAgentsContextPropagationInterceptor(
                 add_temporal_spans=add_temporal_spans,
-                otel_id_generator=provider.id_generator(),
             )
 
         @asynccontextmanager

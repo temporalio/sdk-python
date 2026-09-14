@@ -5,10 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 import opentelemetry.trace
+from opentelemetry.context import attach
+from opentelemetry.trace import (
+    NonRecordingSpan,
+    SpanContext,
+    TraceFlags,
+    set_span_in_context,
+)
 
-import temporalio.converter
-
-from ..opentelemetry._id_generator import TemporalIdGenerator
 from ._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
     _InputWithHeaders,
@@ -19,22 +23,6 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
     OpenAIAgentsContextPropagationInterceptor
 ):
     """OTEL-aware variant that enhances headers with OpenTelemetry span context."""
-
-    def __init__(
-        self,
-        otel_id_generator: TemporalIdGenerator,
-        payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
-        add_temporal_spans: bool = True,
-    ) -> None:
-        """Initialize OTEL-aware context propagation interceptor.
-
-        Args:
-            otel_id_generator: Generator for OTEL-compatible IDs.
-            payload_converter: Converter for serializing trace context.
-            add_temporal_spans: Whether to add Temporal-specific spans.
-        """
-        super().__init__(payload_converter, add_temporal_spans, start_traces=True)
-        self._otel_id_generator = otel_id_generator
 
     def header_contents(self) -> dict[str, Any]:
         """Get header contents enhanced with OpenTelemetry span context.
@@ -66,23 +54,22 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
         otel_span_id = span_info.get("otelSpanId")
         otel_trace_id = span_info.get("otelTraceId")
 
-        # Seed the trace id before the trace is reconstructed so the workflow's root
-        # OTEL span shares the caller's trace id rather than generating a new one.
-        if otel_trace_id and self._otel_id_generator:
-            self._otel_id_generator.seed_trace_id(otel_trace_id)
+        # Parent OTEL spans started here to the caller's span. The Agents SDK trace
+        # and span restored below are not started, so OpenInference never registers
+        # copies of them under the caller's IDs.
+        if otel_span_id and otel_trace_id:
+            attach(
+                set_span_in_context(
+                    NonRecordingSpan(
+                        SpanContext(
+                            trace_id=otel_trace_id,
+                            span_id=otel_span_id,
+                            is_remote=True,
+                            trace_flags=TraceFlags(TraceFlags.SAMPLED),
+                        )
+                    )
+                )
+            )
 
-        # If only a trace was propagated from the caller, we need to seed for trace context
-        if otel_span_id and self._otel_id_generator and span_info.get("spanId") is None:
-            self._otel_id_generator.seed_span_id(otel_span_id)
-
-        super().trace_context_from_header_contents(span_info)
-
-        # If a span was propagated from the caller, we need to seed for span context
-        if (
-            otel_span_id
-            and self._otel_id_generator
-            and span_info.get("spanId") is not None
-        ):
-            self._otel_id_generator.seed_span_id(otel_span_id)
-
-        super().span_context_from_header_contents(span_info)
+        self.trace_context_from_header_contents(span_info)
+        self.span_context_from_header_contents(span_info)

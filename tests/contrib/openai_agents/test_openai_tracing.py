@@ -3,7 +3,7 @@ from datetime import timedelta
 from typing import Any
 
 import opentelemetry.trace
-from agents import Span, Trace, TracingProcessor, custom_span, trace
+from agents import Agent, Runner, Span, Trace, TracingProcessor, custom_span, trace
 from agents.tracing import get_trace_provider
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
@@ -14,7 +14,10 @@ from temporalio.client import Client
 from temporalio.contrib.openai_agents import _temporal_openai_agents
 from temporalio.contrib.openai_agents.testing import (
     AgentEnvironment,
+    ResponseBuilders,
+    TestModel,
 )
+from temporalio.contrib.openai_agents.workflow import activity_as_tool
 from temporalio.contrib.opentelemetry import create_tracer_provider
 from temporalio.worker.workflow_sandbox import (
     SandboxedWorkflowRunner,
@@ -677,15 +680,18 @@ async def test_otel_tracing_in_runner(
             ResearchWorkflow,
             max_cached_workflows=0,
         ) as worker:
-            with trace("Research workflow"):
-                workflow_handle = await client.start_workflow(
-                    ResearchWorkflow.run,
-                    "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
-                    id=f"research-workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    execution_timeout=timedelta(seconds=120),
-                )
-                await workflow_handle.result()
+            # The worker instruments on its run task, which has not run yet; without
+            # this the client's trace would get no OTEL root span.
+            with env.openai_agents_plugin.tracing_context():
+                with trace("Research workflow"):
+                    workflow_handle = await client.start_workflow(
+                        ResearchWorkflow.run,
+                        "Caribbean vacation spots in April, optimizing for surfing, hiking and water sports",
+                        id=f"research-workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                        execution_timeout=timedelta(seconds=120),
+                    )
+                    await workflow_handle.result()
 
     spans = exporter.get_finished_spans()
     print("OTEL tracing in runner spans:")
@@ -858,21 +864,23 @@ async def test_sdk_trace_to_otel_span_parenting(
                 SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
             ),
         ) as worker:
-            # Start SDK trace in client, then start workflow within that trace
-            with trace("Client SDK trace"):
-                workflow_handle = await new_client.start_workflow(
-                    OtelSpanWorkflow.run,
-                    id=f"sdk-trace-otel-span-workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                    execution_timeout=timedelta(seconds=120),
-                )
-                workflow_id = workflow_handle.id
+            # The worker instruments on its run task, which has not run yet; without
+            # this the client's trace would get no OTEL root span.
+            with env.openai_agents_plugin.tracing_context():
+                with trace("Client SDK trace"):
+                    workflow_handle = await new_client.start_workflow(
+                        OtelSpanWorkflow.run,
+                        id=f"sdk-trace-otel-span-workflow-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                        execution_timeout=timedelta(seconds=120),
+                    )
+                    workflow_id = workflow_handle.id
 
-                # Wait for workflow to be ready
-                async def ready() -> bool:
-                    return await workflow_handle.query(OtelSpanWorkflow.ready)
+                    # Wait for workflow to be ready
+                    async def ready() -> bool:
+                        return await workflow_handle.query(OtelSpanWorkflow.ready)
 
-                await assert_eq_eventually(True, ready)
+                    await assert_eq_eventually(True, ready)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
@@ -953,3 +961,77 @@ async def test_sdk_trace_to_otel_span_parenting(
     assert len(span_ids) == len(set(span_ids)), (
         f"All spans should have unique IDs, got: {span_ids}"
     )
+
+
+@activity.defn
+async def lookup_activity(query: str) -> str:
+    return f"result for {query}"
+
+
+@workflow.defn
+class ActivityToolWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        agent = Agent[str](
+            name="Tool agent",
+            instructions="Use the tool.",
+            tools=[
+                activity_as_tool(
+                    lookup_activity, start_to_close_timeout=timedelta(seconds=10)
+                )
+            ],
+        )
+        return str((await Runner.run(agent, input="look up x")).final_output)
+
+
+async def test_otel_spans_single_process_parents_exported(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    """Client, workflow and activity in one process with Temporal spans enabled.
+
+    Every exported span must have an exported parent, and the client's root span
+    must be the one exported (not a replica recreated on the worker side).
+    """
+    exporter = set_test_tracer_provider()
+
+    async with AgentEnvironment(
+        model=TestModel.returning_responses(
+            [
+                ResponseBuilders.tool_call('{"query":"x"}', "lookup_activity"),
+                ResponseBuilders.output_message("done"),
+            ]
+        ),
+        use_otel_instrumentation=True,
+    ) as env:
+        client = env.applied_on_client(client)
+
+        async with new_worker(
+            client, ActivityToolWorkflow, activities=[lookup_activity]
+        ) as worker:
+            with env.openai_agents_plugin.tracing_context():
+                with trace("Client trace"):
+                    root = opentelemetry.trace.get_current_span()
+                    root.set_attribute("test.marker", "client root")
+                    result = await client.execute_workflow(
+                        ActivityToolWorkflow.run,
+                        id=f"otel-single-process-{uuid.uuid4()}",
+                        task_queue=worker.task_queue,
+                        execution_timeout=timedelta(seconds=120),
+                    )
+    assert result == "done"
+
+    spans = exporter.get_finished_spans()
+    print_otel_spans(spans)
+    by_id = {span.context.span_id: span for span in spans if span.context}
+
+    assert "temporal:executeActivity" in {span.name for span in spans}
+    assert [
+        span.name for span in spans if span.parent and span.parent.span_id not in by_id
+    ] == [], "spans whose parent was never exported"
+
+    exported_root = by_id.get(root.get_span_context().span_id)
+    assert exported_root is not None, "client root span was not exported"
+    assert exported_root.parent is None
+    assert exported_root.attributes is not None
+    assert exported_root.attributes["test.marker"] == "client root"
