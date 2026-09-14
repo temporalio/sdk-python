@@ -250,6 +250,7 @@ class GoogleAdkPlugin(SimplePlugin):
         Use with caution in production environments.
 
     This plugin configures:
+
     - Pydantic Payload Converter (required for ADK objects).
     - Sandbox Passthrough for google.adk and google.genai modules.
     - ADK's time, id, and random providers, so ADK-generated ids and retry
