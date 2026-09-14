@@ -56,6 +56,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
+  and supports its file download API, including video inputs and download
+  destinations.
 - `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
   model, and backend-op calls: each dispatch runs its own Activity, and the
   continue-as-new result cache is retired for new executions (a continued run
