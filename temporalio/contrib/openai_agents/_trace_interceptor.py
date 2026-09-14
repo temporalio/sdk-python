@@ -60,6 +60,24 @@ def temporal_span(
         yield
 
 
+@contextmanager
+def _as_current_span(span: Span[Any] | None):
+    """Make ``span`` the current span for the duration of the block only.
+
+    Used to capture a span in an outbound header without leaving it current,
+    which would make it the parent of spans created later in the same context,
+    such as the tool calls that follow a model call within an agent turn.
+    """
+    if span is None:
+        yield
+        return
+    token = Scope.set_current_span(span)
+    try:
+        yield
+    finally:
+        Scope.reset_current_span(token)
+
+
 class OpenAIAgentsContextPropagationInterceptor(
     temporalio.client.Interceptor, temporalio.worker.Interceptor
 ):
@@ -404,9 +422,9 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             span = custom_span(
                 name="temporal:startActivity", data={"activity": input.activity}
             )
-            span.start(mark_as_current=True)
-
-        self.root().set_header_from_context(input)
+            span.start()
+        with _as_current_span(span):
+            self.root().set_header_from_context(input)
         handle = self.next.start_activity(input)
         if span:
             handle.add_done_callback(lambda _: span.finish())  # type: ignore
@@ -421,8 +439,9 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             span = custom_span(
                 name="temporal:startChildWorkflow", data={"workflow": input.workflow}
             )
-            span.start(mark_as_current=True)
-        self.root().set_header_from_context(input)
+            span.start()
+        with _as_current_span(span):
+            self.root().set_header_from_context(input)
         handle = await self.next.start_child_workflow(input)
         if span:
             handle.add_done_callback(lambda _: span.finish())  # type: ignore
@@ -437,8 +456,9 @@ class _ContextPropagationWorkflowOutboundInterceptor(
             span = custom_span(
                 name="temporal:startLocalActivity", data={"activity": input.activity}
             )
-            span.start(mark_as_current=True)
-        self.root().set_header_from_context(input)
+            span.start()
+        with _as_current_span(span):
+            self.root().set_header_from_context(input)
         handle = self.next.start_local_activity(input)
         if span:
             handle.add_done_callback(lambda _: span.finish())  # type: ignore

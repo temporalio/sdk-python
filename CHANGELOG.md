@@ -86,6 +86,11 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
+- `temporalio.contrib.openai_agents`: the `temporal:startActivity`, `temporal:startChildWorkflow`,
+  and `temporal:startLocalActivity` spans no longer remain the current Agents SDK span after the
+  start. Previously, spans created afterwards in the same context were parented to them; in an
+  agent loop, tool calls that followed a model call nested under the model call's span instead
+  of under the turn.
 
 ### Security
 
