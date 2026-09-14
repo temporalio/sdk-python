@@ -681,11 +681,22 @@ async def test_workflow_only_trace_to_spans(
             )
             workflow_id = workflow_handle.id
 
-            # Wait for workflow to be ready
-            async def ready() -> bool:
-                return await workflow_handle.query(SelfTracingWorkflow.ready)
+            # Wait for the activity result to be applied by polling history rather
+            # than querying. On the time-skipping test server a query that lands
+            # while that Workflow Task runs is delivered in an extra, empty Workflow
+            # Task; sdk-core merges the two and replays the activity result with
+            # is_replaying=False, so temporal:startActivity would end twice.
+            async def activity_result_applied() -> bool:
+                events = (await workflow_handle.fetch_history()).events
+                return (
+                    sum(
+                        e.HasField("workflow_task_completed_event_attributes")
+                        for e in events
+                    )
+                    >= 2
+                )
 
-            await assert_eq_eventually(True, ready)
+            await assert_eq_eventually(True, activity_result_applied)
 
     # Second worker: Complete the workflow with fresh objects (new instrumentation)
     async with AgentEnvironment(
