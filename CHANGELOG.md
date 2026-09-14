@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.33.0] - 2026-09-14
+
+### Added
+
 #### Standalone Activity operator commands
 
 - `ActivityHandle` now supports operator commands for standalone activities: `pause`,
@@ -36,8 +50,6 @@ to include examples, links to docs, or any other relevant information.
 - System Nexus Signal-with-Start Workflow operations now invoke
   `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
-
-### Deprecated
 
 ### :boom: Breaking Changes
 
@@ -86,8 +98,6 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
-
-### Security
 
 ## [1.32.0] - 2026-08-24
 
