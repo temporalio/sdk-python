@@ -40,6 +40,7 @@ from temporalio.contrib.openai_agents.testing import (
     ResponseBuilders,
     TestModel,
 )
+from temporalio.contrib.openai_agents.workflow import activity_as_tool
 from temporalio.contrib.opentelemetry import create_tracer_provider
 from temporalio.exceptions import (
     ActivityError,
@@ -286,6 +287,79 @@ async def test_tracing(client: Client):
             processor.span_events[-8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
+
+
+@activity.defn
+async def lookup_account(account_id: str) -> str:
+    return f"account {account_id}"
+
+
+@workflow.defn
+class ToolTracingWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        agent = Agent[str](
+            name="Account agent",
+            instructions="Look up the account.",
+            tools=[
+                activity_as_tool(
+                    lookup_account, start_to_close_timeout=timedelta(seconds=10)
+                )
+            ],
+        )
+        result = await Runner.run(agent, "Look up account 1")
+        return result.final_output
+
+
+async def test_tool_span_parented_to_turn(client: Client):
+    """Native (non-OTel) tracing: a tool call that follows a model call in the
+    same turn is a sibling of the model call's temporal:startActivity span, not
+    its child."""
+    model = TestModel.returning_responses(
+        [
+            ResponseBuilders.tool_call('{"account_id": "1"}', "lookup_account"),
+            ResponseBuilders.output_message("done"),
+        ]
+    )
+    async with AgentEnvironment(model=model) as env:
+        client = env.applied_on_client(client)
+        processor = MemoryTracingProcessor()
+        get_trace_provider().set_processors([processor])
+
+        async with new_worker(
+            client, ToolTracingWorkflow, activities=[lookup_account]
+        ) as worker:
+            with trace("Tool workflow") as t:
+                await client.execute_workflow(
+                    ToolTracingWorkflow.run,
+                    id=f"tool-tracing-workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                    execution_timeout=timedelta(seconds=120),
+                )
+
+    # MemoryTracingProcessor's lists are shared across tests; keep only this trace
+    spans = {
+        s.span_id: s
+        for s, started in processor.span_events
+        if started and s.trace_id == t.trace_id
+    }
+
+    def name(span: Span[Any]) -> str | None:
+        return span.span_data.export().get("name")
+
+    def parent_name(span: Span[Any]) -> str | None:
+        return name(spans[span.parent_id]) if span.parent_id else None
+
+    tool_span = next(s for s in spans.values() if s.span_data.type == "function")
+    assert parent_name(tool_span) == "turn"
+
+    # Model calls (one per turn) stay under their turn; the tool's activity stays under the tool
+    start_spans = [s for s in spans.values() if name(s) == "temporal:startActivity"]
+    assert sorted(parent_name(s) or "" for s in start_spans) == [
+        "lookup_account",
+        "turn",
+        "turn",
+    ]
 
 
 @activity.defn
