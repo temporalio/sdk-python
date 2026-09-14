@@ -105,9 +105,31 @@ def _deterministic_time_provider() -> float:
     return time.time()
 
 
+_ADK_RANDOM_ATTR = "__temporal_adk_random"
+
+
+def _workflow_adk_random() -> random.Random:
+    # ADK draws from a private stream (a workflow.new_random() cached on the
+    # workflow instance, as the opentelemetry and langsmith integrations do)
+    # rather than sharing workflow.random(), so how many values ADK consumes
+    # never shifts the sequence user code sees. The read-only check must come
+    # first: the cached instance would otherwise let a query handler advance
+    # the stream, diverging later activations from replay.
+    if workflow.unsafe.is_read_only():
+        raise workflow.ReadOnlyContextError(
+            "While in read-only function, action attempted: ADK random"
+        )
+    inst = workflow.instance()
+    rng: random.Random | None = getattr(inst, _ADK_RANDOM_ATTR, None)
+    if rng is None:
+        rng = workflow.new_random()
+        setattr(inst, _ADK_RANDOM_ATTR, rng)
+    return rng
+
+
 def _deterministic_id_provider() -> str:
     if workflow.in_workflow():
-        return str(workflow.uuid4())
+        return str(uuid.UUID(int=_workflow_adk_random().getrandbits(128), version=4))
     return str(uuid.uuid4())
 
 
@@ -120,15 +142,17 @@ _random_outside_workflow = random.Random()
 
 def _deterministic_random_provider() -> random.Random:
     if workflow.in_workflow():
-        return workflow.random()
+        return _workflow_adk_random()
     return _random_outside_workflow
 
 
 _install_provider_lock = threading.Lock()
 
 
-def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -> None:
-    """Rebinds an ADK platform ContextVar to one whose default is ``provider``.
+def _install_provider(
+    module: Any, var_name: str, default_name: str, provider: Callable[[], Any]
+) -> None:
+    """Makes ``provider`` an ADK platform seam's default, everywhere.
 
     ADK's ``set_*_provider`` functions set a value in the calling context only.
     Workflow tasks run on worker threads, which start with an empty
@@ -136,17 +160,20 @@ def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -
     reaches them and ADK falls back to its wall-clock and random defaults
     there. A ContextVar's default, unlike a set value, is visible from every
     context, so the module's variable is replaced with one that defaults to
-    ``provider``. ADK's ``set_*_provider`` and ``reset_*_provider`` operate on
-    the new variable from then on; a value set on the old one beforehand is
-    orphaned, so it is warned about. A no-op when ``provider`` is already the
-    default.
+    ``provider``. The module's ``_default_*`` binding is rebound too, because
+    ``reset_*_provider`` restores that binding: without this, an override
+    followed by a reset would land on the standard-library provider rather
+    than back on ``provider``. ADK's ``set_*_provider`` and
+    ``reset_*_provider`` operate on the new variable from then on; a value set
+    on the old one beforehand is orphaned, so it is warned about. A no-op when
+    ``provider`` is already installed.
     """
     current: contextvars.ContextVar[Callable[[], Any]] = getattr(module, var_name)
     try:
         default = contextvars.Context().run(current.get)
     except LookupError:
         default = None
-    if default is provider:
+    if default is provider and getattr(module, default_name) is provider:
         return
     if current.get(default) is not default:
         warnings.warn(
@@ -157,6 +184,7 @@ def _install_provider(module: Any, var_name: str, provider: Callable[[], Any]) -
             UserWarning,
             stacklevel=_stacklevel_outside_temporalio(),
         )
+    setattr(module, default_name, provider)
     setattr(module, var_name, contextvars.ContextVar(current.name, default=provider))
 
 
@@ -170,18 +198,21 @@ def setup_deterministic_runtime() -> None:
     The providers become the process-wide defaults of ADK's
     ``google.adk.platform`` time, uuid, and random seams, so they apply inside
     workflow tasks (which run on worker threads with an empty contextvars
-    context) as well as in the calling context. Inside a workflow they return
-    ``workflow.time()``, ``workflow.uuid4()``, and ``workflow.random()``, so
-    ADK-generated ids and retry jitter are reproducible on replay; like those
-    functions, id and random generation raise
-    :class:`temporalio.workflow.ReadOnlyContextError` in query handlers and
-    update validators. Outside a workflow in the same process (activities,
+    context) as well as in the calling context. Inside a workflow, time comes
+    from ``workflow.time()``, and ids and randoms come from a workflow-private
+    deterministic stream (a ``workflow.new_random()`` cached on the workflow
+    instance), so ADK-generated ids and retry jitter are reproducible on
+    replay without shifting the sequence user code sees from
+    ``workflow.random()`` and ``workflow.uuid4()``. Id and random generation
+    raise :class:`temporalio.workflow.ReadOnlyContextError` in query handlers
+    and update validators. Outside a workflow in the same process (activities,
     client code) they fall back to ``time.time()``, ``uuid.uuid4()``, and a
     process-wide ``random.Random``.
 
     Overrides through ADK's ``set_*_provider`` functions must be made after
     this runs (after the worker starts, or from workflow code); one made
-    earlier is replaced, with a warning.
+    earlier is replaced, with a warning. ADK's ``reset_*_provider`` functions
+    restore these deterministic providers, not the standard-library ones.
 
     :class:`GoogleAdkPlugin` calls this when a worker or replayer starts.
     Calling it again is a no-op.
@@ -194,16 +225,19 @@ def setup_deterministic_runtime() -> None:
         _install_provider(
             google.adk.platform.time,
             "_time_provider_context_var",
+            "_default_time_provider",
             _deterministic_time_provider,
         )
         _install_provider(
             google.adk.platform.uuid,
             "_id_provider_context_var",
+            "_default_id_provider",
             _deterministic_id_provider,
         )
         _install_provider(
             google.adk.platform._random,
             "_random_provider_context_var",
+            "_default_random_provider",
             _deterministic_random_provider,
         )
 
@@ -219,7 +253,8 @@ class GoogleAdkPlugin(SimplePlugin):
     - Pydantic Payload Converter (required for ADK objects).
     - Sandbox Passthrough for google.adk and google.genai modules.
     - ADK's time, id, and random providers, so ADK-generated ids and retry
-      jitter come from the workflow's deterministic clock and random stream
+      jitter come from the workflow's deterministic clock and a
+      workflow-private deterministic random stream
       (see :func:`setup_deterministic_runtime`).
 
     At worker and replayer configuration time it also warns when the global
