@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 import opentelemetry.trace
 
 import temporalio.converter
 
-from ..opentelemetry._id_generator import TemporalIdGenerator
 from ._trace_interceptor import (
     OpenAIAgentsContextPropagationInterceptor,
     _InputWithHeaders,
@@ -22,19 +23,19 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
 
     def __init__(
         self,
-        otel_id_generator: TemporalIdGenerator,
         payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
         add_temporal_spans: bool = True,
     ) -> None:
         """Initialize OTEL-aware context propagation interceptor.
 
         Args:
-            otel_id_generator: Generator for OTEL-compatible IDs.
             payload_converter: Converter for serializing trace context.
             add_temporal_spans: Whether to add Temporal-specific spans.
         """
-        super().__init__(payload_converter, add_temporal_spans, start_traces=True)
-        self._otel_id_generator = otel_id_generator
+        super().__init__(
+            payload_converter=payload_converter,
+            add_temporal_spans=add_temporal_spans,
+        )
 
     def header_contents(self) -> dict[str, Any]:
         """Get header contents enhanced with OpenTelemetry span context.
@@ -50,39 +51,46 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
                 **super().header_contents(),
                 "otelSpanId": span_context.span_id,
                 "otelTraceId": span_context.trace_id,
+                "otelTraceFlags": int(span_context.trace_flags),
+                "otelTraceState": span_context.trace_state.to_header(),
             }
         else:
             return super().header_contents()
 
+    @contextmanager
     def context_from_header(
         self,
         input: _InputWithHeaders,
-    ):
-        """Extracts and initializes trace information the input header."""
+    ) -> Iterator[None]:
+        """Use propagated IDs as a remote parent without recording replicas."""
         span_info = self.get_header_contents(input)
-
-        if span_info is None:
-            return
-        otel_span_id = span_info.get("otelSpanId")
-        otel_trace_id = span_info.get("otelTraceId")
-
-        # Seed the trace id before the trace is reconstructed so the workflow's root
-        # OTEL span shares the caller's trace id rather than generating a new one.
-        if otel_trace_id and self._otel_id_generator:
-            self._otel_id_generator.seed_trace_id(otel_trace_id)
-
-        # If only a trace was propagated from the caller, we need to seed for trace context
-        if otel_span_id and self._otel_id_generator and span_info.get("spanId") is None:
-            self._otel_id_generator.seed_span_id(otel_span_id)
-
-        super().trace_context_from_header_contents(span_info)
-
-        # If a span was propagated from the caller, we need to seed for span context
-        if (
-            otel_span_id
-            and self._otel_id_generator
-            and span_info.get("spanId") is not None
-        ):
-            self._otel_id_generator.seed_span_id(otel_span_id)
-
-        super().span_context_from_header_contents(span_info)
+        with super().context_from_header(input=input):
+            if (
+                span_info is not None
+                and span_info.get("otelSpanId")
+                and span_info.get("otelTraceId")
+            ):
+                span_context: opentelemetry.trace.SpanContext = (
+                    opentelemetry.trace.SpanContext(
+                        trace_id=span_info["otelTraceId"],
+                        span_id=span_info["otelSpanId"],
+                        is_remote=True,
+                        trace_flags=opentelemetry.trace.TraceFlags(
+                            span_info.get(
+                                "otelTraceFlags", opentelemetry.trace.TraceFlags.SAMPLED
+                            )
+                        ),
+                        trace_state=opentelemetry.trace.TraceState.from_header(
+                            [span_info["otelTraceState"]]
+                            if span_info.get("otelTraceState")
+                            else []
+                        ),
+                    )
+                )
+                with opentelemetry.trace.use_span(
+                    opentelemetry.trace.NonRecordingSpan(span_context),
+                    end_on_exit=False,
+                ):
+                    yield
+            else:
+                yield

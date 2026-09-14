@@ -56,6 +56,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- OpenAI Agents tracing preserves caller spans across workers and restores context
+  after activity, local-activity, and child-workflow completion callbacks.
 - `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
   model, and backend-op calls: each dispatch runs its own Activity, and the
   continue-as-new result cache is retired for new executions (a continued run
