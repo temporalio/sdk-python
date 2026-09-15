@@ -45,8 +45,8 @@ to include examples, links to docs, or any other relevant information.
   stream, so they never shift the sequences user code sees from `workflow.random()` and
   `workflow.uuid4()`; ADK's `reset_*_provider()` functions restore the deterministic
   providers rather than the standard-library ones; and read-only contexts (query handlers,
-  update validators) receive nondeterministic entropy that leaves the private stream
-  untouched.
+  update validators) receive wall-clock time and nondeterministic entropy that leave the
+  private stream untouched.
 
 ### Security
 

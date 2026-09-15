@@ -100,7 +100,11 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
 
 
 def _deterministic_time_provider() -> float:
-    if workflow.in_workflow():
+    # Read-only contexts (query handlers, update validators) get wall-clock
+    # time: their results are never replayed, and workflow.time() would hand
+    # them the last activation's timestamp, which is stale by however long the
+    # workflow has been parked.
+    if workflow.in_workflow() and not workflow.unsafe.is_read_only():
         return workflow.time()
     return time.time()
 
@@ -208,11 +212,12 @@ def setup_deterministic_runtime() -> None:
     instance), so ADK-generated ids and retry jitter are reproducible on
     replay without shifting the sequence user code sees from
     ``workflow.random()`` and ``workflow.uuid4()``. In read-only contexts
-    (query handlers, update validators) ids and randoms come from a
-    nondeterministic fallback stream that leaves the private stream untouched,
-    since read-only results are never replayed. Outside a workflow in the same
-    process (activities, client code) they fall back to ``time.time()``,
-    ``uuid.uuid4()``, and a process-wide ``random.Random``.
+    (query handlers, update validators) time comes from the wall clock and ids
+    and randoms come from a nondeterministic fallback stream that leaves the
+    private stream untouched, since read-only results are never replayed.
+    Outside a workflow in the same process (activities, client code) they fall
+    back to ``time.time()``, ``uuid.uuid4()``, and a process-wide
+    ``random.Random``.
 
     Overrides through ADK's ``set_*_provider`` functions must be made after
     this runs (after the worker starts, or from workflow code); one made

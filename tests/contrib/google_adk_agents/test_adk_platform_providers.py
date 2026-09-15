@@ -297,6 +297,12 @@ class QueryDuringRunWorkflow:
     def query_adk_id(self) -> str:
         return adk_uuid.new_uuid()
 
+    @workflow.query
+    def query_adk_time(self) -> float:
+        # Read-only contexts get wall-clock time, not the stale timestamp of
+        # the activation the workflow last parked on.
+        return adk_time.get_time()
+
 
 @pytest.mark.parametrize(
     "workflow_runner",
@@ -327,6 +333,9 @@ async def test_query_draws_do_not_advance_private_stream(
         # Draw through the read-only fallback between the run's two draws.
         for _ in range(3):
             assert uuid.UUID(await handle.query(QueryDuringRunWorkflow.query_adk_id))
+        # get_time() in a read-only context returns wall-clock time.
+        queried_time = await handle.query(QueryDuringRunWorkflow.query_adk_time)
+        assert queried_time == pytest.approx(time.time(), abs=60)
         await handle.signal(QueryDuringRunWorkflow.go)
         ids = await handle.result()
         history = await handle.fetch_history()
