@@ -67,6 +67,11 @@ from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
+from ..workflow._event_groups import (
+    _capture_event_group_markers,
+    _inbound_event_group,
+    _inbound_update_event_group,
+)
 from . import _command_aware_visitor
 from ._interceptor import (
     ContinueAsNewInput,
@@ -722,7 +727,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 command = None  # type: ignore
 
                 # Run the handler
-                success = await self._inbound.handle_update_handler(handler_input)
+                with _inbound_update_event_group(job.id).scope():
+                    success = await self._inbound.handle_update_handler(handler_input)
                 result_payloads = self._workflow_context_payload_converter.to_payloads(
                     [success]
                 )
@@ -1241,6 +1247,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         versioning_intent: temporalio.workflow.VersioningIntent | None,
         initial_versioning_behavior: temporalio.workflow.ContinueAsNewVersioningBehavior
         | None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> NoReturn:
         self._assert_not_read_only("continue as new")
         # Use definition if callable
@@ -1270,6 +1277,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 arg_types=arg_types,
                 versioning_intent=versioning_intent,
                 initial_versioning_behavior=initial_versioning_behavior,
+                event_groups=event_groups,
             )
         )
 
@@ -1378,7 +1386,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             type_hint,  # type: ignore[arg-type]
         )
 
-    def workflow_upsert_memo(self, updates: Mapping[str, Any]) -> None:
+    def workflow_upsert_memo(
+        self,
+        updates: Mapping[str, Any],
+        *,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
+    ) -> None:
         # Converting before creating a command so that we don't leave a partial command in case of conversion failure.
         update_payloads = {}
         removals = []
@@ -1394,7 +1407,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if not update_payloads and not removals:
             return
 
+        markers = _capture_event_group_markers(event_groups)
+
         command = self._add_command()
+        command.event_group_markers.extend(markers)
         fields = command.modify_workflow_properties.upserted_memo.fields
 
         # Updating memo inside info by downcasting to mutable mapping.
@@ -1438,7 +1454,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._metric_meter = _ReplaySafeMetricMeter(metric_meter)
         return self._metric_meter
 
-    def workflow_patch(self, id: str, *, deprecated: bool) -> bool:
+    def workflow_patch(
+        self,
+        id: str,
+        *,
+        deprecated: bool,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
+    ) -> bool:
         self._assert_not_read_only("patch")
         # We use a previous memoized result of this if present. If this is being
         # deprecated, we can still use memoized result and skip the command.
@@ -1462,7 +1484,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             use_patch = True
         self._patches_memoized[id] = use_patch
         if use_patch:
+            markers = _capture_event_group_markers(event_groups)
+
             command = self._add_command()
+            command.event_group_markers.extend(markers)
             command.set_patch_marker.patch_id = id
             command.set_patch_marker.deprecated = deprecated
         return use_patch
@@ -1561,6 +1586,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         activity_id: str | None,
         versioning_intent: temporalio.workflow.VersioningIntent | None,
         summary: str | None = None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
@@ -1598,6 +1624,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
                 summary=summary,
+                event_groups=event_groups,
                 priority=priority,
             )
         )
@@ -1626,6 +1653,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         versioning_intent: temporalio.workflow.VersioningIntent | None,
         static_summary: str | None = None,
         static_details: str | None = None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
@@ -1666,6 +1694,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 versioning_intent=versioning_intent,
                 static_summary=static_summary,
                 static_details=static_details,
+                event_groups=event_groups,
                 priority=priority,
             )
         )
@@ -1683,6 +1712,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         cancellation_type: temporalio.workflow.ActivityCancellationType,
         activity_id: str | None,
         summary: str | None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         # Get activity definition if it's callable
         name: str
@@ -1716,6 +1746,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 local_retry_threshold=local_retry_threshold,
                 cancellation_type=cancellation_type,
                 summary=summary,
+                event_groups=event_groups,
                 headers={},
                 arg_types=arg_types,
                 ret_type=ret_type,
@@ -1735,6 +1766,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         cancellation_type: temporalio.workflow.NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         if temporalio.nexus.system.is_system_endpoint(endpoint):
             return await _start_system_nexus_operation(
@@ -1751,6 +1783,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     cancellation_type=cancellation_type,
                     headers=None,
                     summary=summary,
+                    event_groups=event_groups,
                 ),
             )
         return await self._outbound.start_nexus_operation(
@@ -1766,6 +1799,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 cancellation_type=cancellation_type,
                 headers=headers,
                 summary=summary,
+                event_groups=event_groups,
             )
         )
 
@@ -1778,8 +1812,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             temporalio.common.SearchAttributes
             | Sequence[temporalio.common.SearchAttributeUpdate]
         ),
+        *,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
-        v = self._add_command().upsert_workflow_search_attributes
+        markers = _capture_event_group_markers(event_groups)
+
+        command = self._add_command()
+        command.event_group_markers.extend(markers)
+        v = command.upsert_workflow_search_attributes
 
         # Update the attrs on info, casting to their mutable forms first
         mut_attrs = cast(
@@ -1879,7 +1919,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     )
 
     async def workflow_sleep(
-        self, duration: float, *, summary: str | None = None
+        self,
+        duration: float,
+        *,
+        summary: str | None = None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         user_metadata = (
             temporalio.api.sdk.v1.UserMetadata(
@@ -1888,10 +1932,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if summary
             else None
         )
+        markers = _capture_event_group_markers(event_groups)
+
         fut = self.create_future()
         timer_handle = self._timer_impl(
             duration,
-            _TimerOptions(user_metadata=user_metadata),
+            _TimerOptions(user_metadata=user_metadata, event_group_markers=markers),
             lambda: fut.set_result(None) if not fut.done() else None,
         )
         fut.add_done_callback(
@@ -1905,6 +1951,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         *,
         timeout: float | None = None,
         timeout_summary: str | None = None,
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         self._assert_not_read_only("wait condition")
         cancellation_requested_before = self._cancel_reason is not None
@@ -1931,10 +1978,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if timeout_summary
             else None
         )
+        markers = _capture_event_group_markers(event_groups)
         ctxvars = contextvars.copy_context()
 
         async def in_context():
-            _TimerOptionsCtxVar.set(_TimerOptions(user_metadata=user_metadata))
+            _TimerOptionsCtxVar.set(
+                _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
+            )
             await asyncio.wait_for(fut, timeout)
 
         try:
@@ -2041,8 +2091,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 except _ActivityDoBackoffError as err:
                     # We have to sleep then reschedule. Note this sleep can be
                     # cancelled like any other timer.
-                    await asyncio.sleep(
-                        err.backoff.backoff_duration.ToTimedelta().total_seconds()
+                    await self.workflow_sleep(
+                        err.backoff.backoff_duration.ToTimedelta().total_seconds(),
+                        event_groups=input.event_groups,
                     )
                     handle._apply_schedule_command(err.backoff)
                     # We have to put the handle back on the pending activity
@@ -2065,6 +2116,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
         payloads = payload_converter.to_payloads(input.args) if input.args else None
+        markers = _capture_event_group_markers(input.event_groups)
+
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.child_workflow_id = input.child_workflow_id
@@ -2073,6 +2126,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             v.args.extend(payloads)
         if input.headers:
             temporalio.common._apply_headers(input.headers, v.headers)
+        command.event_group_markers.extend(markers)
+
         await self._signal_external_workflow(command)
 
     async def _outbound_signal_external_workflow(
@@ -2085,6 +2140,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
         payloads = payload_converter.to_payloads(input.args) if input.args else None
+        markers = _capture_event_group_markers(input.event_groups)
+
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.workflow_execution.namespace = input.namespace
@@ -2096,6 +2153,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             v.args.extend(payloads)
         if input.headers:
             temporalio.common._apply_headers(input.headers, v.headers)
+        command.event_group_markers.extend(markers)
+
         await self._signal_external_workflow(command)
 
     async def _outbound_start_child_workflow(
@@ -2680,8 +2739,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         def done_callback(_f: Any):
             self._in_progress_signals.pop(id, None)
 
+        async def run_signal() -> None:
+            with _inbound_event_group(job.originating_event_id).scope():
+                await self._inbound.handle_signal(input)
+
         task = self.create_task(
-            self._run_top_level_workflow_function(self._inbound.handle_signal(input)),
+            self._run_top_level_workflow_function(run_signal()),
             name=f"signal: {job.signal_name}",
         )
         task.add_done_callback(done_callback)
@@ -2950,10 +3013,22 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if delay < 0:
             raise RuntimeError("Attempting to schedule timer with negative delay")
 
+        if options.event_group_markers is None:
+            options = _TimerOptions(
+                user_metadata=options.user_metadata,
+                event_group_markers=_capture_event_group_markers(None),
+            )
+
         # Create, schedule, and return
         seq = self._next_seq("timer")
         handle = _TimerHandle(
-            seq, self.time() + delay, options, callback, args, self, context
+            seq,
+            self.time() + delay,
+            options,
+            callback,
+            args,
+            self,
+            context,
         )
         handle._apply_start_command(self._add_command(), delay)
         self._pending_timers[seq] = handle
@@ -3246,6 +3321,7 @@ class _WorkflowOutboundImpl(
 @dataclass(frozen=True)
 class _TimerOptions:
     user_metadata: temporalio.api.sdk.v1.UserMetadata | None = None
+    event_group_markers: Sequence[temporalio.api.sdk.v1.EventGroupMarker] | None = None
 
 
 _TimerOptionsCtxVar: contextvars.ContextVar[_TimerOptions] = contextvars.ContextVar(
@@ -3258,7 +3334,7 @@ class _TimerHandle(asyncio.TimerHandle):
         self,
         seq: int,
         when: float,
-        options: _TimerOptions | None,
+        options: _TimerOptions,
         callback: Callable[..., Any],
         args: Sequence[Any],
         loop: asyncio.AbstractEventLoop,
@@ -3274,8 +3350,9 @@ class _TimerHandle(asyncio.TimerHandle):
         delay: float,
     ) -> None:
         command.start_timer.seq = self._seq
-        if self._options and self._options.user_metadata:
+        if self._options.user_metadata:
             command.user_metadata.CopyFrom(self._options.user_metadata)
+        command.event_group_markers.extend(self._options.event_group_markers or ())
         command.start_timer.start_to_fire_timeout.FromNanoseconds(int(delay * 1e9))
 
     def _apply_cancel_command(
@@ -3283,6 +3360,7 @@ class _TimerHandle(asyncio.TimerHandle):
         command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
     ) -> None:
         command.cancel_timer.seq = self._seq
+        command.event_group_markers.extend(self._options.event_group_markers or ())
 
 
 class _ActivityDoBackoffError(BaseException):
@@ -3323,6 +3401,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 is_local=isinstance(self._input, StartLocalActivityInput),
             )
         )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     def cancel(self, msg: Any | None = None) -> bool:
         # Allow the cancel to go through for the task even if we're deleting,
@@ -3410,6 +3489,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             command.user_metadata.summary.CopyFrom(
                 self._payload_converter.to_payload(self._input.summary)
             )
+        command.event_group_markers.extend(self._event_group_markers)
         v.cancellation_type = cast(
             temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ValueType,
             int(self._input.cancellation_type),
@@ -3454,6 +3534,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             command.request_cancel_activity.seq = self._seq
         else:
             command.request_cancel_local_activity.seq = self._seq
+        command.event_group_markers.extend(self._event_group_markers)
 
 
 class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
@@ -3482,6 +3563,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._failure_converter = self._instance._failure_converter_with_context(
             workflow_context
         )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     @property
     def id(self) -> str:
@@ -3497,6 +3579,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         self._instance._assert_not_read_only("signal child handle")
         await self._instance._outbound.signal_child_workflow(
@@ -3507,6 +3590,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 args=temporalio.common._arg_or_args(arg, args),
                 child_workflow_id=self._input.id,
                 headers={},
+                event_groups=event_groups,
             )
         )
 
@@ -3586,6 +3670,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             command.user_metadata.details.CopyFrom(
                 self._payload_converter.to_payload(self._input.static_details)
             )
+        command.event_group_markers.extend(self._event_group_markers)
         if self._input.priority:
             v.priority.CopyFrom(self._input.priority._to_proto())
 
@@ -3599,6 +3684,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         v = command.cancel_child_workflow_execution
         v.child_workflow_seq = self._seq
         v.reason = reason
+        command.event_group_markers.extend(self._event_group_markers)
 
 
 class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
@@ -3627,6 +3713,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         self._instance._assert_not_read_only("signal external handle")
         await self._instance._outbound.signal_external_workflow(
@@ -3639,18 +3726,29 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 workflow_id=self._id,
                 workflow_run_id=self._run_id,
                 headers={},
+                event_groups=event_groups,
             )
         )
 
-    async def cancel(self, *, reason: str = "") -> None:
+    async def cancel(
+        self,
+        *,
+        reason: str = "",
+        event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
+    ) -> None:
         self._instance._assert_not_read_only("cancel external handle")
+
+        markers = _capture_event_group_markers(event_groups)
+
         command = self._instance._add_command()
+        command.event_group_markers.extend(markers)
         v = command.request_cancel_external_workflow_execution
         v.workflow_execution.namespace = self._instance._info.namespace
         v.workflow_execution.workflow_id = self._id
         if self._run_id:
             v.workflow_execution.run_id = self._run_id
         v.reason = reason
+
         await self._instance._cancel_external_workflow(command)
 
 
@@ -3672,6 +3770,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
         self._failure_converter = failure_converter
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     @property
     def operation_token(self) -> str | None:
@@ -3735,12 +3834,14 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             command.user_metadata.summary.CopyFrom(
                 self._payload_converter.to_payload(self._input.summary)
             )
+        command.event_group_markers.extend(self._event_group_markers)
 
     def _apply_cancel_command(
         self,
         command: temporalio.bridge.proto.workflow_commands.WorkflowCommand,
     ) -> None:
         command.request_cancel_nexus_operation.seq = self._seq
+        command.event_group_markers.extend(self._event_group_markers)
 
 
 class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
@@ -3750,6 +3851,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         super().__init__("Continue as new")
         self._instance = instance
         self._input = input
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     def _apply_command(self) -> None:
         # Convert arguments before creating command in case it raises error
@@ -3804,6 +3906,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                 "temporalio.api.enums.v1.ContinueAsNewVersioningBehavior.ValueType",
                 int(self._input.initial_versioning_behavior),
             )
+        command.event_group_markers.extend(self._event_group_markers)
 
 
 def _encode_search_attributes(

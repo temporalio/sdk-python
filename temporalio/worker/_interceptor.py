@@ -177,6 +177,7 @@ class ContinueAsNewInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: VersioningIntent | None
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None
     # The types may be absent
     arg_types: list[type] | None
 
@@ -231,6 +232,7 @@ class SignalChildWorkflowInput:
     args: Sequence[Any]
     child_workflow_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
 
 
 @dataclass
@@ -243,6 +245,7 @@ class SignalExternalWorkflowInput:
     workflow_id: str
     workflow_run_id: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
 
 
 @dataclass
@@ -263,6 +266,7 @@ class StartActivityInput:
     disable_eager_execution: bool
     versioning_intent: VersioningIntent | None
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -293,6 +297,7 @@ class StartChildWorkflowInput:
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -313,6 +318,7 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
     headers: Mapping[str, str] | None
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
     output_type: type[OutputT] | None = None
 
     def __post_init__(self) -> None:
@@ -366,6 +372,7 @@ class StartLocalActivityInput:
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None
 
     # The types may be absent
     arg_types: list[type] | None

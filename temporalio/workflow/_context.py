@@ -22,6 +22,7 @@ from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
     from ._activities import ActivityCancellationType, ActivityHandle
+    from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
     from ._workflow_ops import (
@@ -90,6 +91,13 @@ class Info:
     first_execution_run_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     namespace: str
+
+    original_execution_run_id: str
+    """Run ID recorded on the ``WorkflowExecutionStarted`` event.
+
+    Unlike :py:attr:`run_id`, this value is preserved across workflow resets.
+    """
+
     parent: ParentInfo | None
     root: RootInfo | None
     priority: temporalio.common.Priority
@@ -296,6 +304,7 @@ class _Runtime(ABC):
         ),
         versioning_intent: VersioningIntent | None,
         initial_versioning_behavior: ContinueAsNewVersioningBehavior | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NoReturn: ...
 
     @abstractmethod
@@ -365,13 +374,24 @@ class _Runtime(ABC):
     ) -> Any: ...
 
     @abstractmethod
-    def workflow_upsert_memo(self, updates: Mapping[str, Any]) -> None: ...
+    def workflow_upsert_memo(
+        self,
+        updates: Mapping[str, Any],
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
+    ) -> None: ...
 
     @abstractmethod
     def workflow_metric_meter(self) -> temporalio.common.MetricMeter: ...
 
     @abstractmethod
-    def workflow_patch(self, id: str, *, deprecated: bool) -> bool: ...
+    def workflow_patch(
+        self,
+        id: str,
+        *,
+        deprecated: bool,
+        event_groups: Sequence[EventGroup] | None = None,
+    ) -> bool: ...
 
     @abstractmethod
     def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter: ...
@@ -413,6 +433,7 @@ class _Runtime(ABC):
         activity_id: str | None,
         versioning_intent: VersioningIntent | None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> ActivityHandle[Any]: ...
 
@@ -440,6 +461,7 @@ class _Runtime(ABC):
         versioning_intent: VersioningIntent | None,
         static_summary: str | None = None,
         static_details: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> ChildWorkflowHandle[Any, Any]: ...
 
@@ -457,6 +479,7 @@ class _Runtime(ABC):
         cancellation_type: ActivityCancellationType,
         activity_id: str | None,
         summary: str | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod
@@ -473,6 +496,7 @@ class _Runtime(ABC):
         cancellation_type: NexusOperationCancellationType,
         headers: Mapping[str, str] | None,
         summary: str | None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
@@ -485,11 +509,17 @@ class _Runtime(ABC):
             temporalio.common.SearchAttributes
             | Sequence[temporalio.common.SearchAttributeUpdate]
         ),
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @abstractmethod
     async def workflow_sleep(
-        self, duration: float, *, summary: str | None = None
+        self,
+        duration: float,
+        *,
+        summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -499,6 +529,7 @@ class _Runtime(ABC):
         *,
         timeout: float | None = None,
         timeout_summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @abstractmethod
@@ -550,7 +581,9 @@ def current_update_info() -> UpdateInfo | None:
     return _current_update_info.get(None)
 
 
-def deprecate_patch(id: str) -> None:
+def deprecate_patch(
+    id: str, *, event_groups: Sequence[EventGroup] | None = None
+) -> None:
     """Mark a patch as deprecated.
 
     This marks a workflow that had :py:func:`patched` in a previous version of
@@ -560,8 +593,11 @@ def deprecate_patch(id: str) -> None:
 
     Args:
         id: The identifier originally used with :py:func:`patched`.
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
-    _Runtime.current().workflow_patch(id, deprecated=True)
+    _Runtime.current().workflow_patch(id, deprecated=True, event_groups=event_groups)
 
 
 def extern_functions() -> Mapping[str, Callable]:
@@ -679,15 +715,26 @@ def memo_value(
     return _Runtime.current().workflow_memo_value(key, default, type_hint=type_hint)
 
 
-def upsert_memo(updates: Mapping[str, Any]) -> None:
+def upsert_memo(
+    updates: Mapping[str, Any],
+    *,
+    event_groups: Sequence[EventGroup] | None = None,
+) -> None:
     """Adds, modifies, and/or removes memos, with upsert semantics.
 
     Every memo that has a matching key has its value replaced with the one specified in ``updates``.
     If the value is set to ``None``, the memo is removed instead.
     For every key with no existing memo, a new memo is added with specified value (unless the value is ``None``).
     Memos with keys not included in ``updates`` remain unchanged.
+
+    Args:
+        updates: Mapping of memo keys to values. A value of ``None`` removes
+            the memo.
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
-    return _Runtime.current().workflow_upsert_memo(updates)
+    return _Runtime.current().workflow_upsert_memo(updates, event_groups=event_groups)
 
 
 def get_current_details() -> str:
@@ -759,7 +806,7 @@ def now() -> datetime:
     return datetime.fromtimestamp(time(), timezone.utc)
 
 
-def patched(id: str) -> bool:
+def patched(id: str, *, event_groups: Sequence[EventGroup] | None = None) -> bool:
     """Patch a workflow.
 
     When called, this will only return true if code should take the newer path
@@ -772,12 +819,17 @@ def patched(id: str) -> bool:
     Args:
         id: The identifier for this patch. This identifier may be used
             repeatedly in the same workflow to represent the same patch
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
 
     Returns:
         True if this should take the newer path, false if it should take the
         older path.
     """
-    return _Runtime.current().workflow_patch(id, deprecated=False)
+    return _Runtime.current().workflow_patch(
+        id, deprecated=False, event_groups=event_groups
+    )
 
 
 def payload_converter() -> temporalio.converter.PayloadConverter:
@@ -874,6 +926,8 @@ def upsert_search_attributes(
         temporalio.common.SearchAttributes
         | Sequence[temporalio.common.SearchAttributeUpdate]
     ),
+    *,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> None:
     """Upsert search attributes for this workflow.
 
@@ -883,11 +937,16 @@ def upsert_search_attributes(
             search attribute keys). The dictionary form of attributes is
             DEPRECATED and if used, result in invalid key types on the
             typed_search_attributes property in the info.
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
     if not attributes:
         return
     temporalio.common._warn_on_deprecated_search_attributes(attributes)
-    _Runtime.current().workflow_upsert_search_attributes(attributes)
+    _Runtime.current().workflow_upsert_search_attributes(
+        attributes, event_groups=event_groups
+    )
 
 
 def uuid4() -> uuid.UUID:
@@ -929,19 +988,28 @@ def uuid7() -> uuid.UUID:
     )
 
 
-async def sleep(duration: float | timedelta, *, summary: str | None = None) -> None:
+async def sleep(
+    duration: float | timedelta,
+    *,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
+) -> None:
     """Sleep for the given duration.
 
     Args:
         duration: Duration to sleep in seconds or as a timedelta.
         summary: A single-line fixed summary for this timer that may appear in UI/CLI.
             This can be in single-line Temporal markdown format.
+        event_groups: Event Groups to associate this command with, in addition
+            to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
     await _Runtime.current().workflow_sleep(
         duration=(
             duration.total_seconds() if isinstance(duration, timedelta) else duration
         ),
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -950,6 +1018,7 @@ async def wait_condition(
     *,
     timeout: timedelta | float | None = None,
     timeout_summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> None:
     """Wait on a callback to become true.
 
@@ -968,9 +1037,14 @@ async def wait_condition(
         timeout_summary: Optional simple string identifying the timer (created if ``timeout`` is
             present) that may be visible in UI/CLI. While it can be normal text, it is best to treat
             as a timer ID.
+        event_groups: Event Groups to associate the timer command (created if
+            ``timeout`` is present) with, in addition to those active in the
+            current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,
         timeout=timeout.total_seconds() if isinstance(timeout, timedelta) else timeout,
         timeout_summary=timeout_summary,
+        event_groups=event_groups,
     )
