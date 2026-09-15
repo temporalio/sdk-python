@@ -11,7 +11,7 @@ from __future__ import annotations
 import io
 import os
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, overload
 
 if TYPE_CHECKING:
     import google.auth.credentials
@@ -100,12 +100,31 @@ class TemporalAsyncFiles(AsyncFiles):
             **act_config,
         )
 
+    @overload
     async def download(
         self,
         *,
-        file: str | types.File,
+        file: str | types.File | types.Video | types.GeneratedVideo,
+        destination: None = None,
         config: types.DownloadFileConfigOrDict | None = None,
-    ) -> bytes:
+    ) -> bytes: ...
+
+    @overload
+    async def download(
+        self,
+        *,
+        file: str | types.File | types.Video | types.GeneratedVideo,
+        destination: str | os.PathLike[str] | io.IOBase,
+        config: types.DownloadFileConfigOrDict | None = None,
+    ) -> None: ...
+
+    async def download(
+        self,
+        *,
+        file: str | types.File | types.Video | types.GeneratedVideo,
+        destination: str | os.PathLike[str] | io.IOBase | None = None,
+        config: types.DownloadFileConfigOrDict | None = None,
+    ) -> bytes | None:
         """Download a file via a Temporal activity."""
         act_config: ActivityConfig = {**self._activity_config}
         if "summary" not in act_config:
@@ -119,19 +138,48 @@ class TemporalAsyncFiles(AsyncFiles):
                 download_config = config
             _validate_http_options(download_config.http_options)
 
-        if isinstance(file, types.File):
-            if not file.name:
-                raise ValueError("File object must have a name to download.")
+        if isinstance(file, types.GeneratedVideo):
+            file_video = file.video
+            file_name = file_video.uri if file_video is not None else None
+        elif isinstance(file, types.Video):
+            file_name = file.uri
+        elif isinstance(file, types.File):
             file_name = file.name
         else:
             file_name = file
+        if not file_name:
+            raise ValueError("File name is required.")
 
-        return await temporal_workflow.execute_activity(
+        if isinstance(destination, io.IOBase):
+            destination_stream = destination
+            destination_path = None
+        elif destination is not None:
+            destination_stream = None
+            destination_path = os.fspath(destination)
+        else:
+            destination_stream = None
+            destination_path = None
+
+        data = await temporal_workflow.execute_activity(
             "gemini_files_download",
-            _GeminiDownloadFileRequest(file=file_name, config=download_config),
+            _GeminiDownloadFileRequest(
+                file=file_name,
+                destination=destination_path,
+                config=download_config,
+            ),
             result_type=bytes,
             **act_config,
         )
+        if destination_stream is not None:
+            destination_stream.write(data)
+            return None
+        if destination_path is not None:
+            return None
+        if isinstance(file, types.Video):
+            file.video_bytes = data
+        elif isinstance(file, types.GeneratedVideo) and file.video is not None:
+            file.video.video_bytes = data
+        return data
 
     async def register_files(
         self,
