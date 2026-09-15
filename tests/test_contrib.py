@@ -17,7 +17,7 @@ def test_openai_agents_standalone_module(monkeypatch: pytest.MonkeyPatch) -> Non
     standalone_module = ModuleType("temporalio.contrib.openai_agents")
     monkeypatch.setattr(
         temporalio.contrib,
-        "import_module",
+        "_import_module",
         lambda name: standalone_module,
     )
     assert getattr(temporalio.contrib, "openai_agents") is standalone_module
