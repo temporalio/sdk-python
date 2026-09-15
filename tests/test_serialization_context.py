@@ -160,7 +160,9 @@ class SerializationContextCompositePayloadConverter(
 
 @activity.defn
 async def passthrough_activity(input: TraceData) -> TraceData:
-    activity.payload_converter().to_payload(input)
+    payload_converter = activity.payload_converter()
+    assert isinstance(payload_converter, SerializationContextCompositePayloadConverter)
+    payload_converter.to_payload(input)
     activity.heartbeat(input)
     # Wait for the heartbeat to be processed so that it modifies the data before the activity returns
     await asyncio.sleep(0.2)
@@ -178,7 +180,11 @@ class EchoWorkflow:
 class PayloadConversionWorkflow:
     @workflow.run
     async def run(self, data: TraceData) -> TraceData:
-        workflow.payload_converter().to_payload(data)
+        payload_converter = workflow.payload_converter()
+        assert isinstance(
+            payload_converter, SerializationContextCompositePayloadConverter
+        )
+        payload_converter.to_payload(data)
         data = await workflow.execute_activity(
             passthrough_activity,
             data,
