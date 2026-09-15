@@ -28,6 +28,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+
 ### Security
 
 ## [1.33.0] - 2026-09-14
