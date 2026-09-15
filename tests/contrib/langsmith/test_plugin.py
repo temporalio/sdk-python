@@ -108,12 +108,14 @@ class TestPluginIntegration:
                     handle, ComprehensiveWorkflow.is_waiting_for_signal
                 ), "Workflow never reached signal wait point"
                 await handle.query(ComprehensiveWorkflow.my_query)
-                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
+                # Updates hit the workflow parked at the signal wait, so no
+                # workflow task is ever in flight around them; the signal then
+                # releases the rest of the run.
                 await handle.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
+                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle.result()
 
         assert result == "comprehensive-done"

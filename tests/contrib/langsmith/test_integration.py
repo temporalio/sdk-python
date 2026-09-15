@@ -625,13 +625,15 @@ class TestComprehensiveTracing:
                 max_cached_workflows=0,
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
+                # Query and updates all hit the workflow parked at the signal
+                # wait, so no workflow task is ever in flight around them; the
+                # signal then releases the rest of the run.
                 await handle_2.query(ComprehensiveWorkflow.my_query)
-                await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
                 await handle_2.execute_update(ComprehensiveWorkflow.my_update, "finish")
+                await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle_2.result()
 
         assert result == "comprehensive-done"
@@ -838,12 +840,14 @@ class TestComprehensiveTracing:
                 max_cached_workflows=0,
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
-                await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
-                await wait_for_workflow_idle(raw_handle, timeout=_IDLE_TIMEOUT)
+                # Updates hit the workflow parked at the signal wait, so no
+                # workflow task is ever in flight around them; the signal then
+                # releases the rest of the run.
                 await handle_2.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
                 await handle_2.execute_update(ComprehensiveWorkflow.my_update, "finish")
+                await handle_2.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle_2.result()
 
         assert result == "comprehensive-done"
