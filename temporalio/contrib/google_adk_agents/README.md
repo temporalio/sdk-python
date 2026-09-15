@@ -43,9 +43,9 @@ ADK provides: (from the [ADK overview](https://google.github.io/adk-docs/#learn-
 
 #### 1. Deterministic Runtime
 - Installs ADK's `google.adk.platform` time, uuid, and random providers as process-wide defaults, so they apply inside workflow tasks (which run on worker threads with an empty `contextvars` context)
-- Inside a workflow the providers return `workflow.time()`, `workflow.uuid4()`, and `workflow.random()`, so ADK-generated session, event, invocation, and function-call ids and retry jitter are reproducible on replay. Like those functions, ADK id generation and `get_random()` raise `ReadOnlyContextError` inside query handlers and update validators
+- Inside a workflow, time comes from `workflow.time()` and ids and randoms come from a workflow-private deterministic stream (a `workflow.new_random()` cached per run), so ADK-generated session, event, invocation, and function-call ids and retry jitter are reproducible on replay without shifting the sequences user code sees from `workflow.random()` and `workflow.uuid4()`. In read-only contexts (query handlers, update validators) ids and randoms come from nondeterministic entropy that leaves the private stream untouched
 - Outside a workflow in the same process (activities, client code) they fall back to the standard library
-- Overrides through ADK's `set_*_provider` functions must be made after the Worker starts or from workflow code; one made earlier is replaced (with a warning) when the plugin installs its providers
+- Overrides through ADK's `set_*_provider` functions must be made after the Worker starts or from workflow code; one made earlier is replaced (with a warning) when the plugin installs its providers, and `reset_*_provider` restores the deterministic providers rather than the standard-library ones
 - Automatic setup when using `GoogleAdkPlugin`
 
 #### 2. Activity-Based Model Execution
