@@ -2,9 +2,6 @@
 
 Helpers for deriving a worker identity from Cloud Run instance metadata. Both Cloud Run worker pools
 and services are supported.
-
-.. warning::
-    Google Cloud Run support is experimental.
 """
 
 from __future__ import annotations

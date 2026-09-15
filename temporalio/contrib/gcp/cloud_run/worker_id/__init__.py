@@ -3,13 +3,6 @@
 :py:class:`WorkerIDPlugin` reads Cloud Run instance metadata (from a worker pool or a service) and
 sets the client identity from the Cloud Run instance.
 
-For advanced or non-plugin use, :py:func:`get_google_cloud_run_metadata` returns the underlying
-:py:class:`GoogleCloudRunMetadata`, whose ``worker_identity`` property exposes the same value the
-plugin applies.
-
-.. warning::
-    Google Cloud Run support is experimental.
-
 Quick start::
 
     import asyncio

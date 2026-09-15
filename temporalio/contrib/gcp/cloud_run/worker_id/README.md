@@ -1,16 +1,11 @@
 # worker_id
 
-> ⚠️ **This package is currently at an experimental release stage.** ⚠️
-
 A plugin for running [Temporal](https://temporal.io) workers on Google Cloud Run. `WorkerIDPlugin`
 reads Cloud Run instance metadata and sets the client identity. Both Cloud Run **worker pools** and
 **services** are supported.
 
 Register the plugin once when connecting the client and it sets the client **identity** to a value
 derived from the Cloud Run instance (unless you already passed an `identity`).
-
-Client plugins automatically propagate to workers created from that client, so the worker inherits
-this identity and there is nothing to wire up on the worker.
 
 ## Quick start
 

@@ -20,12 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added the experimental `temporalio.contrib.gcp.cloud_run.worker_id` module for long-lived Temporal
-  workers on Google Cloud Run worker pools and services. Register `WorkerIDPlugin` on your client
-  (`plugins=[WorkerIDPlugin()]`); it propagates to workers automatically, setting the client identity
-  from the Cloud Run instance (unless one is already configured). The underlying
-  `GoogleCloudRunMetadata` helper (via `get_google_cloud_run_metadata`) exposes the same value for
-  advanced use.
+- Added the `temporalio.contrib.gcp.cloud_run.worker_id` module plugin to help set the worker identity on Cloud Run.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
