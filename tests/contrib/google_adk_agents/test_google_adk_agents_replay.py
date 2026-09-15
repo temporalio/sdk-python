@@ -6,6 +6,10 @@ from google.adk.models import LLMRegistry
 from temporalio.client import WorkflowHistory
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin
 from temporalio.worker import Replayer
+from tests.contrib.google_adk_agents.test_adk_graph_workflows import (
+    SequentialGraphWorkflow,
+)
+from tests.contrib.google_adk_agents.test_adk_hitl import HumanInputGraphWorkflow
 from tests.contrib.google_adk_agents.test_google_adk_agents import (
     MultiAgentWorkflow,
     ResearchModel,
@@ -19,6 +23,8 @@ from tests.contrib.google_adk_agents.test_google_adk_agents import (
     [
         "multi_agent.json",
         "single_agent.json",
+        "graph_workflow.json",
+        "hitl_workflow.json",
     ],
 )
 async def test_replay(file_name: str) -> None:
@@ -28,6 +34,11 @@ async def test_replay(file_name: str) -> None:
         LLMRegistry.register(ResearchModel)
         LLMRegistry.register(WeatherModel)
         await Replayer(
-            workflows=[MultiAgentWorkflow, WeatherAgent],
+            workflows=[
+                MultiAgentWorkflow,
+                WeatherAgent,
+                SequentialGraphWorkflow,
+                HumanInputGraphWorkflow,
+            ],
             plugins=[GoogleAdkPlugin()],
         ).replay_workflow(WorkflowHistory.from_json("fake", history_json))
