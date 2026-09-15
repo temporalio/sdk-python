@@ -100,6 +100,7 @@ class _GeminiDownloadFileRequest(BaseModel):
     """Serializable activity input for a file download."""
 
     file: str
+    destination: str | None = None
     config: types.DownloadFileConfig | None = None
 
 
