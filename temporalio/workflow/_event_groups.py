@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import contextvars
-import hashlib
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -86,7 +85,7 @@ class EventGroup(ABC):
 class _LabelEventGroup(EventGroup):
     """An Event Group explicitly created by workflow code."""
 
-    def __init__(self, id: str, label: str) -> None:
+    def __init__(self, id: str, label: str | None) -> None:
         self._id = id
         self._label = label
 
@@ -97,9 +96,11 @@ class _LabelEventGroup(EventGroup):
         )
 
     def _to_proto(self) -> temporalio.api.sdk.v1.EventGroupMarker:
-        # Deliberately the SDK's default converter rather than the worker's own: the UI and CLI
-        # rely on the label being a json/plain string, which a user-provided converter could
-        # break.
+        if self._label is None:
+            return temporalio.api.sdk.v1.EventGroupMarker(
+                label=temporalio.api.sdk.v1.EventGroupMarker.Label(id=self._id)
+            )
+        # Deliberately the SDK's default converter, not the user-provided one.
         return temporalio.api.sdk.v1.EventGroupMarker(
             label=temporalio.api.sdk.v1.EventGroupMarker.Label(
                 id=self._id,
@@ -158,47 +159,29 @@ _active_event_groups: contextvars.ContextVar[_ActiveEventGroups] = (
 )
 
 
-def create_event_group(label: str, *, id: str | None = None) -> EventGroup:
-    """Create an Event Group that can be attached to commands produced by this
+def create_event_group(id: str, *, label: str | None = None) -> EventGroup:
+    """Create an Event Group that can be attached to commands scheduled by this
     workflow.
 
+    Attach the returned group via command ``event_groups`` options, or via
+    :py:meth:`EventGroup.scope`.
+
     Args:
-        label: User-visible label for the group, surfaced in the UI and CLI.
-            The label is converted to a payload using the SDK's default payload
-            converter, not the one configured on the worker, then encoded using
-            the worker's configured payload codecs.
-
-            Note that when no ``id`` is given, the id is derived from the label
-            using a hash function. Given short and predictable labels,
-            brute-forcing the hashed value may be computationally feasible,
-            thereby recovering the label. Avoid putting sensitive information
-            in labels, or provide an explicit ``id``.
-        id: Opaque identifier determining whether two Event Groups are the
-            same. Events are grouped together if and only if their groups have
-            the same id, without regard to their labels; only the first label
-            seen for a given id is used. Defaults to a deterministic,
-            replay-stable value derived from the label. The id is not encoded
-            using payload codecs.
-
-    Returns:
-        The new Event Group.
+        id: Non-empty group identity. Commands with the same ``id`` belong to
+            the same group. The user-provided ID is stored as plain text in the
+            workflow history and should therefore not contain sensitive
+            information.
+        label: Optional non-empty display text for the UI / CLI. If provided,
+            it is persisted to history as a codec-encoded Payload.
 
     .. warning::
         Event Groups is an experimental API and may change without notice.
     """
-    info = _Runtime.current().workflow_info()
-    if not label:
-        raise ValueError("Event group label cannot be empty")
-    if id is None:
-        # Salted with the run id so that the label cannot be recovered from the
-        # id using precomputed hashes. This is the run id of the
-        # WorkflowExecutionStarted event, which is preserved across resets, so
-        # ids remain stable on replay and after a reset.
-        id = hashlib.sha1(
-            f"{info.original_execution_run_id}{label}".encode()
-        ).hexdigest()
-    elif not id:
+    _Runtime.current()
+    if not id:
         raise ValueError("Event group id cannot be empty")
+    if label is not None and not label:
+        raise ValueError("Event group label cannot be empty")
     return _LabelEventGroup(id, label)
 
 

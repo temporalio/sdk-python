@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import uuid
 from collections.abc import Sequence
 from datetime import timedelta
@@ -10,11 +9,10 @@ import nexusrpc
 import pytest
 
 from temporalio import activity, workflow
-from temporalio.api.common.v1 import Payload, WorkflowExecution
+from temporalio.api.common.v1 import Payload
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.sdk.v1 import EventGroupMarker
-from temporalio.api.workflowservice.v1 import ResetWorkflowExecutionRequest
 from temporalio.client import Client, WorkflowHandle
 from temporalio.common import RawValue, RetryPolicy, SearchAttributeKey
 from temporalio.converter import (
@@ -61,155 +59,23 @@ def _require_event_groups_server(env: WorkflowEnvironment) -> None:
 
 ####################################################################################################
 # 1. Explicit Event Groups Marker Label IDs (`EG-LABEL-ID`)
+#
+# EG-LABEL-ID-00..04 (derived IDs) are retracted: IDs are always caller-provided.
 ####################################################################################################
-
-
-@workflow.defn
-class DerivedIdsWorkflow:
-    @workflow.run
-    async def run(self) -> None:
-        a = workflow.create_event_group("aaa")
-        b1 = workflow.create_event_group("bbb")
-        b2 = workflow.create_event_group("bbb")
-        await _activity("activity-a", [a])
-        await _activity("activity-b1", [b1])
-        await _activity("activity-b2", [b2])
-
-
-async def test_derived_label_ids(client: Client, env: WorkflowEnvironment):
-    _require_event_groups_server(env)
-
-    async with new_worker(
-        client, DerivedIdsWorkflow, activities=[noop_activity]
-    ) as worker:
-        handle1 = await client.start_workflow(
-            DerivedIdsWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        handle2 = await client.start_workflow(
-            DerivedIdsWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        await handle1.result()
-        await handle2.result()
-        events1 = await _fetch_events(handle1)
-        events2 = await _fetch_events(handle2)
-        run_id1 = _run_id(handle1)
-
-        assert (
-            len(_events_of_type(events1, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
-            == 3
-        )
-        assert (
-            len(_events_of_type(events2, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
-            == 3
-        )
-
-        # EG-LABEL-ID-00: Derived IDs match SHA1(original_execution_run_id + label)
-        _assert_marker_ids(
-            _activity_event(events1, "activity-a"),
-            _label_marker_id(_default_marker_id(run_id1, "aaa")),
-        )
-
-        # EG-LABEL-ID-01: same label + no user-provided ID => same group
-        assert _marker_ids(_activity_event(events1, "activity-b1")) == _marker_ids(
-            _activity_event(events1, "activity-b2")
-        )
-
-        # EG-LABEL-ID-02: different labels + no user-provided ID => distinct groups
-        assert _marker_ids(_activity_event(events1, "activity-a")) != _marker_ids(
-            _activity_event(events1, "activity-b1")
-        )
-
-        # EG-LABEL-ID-03: same labels + different workflow execs => distinct groups
-        assert _marker_ids(_activity_event(events1, "activity-a")) != _marker_ids(
-            _activity_event(events2, "activity-a")
-        )
-
-
-async def test_derived_label_ids_stable_across_reset(
-    client: Client, env: WorkflowEnvironment
-):
-    _require_event_groups_server(env)
-
-    async with new_worker(
-        client, DerivedIdsWorkflow, activities=[noop_activity]
-    ) as worker:
-        handle = await client.start_workflow(
-            DerivedIdsWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        await handle.result()
-        events = await _fetch_events(handle)
-        original_run_id = _run_id(handle)
-
-        first_wft_started = next(
-            e.event_id
-            for e in events
-            if e.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
-        )
-        reset = await client.workflow_service.reset_workflow_execution(
-            ResetWorkflowExecutionRequest(
-                namespace=client.namespace,
-                workflow_execution=WorkflowExecution(
-                    workflow_id=handle.id, run_id=original_run_id
-                ),
-                reason="test event group id stability across reset",
-                request_id=str(uuid.uuid4()),
-                workflow_task_finish_event_id=first_wft_started,
-            )
-        )
-        assert reset.run_id != original_run_id
-        reset_handle = client.get_workflow_handle(handle.id, run_id=reset.run_id)
-        await reset_handle.result()
-        reset_events = await _fetch_events(reset_handle)
-
-        assert (
-            len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
-            == 3
-        )
-        assert (
-            len(
-                _events_of_type(
-                    reset_events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
-                )
-            )
-            == 3
-        )
-
-        # Control: reset re-executed the first workflow task
-        assert (
-            _events_of_type(events, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)[
-                0
-            ].event_time
-            != _events_of_type(
-                reset_events, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
-            )[0].event_time
-        )
-
-        # EG-LABEL-ID-04: derived IDs are based on the original execution run id
-        _assert_marker_ids(
-            _activity_event(reset_events, "activity-a"),
-            _label_marker_id(_default_marker_id(original_run_id, "aaa")),
-        )
-        assert _marker_ids(_activity_event(events, "activity-b1")) == _marker_ids(
-            _activity_event(reset_events, "activity-b1")
-        )
 
 
 @workflow.defn
 class UserProvidedIdsWorkflow:
     @workflow.run
     async def run(self) -> None:
-        c = workflow.create_event_group("ccc", id="c-id")
-        d1 = workflow.create_event_group("ddd1", id="d-id")
-        d2 = workflow.create_event_group("ddd2", id="d-id")
+        c = workflow.create_event_group("c-id", label="ccc")
+        d1 = workflow.create_event_group("d-id", label="ddd1")
+        d2 = workflow.create_event_group("d-id", label="ddd2")
+        not_c = workflow.create_event_group("not-c-id", label="ccc")
         await _activity("activity-c", [c])
         await _activity("activity-d1", [d1])
         await _activity("activity-d2", [d2])
+        await _activity("activity-not-c", [not_c])
 
 
 async def test_user_provided_label_ids(client: Client, env: WorkflowEnvironment):
@@ -227,17 +93,22 @@ async def test_user_provided_label_ids(client: Client, env: WorkflowEnvironment)
         events = await _fetch_events(handle)
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
-            == 3
+            == 4
         )
 
-        # EG-LABEL-ID-20: user-provided IDs are used verbatim
+        # EG-LABEL-ID-20: IDs are used verbatim
         _assert_marker_ids(
             _activity_event(events, "activity-c"), _label_marker_id("c-id")
         )
 
-        # EG-LABEL-ID-21: different labels + same user-provided ID => same group
+        # EG-LABEL-ID-21: different labels + same ID => same group
         assert _marker_ids(_activity_event(events, "activity-d1")) == _marker_ids(
             _activity_event(events, "activity-d2")
+        )
+
+        # EG-LABEL-ID-22: same label + different IDs => distinct groups
+        assert _marker_ids(_activity_event(events, "activity-c")) != _marker_ids(
+            _activity_event(events, "activity-not-c")
         )
 
 
@@ -251,7 +122,7 @@ class LabelPayloadWorkflow:
     @workflow.run
     async def run(self) -> None:
         a = workflow.create_event_group("aaa")
-        b = workflow.create_event_group("bbb", id="b-id")
+        b = workflow.create_event_group("bbb", label="Label B")
         # Control: activity arguments go through the worker's payload converter, so this is how the
         # custom-converter test proves that converter is actually installed.
         await workflow.execute_activity(
@@ -324,17 +195,17 @@ async def test_label_payload_is_json_plain(client: Client, env: WorkflowEnvironm
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a_id = _default_marker_id(run_id, "aaa")
 
         activity_a = _activity_event(events, "activity-a")
         activity_b = _activity_event(events, "activity-b")
-        _assert_markers(activity_a, _label_marker(a_id, "aaa"))
-        _assert_markers(activity_b, _label_marker("b-id", "bbb"))
+        _assert_markers(activity_a, _label_marker_id("aaa"))
+        _assert_markers(activity_b, _label_marker("bbb", "Label B"))
 
         # EG-LABEL-PAYLOAD-00: label payload is a json/plain JSON string
-        assert _label_payload_of(activity_a, a_id) == ("json/plain", '"aaa"')
-        assert _label_payload_of(activity_b, "b-id") == ("json/plain", '"bbb"')
+        assert _label_payload_of(activity_b, "bbb") == ("json/plain", '"Label B"')
+
+        # EG-LABEL-PAYLOAD-02: an omitted label produces no payload
+        assert not _label_payload_set(activity_a, "aaa")
 
 
 async def test_label_payload_uses_default_converter_not_worker_converter(
@@ -357,8 +228,6 @@ async def test_label_payload_uses_default_converter_not_worker_converter(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a_id = _default_marker_id(run_id, "aaa")
 
         control = _activity_event(events, "control")
         control_payload = (
@@ -371,8 +240,8 @@ async def test_label_payload_uses_default_converter_not_worker_converter(
         activity_b = _activity_event(events, "activity-b")
 
         # EG-LABEL-PAYLOAD-01: labels still go through the SDK default converter
-        assert _label_payload_of(activity_a, a_id) == ("json/plain", '"aaa"')
-        assert _label_payload_of(activity_b, "b-id") == ("json/plain", '"bbb"')
+        assert _label_payload_of(activity_b, "bbb") == ("json/plain", '"Label B"')
+        assert not _label_payload_set(activity_a, "aaa")
 
 
 async def test_label_payload_is_codec_encoded_but_ids_are_not(
@@ -396,23 +265,19 @@ async def test_label_payload_is_codec_encoded_but_ids_are_not(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a_id = _default_marker_id(run_id, "aaa")
 
         activity_a = _activity_event(events, "activity-a")
         activity_b = _activity_event(events, "activity-b")
 
         # EG-LABEL-PAYLOAD-21: IDs are not codec-encoded
-        _assert_marker_ids(activity_a, _label_marker_id(a_id))
-        _assert_marker_ids(activity_b, _label_marker_id("b-id"))
+        _assert_marker_ids(activity_a, _label_marker_id("aaa"))
+        _assert_marker_ids(activity_b, _label_marker_id("bbb"))
 
         # EG-LABEL-PAYLOAD-20: label payloads are processed by payload codecs
-        assert _label_payload_of(activity_a, a_id)[0] == "binary/wrapped"
-        assert _label_payload_of(activity_b, "b-id")[0] == "binary/wrapped"
-        decoded_a = (await codec.decode([_raw_label_payload(activity_a, a_id)]))[0]
-        decoded_b = (await codec.decode([_raw_label_payload(activity_b, "b-id")]))[0]
-        assert PayloadConverter.default.from_payload(decoded_a) == "aaa"
-        assert PayloadConverter.default.from_payload(decoded_b) == "bbb"
+        assert _label_payload_of(activity_b, "bbb")[0] == "binary/wrapped"
+        decoded_b = (await codec.decode([_raw_label_payload(activity_b, "bbb")]))[0]
+        assert PayloadConverter.default.from_payload(decoded_b) == "Label B"
+        assert not _label_payload_set(activity_a, "aaa")
 
 
 ####################################################################################################
@@ -452,7 +317,7 @@ async def test_commands_in_a_scope_carry_its_marker(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
 
         # EG-SCOPE-00: baseline only; per-command coverage lives in EG-COMMANDS
         _assert_markers(_activity_event(events, "activity"), a)
@@ -492,9 +357,8 @@ async def test_nesting_scopes_composes(client: Client, env: WorkflowEnvironment)
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a = _label_marker(_default_marker_id(run_id, "aaa"), "aaa")
-        b = _label_marker(_default_marker_id(run_id, "bbb"), "bbb")
+        a = _label_marker_id("aaa")
+        b = _label_marker_id("bbb")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -536,7 +400,7 @@ async def test_reentering_a_group_nests_correctly(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -595,12 +459,11 @@ async def test_a_group_can_be_scoped_from_two_concurrent_branches(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a = _label_marker(_default_marker_id(run_id, "aaa"), "aaa")
-        b = _label_marker(_default_marker_id(run_id, "bbb"), "bbb")
-        c = _label_marker(_default_marker_id(run_id, "ccc"), "ccc")
-        d = _label_marker(_default_marker_id(run_id, "ddd"), "ddd")
-        e = _label_marker(_default_marker_id(run_id, "eee"), "eee")
+        a = _label_marker_id("aaa")
+        b = _label_marker_id("bbb")
+        c = _label_marker_id("ccc")
+        d = _label_marker_id("ddd")
+        e = _label_marker_id("eee")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -655,7 +518,7 @@ async def test_a_task_started_inside_a_scope_keeps_it_after_exit(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -701,7 +564,7 @@ async def test_a_task_created_outside_a_scope_does_not_inherit_it(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -744,9 +607,8 @@ async def test_a_scope_unwinds_cleanly_when_its_body_throws(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
-        a = _label_marker(_default_marker_id(run_id, "aaa"), "aaa")
-        b = _label_marker(_default_marker_id(run_id, "bbb"), "bbb")
+        a = _label_marker_id("aaa")
+        b = _label_marker_id("bbb")
 
         assert (
             len(_events_of_type(events, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED))
@@ -817,7 +679,7 @@ async def test_static_signal_handler_implicit_group(
         await handle.result()
         events = await _fetch_events(handle)
         signal = _event_marker(_signaled_event_ids(events)[0])
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
 
         # EG-IMPLICIT-00
         _assert_markers(_activity_event(events, "from-static-signal"), signal)
@@ -869,12 +731,11 @@ async def test_runtime_signal_handler_implicit_group(
         await handle.signal("mySignal")
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         signal_ids = _signaled_event_ids(events)
         assert len(signal_ids) == 1
         signal = _event_marker(signal_ids[0])
-        outside = _label_marker(_default_marker_id(run_id, "outside"), "outside")
-        inside = _label_marker(_default_marker_id(run_id, "inside"), "inside")
+        outside = _label_marker_id("outside")
+        inside = _label_marker_id("inside")
 
         # EG-IMPLICIT-10: handler carries the signaled event, not the registration scope
         _assert_markers(_activity_event(events, "from-runtime-signal"), signal)
@@ -1011,7 +872,7 @@ async def test_static_update_handler_implicit_group(
         await handle.result()
         events = await _fetch_events(handle)
         update = _update_marker(update_id)
-        inside = _label_marker(_default_marker_id(_run_id(handle), "inside"), "inside")
+        inside = _label_marker_id("inside")
 
         # EG-IMPLICIT-50
         _assert_markers(_activity_event(events, "from-static-update"), update)
@@ -1078,10 +939,9 @@ async def test_runtime_update_handler_implicit_group(
         await handle.execute_update("myUpdate", id=update_id)
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         update = _update_marker(update_id)
-        outside = _label_marker(_default_marker_id(run_id, "outside"), "outside")
-        inside = _label_marker(_default_marker_id(run_id, "inside"), "inside")
+        outside = _label_marker_id("outside")
+        inside = _label_marker_id("inside")
 
         # EG-IMPLICIT-60
         _assert_markers(_activity_event(events, "from-runtime-update"), update)
@@ -1145,8 +1005,8 @@ class AggregationWorkflow:
     async def run(self) -> None:
         a1 = workflow.create_event_group("aaa")
         a2 = workflow.create_event_group("aaa")
-        b1 = workflow.create_event_group("bbb1", id="b-id")
-        b2 = workflow.create_event_group("bbb2", id="b-id")
+        b1 = workflow.create_event_group("b-id", label="bbb1")
+        b2 = workflow.create_event_group("b-id", label="bbb2")
 
         await _activity("direct-duplicates", [a2, b1, a1, b1, a2, a1])
 
@@ -1179,7 +1039,7 @@ async def test_markers_dedupe_by_id(client: Client, env: WorkflowEnvironment):
         )
         await handle.result()
         events = await _fetch_events(handle)
-        a = _label_marker(_default_marker_id(_run_id(handle), "aaa"), "aaa")
+        a = _label_marker_id("aaa")
         b = _label_marker("b-id", "bbb1")
         both = (a, b)
 
@@ -1205,6 +1065,8 @@ async def test_markers_dedupe_by_id(client: Client, env: WorkflowEnvironment):
 ####################################################################################################
 # 6. Command Type Coverage (`EG-COMMANDS`)
 #
+# EG-COMMANDS-07-CHILD does not apply: the child handle is an asyncio.Task, so Task.cancel()
+# is the inherited-from-start path already covered by EG-COMMANDS-04-CANCEL.
 # EG-COMMANDS-23 and EG-COMMANDS-24 do not apply: Core-based SDKs have no version/sideEffect API.
 # Python continue_as_new always takes options, so there is no short-form counterpart of EG-COMMANDS-40.
 ####################################################################################################
@@ -1244,12 +1106,11 @@ async def test_timer_commands_carry_markers(client: Client, env: WorkflowEnviron
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
-        ambient = (_label_marker(_default_marker_id(run_id, "scope"), "scope"),)
+        ambient = (_label_marker_id("scope"),)
 
         timers = _events_of_type(events, EventType.EVENT_TYPE_TIMER_STARTED)
         # sleep, wait_condition timeout, wait_for's 1ms timeout, the cancelled 60s sleep
@@ -1315,10 +1176,9 @@ async def test_activity_commands_carry_markers(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
 
         # EG-COMMANDS-02
@@ -1400,20 +1260,17 @@ async def test_local_activity_commands_carry_markers(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
         cancel_trigger = (
             *both,
-            _label_marker(
-                _default_marker_id(run_id, "cancel-trigger"), "cancel-trigger"
-            ),
+            _label_marker_id("cancel-trigger"),
         )
         cancelled_la = (
             *both,
-            _label_marker(_default_marker_id(run_id, "cancelled-la"), "cancelled-la"),
+            _label_marker_id("cancelled-la"),
         )
 
         local_acts = _markers_named(events, "core_local_activity")
@@ -1441,12 +1298,11 @@ class ChildWorkflowCommandsWorkflow:
         direct = workflow.create_event_group("direct")
         scope = workflow.create_event_group("scope")
         with scope.scope():
-            child = await workflow.start_child_workflow(
-                WaitForSignalChildWorkflow.run,
+            await workflow.start_child_workflow(
+                NoopChildWorkflow.run,
                 id=f"{workflow.info().workflow_id}_child",
                 event_groups=[direct],
             )
-            await child.signal("noop", event_groups=[direct])
             await _swallow(
                 asyncio.wait_for(
                     workflow.execute_child_workflow(
@@ -1468,7 +1324,7 @@ async def test_child_workflow_commands_carry_markers(
     async with new_worker(
         client,
         ChildWorkflowCommandsWorkflow,
-        WaitForSignalChildWorkflow,
+        NoopChildWorkflow,
         SleepChildWorkflow,
     ) as worker:
         handle = await client.start_workflow(
@@ -1478,10 +1334,9 @@ async def test_child_workflow_commands_carry_markers(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
 
         initiated = _events_of_type(
@@ -1492,13 +1347,6 @@ async def test_child_workflow_commands_carry_markers(
         _assert_markers(initiated[0], *both)
         # EG-COMMANDS-04-CANCEL
         _assert_markers(initiated[1], *both)
-        _assert_markers(
-            _single_event(
-                events,
-                EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
-            ),
-            *both,
-        )
         _assert_markers(
             _single_event(
                 events,
@@ -1578,10 +1426,9 @@ async def test_nexus_operation_commands_carry_markers(
         )
         await handle.result()
         events = await _fetch_events(handle)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
 
         scheduled = _events_of_type(
@@ -1632,8 +1479,8 @@ async def test_external_workflow_commands_carry_markers(
         await handle.result()
         events = await _fetch_events(handle)
         both = (
-            _label_marker(_default_marker_id(_run_id(handle), "direct"), "direct"),
-            _label_marker(_default_marker_id(_run_id(handle), "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
         # EG-COMMANDS-06
         _assert_markers(
@@ -1648,6 +1495,59 @@ async def test_external_workflow_commands_carry_markers(
             _single_event(
                 events,
                 EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
+            ),
+            *both,
+        )
+
+
+@workflow.defn
+class ChildWorkflowSignalCommandsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        direct = workflow.create_event_group("direct")
+        scope = workflow.create_event_group("scope")
+        child = await workflow.start_child_workflow(
+            WaitForSignalChildWorkflow.run,
+            id=f"{workflow.info().workflow_id}_child",
+        )
+        with scope.scope():
+            await child.signal("noop", event_groups=[direct])
+        await child
+
+
+async def test_child_workflow_signal_commands_carry_markers(
+    client: Client, env: WorkflowEnvironment
+):
+    _require_event_groups_server(env)
+
+    async with new_worker(
+        client,
+        ChildWorkflowSignalCommandsWorkflow,
+        WaitForSignalChildWorkflow,
+    ) as worker:
+        handle = await client.start_workflow(
+            ChildWorkflowSignalCommandsWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+        events = await _fetch_events(handle)
+        both = (
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
+        )
+
+        # Start is outside the ambient scope so 06-CHILD is not inheriting start-child markers.
+        _assert_markers(
+            _single_event(
+                events, EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
+            )
+        )
+        # EG-COMMANDS-06-CHILD
+        _assert_markers(
+            _single_event(
+                events,
+                EventType.EVENT_TYPE_SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_INITIATED,
             ),
             *both,
         )
@@ -1687,8 +1587,8 @@ async def test_metadata_commands_carry_markers(
         await handle.result()
         events = await _fetch_events(handle)
         both = (
-            _label_marker(_default_marker_id(_run_id(handle), "direct"), "direct"),
-            _label_marker(_default_marker_id(_run_id(handle), "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
 
         # EG-COMMANDS-20
@@ -1735,13 +1635,12 @@ async def test_continue_as_new_carries_markers(
             task_queue=worker.task_queue,
         )
         await handle.result()
-        # ContinuedAsNew lives on the first run, which is also the run whose id the markers used
+        # ContinuedAsNew lives on the first run
         first_run = client.get_workflow_handle(handle.id, run_id=_run_id(handle))
         events = await _fetch_events(first_run)
-        run_id = _run_id(handle)
         both = (
-            _label_marker(_default_marker_id(run_id, "direct"), "direct"),
-            _label_marker(_default_marker_id(run_id, "scope"), "scope"),
+            _label_marker_id("direct"),
+            _label_marker_id("scope"),
         )
 
         # EG-COMMANDS-40
@@ -1759,24 +1658,32 @@ async def test_continue_as_new_carries_markers(
 
 
 @workflow.defn
-class EmptyLabelWorkflow:
+class EmptyIdAndLabelWorkflow:
     @workflow.run
-    async def run(self) -> str:
+    async def run(self) -> list[str]:
+        errors: list[str] = []
         try:
             workflow.create_event_group("")
         except ValueError as err:
-            return str(err)
-        return "no error"
+            errors.append(str(err))
+        try:
+            workflow.create_event_group("id", label="")
+        except ValueError as err:
+            errors.append(str(err))
+        return errors
 
 
-async def test_event_group_rejects_empty_label(
+async def test_event_group_rejects_empty_id_and_label(
     client: Client, env: WorkflowEnvironment
 ):
     _require_event_groups_server(env)
 
-    async with new_worker(client, EmptyLabelWorkflow) as worker:
-        assert "Event group label cannot be empty" == await client.execute_workflow(
-            EmptyLabelWorkflow.run,
+    async with new_worker(client, EmptyIdAndLabelWorkflow) as worker:
+        assert [
+            "Event group id cannot be empty",
+            "Event group label cannot be empty",
+        ] == await client.execute_workflow(
+            EmptyIdAndLabelWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
@@ -1795,10 +1702,6 @@ def test_create_event_group_requires_workflow_context():
 # not, for the cases where two groups share an id but not a label and the emitted label is
 # unspecified.
 ####################################################################################################
-
-
-def _default_marker_id(original_execution_run_id: str, label: str) -> str:
-    return hashlib.sha1(f"{original_execution_run_id}{label}".encode()).hexdigest()
 
 
 def _run_id(handle: WorkflowHandle) -> str:
@@ -1857,11 +1760,13 @@ def _render_marker(marker: EventGroupMarker) -> str:
         return f"event:{marker.inbound_event.inbound_event_id}"
     if marker.HasField("inbound_update"):
         return f"update:{marker.inbound_update.inbound_update_id}"
-    try:
-        label = PayloadConverter.default.from_payload(marker.label.label)
-        return f"label:{marker.label.id}:{label}"
-    except Exception:
-        return f"label:{marker.label.id}"
+    if marker.label.HasField("label"):
+        try:
+            label = PayloadConverter.default.from_payload(marker.label.label)
+            return f"label:{marker.label.id}:{label}"
+        except Exception:
+            return f"label:{marker.label.id}"
+    return f"label:{marker.label.id}"
 
 
 def _render_marker_id(marker: EventGroupMarker) -> str:
@@ -1915,8 +1820,17 @@ def _update_marker(update_id: str) -> str:
 def _label_payload_of(event: HistoryEvent, marker_id: str) -> tuple[str, str]:
     for marker in event.event_group_markers:
         if marker.HasField("label") and marker.label.id == marker_id:
+            if not marker.label.HasField("label"):
+                raise AssertionError(f"label marker {marker_id!r} has no payload")
             encoding = marker.label.label.metadata["encoding"].decode()
             return encoding, marker.label.label.data.decode()
+    raise AssertionError(f"no label marker {marker_id!r} on event")
+
+
+def _label_payload_set(event: HistoryEvent, marker_id: str) -> bool:
+    for marker in event.event_group_markers:
+        if marker.HasField("label") and marker.label.id == marker_id:
+            return marker.label.HasField("label")
     raise AssertionError(f"no label marker {marker_id!r} on event")
 
 
