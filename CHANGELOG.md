@@ -20,13 +20,33 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `workflow.uuid4()` now accepts an optional keyword-only `random` argument to derive the
+  UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
+  without reading or advancing any workflow state.
+
 ### Changed
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`; 2.8.0 is the
+  first release with the `google.adk.platform._random` seam the plugin now installs a provider for.
+
 ### Fixed
+
+- `GoogleAdkPlugin` now applies its deterministic time, id, and random providers inside
+  workflow tasks. ADK reads them from `contextvars` and workflow tasks run on worker threads
+  whose context is empty, so on a standard `Worker` or `Replayer` ADK-generated session,
+  event, invocation, and function-call ids came from wall-clock time and `uuid.uuid4()`; only
+  debug mode, which runs tasks inline, saw the deterministic values. The providers are now
+  installed as process-wide defaults that fall back to the real clock and RNG outside a
+  workflow. Inside a workflow, ADK ids and randoms draw from a workflow-private deterministic
+  stream, so they never shift the sequences user code sees from `workflow.random()` and
+  `workflow.uuid4()`; ADK's `reset_*_provider()` functions restore the deterministic
+  providers rather than the standard-library ones; and read-only contexts (query handlers,
+  update validators) receive wall-clock time and nondeterministic entropy that leave the
+  private stream untouched.
 
 ### Security
 
