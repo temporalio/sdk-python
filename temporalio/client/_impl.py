@@ -50,6 +50,7 @@ from ._activity import (
     ActivityExecutionAsyncIterator,
     ActivityExecutionCount,
     ActivityExecutionDescription,
+    ActivityExecutionOptions,
     ActivityHandle,
     AsyncActivityIDReference,
 )
@@ -87,6 +88,7 @@ from ._interceptor import (
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
+    PauseActivityInput,
     PauseScheduleInput,
     QueryWorkflowInput,
     ReportCancellationAsyncActivityInput,
@@ -100,7 +102,9 @@ from ._interceptor import (
     TerminateNexusOperationInput,
     TerminateWorkflowInput,
     TriggerScheduleInput,
+    UnpauseActivityInput,
     UnpauseScheduleInput,
+    UpdateActivityOptionsInput,
     UpdateScheduleInput,
     UpdateWithStartStartWorkflowInput,
     UpdateWithStartUpdateWorkflowInput,
@@ -680,6 +684,98 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Pause an activity."""
+        await self._client.workflow_service.pause_activity_execution(
+            temporalio.api.workflowservice.v1.PauseActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Unpause an activity."""
+        req = temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            reason=input.reason or "",
+        )
+        if input.jitter is not None:
+            req.jitter.FromTimedelta(input.jitter)
+        await self._client.workflow_service.unpause_activity_execution(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Update or restore an activity's options."""
+        # restore_original is exclusive to all other updates.
+        if input.restore_original and input.updates:
+            raise ValueError(
+                "restore_original cannot be combined with individual option updates"
+            )
+        req = temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+        )
+        if input.restore_original:
+            req.restore_original = True
+        else:
+            # The handle rejects a repeated option, but an interceptor could still add one.
+            seen: set[str] = set()
+            for update in input.updates:
+                name = update.key.name
+                if name in seen:
+                    raise ValueError(
+                        f"update_activity_options received more than one update for {name}"
+                    )
+                seen.add(name)
+                req.update_mask.paths.append(name)
+                if update.value is None:
+                    continue
+                if name == "task_queue.name":
+                    req.activity_options.task_queue.name = update.value
+                elif name == "retry_policy":
+                    update.value.apply_to_proto(req.activity_options.retry_policy)
+                elif name == "priority":
+                    req.activity_options.priority.CopyFrom(update.value._to_proto())
+                elif name in (
+                    "schedule_to_close_timeout",
+                    "schedule_to_start_timeout",
+                    "start_to_close_timeout",
+                    "heartbeat_timeout",
+                    "start_delay",
+                ):
+                    getattr(req.activity_options, name).FromTimedelta(update.value)
+                else:
+                    # Reached only if a key is added without a conversion for it here.
+                    raise ValueError(f"No conversion for activity option {name!r}")
+
+        resp = await self._client.workflow_service.update_activity_execution_options(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return ActivityExecutionOptions._from_proto(resp.activity_options)
 
     async def describe_activity(
         self, input: DescribeActivityInput
@@ -1453,6 +1549,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
         """Start a nexus operation and return a handle to it."""
+        nexus_context = temporalio.converter.NexusSerializationContext(
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+        )
+        data_converter = self._client.data_converter.with_context(nexus_context)
         req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
@@ -1479,7 +1581,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
 
         # Set input payload
-        encoded = await self._client.data_converter.encode([input.arg])
+        encoded = await data_converter.encode([input.arg])
         if encoded:
             req.input.CopyFrom(encoded[0])
 
@@ -1524,6 +1626,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             result_type=input.result_type,
             endpoint=input.endpoint,
             service=input.service,
+            operation=input.operation,
         )
 
     async def describe_nexus_operation(
@@ -1541,15 +1644,31 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+        data_converter = self._client.data_converter.with_context(
+            temporalio.converter.NexusSerializationContext(
+                endpoint=resp.info.endpoint,
+                service=resp.info.service,
+                operation=resp.info.operation,
+            )
+        )
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
-            data_converter=self._client.data_converter,
+            data_converter=data_converter,
         )
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
     ) -> Any:
         """Poll for nexus operation result until it's available."""
+        data_converter = self._client.data_converter
+        if input.endpoint and input.service and input.operation:
+            data_converter = data_converter.with_context(
+                temporalio.converter.NexusSerializationContext(
+                    endpoint=input.endpoint,
+                    service=input.service,
+                    operation=input.operation,
+                )
+            )
         req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             operation_id=input.operation_id,
@@ -1571,21 +1690,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 match res.WhichOneof("outcome"):
                     case "result":
                         type_hints = [input.result_type] if input.result_type else None
-                        [result] = await self._client.data_converter.decode(
-                            [res.result], type_hints
-                        )
+                        [result] = await data_converter.decode([res.result], type_hints)
                         return result
-
                     case "failure":
                         raise NexusOperationFailureError(
-                            cause=await self._client.data_converter.decode_failure(
-                                res.failure
-                            )
+                            cause=await data_converter.decode_failure(res.failure)
                         )
-
                     case None:
-                        # poll again
-                        pass
+                        continue
             except RPCError as err:
                 match err.status:
                     case RPCStatusCode.DEADLINE_EXCEEDED:
