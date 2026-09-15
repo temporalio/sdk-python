@@ -1,4 +1,4 @@
-"""Event Groups, a way to regroup logically related workflow events.
+"""Event Groups, a way to group logically related workflow events.
 
 .. warning::
     Event Groups is an experimental API and may change without notice.
@@ -16,6 +16,7 @@ import temporalio.api.sdk.v1
 import temporalio.converter
 
 from ._context import _Runtime
+from ._sandbox import logger
 
 __all__ = [
     "EventGroup",
@@ -188,7 +189,11 @@ def create_event_group(id: str, *, label: str | None = None) -> EventGroup:
 def _inbound_event_group(event_id: int) -> EventGroup:
     """Create the implicit Event Group for an inbound signal's history event."""
     if event_id <= 0:
-        # Invalid event ID. Don't fail the WFT — return a stub Implicit EG Marker instead.
+        logger.warning(
+            "Cannot create implicit Event Group for signal with invalid "
+            "originating event ID: %s",
+            event_id,
+        )
         return _StubImplicitEventGroup()
     return _ImplicitEventGroup(
         temporalio.api.sdk.v1.EventGroupMarker(

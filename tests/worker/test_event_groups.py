@@ -625,7 +625,11 @@ async def test_a_scope_unwinds_cleanly_when_its_body_throws(
 ####################################################################################################
 
 
-def test_invalid_inbound_event_id_is_noop_stub() -> None:
+def test_invalid_inbound_event_id_is_noop_stub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(workflow.logger, "warning", lambda *args, **kwargs: None)
+
     stub = _inbound_event_group(0)
     assert isinstance(stub, _StubImplicitEventGroup)
     assert isinstance(_inbound_event_group(-1), _StubImplicitEventGroup)

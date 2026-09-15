@@ -67,6 +67,11 @@ from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
 from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
+from ..workflow._event_groups import (
+    _capture_event_group_markers,
+    _inbound_event_group,
+    _inbound_update_event_group,
+)
 from . import _command_aware_visitor
 from ._interceptor import (
     ContinueAsNewInput,
@@ -722,7 +727,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 command = None  # type: ignore
 
                 # Run the handler
-                with temporalio.workflow._inbound_update_event_group(job.id).scope():
+                with _inbound_update_event_group(job.id).scope():
                     success = await self._inbound.handle_update_handler(handler_input)
                 result_payloads = self._workflow_context_payload_converter.to_payloads(
                     [success]
@@ -1402,7 +1407,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if not update_payloads and not removals:
             return
 
-        markers = temporalio.workflow._capture_event_group_markers(event_groups)
+        markers = _capture_event_group_markers(event_groups)
 
         command = self._add_command()
         command.event_group_markers.extend(markers)
@@ -1479,7 +1484,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             use_patch = True
         self._patches_memoized[id] = use_patch
         if use_patch:
-            markers = temporalio.workflow._capture_event_group_markers(event_groups)
+            markers = _capture_event_group_markers(event_groups)
 
             command = self._add_command()
             command.event_group_markers.extend(markers)
@@ -1810,7 +1815,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         *,
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
-        markers = temporalio.workflow._capture_event_group_markers(event_groups)
+        markers = _capture_event_group_markers(event_groups)
 
         command = self._add_command()
         command.event_group_markers.extend(markers)
@@ -1927,7 +1932,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if summary
             else None
         )
-        markers = temporalio.workflow._capture_event_group_markers(event_groups)
+        markers = _capture_event_group_markers(event_groups)
 
         fut = self.create_future()
         timer_handle = self._timer_impl(
@@ -1973,7 +1978,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if timeout_summary
             else None
         )
-        markers = temporalio.workflow._capture_event_group_markers(event_groups)
+        markers = _capture_event_group_markers(event_groups)
         ctxvars = contextvars.copy_context()
 
         async def in_context():
@@ -2111,7 +2116,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
         payloads = payload_converter.to_payloads(input.args) if input.args else None
-        markers = temporalio.workflow._capture_event_group_markers(input.event_groups)
+        markers = _capture_event_group_markers(input.event_groups)
 
         command = self._add_command()
         v = command.signal_external_workflow_execution
@@ -2135,7 +2140,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
         payloads = payload_converter.to_payloads(input.args) if input.args else None
-        markers = temporalio.workflow._capture_event_group_markers(input.event_groups)
+        markers = _capture_event_group_markers(input.event_groups)
 
         command = self._add_command()
         v = command.signal_external_workflow_execution
@@ -2735,9 +2740,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._in_progress_signals.pop(id, None)
 
         async def run_signal() -> None:
-            with temporalio.workflow._inbound_event_group(
-                job.originating_event_id
-            ).scope():
+            with _inbound_event_group(job.originating_event_id).scope():
                 await self._inbound.handle_signal(input)
 
         task = self.create_task(
@@ -3013,9 +3016,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if options.event_group_markers is None:
             options = _TimerOptions(
                 user_metadata=options.user_metadata,
-                event_group_markers=temporalio.workflow._capture_event_group_markers(
-                    None
-                ),
+                event_group_markers=_capture_event_group_markers(None),
             )
 
         # Create, schedule, and return
@@ -3400,9 +3401,7 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
                 is_local=isinstance(self._input, StartLocalActivityInput),
             )
         )
-        self._event_group_markers = temporalio.workflow._capture_event_group_markers(
-            input.event_groups
-        )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     def cancel(self, msg: Any | None = None) -> bool:
         # Allow the cancel to go through for the task even if we're deleting,
@@ -3564,9 +3563,7 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         self._failure_converter = self._instance._failure_converter_with_context(
             workflow_context
         )
-        self._event_group_markers = temporalio.workflow._capture_event_group_markers(
-            input.event_groups
-        )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     @property
     def id(self) -> str:
@@ -3741,7 +3738,7 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
     ) -> None:
         self._instance._assert_not_read_only("cancel external handle")
 
-        markers = temporalio.workflow._capture_event_group_markers(event_groups)
+        markers = _capture_event_group_markers(event_groups)
 
         command = self._instance._add_command()
         command.event_group_markers.extend(markers)
@@ -3773,9 +3770,7 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
         self._failure_converter = failure_converter
-        self._event_group_markers = temporalio.workflow._capture_event_group_markers(
-            input.event_groups
-        )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     @property
     def operation_token(self) -> str | None:
@@ -3856,9 +3851,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
         super().__init__("Continue as new")
         self._instance = instance
         self._input = input
-        self._event_group_markers = temporalio.workflow._capture_event_group_markers(
-            input.event_groups
-        )
+        self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
     def _apply_command(self) -> None:
         # Convert arguments before creating command in case it raises error

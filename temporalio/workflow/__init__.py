@@ -109,9 +109,6 @@ from ._definition import (
 )
 from ._event_groups import (
     EventGroup,
-    _capture_event_group_markers,
-    _inbound_event_group,
-    _inbound_update_event_group,
     create_event_group,
 )
 from ._exceptions import (
@@ -295,9 +292,6 @@ __all__ = [
     "_Definition",
     "_is_unbound_method_on_cls",
     "_parameters_identical_up_to_naming",
-    "_capture_event_group_markers",
-    "_inbound_event_group",
-    "_inbound_update_event_group",
     "_NotInWorkflowEventLoopError",
     "_assert_dynamic_handler_args",
     "_bind_method",
