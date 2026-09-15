@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.33.0] - 2026-09-14
+
+### Added
+
 #### Standalone Activity operator commands
 
 - `ActivityHandle` now supports operator commands for standalone activities: `pause`,
@@ -27,17 +41,24 @@ to include examples, links to docs, or any other relevant information.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
+  and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
+  synchronous results, and failures. Asynchronous handler results and detached standalone handles
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
 
 ### Changed
 
+- Standalone Activities are now generally available (GA). (Standalone Activities as Nexus operations
+  and Standalone Activities operator commands remain experimental. Operator commands are `pause`,
+  `unpause`, `updateOptions`, `restoreOriginal`.)
 - System Nexus Signal-with-Start Workflow operations now use the typed
   `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
   the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
 - System Nexus Signal-with-Start Workflow operations now invoke
   `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
-
-### Deprecated
+- The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
+  operation.
 
 ### :boom: Breaking Changes
 
@@ -86,8 +107,6 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
-
-### Security
 
 ## [1.32.0] - 2026-08-24
 
