@@ -10,8 +10,8 @@ from unittest.mock import Mock
 import pytest
 
 from temporalio.contrib.gcp.cloud_run.id import (
-    GoogleCloudRunMetadata,
     CloudRunIDPlugin,
+    GoogleCloudRunMetadata,
 )
 from temporalio.service import ConnectConfig, ServiceClient
 
@@ -48,7 +48,9 @@ def _service_client() -> ServiceClient:
 class TestClientIdentity:
     @pytest.mark.asyncio
     async def test_sets_identity_when_unset(self) -> None:
-        plugin = CloudRunIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = CloudRunIDPlugin(
+            metadata=_metadata(instance_id="abc", revision="rev-1")
+        )
         # ConnectConfig auto-fills identity with <pid>@<hostname> when none is given.
         config = ConnectConfig(target_host="localhost:7233")
         assert config.identity == f"{os.getpid()}@{socket.gethostname()}"
@@ -63,7 +65,9 @@ class TestClientIdentity:
 
     @pytest.mark.asyncio
     async def test_preserves_caller_identity(self) -> None:
-        plugin = CloudRunIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = CloudRunIDPlugin(
+            metadata=_metadata(instance_id="abc", revision="rev-1")
+        )
         config = ConnectConfig(target_host="localhost:7233", identity="my-identity")
         service_client = _service_client()
 

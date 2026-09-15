@@ -29,12 +29,12 @@ Quick start::
     asyncio.run(main())
 """
 
+from temporalio.contrib.gcp.cloud_run.id._cloud_run_id_plugin import CloudRunIDPlugin
 from temporalio.contrib.gcp.cloud_run.id._metadata import (
     CLOUD_RUN_METADATA_URL,
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
 )
-from temporalio.contrib.gcp.cloud_run.id._cloud_run_id_plugin import CloudRunIDPlugin
 
 __all__ = [
     "CLOUD_RUN_METADATA_URL",
