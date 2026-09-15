@@ -21,20 +21,45 @@ to include examples, links to docs, or any other relevant information.
 ### Added
 
 - Added the `temporalio.contrib.gcp.cloud_run.worker_id` module plugin to help set the worker identity on Cloud Run.
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.33.0] - 2026-09-14
+
+### Added
+
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `update_options` and `restore_original_options`.
 - Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
 - Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
 - New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
+  and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
+  synchronous results, and failures. Asynchronous handler results and detached standalone handles
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
 
 ### Changed
 
+- Standalone Activities are now generally available (GA). (Standalone Activities as Nexus operations
+  and Standalone Activities operator commands remain experimental. Operator commands are `pause`,
+  `unpause`, `updateOptions`, `restoreOriginal`.)
 - System Nexus Signal-with-Start Workflow operations now use the typed
   `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
   the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
 - System Nexus Signal-with-Start Workflow operations now invoke
   `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
-
-### Deprecated
+- The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
+  operation.
 
 ### :boom: Breaking Changes
 
@@ -53,9 +78,27 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
+  and supports its file download API, including video inputs and download
+  destinations.
+- `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
+  model, and backend-op calls: each dispatch runs its own Activity, and the
+  continue-as-new result cache is retired for new executions (a continued run
+  resumes from the carried transcript and never re-executes prior dispatches,
+  so a carried cache entry could only serve stale results). Patch-gated
+  (`deepagents.retire-result-cache`), so histories recorded before this change
+  replay unchanged; note that deferring the patch keeps the full legacy dedup
+  cache — including the stale-result behavior this entry describes — and that
+  a chain upgraded mid-continue-as-new re-executes rather than reuses a
+  repeated identical call (the conservative direction).
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
+
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
+- System Nexus Signal-with-Start workflow operations now give custom payload
+  converters the target workflow's serialization context when encoding their
+  inner request payloads.
 - Cancelling an activity from a signal while the workflow itself is cancelled
   no longer causes a nondeterminism error from duplicate activity-cancellation
   commands.
@@ -67,8 +110,7 @@ to include examples, links to docs, or any other relevant information.
   retried on its configured interval instead.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
-
-### Security
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
 
 ## [1.32.0] - 2026-08-24
 
@@ -175,6 +217,10 @@ to include examples, links to docs, or any other relevant information.
   This lets types with transfer type converters delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
   contexts.
+- Added `temporalio.contrib.opentelemetry.MetricsExporter`, which drains a
+  `temporalio.runtime.MetricBuffer` on a fixed interval and exports through a
+  real OpenTelemetry `MeterProvider`, giving SDK/Core metrics access to
+  standard OTel features (views, resource, exemplars). Experimental.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the
