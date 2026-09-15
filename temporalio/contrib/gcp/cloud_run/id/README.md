@@ -2,7 +2,7 @@
 
 > ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
-A plugin for running [Temporal](https://temporal.io) workers on Google Cloud Run. `CloudRunIDPlugin`
+A plugin for running [Temporal](https://temporal.io) workers on Google Cloud Run. `CloudRunIdPlugin`
 reads Cloud Run instance metadata and sets the client identity. Both Cloud Run **worker pools** and
 **services** are supported.
 
@@ -15,7 +15,7 @@ derived from the Cloud Run instance (unless you already passed an `identity`).
 import asyncio
 
 from temporalio.client import Client
-from temporalio.contrib.gcp.cloud_run.id import CloudRunIDPlugin
+from temporalio.contrib.gcp.cloud_run.id import CloudRunIdPlugin
 from temporalio.worker import Worker
 
 from my_workflows import MyWorkflow
@@ -26,7 +26,7 @@ async def main() -> None:
     # Install the plugin on the client; it propagates to workers automatically.
     client = await Client.connect(
         "localhost:7233",
-        plugins=[CloudRunIDPlugin()],
+        plugins=[CloudRunIdPlugin()],
     )
 
     worker = Worker(
@@ -55,7 +55,7 @@ the
 at `http://metadata.google.internal/computeMetadata/v1/instance/id`, which requires the
 `Metadata-Flavor: Google` request header.
 
-When the client connects, `CloudRunIDPlugin` resolves the worker pool name from
+When the client connects, `CloudRunIdPlugin` resolves the worker pool name from
 `CLOUD_RUN_WORKER_POOL` (falling back to the service name `K_SERVICE`) and the revision from
 `CLOUD_RUN_REVISION` (falling back to
 `K_REVISION`), then performs a single synchronous HTTP GET to the metadata server for the instance
@@ -74,10 +74,10 @@ For advanced scenarios or unit tests you can bypass the metadata server by passi
 metadata object, or steer the fetch with `getenv` / `metadata_url` / `timeout`:
 
 ```python
-from temporalio.contrib.gcp.cloud_run.id import CloudRunIDPlugin, get_google_cloud_run_metadata
+from temporalio.contrib.gcp.cloud_run.id import CloudRunIdPlugin, get_google_cloud_run_metadata
 
 metadata = get_google_cloud_run_metadata()
-plugin = CloudRunIDPlugin(metadata=metadata)
+plugin = CloudRunIdPlugin(metadata=metadata)
 
 # metadata.identity exposes the same value the plugin applies, for use
 # without the plugin if needed.

@@ -10,7 +10,7 @@ from unittest.mock import Mock
 import pytest
 
 from temporalio.contrib.gcp.cloud_run.id import (
-    CloudRunIDPlugin,
+    CloudRunIdPlugin,
     GoogleCloudRunMetadata,
 )
 from temporalio.service import ConnectConfig, ServiceClient
@@ -48,7 +48,7 @@ def _service_client() -> ServiceClient:
 class TestClientIdentity:
     @pytest.mark.asyncio
     async def test_sets_identity_when_unset(self) -> None:
-        plugin = CloudRunIDPlugin(
+        plugin = CloudRunIdPlugin(
             metadata=_metadata(instance_id="abc", revision="rev-1")
         )
         # ConnectConfig auto-fills identity with <pid>@<hostname> when none is given.
@@ -65,7 +65,7 @@ class TestClientIdentity:
 
     @pytest.mark.asyncio
     async def test_preserves_caller_identity(self) -> None:
-        plugin = CloudRunIDPlugin(
+        plugin = CloudRunIdPlugin(
             metadata=_metadata(instance_id="abc", revision="rev-1")
         )
         config = ConnectConfig(target_host="localhost:7233", identity="my-identity")
@@ -85,14 +85,14 @@ class TestClientIdentity:
 class TestMetadataFetch:
     def test_construction_does_not_fetch(self) -> None:
         # A bad metadata URL must not raise at construction -- the fetch is lazy.
-        CloudRunIDPlugin(
+        CloudRunIdPlugin(
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
         )
 
     @pytest.mark.asyncio
     async def test_connect_fails_fast_off_platform(self) -> None:
-        plugin = CloudRunIDPlugin(
+        plugin = CloudRunIdPlugin(
             timeout=1.0,
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
@@ -114,7 +114,7 @@ class TestMetadataFetch:
             "temporalio.contrib.gcp.cloud_run.id._cloud_run_id_plugin.get_google_cloud_run_metadata",
             fetch,
         )
-        plugin = CloudRunIDPlugin()
+        plugin = CloudRunIdPlugin()
         config = ConnectConfig(target_host="localhost:7233")
 
         async def connect(_input: ConnectConfig) -> ServiceClient:
