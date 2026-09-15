@@ -22,7 +22,7 @@ from google.adk.platform import time as adk_time
 from google.adk.platform import uuid as adk_uuid
 
 from temporalio import workflow
-from temporalio.client import Client, WorkflowQueryFailedError
+from temporalio.client import Client
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, _plugin
 from temporalio.worker import (
     Replayer,
@@ -100,8 +100,8 @@ class PlatformProviderWorkflow:
 
     @workflow.query
     def query_adk_id(self) -> str:
-        # The cached private stream must refuse read-only contexts; a query
-        # advancing it would diverge later activations from replay.
+        # Read-only contexts get nondeterministic entropy; the cached private
+        # stream must stay untouched (QueryDuringRunWorkflow proves that).
         return adk_uuid.new_uuid()
 
 
@@ -134,8 +134,9 @@ async def test_providers_apply_inside_workflow_tasks(
             execution_timeout=timedelta(seconds=60),
         )
         readings = await handle.result()
-        with pytest.raises(WorkflowQueryFailedError, match="read-only"):
-            await handle.query(PlatformProviderWorkflow.query_adk_id)
+        # Read-only fallback: a query still gets a valid (nondeterministic)
+        # uuid rather than an error.
+        assert uuid.UUID(await handle.query(PlatformProviderWorkflow.query_adk_id))
         history = await handle.fetch_history()
 
     assert readings.adk_time == readings.workflow_time
@@ -262,6 +263,86 @@ async def test_reset_in_workflow_restores_deterministic_providers(
         workflow_runner=UnsandboxedWorkflowRunner(),
     ).replay_workflow(history)
     assert unsandboxed_set_reset_readings == [readings]
+
+
+# Same hand-back mechanism as unsandboxed_readings above.
+unsandboxed_query_run_ids: list[list[str]] = []
+
+
+@workflow.defn
+class QueryDuringRunWorkflow:
+    """Proves query-handler draws never advance the private ADK stream.
+
+    The run draws one id, waits for a signal (queries happen here), then
+    draws another. Queries do not run during replay, so if a query had
+    advanced the cached stream, the second id could not reproduce on replay.
+    """
+
+    def __init__(self) -> None:
+        self.proceed = False
+
+    @workflow.run
+    async def run(self) -> list[str]:
+        ids = [adk_uuid.new_uuid()]
+        await workflow.wait_condition(lambda: self.proceed)
+        ids.append(adk_uuid.new_uuid())
+        unsandboxed_query_run_ids.append(ids)
+        return ids
+
+    @workflow.signal
+    def go(self) -> None:
+        self.proceed = True
+
+    @workflow.query
+    def query_adk_id(self) -> str:
+        return adk_uuid.new_uuid()
+
+
+@pytest.mark.parametrize(
+    "workflow_runner",
+    [SandboxedWorkflowRunner(), UnsandboxedWorkflowRunner()],
+    ids=["sandboxed", "unsandboxed"],
+)
+async def test_query_draws_do_not_advance_private_stream(
+    client: Client, workflow_runner: WorkflowRunner
+) -> None:
+    reset_adk_providers_to_shipped_state()
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    task_queue = f"adk-query-stream-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[QueryDuringRunWorkflow],
+        workflow_runner=workflow_runner,
+    ):
+        handle = await client.start_workflow(
+            QueryDuringRunWorkflow.run,
+            id=f"adk-query-stream-{uuid.uuid4()}",
+            task_queue=task_queue,
+            execution_timeout=timedelta(seconds=60),
+        )
+        # Draw through the read-only fallback between the run's two draws.
+        for _ in range(3):
+            assert uuid.UUID(await handle.query(QueryDuringRunWorkflow.query_adk_id))
+        await handle.signal(QueryDuringRunWorkflow.go)
+        ids = await handle.result()
+        history = await handle.fetch_history()
+
+    assert len(ids) == 2 and ids[0] != ids[1]
+
+    # Replay never runs the queries; the ids only reproduce if the query
+    # draws left the private stream untouched.
+    reset_adk_providers_to_shipped_state()
+    unsandboxed_query_run_ids.clear()
+    await Replayer(
+        workflows=[QueryDuringRunWorkflow],
+        plugins=[GoogleAdkPlugin()],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ).replay_workflow(history)
+    assert unsandboxed_query_run_ids == [ids]
 
 
 def test_reset_outside_workflow_restores_installed_provider() -> None:
