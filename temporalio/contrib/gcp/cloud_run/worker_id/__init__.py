@@ -1,6 +1,6 @@
 """Run Temporal workers on Google Cloud Run.
 
-:py:class:`WorkerIDPlugin` reads Cloud Run instance metadata (from a worker pool or a service) and
+:py:class:`CloudRunIDPlugin` reads Cloud Run instance metadata (from a worker pool or a service) and
 sets the client identity from the Cloud Run instance.
 
 Quick start::
@@ -8,14 +8,14 @@ Quick start::
     import asyncio
 
     from temporalio.client import Client
-    from temporalio.contrib.gcp.cloud_run.worker_id import WorkerIDPlugin
+    from temporalio.contrib.gcp.cloud_run.worker_id import CloudRunIDPlugin
     from temporalio.worker import Worker
 
     async def main() -> None:
         # Install the plugin on the client; it propagates to workers automatically.
         client = await Client.connect(
             "localhost:7233",
-            plugins=[WorkerIDPlugin()],
+            plugins=[CloudRunIDPlugin()],
         )
 
         worker = Worker(
@@ -34,11 +34,11 @@ from temporalio.contrib.gcp.cloud_run.worker_id._metadata import (
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
 )
-from temporalio.contrib.gcp.cloud_run.worker_id._worker_id_plugin import WorkerIDPlugin
+from temporalio.contrib.gcp.cloud_run.worker_id._cloud_run_id_plugin import CloudRunIDPlugin
 
 __all__ = [
     "CLOUD_RUN_METADATA_URL",
     "GoogleCloudRunMetadata",
-    "WorkerIDPlugin",
+    "CloudRunIDPlugin",
     "get_google_cloud_run_metadata",
 ]

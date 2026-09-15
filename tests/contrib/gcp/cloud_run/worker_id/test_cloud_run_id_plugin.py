@@ -11,7 +11,7 @@ import pytest
 
 from temporalio.contrib.gcp.cloud_run.worker_id import (
     GoogleCloudRunMetadata,
-    WorkerIDPlugin,
+    CloudRunIDPlugin,
 )
 from temporalio.service import ConnectConfig, ServiceClient
 
@@ -48,7 +48,7 @@ def _service_client() -> ServiceClient:
 class TestClientIdentity:
     @pytest.mark.asyncio
     async def test_sets_identity_when_unset(self) -> None:
-        plugin = WorkerIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = CloudRunIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
         # ConnectConfig auto-fills identity with <pid>@<hostname> when none is given.
         config = ConnectConfig(target_host="localhost:7233")
         assert config.identity == f"{os.getpid()}@{socket.gethostname()}"
@@ -63,7 +63,7 @@ class TestClientIdentity:
 
     @pytest.mark.asyncio
     async def test_preserves_caller_identity(self) -> None:
-        plugin = WorkerIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
+        plugin = CloudRunIDPlugin(metadata=_metadata(instance_id="abc", revision="rev-1"))
         config = ConnectConfig(target_host="localhost:7233", identity="my-identity")
         service_client = _service_client()
 
@@ -81,14 +81,14 @@ class TestClientIdentity:
 class TestMetadataFetch:
     def test_construction_does_not_fetch(self) -> None:
         # A bad metadata URL must not raise at construction -- the fetch is lazy.
-        WorkerIDPlugin(
+        CloudRunIDPlugin(
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
         )
 
     @pytest.mark.asyncio
     async def test_connect_fails_fast_off_platform(self) -> None:
-        plugin = WorkerIDPlugin(
+        plugin = CloudRunIDPlugin(
             timeout=1.0,
             metadata_url=f"http://127.0.0.1:{_closed_port()}/instance/id",
             getenv={}.get,  # type: ignore[arg-type]
@@ -107,10 +107,10 @@ class TestMetadataFetch:
     ) -> None:
         fetch = Mock(return_value=_metadata(instance_id="abc", revision="rev-1"))
         monkeypatch.setattr(
-            "temporalio.contrib.gcp.cloud_run.worker_id._worker_id_plugin.get_google_cloud_run_metadata",
+            "temporalio.contrib.gcp.cloud_run.worker_id._cloud_run_id_plugin.get_google_cloud_run_metadata",
             fetch,
         )
-        plugin = WorkerIDPlugin()
+        plugin = CloudRunIDPlugin()
         config = ConnectConfig(target_host="localhost:7233")
 
         async def connect(_input: ConnectConfig) -> ServiceClient:
