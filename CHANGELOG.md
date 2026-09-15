@@ -22,13 +22,23 @@ to include examples, links to docs, or any other relevant information.
 
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
   graph workflows, dynamic `@node` workflows, and durable HITL.
+
 ### Changed
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
 ### Fixed
+
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
 
 ### Security
 
@@ -64,11 +74,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
-- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
-- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
-  workflow's deterministic random stream. A workflow started under an earlier release that calls
-  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
-  across the upgrade; drain such workflows or use worker versioning.
 - Experimental external storage: `ExternalStorage.driver_selector` is now called with a
   `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
   the new type carries the same `target` field. Since selectors are plain callables, a stale
@@ -84,8 +89,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
-  the workflow sandbox.
 - `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
   and supports its file download API, including video inputs and download
   destinations.
