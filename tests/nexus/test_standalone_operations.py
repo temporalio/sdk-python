@@ -869,7 +869,9 @@ class _RecordingOutboundInterceptor(OutboundInterceptor):
         self, input: GetNexusOperationResultInput
     ) -> Any:
         self._parent.result_calls.append(input)
-        return await super().get_nexus_operation_result(input)
+        result = await super().get_nexus_operation_result(input)
+        self._parent.result_outputs.append(result)
+        return result
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         self._parent.cancel_calls.append(input)
@@ -898,6 +900,7 @@ class _RecordingInterceptor(Interceptor):
         self.start_calls: list[StartNexusOperationInput] = []
         self.describe_calls: list[DescribeNexusOperationInput] = []
         self.result_calls: list[GetNexusOperationResultInput] = []
+        self.result_outputs: list[Any] = []
         self.cancel_calls: list[CancelNexusOperationInput] = []
         self.terminate_calls: list[TerminateNexusOperationInput] = []
         self.list_calls: list[ListNexusOperationsInput] = []
@@ -981,6 +984,21 @@ async def test_interceptor_receives_inputs(client: Client, env: WorkflowEnvironm
         assert isinstance(result_input, GetNexusOperationResultInput)
         assert result_input.operation_id == op_id
         assert result_input.result_type == EchoOutput
+        assert result_input.endpoint == endpoint_name
+        assert result_input.service == "StandaloneTestService"
+        assert result_input.operation == "blocking_async"
+
+        # Interceptors receive successfully decoded results.
+        value = f"interceptor-success-{uuid.uuid4()}"
+        handle = await nexus_client.start_operation(
+            StandaloneTestService.echo_sync,
+            EchoInput(value=value),
+            id=str(uuid.uuid4()),
+            schedule_to_close_timeout=timedelta(seconds=30),
+        )
+        result = await handle.result()
+        assert result == EchoOutput(value=value)
+        assert interceptor.result_outputs == [EchoOutput(value=value)]
 
         # Start another so we can terminate it
         previous_start_count = len(interceptor.start_calls)

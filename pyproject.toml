@@ -1,6 +1,6 @@
 [project]
 name = "temporalio"
-version = "1.32.0"
+version = "1.33.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
@@ -55,7 +55,7 @@ cloud-run-worker-otel = [
   "protobuf<7",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
-google-genai = ["google-genai>=2.10.0,<3.0.0"]
+google-genai = ["google-genai>=2.21.0,<3.0.0"]
 strands-agents = ["strands-agents>=1.39.0"]
 
 [project.urls]

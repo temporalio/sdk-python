@@ -24,6 +24,7 @@ from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
     ScheduleNexusOperation,
     SignalExternalWorkflowExecution,
     StartChildWorkflowExecution,
+    WorkflowCommand,
 )
 
 
@@ -114,6 +115,18 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
     ) -> None:
         with current_command(CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION, o.seq):
             await super()._visit_coresdk_workflow_commands_ScheduleNexusOperation(fs, o)
+
+    async def _visit_coresdk_workflow_commands_WorkflowCommand(
+        self, fs: VisitorFunctions, o: WorkflowCommand
+    ) -> None:
+        if o.HasField("schedule_nexus_operation"):
+            with current_command(
+                CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION,
+                o.schedule_nexus_operation.seq,
+            ):
+                await super()._visit_coresdk_workflow_commands_WorkflowCommand(fs, o)
+        else:
+            await super()._visit_coresdk_workflow_commands_WorkflowCommand(fs, o)
 
     # Workflow activation jobs with payloads
     async def _visit_coresdk_workflow_activation_ResolveActivity(
