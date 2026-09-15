@@ -28,6 +28,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+
 ### Security
 
 ## [1.33.0] - 2026-09-14
@@ -77,7 +79,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
   and supports its file download API, including video inputs and download
   destinations.
