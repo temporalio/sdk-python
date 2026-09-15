@@ -99,10 +99,11 @@ temporalio.converter.transfer_type_convertible(_FailureTransferValueConverter)(
 
 class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
     def __init__(
-        self, expected_payload_converter: temporalio.converter.PayloadConverter
+        self,
+        expected_payload_converter_type: type[temporalio.converter.PayloadConverter],
     ) -> None:
         super().__init__()
-        self.expected_payload_converter = expected_payload_converter
+        self.expected_payload_converter_type = expected_payload_converter_type
         self.to_failure_calls = 0
         self.from_failure_calls = 0
 
@@ -112,7 +113,7 @@ class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
         payload_converter: temporalio.converter.PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        assert payload_converter is self.expected_payload_converter
+        assert isinstance(payload_converter, self.expected_payload_converter_type)
         self.to_failure_calls += 1
         super().to_failure(exception, payload_converter, failure)
 
@@ -121,7 +122,7 @@ class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
         failure: temporalio.api.failure.v1.Failure,
         payload_converter: temporalio.converter.PayloadConverter,
     ) -> BaseException:
-        assert payload_converter is self.expected_payload_converter
+        assert isinstance(payload_converter, self.expected_payload_converter_type)
         self.from_failure_calls += 1
         return super().from_failure(failure, payload_converter)
 
@@ -708,7 +709,7 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
 
 def test_system_nexus_uses_user_failure_converter() -> None:
     payload_converter = temporalio.converter.default().payload_converter
-    failure_converter = _TrackingFailureConverter(payload_converter)
+    failure_converter = _TrackingFailureConverter(DefaultPayloadConverter)
     system_converter = nexus_system._get_payload_converter(
         payload_converter, failure_converter
     )

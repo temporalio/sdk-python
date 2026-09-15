@@ -60,6 +60,9 @@ import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.converter._payload_converter import (
+    _TemporalTransferTypePayloadConverter,
+)
 from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
     _start_system_nexus_operation,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
@@ -1468,7 +1471,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return use_patch
 
     def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter:
-        return self._workflow_context_payload_converter
+        return _TemporalTransferTypePayloadConverter.unwrap(
+            self._workflow_context_payload_converter
+        )
 
     def workflow_random(self) -> random.Random:
         self._assert_not_read_only("random")
