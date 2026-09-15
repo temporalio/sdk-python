@@ -65,9 +65,6 @@ class ActivityExecutionAsyncIterator:
     """Asynchronous iterator for activity execution values.
 
     You should typically use ``async for`` on this iterator and not call any of its methods.
-
-    .. warning::
-       This API is experimental.
     """
 
     def __init__(
@@ -168,11 +165,7 @@ class ActivityExecutionAsyncIterator:
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecution:
-    """Info for an activity execution not started by a workflow, from list response.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Info for an activity execution not started by a workflow, from list response."""
 
     activity_id: str
     """Activity ID."""
@@ -265,11 +258,7 @@ class ActivityExecution:
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecutionDescription(ActivityExecution):
-    """Detailed information about an activity execution not started by a workflow.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Detailed information about an activity execution not started by a workflow."""
 
     attempt: int
     """Current attempt number."""
@@ -563,9 +552,6 @@ class ActivityExecutionDescription(ActivityExecution):
 class ActivityExecutionStatus(IntEnum):
     """Status of an activity execution.
 
-    .. warning::
-       This API is experimental.
-
     See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
     """
 
@@ -597,9 +583,6 @@ class ActivityExecutionStatus(IntEnum):
 
 class PendingActivityState(IntEnum):
     """Detailed state of an activity execution that is in ACTIVITY_EXECUTION_STATUS_RUNNING.
-
-    .. warning::
-       This API is experimental.
 
     See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
     """
@@ -782,11 +765,7 @@ class ActivityExecutionOptions:
 
 @dataclass(frozen=True)
 class ActivityExecutionCount:
-    """Representation of a count from a count activities call.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Representation of a count from a count activities call."""
 
     count: int
     """Total count matching the filter, if any."""
@@ -809,11 +788,7 @@ class ActivityExecutionCount:
 
 @dataclass(frozen=True)
 class ActivityExecutionCountAggregationGroup:
-    """A single aggregation group from a count activities call.
-
-    .. warning::
-       This API is experimental.
-    """
+    """A single aggregation group from a count activities call."""
 
     count: int
     """Count for this group."""
@@ -985,11 +960,7 @@ class AsyncActivityHandle(WithSerializationContext):
 
 
 class ActivityHandle(Generic[ReturnType]):
-    """Handle representing an activity execution not started by a workflow.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Handle representing an activity execution not started by a workflow."""
 
     def __init__(
         self,
@@ -1039,9 +1010,6 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
         """Wait for result of the activity.
-
-        .. warning::
-           This API is experimental.
 
         The result may already be known if this method has been called before,
         in which case no network call is made. Otherwise the result will be
@@ -1133,9 +1101,6 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Request cancellation of the activity.
 
-        .. warning::
-           This API is experimental.
-
         Requesting cancellation of an activity does not automatically transition the activity to
         canceled status. If the activity is heartbeating, a :py:class:`exceptions.CancelledError`
         exception will be raised when receiving the heartbeat response; if the activity allows this
@@ -1165,9 +1130,6 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> None:
         """Terminate the activity execution immediately.
-
-        .. warning::
-           This API is experimental.
 
         Termination does not reach the worker and the activity code cannot react to it.
         A terminated activity may have a running attempt and will be requested to be
@@ -1347,9 +1309,6 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
-
-        .. warning::
-           This API is experimental.
 
         Args:
             include_input: Include activity input in the response if available.
