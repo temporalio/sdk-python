@@ -39,7 +39,7 @@ class GoogleCloudRunMetadata:
     revision: str
 
     @property
-    def worker_identity(self) -> str:
+    def identity(self) -> str:
         """Worker identity string uniquely identifying this Cloud Run instance.
 
         The format is ``<instance_id>@<revision>``. When the revision is empty the worker pool or

@@ -7,7 +7,7 @@ import socket
 from collections.abc import Awaitable, Callable
 
 import temporalio.plugin
-from temporalio.contrib.gcp.cloud_run.worker_id._metadata import (
+from temporalio.contrib.gcp.cloud_run.id._metadata import (
     CLOUD_RUN_METADATA_URL,
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
@@ -77,7 +77,7 @@ class CloudRunIDPlugin(temporalio.plugin.SimplePlugin):
         """
         metadata = self._resolve_metadata()
         if not config.identity or config.identity == _default_identity():
-            config.identity = metadata.worker_identity
+            config.identity = metadata.identity
         return await super().connect_service_client(config, next)
 
     def _resolve_metadata(self) -> GoogleCloudRunMetadata:

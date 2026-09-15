@@ -1,4 +1,4 @@
-# worker_id
+# id
 
 > ⚠️ **This package is currently at an experimental release stage.** ⚠️
 
@@ -15,7 +15,7 @@ derived from the Cloud Run instance (unless you already passed an `identity`).
 import asyncio
 
 from temporalio.client import Client
-from temporalio.contrib.gcp.cloud_run.worker_id import CloudRunIDPlugin
+from temporalio.contrib.gcp.cloud_run.id import CloudRunIDPlugin
 from temporalio.worker import Worker
 
 from my_workflows import MyWorkflow
@@ -74,11 +74,11 @@ For advanced scenarios or unit tests you can bypass the metadata server by passi
 metadata object, or steer the fetch with `getenv` / `metadata_url` / `timeout`:
 
 ```python
-from temporalio.contrib.gcp.cloud_run.worker_id import CloudRunIDPlugin, get_google_cloud_run_metadata
+from temporalio.contrib.gcp.cloud_run.id import CloudRunIDPlugin, get_google_cloud_run_metadata
 
 metadata = get_google_cloud_run_metadata()
 plugin = CloudRunIDPlugin(metadata=metadata)
 
-# metadata.worker_identity exposes the same value the plugin applies, for use
+# metadata.identity exposes the same value the plugin applies, for use
 # without the plugin if needed.
 ```

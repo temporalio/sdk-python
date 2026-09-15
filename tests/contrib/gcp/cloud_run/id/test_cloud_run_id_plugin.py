@@ -9,7 +9,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from temporalio.contrib.gcp.cloud_run.worker_id import (
+from temporalio.contrib.gcp.cloud_run.id import (
     GoogleCloudRunMetadata,
     CloudRunIDPlugin,
 )
@@ -107,7 +107,7 @@ class TestMetadataFetch:
     ) -> None:
         fetch = Mock(return_value=_metadata(instance_id="abc", revision="rev-1"))
         monkeypatch.setattr(
-            "temporalio.contrib.gcp.cloud_run.worker_id._cloud_run_id_plugin.get_google_cloud_run_metadata",
+            "temporalio.contrib.gcp.cloud_run.id._cloud_run_id_plugin.get_google_cloud_run_metadata",
             fetch,
         )
         plugin = CloudRunIDPlugin()

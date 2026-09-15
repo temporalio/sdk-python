@@ -1,4 +1,4 @@
-"""Tests for temporalio.contrib.gcp.cloud_run.worker_id."""
+"""Tests for temporalio.contrib.gcp.cloud_run.id."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from temporalio.contrib.gcp.cloud_run.worker_id import (
+from temporalio.contrib.gcp.cloud_run.id import (
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
 )
@@ -157,15 +157,15 @@ class TestEnvPrecedence:
 class TestWorkerIdentity:
     def test_identity_uses_revision(self) -> None:
         metadata = _metadata(instance_id="abc", name="my-pool", revision="rev-1")
-        assert metadata.worker_identity == "abc@rev-1"
+        assert metadata.identity == "abc@rev-1"
 
     def test_identity_falls_back_to_name(self) -> None:
         metadata = _metadata(instance_id="abc", name="my-pool", revision="")
-        assert metadata.worker_identity == "abc@my-pool"
+        assert metadata.identity == "abc@my-pool"
 
     def test_identity_falls_back_to_instance_id(self) -> None:
         metadata = _metadata(instance_id="abc", name="", revision="")
-        assert metadata.worker_identity == "abc"
+        assert metadata.identity == "abc"
 
 
 # ---- HTTP fetch ----
@@ -217,4 +217,4 @@ class TestHttpFetch:
             name="my-pool",
             revision="rev-7",
         )
-        assert metadata.worker_identity == "instance-42@rev-7"
+        assert metadata.identity == "instance-42@rev-7"

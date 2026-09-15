@@ -8,7 +8,7 @@ Quick start::
     import asyncio
 
     from temporalio.client import Client
-    from temporalio.contrib.gcp.cloud_run.worker_id import CloudRunIDPlugin
+    from temporalio.contrib.gcp.cloud_run.id import CloudRunIDPlugin
     from temporalio.worker import Worker
 
     async def main() -> None:
@@ -29,12 +29,12 @@ Quick start::
     asyncio.run(main())
 """
 
-from temporalio.contrib.gcp.cloud_run.worker_id._metadata import (
+from temporalio.contrib.gcp.cloud_run.id._metadata import (
     CLOUD_RUN_METADATA_URL,
     GoogleCloudRunMetadata,
     get_google_cloud_run_metadata,
 )
-from temporalio.contrib.gcp.cloud_run.worker_id._cloud_run_id_plugin import CloudRunIDPlugin
+from temporalio.contrib.gcp.cloud_run.id._cloud_run_id_plugin import CloudRunIDPlugin
 
 __all__ = [
     "CLOUD_RUN_METADATA_URL",
