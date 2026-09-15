@@ -1,5 +1,7 @@
 import dataclasses
+import importlib
 import sys
+from typing import Any
 
 import pytest
 
@@ -25,6 +27,65 @@ def test_workflow_sandbox_importer_invalid_module():
         err.value.qualified_name
         == "tests.worker.workflow_sandbox.testmodules.invalid_module"
     )
+
+
+def test_workflow_sandbox_importer_repeat_import_skips_import_machinery(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    imported: list[str] = []
+    orig_import = importlib.__import__
+
+    def recording_import(
+        name: str,
+        globals: Any = None,
+        locals: Any = None,
+        fromlist: Any = (),
+        level: int = 0,
+    ) -> Any:
+        imported.append(name)
+        return orig_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(importlib, "__import__", recording_import)
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox.testmodules.passthrough_module as passthrough
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as stateful
+
+        assert imported
+        imported.clear()
+
+        # Loaded modules are served from sys.modules without re-entering importlib
+        import typing
+
+        import tests.worker.workflow_sandbox.testmodules.passthrough_module as passthrough_again
+        import tests.worker.workflow_sandbox.testmodules.stateful_module as stateful_again
+        from tests.worker.workflow_sandbox import testmodules
+        from tests.worker.workflow_sandbox.testmodules import stateful_module
+
+        assert passthrough_again is passthrough
+        assert stateful_again is stateful is stateful_module
+        assert getattr(testmodules, "stateful_module") is stateful
+        assert typing is sys.modules["typing"]
+    assert imported == []
+
+
+def test_workflow_sandbox_importer_repeat_import_leaves_module_getattr_to_importlib():
+    pkg_name = "tests.worker.workflow_sandbox.testmodules.dynamic_attr_package"
+    with Importer(restrictions, RestrictionContext()).applied():
+        dyn_pkg = importlib.import_module(pkg_name)
+        assert dyn_pkg.dynamic_value == 42
+        before = len(dyn_pkg.getattr_calls)
+
+        # importlib's fromlist hasattr plus the attribute read, same as without the sandbox
+        pkg = __import__(pkg_name, fromlist=["dynamic_value"])
+        assert pkg.dynamic_value == 42
+        assert dyn_pkg.getattr_calls[before:] == ["dynamic_value", "dynamic_value"]
+
+        # A missing name is probed once by importlib and once by the read, not more
+        before = len(dyn_pkg.getattr_calls)
+        pkg = __import__(pkg_name, fromlist=["missing_value"])
+        with pytest.raises(AttributeError):
+            getattr(pkg, "missing_value")
+        assert dyn_pkg.getattr_calls[before:] == ["missing_value", "missing_value"]
 
 
 def test_workflow_sandbox_importer_passthrough_module():
