@@ -18,9 +18,7 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from temporalio.converter import (
-    DataConverter,
-)
+from temporalio.converter import DataConverter
 
 if TYPE_CHECKING:
     from ._activity import (
@@ -202,11 +200,7 @@ class TerminateWorkflowInput:
 
 @dataclass
 class StartActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.start_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.start_activity`."""
 
     activity_type: str
     args: Sequence[Any]
@@ -231,11 +225,7 @@ class StartActivityInput:
 
 @dataclass
 class CancelActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.cancel_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.cancel_activity`."""
 
     activity_id: str
     activity_run_id: str | None
@@ -246,11 +236,7 @@ class CancelActivityInput:
 
 @dataclass
 class TerminateActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.terminate_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.terminate_activity`."""
 
     activity_id: str
     activity_run_id: str | None
@@ -308,11 +294,7 @@ class UpdateActivityOptionsInput:
 
 @dataclass
 class DescribeActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.describe_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.describe_activity`."""
 
     activity_id: str
     activity_run_id: str | None
@@ -326,11 +308,7 @@ class DescribeActivityInput:
 
 @dataclass
 class ListActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.list_activities`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.list_activities`."""
 
     query: str | None
     page_size: int
@@ -342,11 +320,7 @@ class ListActivitiesInput:
 
 @dataclass
 class CountActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.count_activities`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.count_activities`."""
 
     query: str | None
     rpc_metadata: Mapping[str, str | bytes]
@@ -657,6 +631,9 @@ class GetNexusOperationResultInput:
 
     operation_id: str
     run_id: str | None
+    endpoint: str
+    service: str
+    operation: str
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
     result_type: type[Any] | None
@@ -807,27 +784,15 @@ class OutboundInterceptor:
     ### Activity calls
 
     async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
-        """Called for every :py:meth:`Client.start_activity` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.start_activity` call."""
         return await self.next.start_activity(input)
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.cancel` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`ActivityHandle.cancel` call."""
         await self.next.cancel_activity(input)
 
     async def terminate_activity(self, input: TerminateActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.terminate` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`ActivityHandle.terminate` call."""
         await self.next.terminate_activity(input)
 
     async def pause_activity(self, input: PauseActivityInput) -> None:
@@ -860,31 +825,19 @@ class OutboundInterceptor:
     async def describe_activity(
         self, input: DescribeActivityInput
     ) -> ActivityExecutionDescription:
-        """Called for every :py:meth:`ActivityHandle.describe` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`ActivityHandle.describe` call."""
         return await self.next.describe_activity(input)
 
     def list_activities(
         self, input: ListActivitiesInput
     ) -> ActivityExecutionAsyncIterator:
-        """Called for every :py:meth:`Client.list_activities` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.list_activities` call."""
         return self.next.list_activities(input)
 
     async def count_activities(
         self, input: CountActivitiesInput
     ) -> ActivityExecutionCount:
-        """Called for every :py:meth:`Client.count_activities` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.count_activities` call."""
         return await self.next.count_activities(input)
 
     async def start_workflow_update(
