@@ -26,6 +26,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The OpenAI Agents integration has moved to the independently versioned
+  [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
+  package. Install it with `uv add temporalio-openai-agents`; the
+  `temporalio[openai-agents]` extra and bundled `temporalio.contrib.openai_agents`
+  module have been removed.
+
 ### Fixed
 
 ### Security
