@@ -723,8 +723,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
                 # Run the handler
                 success = await self._inbound.handle_update_handler(handler_input)
-                result_payloads = self._workflow_context_payload_converter.to_payloads(
-                    [success]
+                result_payloads = self._workflow_context_payload_converter.to_payloads_with_type_hints(
+                    [success], [defn.ret_type]
                 )
                 if len(result_payloads) != 1:
                     raise ValueError(
@@ -829,8 +829,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         headers=job.headers,
                     )
                     success = await self._inbound.handle_query(input)
-                    result_payloads = (
-                        self._workflow_context_payload_converter.to_payloads([success])
+                    result_payloads = self._workflow_context_payload_converter.to_payloads_with_type_hints(
+                        [success], [defn.ret_type]
                     )
                     if len(result_payloads) != 1:
                         raise ValueError(
@@ -1151,8 +1151,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
-                result_payloads = self._workflow_context_payload_converter.to_payloads(
-                    [result]
+                result_payloads = self._workflow_context_payload_converter.to_payloads_with_type_hints(
+                    [result], [self._defn.ret_type]
                 )
                 if len(result_payloads) != 1:
                     raise ValueError(
@@ -1252,7 +1252,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
             name = defn.name
             arg_types = defn.arg_types
-        elif workflow is not None:
+        elif workflow is None:
+            arg_types = self._defn.arg_types
+        else:
             raise TypeError("Workflow must be None, a string, or callable")  # type:ignore[reportUnreachable]
 
         self._outbound.continue_as_new(
@@ -2064,7 +2066,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=input.child_workflow_id,
             )
         )
-        payloads = payload_converter.to_payloads(input.args) if input.args else None
+        payloads = (
+            payload_converter.to_payloads_with_type_hints(input.args, input.arg_types)
+            if input.args
+            else None
+        )
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.child_workflow_id = input.child_workflow_id
@@ -2084,7 +2090,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=input.workflow_id,
             )
         )
-        payloads = payload_converter.to_payloads(input.args) if input.args else None
+        payloads = (
+            payload_converter.to_payloads_with_type_hints(input.args, input.arg_types)
+            if input.args
+            else None
+        )
         command = self._add_command()
         v = command.signal_external_workflow_execution
         v.workflow_execution.namespace = input.namespace
@@ -3372,7 +3382,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     ) -> None:
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._payload_converter.to_payloads(self._input.args)
+            self._payload_converter.to_payloads_with_type_hints(
+                self._input.args, self._input.arg_types
+            )
             if self._input.args
             else None
         )
@@ -3504,6 +3516,12 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
                     signal
                 ),
+                arg_types=(
+                    defn.arg_types
+                    if callable(signal)
+                    and (defn := temporalio.workflow._SignalDefinition.from_fn(signal))
+                    else None
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
                 child_workflow_id=self._input.id,
                 headers={},
@@ -3532,7 +3550,9 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
     def _apply_start_command(self) -> None:
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._payload_converter.to_payloads(self._input.args)
+            self._payload_converter.to_payloads_with_type_hints(
+                self._input.args, self._input.arg_types
+            )
             if self._input.args
             else None
         )
@@ -3634,6 +3654,12 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
                     signal
                 ),
+                arg_types=(
+                    defn.arg_types
+                    if callable(signal)
+                    and (defn := temporalio.workflow._SignalDefinition.from_fn(signal))
+                    else None
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
                 namespace=self._instance._info.namespace,
                 workflow_id=self._id,
@@ -3704,7 +3730,9 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
             self._result_fut.set_result(None)
 
     def _apply_schedule_command(self) -> None:
-        payload = self._payload_converter.to_payload(self._input.input)
+        payload = self._payload_converter.to_payloads_with_type_hints(
+            [self._input.input], [self._input.input_type]
+        )[0]
         command = self._instance._add_command()
         v = command.schedule_nexus_operation
         v.seq = self._seq
@@ -3754,8 +3782,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
     def _apply_command(self) -> None:
         # Convert arguments before creating command in case it raises error
         payloads = (
-            self._instance._workflow_context_payload_converter.to_payloads(
-                self._input.args
+            self._instance._workflow_context_payload_converter.to_payloads_with_type_hints(
+                self._input.args, self._input.arg_types
             )
             if self._input.args
             else None

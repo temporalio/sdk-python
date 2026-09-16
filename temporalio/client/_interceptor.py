@@ -96,6 +96,7 @@ class StartWorkflowInput:
     request_eager_start: bool
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -170,6 +171,7 @@ class QueryWorkflowInput:
     ret_type: type | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -183,6 +185,7 @@ class SignalWorkflowInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -221,6 +224,7 @@ class StartActivityInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -342,6 +346,7 @@ class StartWorkflowUpdateInput:
     ret_type: type | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -354,6 +359,7 @@ class UpdateWithStartUpdateWorkflowInput:
     wait_for_stage: WorkflowUpdateStage
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     ret_type: type | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -386,6 +392,7 @@ class UpdateWithStartStartWorkflowInput:
     ret_type: type | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -605,6 +612,7 @@ class StartNexusOperationInput:
     headers: Mapping[str, str]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    input_type: type | None = None
 
 
 @dataclass

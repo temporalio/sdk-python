@@ -557,6 +557,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
     Headers may still be encoded by the payload codec if present.
     """
     _from_raw: bool = dataclasses.field(compare=False, init=False)
+    _arg_types: list[type] | None = dataclasses.field(compare=False, init=False)
 
     @staticmethod
     def _from_proto(  # pyright: ignore
@@ -682,6 +683,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         values.
         """
         super().__init__()
+        self._arg_types = None
         if raw_info:
             self._from_raw = True
             # Ignore other fields
@@ -753,6 +755,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 defn = temporalio.workflow._Definition.must_from_run_fn(workflow)
                 if not defn.name:
                     raise ValueError("Cannot schedule dynamic workflow explicitly")
+                self._arg_types = defn.arg_types
                 workflow = defn.name
             elif not isinstance(workflow, str):
                 raise TypeError("Workflow must be a string or callable")  # type:ignore[reportUnreachable]
@@ -815,8 +818,15 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                         payloads=[
                             a
                             if isinstance(a, temporalio.api.common.v1.Payload)
-                            else (await data_converter.encode([a]))[0]
-                            for a in self.args
+                            else (
+                                await data_converter.encode_with_type_hints(
+                                    [a],
+                                    [self._arg_types[index]]
+                                    if self._arg_types and index < len(self._arg_types)
+                                    else None,
+                                )
+                            )[0]
+                            for index, a in enumerate(self.args)
                         ]
                     )
                     if self.args

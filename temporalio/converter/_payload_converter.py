@@ -57,8 +57,21 @@ TransferTypeT = TypeVar("TransferTypeT")
 _TRANSFER_TYPE_CONVERTER_ATTR = "__temporal_transfer_type_converter"
 
 
+class _TypeHintedValues(list[Any]):
+    """Carry hints through legacy overrides without changing their signatures."""
+
+    def __init__(
+        self, values: Sequence[Any], type_hints: Sequence[type | None]
+    ) -> None:
+        super().__init__(values)
+        self.type_hints = tuple(type_hints)
+
+
 class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
     """Converter between a user-facing value and a transfer type value.
+
+    When available, the declared type determines which converter is used for
+    serialization. Otherwise, the value's runtime type is used.
 
     .. warning::
         This API is experimental and subject to change.
@@ -79,6 +92,19 @@ class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
             This API is experimental and subject to change.
         """
         raise NotImplementedError
+
+    def to_transfer_type_with_type_hint(
+        self,
+        value: ValueT,
+        type_hint: type[ValueT] | None,  # type: ignore[reportUnusedParameter]
+    ) -> TransferTypeT:
+        """Convert a value with its declared type, including generic arguments.
+
+        The default implementation delegates to :py:meth:`to_transfer_type`.
+        Override this method when conversion needs the declared type. The hint
+        is None when the caller has no declared type available.
+        """
+        return self.to_transfer_type(value)
 
     @abstractmethod
     def from_transfer_type(
@@ -122,6 +148,9 @@ def transfer_type_convertible(
 def _get_transfer_type_converter(
     value_type: object,
 ) -> TransferTypeConverter[Any, Any] | None:
+    while typing.get_origin(value_type) is typing.Annotated:
+        value_type = typing.get_args(value_type)[0]
+    value_type = typing.get_origin(value_type) or value_type
     converter = getattr(value_type, _TRANSFER_TYPE_CONVERTER_ATTR, None)
     if isinstance(converter, TransferTypeConverter):
         return converter
@@ -133,6 +162,23 @@ class PayloadConverter(ABC):
 
     default: ClassVar[PayloadConverter]
     """Default payload converter."""
+
+    def to_payloads_with_type_hints(
+        self,
+        values: Sequence[Any],
+        type_hints: Sequence[type | None] | None = None,
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """Convert values using declared types for transfer converter selection.
+
+        Hints correspond to values by position. A missing or None hint uses the
+        value's runtime type; hints for omitted arguments are ignored.
+        Existing :py:meth:`to_payloads` overrides are invoked unchanged;
+        overrides should forward the original sequence to preserve hints when
+        delegating to another payload converter.
+        """
+        return self.to_payloads(
+            _TypeHintedValues(values, type_hints) if type_hints is not None else values
+        )
 
     @abstractmethod
     def to_payloads(
@@ -617,10 +663,22 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
         transfer_type_values: list[Any] = []
-        for value in values:
-            converter = _get_transfer_type_converter(type(value))
+        type_hints = (
+            values.type_hints
+            if isinstance(values, _TypeHintedValues)
+            else (None,) * len(values)
+        )
+        for index, value in enumerate(values):
+            type_hint = type_hints[index] if index < len(type_hints) else None
+            converter = (
+                None
+                if isinstance(value, temporalio.common.RawValue)
+                else _get_transfer_type_converter(
+                    type_hint if type_hint is not None else type(value)
+                )
+            )
             if converter is not None:
-                value = converter.to_transfer_type(value)
+                value = converter.to_transfer_type_with_type_hint(value, type_hint)
             transfer_type_values.append(value)
         return self._inner_payload_converter.to_payloads(transfer_type_values)
 

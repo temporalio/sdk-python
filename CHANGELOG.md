@@ -29,6 +29,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Use declared argument and result types, when available, to select transfer type
+  converters during serialization, while preserving existing data and payload
+  converter method signatures.
+
 ### Security
 
 ## [1.33.0] - 2026-09-14

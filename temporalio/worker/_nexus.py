@@ -471,7 +471,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     )
                 )
             elif isinstance(result, nexusrpc.handler.StartOperationResultSync):
-                [payload] = data_converter.payload_converter.to_payloads([result.value])
+                operation = self._handler.service_handlers[
+                    start_request.service
+                ].service.operation_definitions[start_request.operation]
+                [payload] = (
+                    data_converter.payload_converter.to_payloads_with_type_hints(
+                        [result.value], [operation.output_type]
+                    )
+                )
                 return temporalio.api.nexus.v1.StartOperationResponse(
                     sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
                         payload=payload,
