@@ -2,6 +2,7 @@ import dataclasses
 import datetime
 import os
 import pathlib
+import pickle
 import typing
 import uuid
 
@@ -9,6 +10,7 @@ import pydantic
 import pytest
 from pydantic import BaseModel
 
+import temporalio.contrib.pydantic
 from temporalio.client import Client
 from temporalio.contrib.pydantic import (
     PydanticJSONPlainPayloadConverter,
@@ -53,6 +55,42 @@ _MANY_TYPE_HINTS = tuple(
 _UNHASHABLE_TYPE_HINT = typing.cast(
     type, typing.cast(object, typing.Annotated[list[int], []])
 )
+
+
+@pytest.mark.parametrize("max_cached_type_adapters", [0, 2, None])
+def test_pydantic_json_converter_pickle(max_cached_type_adapters: int | None):
+    class Model(BaseModel):
+        value: int
+        default: int = 0
+
+    converter = PydanticJSONPlainPayloadConverter(
+        temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=True),
+        max_cached_type_adapters=max_cached_type_adapters,
+    )
+    value = Model(value=1)
+    payload = converter.to_payload(value)
+    assert payload is not None
+    assert converter.from_payload(payload, Model) == value
+    cache_info = converter._type_adapter.cache_info()
+
+    restored = pickle.loads(pickle.dumps(converter))
+
+    assert converter._type_adapter.cache_info() == cache_info
+    assert restored._type_adapter.cache_info().maxsize == max_cached_type_adapters
+    assert restored._type_adapter.cache_info().currsize == 0
+    assert restored.to_payload(value) == payload
+    assert payload.data == b'{"value":1}'
+    assert restored.from_payload(payload, Model) == value
+    assert restored.from_payload(payload, Model) == value
+    assert restored._type_adapter.cache_info().hits == (
+        0 if max_cached_type_adapters == 0 else 1
+    )
+
+
+async def test_pydantic_data_converter_pickle():
+    restored = pickle.loads(pickle.dumps(pydantic_data_converter))
+    value = {"a": 1}
+    assert await restored.decode(await restored.encode([value]), [dict]) == [value]
 
 
 @pytest.mark.parametrize(
