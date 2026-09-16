@@ -12,8 +12,11 @@ from pkgutil import extend_path as _extend_path
 
 from .service import __version__ as __sdk_version
 
-# For example, find ``temporalio.openai_agents`` in site-packages when this SDK
-# is imported from an editable checkout in a different directory.
+# After Python finds this ``temporalio`` package, it does not keep searching for
+# other ``temporalio`` directories, such as one containing the separately
+# installed ``temporalio-openai-agents`` package. Explicitly extend the search
+# path so they can be found. Every package that provides ``temporalio/__init__.py``
+# must do this: https://docs.python.org/3.14/library/pkgutil.html#pkgutil.extend_path
 __path__ = _extend_path(__path__, __name__)
 
 __version__ = __sdk_version
