@@ -315,6 +315,29 @@ worker is unaffected, and the original function is restored when the worker
 stops. If you would rather be explicit, use `create_temporal_deep_agent` or
 pass `TemporalModel("provider:name")` yourself.
 
+## Code interpreter (`langchain-quickjs`)
+
+Deep Agents' [code interpreter](https://docs.langchain.com/oss/python/deepagents/interpreters)
+(`pip install "deepagents[quickjs]"`) runs inside the workflow: add
+`CodeInterpreterMiddleware()` to `create_deep_agent(middleware=[...])` as usual. The
+plugin runs the QuickJS VM on the workflow's own event loop (upstream hosts it on a
+thread the deterministic loop cannot service) and passes `langchain_quickjs`,
+`quickjs_rs`, `wasmtime`, and `bsdiff4` through the sandbox. `langchain-quickjs` stays
+optional: nothing is imported unless your workflow imports it.
+
+What is durable: the JavaScript itself is workflow code and replays; a sub-agent
+dispatched from JavaScript with `task(...)` runs in-workflow, so its model calls are
+`deepagents.invoke_model` Activities like any other sub-agent's; a tool called from
+JavaScript through PTC (`tools.<name>(...)`) follows that tool's own Workflow-vs-Activity
+choice above, so wrap I/O tools with `tool_as_activity`.
+
+Rules for the JavaScript, because it is workflow code: do not read the clock or
+randomness — inside the VM `Date.now()` is wall-clock and `Math.random()` is seeded per
+runtime, so both break replay; set the middleware's `timeout=` generously, since it is
+wall-clock; and prefer `mode="turn"` — a `mode="thread"` heap snapshot lives in graph
+state and is not carried across `run_deep_agent`'s continue-as-new. Upstream's own
+caveat applies too: PTC and `task()` calls do not pass through `interrupt_on` approval.
+
 ## Composing with other plugins
 
 This plugin carries no tracing context of its own. For observability, compose it

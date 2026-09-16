@@ -205,9 +205,16 @@ class DeepAgentsPlugin(SimplePlugin):
         # Installed for the life of the process, never uninstalled — see
         # _install_langsmith_temporal_override for why.
         _install_langsmith_temporal_override()
+        # No-op unless quickjs-rs (the langchain-quickjs code interpreter's VM)
+        # is installed; see _quickjs for why its worker thread cannot be used
+        # from a workflow.
+        from temporalio.contrib.deepagents import _quickjs
+
+        _quickjs.install_quickjs_inline_patch()
         try:
             yield
         finally:
+            _quickjs.uninstall_quickjs_inline_patch()
             if patched:
                 # Import is cached: patched=True implies the import above succeeded.
                 from temporalio.contrib.deepagents import _model, _tools
