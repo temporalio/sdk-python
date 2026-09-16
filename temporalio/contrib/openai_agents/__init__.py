@@ -1,7 +1,13 @@
 """Compatibility imports for the standalone OpenAI Agents integration.
 
 New code should import :mod:`temporalio.openai_agents` directly.
+
+.. deprecated::
+    Install ``temporalio-openai-agents`` and import
+    :mod:`temporalio.openai_agents` instead.
 """
+
+import warnings
 
 from temporalio.openai_agents import (
     AgentsWorkflowError,
@@ -17,6 +23,13 @@ from temporalio.openai_agents import (
 )
 
 from . import testing, workflow
+
+warnings.warn(
+    "temporalio.contrib.openai_agents is deprecated; install "
+    "temporalio-openai-agents and import temporalio.openai_agents instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 __all__ = [
     "AgentsWorkflowError",
