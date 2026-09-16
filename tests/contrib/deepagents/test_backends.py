@@ -57,6 +57,14 @@ class RecordingBackend:
     async def aread(self, file_path: str) -> str:
         return f"acontents of {file_path}"
 
+    # ``delete`` is optional in the protocol (deepagents >= 0.7); a backend that
+    # has it must still cross the activity boundary like every other op.
+    async def adelete(self, file_path: str) -> str:
+        return f"deleted {file_path}"
+
+    def delete(self, file_path: str) -> str:
+        return f"deleted {file_path}"
+
 
 @workflow.defn
 class BackendWorkflow:
@@ -68,7 +76,8 @@ class BackendWorkflow:
         )
         sync_out = await backend.read(path)
         async_out = await backend.aread(path)
-        return f"{sync_out}|{async_out}"
+        deleted = await backend.adelete(path)
+        return f"{sync_out}|{async_out}|{deleted}"
 
 
 # Bind deepagents symbols off the module importorskip returns: a static
@@ -136,10 +145,35 @@ async def test_temporal_backend_op_activity(env: WorkflowEnvironment) -> None:
         )
         out = await handle.result()
 
-    assert out == "contents of notes.txt|acontents of notes.txt"
+    assert out == "contents of notes.txt|acontents of notes.txt|deleted notes.txt"
     counts = await count_scheduled_activities(handle)
-    # One activity per op — the sync read AND the async aread both cross.
-    assert counts[BACKEND_OP] == 2, counts
+    # One activity per op — the sync read, the async aread, and the optional
+    # adelete all cross.
+    assert counts[BACKEND_OP] == 3, counts
+
+
+def test_temporal_backend_mirrors_inner_delete_support() -> None:
+    # deepagents decides delete support from the wrapper CLASS, so a wrapper
+    # around a delete-capable backend must advertise it and one around a
+    # backend without delete must not (or the agent gets a delete tool that
+    # can only fail).
+    protocol = pytest.importorskip("deepagents.backends.protocol")
+
+    class NoDelete:
+        def read(self, file_path: str) -> str:
+            return f"contents of {file_path}"
+
+    with_delete = TemporalBackend(RecordingBackend())
+    without_delete = TemporalBackend(NoDelete())
+    assert protocol._supports_delete(with_delete) is True
+    assert protocol._supports_delete(without_delete) is False
+    assert isinstance(with_delete, TemporalBackend)
+    assert isinstance(without_delete, TemporalBackend)
+    # The real deepagents backends resolve the same way wrapped or not.
+    state_backend = StateBackend()
+    assert protocol._supports_delete(
+        TemporalBackend(state_backend)
+    ) is protocol._supports_delete(state_backend)
 
 
 def test_temporal_backend_unregisters_on_gc() -> None:

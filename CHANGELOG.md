@@ -22,11 +22,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- The `deepagents` extra now requires `deepagents>=0.7.12,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.11.2`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
 ### Deprecated
 
 ### :boom: Breaking Changes
 
 ### Fixed
+
+- `temporalio.contrib.deepagents.TemporalBackend` mirrors the wrapped backend's optional
+  `delete` support at class level, which deepagents 0.7 checks before offering the delete
+  tool; `delete` / `adelete` on a delete-capable backend run as `deepagents.backend_op`
+  Activities like every other op.
 
 ### Security
 

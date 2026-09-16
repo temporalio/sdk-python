@@ -386,6 +386,7 @@ _ASYNC_TO_SYNC_OPS: dict[str, str] = {
     "adownload_files": "download_files",
     "aupload_files": "upload_files",
     "aexecute": "execute",
+    "adelete": "delete",
 }
 
 _original_backend_async_defaults: dict[str, Any] = {}
@@ -462,6 +463,7 @@ _BACKEND_OPS = (
     "download_files",
     "upload_files",
     "execute",
+    "delete",
     # Async twins (what FilesystemMiddleware actually calls).
     "als",
     "als_info",
@@ -475,7 +477,14 @@ _BACKEND_OPS = (
     "adownload_files",
     "aupload_files",
     "aexecute",
+    "adelete",
 )
+
+# ``delete`` is optional in the deepagents protocol, and deepagents decides
+# whether a backend has it from the CLASS (``type(backend).delete`` compared
+# against the protocol default), not the instance. The wrapper therefore has to
+# mirror the inner backend at class level; see :func:`_wrapper_class_for`.
+_OPTIONAL_OPS = frozenset({"delete", "adelete"})
 
 
 class TemporalBackend:
@@ -490,6 +499,18 @@ class TemporalBackend:
     Unknown attribute access is forwarded to the inner backend so backend
     metadata / configuration the agent reads (but that does no I/O) still works.
     """
+
+    def __new__(
+        cls,
+        inner: Any,
+        *,
+        activity_options: Mapping[str, Any] | None = None,
+    ) -> "TemporalBackend":
+        """Pick the wrapper class that mirrors ``inner``'s optional capabilities."""
+        target: type[TemporalBackend] = (
+            _wrapper_class_for(inner) if cls is TemporalBackend else cls
+        )
+        return object.__new__(target)
 
     def __init__(
         self,
@@ -533,14 +554,55 @@ class TemporalBackend:
         return _serde.load_backend_result(output.result)
 
     def __getattr__(self, name: str) -> Any:
-        """Bound-method access for a known I/O op returns an activity dispatcher.
-
-        Everything else forwards to the inner backend unchanged.
-        """
-        if name in _BACKEND_OPS:
-
-            async def _op(*args: Any, **kwargs: Any) -> Any:
-                return await self._dispatch(name, *args, **kwargs)
-
-            return _op
+        """Forward anything that is not an I/O op to the inner backend unchanged."""
         return getattr(self._inner, name)
+
+
+def _make_backend_op(name: str) -> Callable[..., Any]:
+    async def _op(self: TemporalBackend, *args: Any, **kwargs: Any) -> Any:
+        return await self._dispatch(name, *args, **kwargs)
+
+    _op.__name__ = _op.__qualname__ = name
+    return _op
+
+
+# The I/O ops are real class-level methods, not ``__getattr__`` products, so
+# class-based capability checks in deepagents see them.
+for _op_name in _BACKEND_OPS:
+    if _op_name not in _OPTIONAL_OPS:
+        setattr(TemporalBackend, _op_name, _make_backend_op(_op_name))
+
+_wrapper_classes: dict[bool, type[TemporalBackend]] = {}
+
+
+def _wrapper_class_for(inner: Any) -> type[TemporalBackend]:
+    """Return the ``TemporalBackend`` subclass whose optional ops mirror ``inner``.
+
+    A delete-capable inner backend gets a class whose ``delete`` / ``adelete``
+    dispatch activities like every other op. Any other inner backend keeps the
+    protocol defaults for both, so deepagents disables its delete tool exactly
+    as it would for the unwrapped backend. Without deepagents installed there
+    is no protocol to mirror and the base class is used as-is.
+    """
+    try:
+        protocol = importlib.import_module("deepagents.backends.protocol")
+    except ImportError:
+        return TemporalBackend
+    default_delete = protocol.BackendProtocol.delete
+    supports = getattr(type(inner), "delete", default_delete) is not default_delete
+    cls = _wrapper_classes.get(supports)
+    if cls is None:
+        namespace: dict[str, Any] = {
+            "__module__": __name__,
+            "__qualname__": TemporalBackend.__qualname__,
+            "__doc__": TemporalBackend.__doc__,
+        }
+        if supports:
+            namespace["delete"] = _make_backend_op("delete")
+            namespace["adelete"] = _make_backend_op("adelete")
+        else:
+            namespace["delete"] = default_delete
+            namespace["adelete"] = protocol.BackendProtocol.adelete
+        cls = type(TemporalBackend.__name__, (TemporalBackend,), namespace)
+        _wrapper_classes[supports] = cls
+    return cls
