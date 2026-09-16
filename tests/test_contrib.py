@@ -1,28 +1,19 @@
-from types import ModuleType
-
-import pytest
-
-import temporalio.contrib
-
-
-def test_openai_agents_migration_error() -> None:
-    with pytest.raises(
-        ImportError,
-        match=r"uv add temporalio-openai-agents",
-    ):
-        exec("from temporalio.contrib import openai_agents", {})
+import temporalio.contrib.openai_agents as compatibility
+import temporalio.contrib.openai_agents.testing as compatibility_testing
+import temporalio.contrib.openai_agents.workflow as compatibility_workflow
+import temporalio.openai_agents as standalone
+import temporalio.openai_agents.testing as standalone_testing
+import temporalio.openai_agents.workflow as standalone_workflow
 
 
-def test_openai_agents_standalone_module(monkeypatch: pytest.MonkeyPatch) -> None:
-    standalone_module = ModuleType("temporalio.contrib.openai_agents")
-    monkeypatch.setattr(
-        temporalio.contrib,
-        "_import_module",
-        lambda name: standalone_module,
+def test_openai_agents_compatibility_imports() -> None:
+    assert compatibility.OpenAIAgentsPlugin is standalone.OpenAIAgentsPlugin
+    assert compatibility.OpenAIPayloadConverter is standalone.OpenAIPayloadConverter
+    assert compatibility_testing.AgentEnvironment is standalone_testing.AgentEnvironment
+    assert (
+        compatibility_workflow.activity_as_tool is standalone_workflow.activity_as_tool
     )
-    assert getattr(temporalio.contrib, "openai_agents") is standalone_module
-
-
-def test_unknown_attribute_error() -> None:
-    with pytest.raises(AttributeError, match="does_not_exist"):
-        getattr(temporalio.contrib, "does_not_exist")
+    assert (
+        compatibility_workflow.temporal_sandbox_client
+        is standalone_workflow.temporal_sandbox_client
+    )

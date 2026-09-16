@@ -28,9 +28,10 @@ to include examples, links to docs, or any other relevant information.
 
 - The OpenAI Agents integration has moved to the independently versioned
   [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
-  package. Install it with `uv add temporalio-openai-agents`; the
-  `temporalio[openai-agents]` extra and bundled `temporalio.contrib.openai_agents`
-  module have been removed.
+  package. The existing `temporalio[openai-agents]` extra now installs that
+  package, and compatibility modules preserve the old public
+  `temporalio.contrib.openai_agents` imports. New code should depend on
+  `temporalio-openai-agents` directly and import `temporalio.openai_agents`.
 
 ### Fixed
 
