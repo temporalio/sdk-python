@@ -29,7 +29,7 @@ from temporalio.converter._payload_codec import (
 from temporalio.converter._payload_converter import (
     PayloadConverter,
     _TemporalTransferTypePayloadConverter,
-    _TypeHintedValues,
+    _with_serialization_type_hints,
 )
 from temporalio.converter._serialization_context import (
     SerializationContext,
@@ -106,15 +106,14 @@ class DataConverter(WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         """Encode values using declared types for transfer converter selection.
 
-        Hints correspond to values by position. A missing or None hint uses the
-        value's runtime type; hints for omitted arguments are ignored.
+        Hints correspond to values by position. A missing or None hint disables
+        transfer conversion for that value; hints for omitted arguments are ignored.
         Existing :py:meth:`encode` overrides are invoked unchanged; overrides
         should forward the original sequence to preserve hints when delegating
         to payload conversion.
         """
-        return await self.encode(
-            _TypeHintedValues(values, type_hints) if type_hints is not None else values
-        )
+        with _with_serialization_type_hints(values, type_hints):
+            return await self.encode(values)
 
     async def encode(
         self, values: Sequence[Any]

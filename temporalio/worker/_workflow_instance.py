@@ -2243,6 +2243,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
+        if input.input_type is None:
+            input.input_type = temporalio.nexus.system._get_input_type(
+                input.service, input.operation_name
+            )
         return await self._outbound_start_nexus_operation(input)
 
     #### Miscellaneous helpers ####

@@ -176,6 +176,16 @@ def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
 
 
+def _get_input_type(  # pyright: ignore[reportUnusedFunction]
+    service: str, operation: str
+) -> type | None:
+    """Return the declared input type of a registered system Nexus operation."""
+    from .workflow_service import __nexus_operation_registry__
+
+    operation_info = __nexus_operation_registry__.get((service, operation))
+    return operation_info.operation.input_type if operation_info is not None else None
+
+
 def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]
     service: str,
     operation: str,

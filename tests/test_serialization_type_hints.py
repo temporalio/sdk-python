@@ -61,10 +61,11 @@ temporalio.converter.transfer_type_convertible(RuntimeConverter)(RuntimeValue)
     ("hints", "expected"),
     [
         ([DeclaredValue], "declared:value"),
+        ([RuntimeValue], "runtime:value"),
         ([str], "value"),
-        ([None], "runtime:value"),
-        (None, "runtime:value"),
-        ([], "runtime:value"),
+        ([None], "value"),
+        (None, "value"),
+        ([], "value"),
         ([DeclaredValue, int], "declared:value"),
     ],
 )
@@ -89,13 +90,7 @@ class GenericConverter(
     transfer_type = str
 
     def to_transfer_type(self, value: GenericValue[Any]) -> str:
-        return "no hint"
-
-    def to_transfer_type_with_type_hint(
-        self, value: GenericValue[Any], type_hint: type[GenericValue[Any]] | None
-    ) -> str:
-        assert type_hint == GenericValue[int]
-        return "generic hint"
+        return "generic converter"
 
     def from_transfer_type(
         self, value: str, type_hint: type[GenericValue[Any]]
@@ -108,14 +103,14 @@ temporalio.converter.transfer_type_convertible(GenericConverter)(GenericValue)
 
 async def test_transfer_serialization_generic_hint():
     converter = temporalio.converter.DataConverter.default
-    payloads = await converter.encode_with_type_hints(
-        [GenericValue()], [GenericValue[int]]
-    )
-    assert await converter.decode(payloads) == ["generic hint"]
+    payloads = await converter.encode_with_type_hints([object()], [GenericValue[int]])
+    assert await converter.decode(payloads) == ["generic converter"]
 
 
 async def test_transfer_serialization_legacy_overrides_and_nested_conversion():
     calls: list[str] = []
+    typed_values = (RuntimeValue("typed"),)
+    untyped_values = [RuntimeValue("untyped")]
 
     class LegacyPayloadConverter(temporalio.converter.DefaultPayloadConverter):
         def to_payloads(
@@ -131,7 +126,7 @@ async def test_transfer_serialization_legacy_overrides_and_nested_conversion():
                 temporalio.converter.DataConverter.default.payload_converter.from_payload(
                     nested
                 )
-                == "runtime:nested"
+                == "nested"
             )
             return super().to_payloads(values)
 
@@ -140,17 +135,126 @@ async def test_transfer_serialization_legacy_overrides_and_nested_conversion():
             self, values: Sequence[Any]
         ) -> list[temporalio.api.common.v1.Payload]:
             calls.append("data")
+            assert values is typed_values or values is untyped_values
+            nested = await temporalio.converter.DataConverter.default.encode(
+                [RuntimeValue("before")]
+            )
+            assert await temporalio.converter.DataConverter.default.decode(nested) == [
+                "before"
+            ]
             await asyncio.sleep(0)
             return await super().encode(values)
 
     converter = LegacyDataConverter(payload_converter_class=LegacyPayloadConverter)
     typed, untyped = await asyncio.gather(
-        converter.encode_with_type_hints([RuntimeValue("typed")], [DeclaredValue]),
-        converter.encode([RuntimeValue("untyped")]),
+        converter.encode_with_type_hints(typed_values, [DeclaredValue]),
+        converter.encode(untyped_values),
     )
     assert await converter.decode(typed) == ["declared:typed"]
-    assert await converter.decode(untyped) == ["runtime:untyped"]
+    assert await converter.decode(untyped) == ["untyped"]
     assert calls.count("data") == calls.count("payload") == 2
+
+
+def test_transfer_serialization_payload_override_preserves_sequence():
+    expected_values = (RuntimeValue("value"),)
+    inner = temporalio.converter.DataConverter.default.payload_converter
+
+    class LegacyPayloadConverter(temporalio.converter.DefaultPayloadConverter):
+        def to_payloads(
+            self, values: Sequence[Any]
+        ) -> list[temporalio.api.common.v1.Payload]:
+            assert values is expected_values
+            return inner.to_payloads(values)
+
+    payloads = LegacyPayloadConverter().to_payloads_with_type_hints(
+        expected_values, [DeclaredValue]
+    )
+    assert inner.from_payloads(payloads) == ["declared:value"]
+    assert inner.from_payloads(inner.to_payloads(expected_values)) == ["value"]
+
+
+@pytest.mark.parametrize("error", [RuntimeError, asyncio.CancelledError])
+async def test_transfer_serialization_context_reset_on_error(
+    error: type[BaseException],
+):
+    expected_values = [RuntimeValue("value")]
+
+    class FailingDataConverter(temporalio.converter.DataConverter):
+        async def encode(
+            self, values: Sequence[Any]
+        ) -> list[temporalio.api.common.v1.Payload]:
+            assert values is expected_values
+            raise error()
+
+    with pytest.raises(error):
+        await FailingDataConverter().encode_with_type_hints(
+            expected_values, [DeclaredValue]
+        )
+    converter = temporalio.converter.DataConverter.default
+    assert await converter.decode(await converter.encode(expected_values)) == ["value"]
+
+
+async def test_transfer_serialization_restores_outer_hints():
+    expected_values = [RuntimeValue("value")]
+    inner = temporalio.converter.DataConverter.default
+
+    class NestedDataConverter(temporalio.converter.DataConverter):
+        async def encode(
+            self, values: Sequence[Any]
+        ) -> list[temporalio.api.common.v1.Payload]:
+            payloads = await inner.encode_with_type_hints(values, [str])
+            assert await inner.decode(payloads) == ["value"]
+            return await super().encode(values)
+
+    payloads = await NestedDataConverter().encode_with_type_hints(
+        expected_values, [DeclaredValue]
+    )
+    assert await inner.decode(payloads) == ["declared:value"]
+
+
+async def test_transfer_serialization_clears_hints_before_conversion(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    values = [RuntimeValue("value")]
+    converter = temporalio.converter.DataConverter.default
+    original = DeclaredConverter.to_transfer_type
+
+    def convert(self: DeclaredConverter, value: DeclaredValue) -> str:
+        inner = converter.payload_converter
+        assert inner.from_payloads(inner.to_payloads(values)) == ["value"]
+        return original(self, value)
+
+    monkeypatch.setattr(DeclaredConverter, "to_transfer_type", convert)
+    payloads = await converter.encode_with_type_hints(values, [DeclaredValue])
+    assert await converter.decode(payloads) == ["declared:value"]
+
+
+async def test_transfer_serialization_expires_inherited_hints():
+    expected_values = [RuntimeValue("value")]
+    ready = asyncio.Event()
+    converter = temporalio.converter.DataConverter.default
+    tasks: list[asyncio.Task[list[temporalio.api.common.v1.Payload]]] = []
+
+    async def later() -> list[temporalio.api.common.v1.Payload]:
+        await ready.wait()
+        return await converter.encode(expected_values)
+
+    class SpawningDataConverter(temporalio.converter.DataConverter):
+        async def encode(
+            self, values: Sequence[Any]
+        ) -> list[temporalio.api.common.v1.Payload]:
+            tasks.append(asyncio.create_task(later()))
+            return await super().encode(values)
+
+    try:
+        payloads = await SpawningDataConverter().encode_with_type_hints(
+            expected_values, [DeclaredValue]
+        )
+        assert await converter.decode(payloads) == ["declared:value"]
+    finally:
+        ready.set()
+    [payloads] = await asyncio.gather(*tasks)
+    assert await converter.decode(payloads) == ["value"]
 
 
 async def test_transfer_serialization_raw_value():
