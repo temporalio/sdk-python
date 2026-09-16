@@ -255,12 +255,18 @@ class TemporalAsyncClient(AsyncClient):
         # Closure-wrap bound-method tools so google-genai's internal
         # config deep-copy (>= 2.8.0) can't clone the workflow instance.
         self._models = _TemporalAsyncModels(api_client)
-        self._files = TemporalAsyncFiles(api_client, activity_config)
+        self._temporal_files = TemporalAsyncFiles(api_client, activity_config)
+        self._files = self._temporal_files
         self._file_search_stores = TemporalAsyncFileSearchStores(
             api_client, activity_config
         )
         self._temporal_interactions = TemporalAsyncInteractions(activity_config)
         self._temporal_agents = TemporalAsyncAgents(activity_config)
+
+    @property
+    def files(self) -> TemporalAsyncFiles:
+        """Temporal-aware files resource; operations run as activities."""
+        return self._temporal_files
 
     @property
     def interactions(  # type: ignore[override]
