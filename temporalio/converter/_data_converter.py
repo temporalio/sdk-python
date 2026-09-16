@@ -96,7 +96,7 @@ class DataConverter(WithSerializationContext):
         """Return the configured converter with SDK transfer type hooks enabled."""
         return _TemporalTransferTypePayloadConverter.wrap(self.payload_converter)
 
-    def _new_payload_converter(self) -> PayloadConverter:
+    def _new_internal_payload_converter(self) -> PayloadConverter:
         """Create a payload converter instance with SDK transfer type hooks enabled."""
         return _TemporalTransferTypePayloadConverter.wrap(
             self.payload_converter_class()

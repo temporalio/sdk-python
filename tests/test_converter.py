@@ -6,7 +6,6 @@ import ipaddress
 import logging
 import sys
 import traceback
-import typing
 from collections import deque
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
@@ -15,11 +14,8 @@ from enum import Enum, IntEnum
 from typing import (
     Any,
     Dict,  # type:ignore[reportDeprecated]
-    Generic,
     Literal,
     NewType,
-    TypeVar,
-    cast,
     get_args,
     get_type_hints,
 )
@@ -48,14 +44,9 @@ from temporalio.converter import (
     JSONTypeConverter,
     JSONTypeConverterUnhandled,
     PayloadCodec,
-    PayloadConverter,
-    SerializationContext,
-    TransferTypeConverter,
-    WorkflowSerializationContext,
     create_payload_validation_error,
     decode_search_attributes,
     encode_search_attribute_values,
-    transfer_type_convertible,
     value_to_type,
 )
 from temporalio.exceptions import (
@@ -283,235 +274,6 @@ def test_binary_proto():
     assert payload.data == proto.SerializeToString()
     decoded = conv.from_payload(payload)
     assert decoded == proto
-
-
-class TemporalTransferTypeValueConverter(
-    TransferTypeConverter[
-        "TemporalTransferTypeValue",
-        temporalio.api.common.v1.WorkflowExecution,
-    ]
-):
-    transfer_type = temporalio.api.common.v1.WorkflowExecution
-
-    def to_transfer_type(
-        self, value: TemporalTransferTypeValue
-    ) -> temporalio.api.common.v1.WorkflowExecution:
-        return temporalio.api.common.v1.WorkflowExecution(
-            workflow_id=value.value,
-            run_id="run-id",
-        )
-
-    def from_transfer_type(
-        self,
-        value: temporalio.api.common.v1.WorkflowExecution,
-        type_hint: type[TemporalTransferTypeValue],
-    ) -> TemporalTransferTypeValue:
-        return TemporalTransferTypeValue(value=value.workflow_id)
-
-
-@transfer_type_convertible(TemporalTransferTypeValueConverter)
-@dataclass
-class TemporalTransferTypeValue:
-    value: str
-
-
-class TemporalTransferTypeValueWithoutHintConverter(
-    TransferTypeConverter[
-        "TemporalTransferTypeValueWithoutHint",
-        temporalio.api.common.v1.WorkflowExecution,
-    ]
-):
-    def to_transfer_type(
-        self, value: TemporalTransferTypeValueWithoutHint
-    ) -> temporalio.api.common.v1.WorkflowExecution:
-        return temporalio.api.common.v1.WorkflowExecution(
-            workflow_id=value.value,
-            run_id="run-id",
-        )
-
-    def from_transfer_type(
-        self,
-        value: temporalio.api.common.v1.WorkflowExecution,
-        type_hint: type[TemporalTransferTypeValueWithoutHint],
-    ) -> TemporalTransferTypeValueWithoutHint:
-        return TemporalTransferTypeValueWithoutHint(value=value.workflow_id)
-
-
-@transfer_type_convertible(TemporalTransferTypeValueWithoutHintConverter)
-@dataclass
-class TemporalTransferTypeValueWithoutHint:
-    value: str
-
-
-T = TypeVar("T")
-
-
-@dataclass
-class TemporalTransferTypeGenericValue(Generic[T]):
-    value: T
-
-
-class TemporalTransferTypeGenericValueConverter(
-    TransferTypeConverter[
-        TemporalTransferTypeGenericValue[T],
-        temporalio.api.common.v1.WorkflowExecution,
-    ]
-):
-    transfer_type = temporalio.api.common.v1.WorkflowExecution
-
-    def to_transfer_type(
-        self, value: TemporalTransferTypeGenericValue[T]
-    ) -> temporalio.api.common.v1.WorkflowExecution:
-        return temporalio.api.common.v1.WorkflowExecution(
-            workflow_id=str(value.value),
-            run_id="run-id",
-        )
-
-    def from_transfer_type(
-        self,
-        value: temporalio.api.common.v1.WorkflowExecution,
-        type_hint: type[TemporalTransferTypeGenericValue[T]],
-    ) -> TemporalTransferTypeGenericValue[T]:
-        converted_value: str | int = value.workflow_id
-        if typing.get_args(type_hint)[0] is int:
-            converted_value = int(converted_value)
-        return TemporalTransferTypeGenericValue(value=cast(T, converted_value))
-
-
-# Register after both classes are defined so the generic type can be resolved.
-transfer_type_convertible(TemporalTransferTypeGenericValueConverter)(
-    TemporalTransferTypeGenericValue
-)
-
-
-class CustomDefaultPayloadConverter(DefaultPayloadConverter):
-    pass
-
-
-class ContextualTransferPayloadConverter(CustomDefaultPayloadConverter):
-    def __init__(self) -> None:
-        super().__init__()
-        self.context: SerializationContext | None = None
-        self.encoding_contexts: list[SerializationContext | None] = []
-
-    def with_context(
-        self, context: SerializationContext
-    ) -> ContextualTransferPayloadConverter:
-        converter = ContextualTransferPayloadConverter()
-        converter.context = context
-        return converter
-
-    def to_payloads(self, values: Sequence[Any]) -> list[Payload]:
-        self.encoding_contexts.append(self.context)
-        return super().to_payloads(values)
-
-
-async def test_transfer_type_conversion_preserves_user_converter_context():
-    original = DataConverter(payload_converter_class=ContextualTransferPayloadConverter)
-    context = WorkflowSerializationContext(namespace="test", workflow_id="workflow-id")
-    converter = original.with_context(context)
-    user_converter = converter.payload_converter
-    assert isinstance(user_converter, ContextualTransferPayloadConverter)
-    assert user_converter.context is context
-    assert user_converter is not original.payload_converter
-    value = TemporalTransferTypeValue("workflow-id")
-
-    payloads = await converter.encode([value])
-
-    assert user_converter.encoding_contexts == [context]
-    assert await converter.decode(payloads, [TemporalTransferTypeValue]) == [value]
-    assert converter.payload_converter is user_converter
-
-
-async def test_transfer_type_conversion_in_failure_details():
-    converter = DataConverter(payload_converter_class=CustomDefaultPayloadConverter)
-    failure = Failure()
-
-    await converter.encode_failure(
-        ApplicationError("test failure", TemporalTransferTypeValue("workflow-id")),
-        failure,
-    )
-    converted = await converter.decode_failure(failure)
-
-    assert isinstance(converted, ApplicationError)
-    assert converted.details == (
-        temporalio.api.common.v1.WorkflowExecution(
-            workflow_id="workflow-id", run_id="run-id"
-        ),
-    )
-    assert isinstance(converter.payload_converter, CustomDefaultPayloadConverter)
-
-
-async def test_temporal_transfer_type_payload_converter_wraps_user_converter():
-    data_converter = DataConverter(
-        payload_converter_class=CustomDefaultPayloadConverter
-    )
-    assert isinstance(data_converter.payload_converter, CustomDefaultPayloadConverter)
-    assert isinstance(PayloadConverter.default, DefaultPayloadConverter)
-    value = TemporalTransferTypeValue("workflow-id")
-
-    [payload] = await data_converter.encode([value])
-
-    assert payload.metadata["encoding"] == b"json/protobuf"
-    assert (
-        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
-    )
-    assert all("temporal-wire" not in key for key in payload.metadata)
-    assert all(b"temporal-wire" not in value for value in payload.metadata.values())
-    assert await data_converter.decode([payload], [TemporalTransferTypeValue]) == [
-        value
-    ]
-
-    [plain_proto_payload] = await data_converter.encode(
-        [temporalio.api.common.v1.WorkflowExecution(workflow_id="id1", run_id="id2")]
-    )
-    assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
-
-
-async def test_temporal_transfer_type_payload_converter_without_transfer_type_hint():
-    converter = DataConverter.default
-    value = TemporalTransferTypeValueWithoutHint("workflow-id")
-
-    [payload] = await converter.encode([value])
-
-    assert payload.metadata["encoding"] == b"json/protobuf"
-    assert (
-        payload.metadata["messageType"] == b"temporal.api.common.v1.WorkflowExecution"
-    )
-    assert await converter.decode(
-        [payload], [TemporalTransferTypeValueWithoutHint]
-    ) == [value]
-
-
-@pytest.mark.parametrize(
-    ("value", "type_hint"),
-    [
-        (
-            TemporalTransferTypeGenericValue("workflow-id"),
-            TemporalTransferTypeGenericValue[str],
-        ),
-        (
-            TemporalTransferTypeGenericValue(123),
-            TemporalTransferTypeGenericValue[int],
-        ),
-    ],
-)
-async def test_temporal_transfer_type_payload_converter_with_generic_value(
-    value: TemporalTransferTypeGenericValue[T],
-    type_hint: type[TemporalTransferTypeGenericValue[T]],
-):
-    converter = DataConverter.default
-
-    [payload] = await converter.encode([value])
-
-    assert await converter.decode([payload], [type_hint]) == [value]
-
-
-def test_transfer_type_convertible_rejects_existing_converter():
-    with pytest.raises(TypeError, match="already has a transfer type converter"):
-        transfer_type_convertible(TemporalTransferTypeValueConverter)(
-            TemporalTransferTypeValue
-        )
 
 
 def test_encode_search_attribute_values():
