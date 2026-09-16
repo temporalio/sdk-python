@@ -57,8 +57,8 @@ to include examples, links to docs, or any other relevant information.
   and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
   synchronous results, and failures. Asynchronous handler results and detached standalone handles
   are not yet supported. Standalone `USE_EXISTING` handles use their start request's context. A
-  Nexus operation's static summary and details are attached without this context and are read back
-  without it, so they remain readable by a converter that varies by context.
+  Nexus operation's static summary and details are serialized with this context, the same way
+  workflow and activity user metadata are serialized with theirs.
 
 ### Changed
 

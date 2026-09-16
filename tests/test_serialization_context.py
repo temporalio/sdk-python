@@ -2100,13 +2100,13 @@ async def test_workflow_nexus_failure_converter_has_context(
 
 
 class NexusContextRequiringPayloadCodec(PayloadCodec, WithSerializationContext):
-    """Marks payloads it encodes under a Nexus context and refuses to decode, under a Nexus
-    context, a payload that was encoded without one.
+    """Marks payloads it encodes under a Nexus context and requires that mark back on decode.
 
     Stands in for a codec keyed on the context, such as one deriving an encryption key from it:
     such a codec cannot recover a payload whose two halves were converted under different
-    contexts. The leniency in :py:class:`NexusContextMarkerPayloadCodec` deliberately tolerates
-    that mismatch, so it cannot detect this.
+    contexts. Raising in both directions catches a mismatch either way round. The leniency in
+    :py:class:`NexusContextMarkerPayloadCodec` deliberately tolerates such a mismatch, so it
+    cannot detect this.
     """
 
     MARKER_KEY = "nexus-context-required-marker"
@@ -2144,11 +2144,17 @@ class NexusContextRequiringPayloadCodec(PayloadCodec, WithSerializationContext):
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         context = self._nexus_context()
-        if context is None:
-            return list(payloads)
         decoded = []
         for payload in payloads:
-            if self.MARKER_KEY not in payload.metadata:
+            marked = self.MARKER_KEY in payload.metadata
+            if context is None:
+                if marked:
+                    raise RuntimeError(
+                        "payload encoded under a Nexus context was decoded without one"
+                    )
+                decoded.append(payload)
+                continue
+            if not marked:
                 raise RuntimeError(
                     f"payload encoded without a Nexus context was decoded under {context!r}"
                 )
@@ -2160,14 +2166,14 @@ class NexusContextRequiringPayloadCodec(PayloadCodec, WithSerializationContext):
 
 
 @pytest.mark.requires_local_server
-async def test_standalone_nexus_describe_reads_uncontextualized_metadata(
+async def test_standalone_nexus_describe_reads_metadata_with_context(
     env: WorkflowEnvironment,
 ):
     """A description reads back the summary the start request attached.
 
-    The summary is attached without a Nexus context, so the description has to decode it without
-    one. Decoding it under a context the encoder never used does not round-trip for a converter
-    that varies by context.
+    A Nexus operation's user metadata is serialized with the operation's context, the same way
+    workflow and activity user metadata is serialized with theirs. Encoding and decoding it under
+    different contexts does not round-trip for a converter that varies by context.
     """
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
