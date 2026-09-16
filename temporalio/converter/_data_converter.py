@@ -94,9 +94,7 @@ class DataConverter(WithSerializationContext):
 
     def _get_internal_payload_converter(self) -> PayloadConverter:
         """Return the configured converter with SDK transfer type hooks enabled."""
-        return _TemporalTransferTypePayloadConverter.wrap(
-            self.payload_converter  # raw-payload-converter: Wrapping boundary.
-        )
+        return _TemporalTransferTypePayloadConverter.wrap(self.payload_converter)
 
     def _new_payload_converter(self) -> PayloadConverter:
         """Create a payload converter instance with SDK transfer type hooks enabled."""
@@ -185,9 +183,7 @@ class DataConverter(WithSerializationContext):
 
     def with_context(self, context: SerializationContext) -> Self:
         """Return an instance with context set on the component converters."""
-        payload_converter = (
-            self.payload_converter  # raw-payload-converter: Apply context before wrapping.
-        )
+        payload_converter = self.payload_converter
         payload_codec = self.payload_codec
         failure_converter = self.failure_converter
         external_storage = self.external_storage
@@ -202,10 +198,7 @@ class DataConverter(WithSerializationContext):
         if all(
             new is orig
             for new, orig in [
-                (
-                    payload_converter,
-                    self.payload_converter,  # raw-payload-converter: Compare the contextual user converter.
-                ),
+                (payload_converter, self.payload_converter),
                 (payload_codec, self.payload_codec),
                 (failure_converter, self.failure_converter),
                 (external_storage, self.external_storage),

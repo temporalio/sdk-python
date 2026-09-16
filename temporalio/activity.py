@@ -459,7 +459,7 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     This is often used for dynamic activities to convert payloads.
     """
     return _TemporalTransferTypePayloadConverter.unwrap(
-        _Context.current().payload_converter  # raw-payload-converter: Public accessor unwraps the activity context converter.
+        _Context.current().payload_converter
     )
 
 

@@ -23,7 +23,7 @@ class OTelOpenAIAgentsContextPropagationInterceptor(
     def __init__(
         self,
         otel_id_generator: TemporalIdGenerator,
-        payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,  # raw-payload-converter: User-configurable tracing header converter.
+        payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
         add_temporal_spans: bool = True,
     ) -> None:
         """Initialize OTEL-aware context propagation interceptor.

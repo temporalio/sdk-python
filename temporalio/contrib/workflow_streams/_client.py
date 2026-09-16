@@ -362,12 +362,8 @@ class WorkflowStreamClient:
         signal/update goes over the wire. See module docstring.
         """
         if self._client is not None:
-            return (
-                self._client.data_converter.payload_converter  # raw-payload-converter: Stream items match workflow.payload_converter().
-            )
-        return (
-            DataConverter.default.payload_converter  # raw-payload-converter: Stream items match workflow.payload_converter().
-        )
+            return self._client.data_converter.payload_converter
+        return DataConverter.default.payload_converter
 
     def _encode_buffer(self, entries: list[tuple[str, Any]]) -> list[PublishEntry]:
         """Convert buffered (topic, value) pairs to wire entries.

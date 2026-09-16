@@ -229,10 +229,7 @@ def _data_converter(converter: DataConverter | None) -> DataConverter:
         return dataclasses.replace(
             converter, payload_converter_class=OpenAIPayloadConverter
         )
-    elif not isinstance(
-        converter.payload_converter,  # raw-payload-converter: Validate the user's converter type.
-        OpenAIPayloadConverter,
-    ):
+    elif not isinstance(converter.payload_converter, OpenAIPayloadConverter):
         raise ValueError(
             "The payload converter must be of type OpenAIPayloadConverter."
         )
