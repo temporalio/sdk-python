@@ -10,18 +10,17 @@ The complete integration guide now lives in the
 ## Migrating to the standalone package
 
 Remove only the `openai-agents` extra from the existing Temporal dependency,
-preserve every other Temporal extra and the existing Temporal version
-constraint, and add the standalone package:
+preserve every other Temporal extra, and add the standalone package:
 
 ```toml
 # Before
 dependencies = [
-    "temporalio[openai-agents,otel,pydantic]>=1.33.0",
+    "temporalio[openai-agents,otel,pydantic]",
 ]
 
 # After
 dependencies = [
-    "temporalio[otel,pydantic]>=1.33.0",
+    "temporalio[otel,pydantic]",
     "temporalio-openai-agents",
 ]
 ```
@@ -41,7 +40,5 @@ Change application imports to the standalone package:
 from temporalio.openai_agents import OpenAIAgentsPlugin
 ```
 
-The standalone package can coexist with Temporal 1.33 because it installs at
-`temporalio.openai_agents`, which does not overlap the SDK's bundled
-`temporalio.contrib.openai_agents` implementation. The new import path selects
-the standalone implementation on both Temporal 1.33 and 1.34 or later.
+The new import path selects the standalone implementation instead of the
+SDK-bundled `temporalio.contrib.openai_agents` implementation.
