@@ -1654,6 +1654,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
             data_converter=data_converter,
+            # The summary and details were attached without a Nexus context, so a converter that
+            # varies by context only round-trips them if they are decoded without one too.
+            user_metadata_data_converter=self._client.data_converter,
         )
 
     async def get_nexus_operation_result(

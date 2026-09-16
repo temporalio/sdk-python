@@ -8,7 +8,8 @@ EnableCHASMSignalBacklinks enabled and are not covered here.
 
 from __future__ import annotations
 
-from collections.abc import Generator
+import dataclasses
+from collections.abc import Generator, Sequence
 from datetime import timedelta
 from typing import Any
 from unittest import mock
@@ -847,14 +848,20 @@ class _BacklinkStashingService:
         return _AsyncBacklinkOperation()
 
 
-def _make_nexus_worker() -> _NexusWorker:
+def _make_nexus_worker(
+    data_converter: temporalio.converter.DataConverter | None = None,
+) -> _NexusWorker:
     return _NexusWorker(
         bridge_worker=lambda: mock.MagicMock(),
         client=mock.MagicMock(namespace=NAMESPACE),
         namespace=NAMESPACE,
         task_queue="tq",
         service_handlers=[_BacklinkStashingService()],
-        data_converter=temporalio.converter.DataConverter.default,
+        data_converter=(
+            data_converter
+            if data_converter is not None
+            else temporalio.converter.DataConverter.default
+        ),
         interceptors=[],
         metric_meter=mock.MagicMock(),
         executor=None,
@@ -874,6 +881,65 @@ def _start_request(
         operation=operation,
         payload=payload,
     )
+
+
+class _ContextRecordingCodec(
+    temporalio.converter.PayloadCodec, temporalio.converter.WithSerializationContext
+):
+    """Records the serialization context it is handed, so a test can assert which one was used."""
+
+    def __init__(
+        self,
+        seen: list[temporalio.converter.SerializationContext | None],
+        context: temporalio.converter.SerializationContext | None = None,
+    ):
+        self.seen = seen
+        self.context = context
+
+    def with_context(
+        self, context: temporalio.converter.SerializationContext
+    ) -> _ContextRecordingCodec:
+        return _ContextRecordingCodec(self.seen, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+
+async def test_data_converter_for_nexus_task_without_endpoint_has_no_context() -> None:
+    """Servers before 1.30.0 do not report the endpoint the task was addressed to.
+
+    Scoping by an empty endpoint would silently disagree with the caller, which scoped by the real
+    one, so the task is serialized without a context instead.
+    """
+    seen: list[temporalio.converter.SerializationContext | None] = []
+    worker = _make_nexus_worker(
+        data_converter=dataclasses.replace(
+            temporalio.converter.DataConverter.default,
+            payload_codec=_ContextRecordingCodec(seen),
+        )
+    )
+
+    # With an endpoint the task is scoped by it.
+    await worker._data_converter_for_nexus_task("endpoint", "svc", "op").encode(["x"])
+    assert seen == [
+        temporalio.converter.NexusSerializationContext(
+            endpoint="endpoint", service="svc", operation="op"
+        )
+    ]
+
+    # Without one, no context is applied at all.
+    seen.clear()
+    await worker._data_converter_for_nexus_task("", "svc", "op").encode(["x"])
+    assert seen == [None]
 
 
 async def test_sync_response_includes_signal_backlinks() -> None:

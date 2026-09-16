@@ -56,7 +56,9 @@ to include examples, links to docs, or any other relevant information.
 - Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
   and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
   synchronous results, and failures. Asynchronous handler results and detached standalone handles
-  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context. A
+  Nexus operation's static summary and details are attached without this context and are read back
+  without it, so they remain readable by a converter that varies by context.
 
 ### Changed
 

@@ -253,6 +253,12 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     _data_converter: temporalio.converter.DataConverter = field(
         kw_only=True, compare=False, repr=False
     )
+    # User metadata is attached by the caller without a Nexus serialization context, so it has to
+    # be decoded without one too. Everything else on a description belongs to the operation and is
+    # decoded with the operation's context.
+    _user_metadata_data_converter: temporalio.converter.DataConverter = field(
+        kw_only=True, compare=False, repr=False
+    )
     _static_summary: str | None = field(
         kw_only=True, default=None, compare=False, repr=False
     )
@@ -282,7 +288,7 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
     async def _decode_metadata(self) -> None:
         """Internal method to decode metadata lazily."""
         self._static_summary, self._static_details = await _decode_user_metadata(
-            self._data_converter, self.raw_description.user_metadata
+            self._user_metadata_data_converter, self.raw_description.user_metadata
         )
         self._metadata_decoded = True
 
@@ -291,10 +297,22 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
         cls,
         info: temporalio.api.nexus.v1.NexusOperationExecutionInfo,
         data_converter: temporalio.converter.DataConverter,
+        user_metadata_data_converter: temporalio.converter.DataConverter | None = None,
     ) -> Self:
-        """Create from raw proto nexus operation execution info."""
+        """Create from raw proto nexus operation execution info.
+
+        The ``data_converter`` is used for payloads that belong to the operation and is expected to
+        carry the operation's serialization context. User metadata is attached without that context,
+        so ``user_metadata_data_converter`` should be the converter without it; it defaults to
+        ``data_converter`` for callers that have no context to begin with.
+        """
         return cls(
             _data_converter=data_converter,
+            _user_metadata_data_converter=(
+                user_metadata_data_converter
+                if user_metadata_data_converter is not None
+                else data_converter
+            ),
             operation_id=info.operation_id,
             run_id=info.run_id,
             endpoint=info.endpoint,

@@ -2099,6 +2099,111 @@ async def test_workflow_nexus_failure_converter_has_context(
         assert ("from_failure", expected_context) in nexus_failure_context_traces
 
 
+class NexusContextRequiringPayloadCodec(PayloadCodec, WithSerializationContext):
+    """Marks payloads it encodes under a Nexus context and refuses to decode, under a Nexus
+    context, a payload that was encoded without one.
+
+    Stands in for a codec keyed on the context, such as one deriving an encryption key from it:
+    such a codec cannot recover a payload whose two halves were converted under different
+    contexts. The leniency in :py:class:`NexusContextMarkerPayloadCodec` deliberately tolerates
+    that mismatch, so it cannot detect this.
+    """
+
+    MARKER_KEY = "nexus-context-required-marker"
+
+    def __init__(self, context: SerializationContext | None = None):
+        self.context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> NexusContextRequiringPayloadCodec:
+        return NexusContextRequiringPayloadCodec(context)
+
+    def _nexus_context(self) -> NexusSerializationContext | None:
+        return (
+            self.context
+            if isinstance(self.context, NexusSerializationContext)
+            else None
+        )
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        context = self._nexus_context()
+        if context is None:
+            return list(payloads)
+        encoded = []
+        for payload in payloads:
+            marked = temporalio.api.common.v1.Payload()
+            marked.CopyFrom(payload)
+            marked.metadata[self.MARKER_KEY] = b"1"
+            encoded.append(marked)
+        return encoded
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        context = self._nexus_context()
+        if context is None:
+            return list(payloads)
+        decoded = []
+        for payload in payloads:
+            if self.MARKER_KEY not in payload.metadata:
+                raise RuntimeError(
+                    f"payload encoded without a Nexus context was decoded under {context!r}"
+                )
+            stripped = temporalio.api.common.v1.Payload()
+            stripped.CopyFrom(payload)
+            del stripped.metadata[self.MARKER_KEY]
+            decoded.append(stripped)
+        return decoded
+
+
+@pytest.mark.requires_local_server
+async def test_standalone_nexus_describe_reads_uncontextualized_metadata(
+    env: WorkflowEnvironment,
+):
+    """A description reads back the summary the start request attached.
+
+    The summary is attached without a Nexus context, so the description has to decode it without
+    one. Decoding it under a context the encoder never used does not round-trip for a converter
+    that varies by context.
+    """
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = "standalone-nexus-describe-metadata-task-queue"
+    endpoint_name = "standalone-describe-metadata-nexus-endpoint"
+    config = env.client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=NexusContextRequiringPayloadCodec(),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[NexusOperationTestServiceHandler()],
+    ) as worker:
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
+        nexus_client = client.create_nexus_client(
+            service=NexusOperationTestServiceHandler,
+            endpoint=endpoint_name,
+        )
+        operation_handle = await nexus_client.start_operation(
+            NexusOperationTestServiceHandler.operation,
+            "describe-metadata",
+            id=str(uuid.uuid4()),
+            schedule_to_close_timeout=timedelta(seconds=10),
+            summary="the-summary",
+        )
+        assert await operation_handle.result() == "describe-metadata"
+
+        description = await operation_handle.describe()
+        assert await description.static_summary() == "the-summary"
+
+
 @pytest.mark.requires_local_server
 async def test_standalone_nexus_failure_converter_has_context(
     env: WorkflowEnvironment,

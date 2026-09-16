@@ -247,6 +247,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
     def _data_converter_for_nexus_task(
         self, endpoint: str, service: str, operation: str
     ) -> temporalio.converter.DataConverter:
+        if not endpoint:
+            # Servers before 1.30.0 do not report the endpoint the task was addressed to. Scoping
+            # by an empty endpoint would silently disagree with the caller, which scoped by the
+            # real one, so serialize without a context instead.
+            return self._data_converter
         return self._data_converter.with_context(
             temporalio.converter.NexusSerializationContext(
                 endpoint=endpoint,
