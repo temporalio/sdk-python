@@ -258,7 +258,7 @@ class Importer:
                 sys.modules[full_name] = new_mod
                 new_spec.loader.exec_module(new_mod)
 
-        mod = _already_imported(name, full_name, fromlist, level)
+        mod = _loaded_module_for_import(full_name, fromlist, level)
         if mod is None:
             mod = importlib.__import__(name, globals, locals, fromlist, level)
         # Check for restrictions if necessary and apply
@@ -541,26 +541,17 @@ def _get_thread_local_builtin(name: str) -> _ThreadLocalCallable:
     return ret
 
 
-def _already_imported(
-    name: str, full_name: str, fromlist: Sequence[str], level: int
+def _loaded_module_for_import(
+    full_name: str, fromlist: Sequence[str], level: int
 ) -> types.ModuleType | None:
-    # Mirrors importlib.__import__ for loaded modules without taking module locks
+    # The failing GC warning path uses an ordinary absolute import. Leave the
+    # more involved forms, which may load children or run module hooks, to importlib.
+    if fromlist or level:
+        return None
     mod = _fully_imported(full_name)
     if mod is None:
         return None
-    if fromlist:
-        # Only statically stored attributes count; module __getattr__ stays with importlib
-        mod_dict = getattr(mod, "__dict__", None)
-        if not isinstance(mod_dict, dict):
-            return None
-        if "__path__" in mod_dict and any(
-            not isinstance(x, str) or x == "*" or x not in mod_dict for x in fromlist
-        ):
-            return None
-        return mod
-    if level != 0:
-        return None
-    top = name.partition(".")[0]
+    top = full_name.partition(".")[0]
     return mod if top == full_name else _fully_imported(top)
 
 

@@ -29,6 +29,12 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
+
 ### Security
 
 ## [1.33.0] - 2026-09-14
@@ -60,13 +66,6 @@ to include examples, links to docs, or any other relevant information.
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
 - The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
   operation.
-
-### Fixed
-
-- Sandboxed workflow imports of already-loaded modules no longer go through importlib's module
-  locks, fixing intermittent `Failed validating workflow` errors on Python 3.10 caused by a
-  `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection finalizer
-  imported `warnings` during a workflow load ([#585](https://github.com/temporalio/sdk-python/issues/585)).
 
 ### :boom: Breaking Changes
 

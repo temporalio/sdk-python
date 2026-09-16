@@ -1,6 +1,8 @@
 import dataclasses
 import importlib
+import importlib.machinery
 import sys
+import types
 from typing import Any
 
 import pytest
@@ -8,6 +10,7 @@ import pytest
 from temporalio import workflow
 from temporalio.worker.workflow_sandbox._importer import (
     Importer,
+    _loaded_module_for_import,
     _thread_local_sys_modules,
     _ThreadLocalSysModules,
 )
@@ -56,36 +59,46 @@ def test_workflow_sandbox_importer_repeat_import_skips_import_machinery(
         # Loaded modules are served from sys.modules without re-entering importlib
         import typing
 
+        import tests.worker.workflow_sandbox.testmodules as testmodules
         import tests.worker.workflow_sandbox.testmodules.passthrough_module as passthrough_again
         import tests.worker.workflow_sandbox.testmodules.stateful_module as stateful_again
-        from tests.worker.workflow_sandbox import testmodules
-        from tests.worker.workflow_sandbox.testmodules import stateful_module
 
         assert passthrough_again is passthrough
-        assert stateful_again is stateful is stateful_module
+        assert stateful_again is stateful
         assert getattr(testmodules, "stateful_module") is stateful
         assert typing is sys.modules["typing"]
-    assert imported == []
+        assert imported == []
+
+        # Imports with a fromlist keep using importlib's full semantics.
+        from tests.worker.workflow_sandbox.testmodules import stateful_module
+
+        assert stateful_module is stateful
+        assert imported == ["tests.worker.workflow_sandbox.testmodules"]
 
 
-def test_workflow_sandbox_importer_repeat_import_leaves_module_getattr_to_importlib():
-    pkg_name = "tests.worker.workflow_sandbox.testmodules.dynamic_attr_package"
-    with Importer(restrictions, RestrictionContext()).applied():
-        dyn_pkg = importlib.import_module(pkg_name)
-        assert dyn_pkg.dynamic_value == 42
-        before = len(dyn_pkg.getattr_calls)
+def test_loaded_module_fast_path_requires_completed_modules(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    top_name = "test_loaded_module_fast_path"
+    child_name = f"{top_name}.child"
+    top = types.ModuleType(top_name)
+    child = types.ModuleType(child_name)
+    top_spec = importlib.machinery.ModuleSpec(top_name, loader=None)
+    child_spec = importlib.machinery.ModuleSpec(child_name, loader=None)
+    top.__spec__ = top_spec
+    child.__spec__ = child_spec
+    monkeypatch.setitem(sys.modules, top_name, top)
+    monkeypatch.setitem(sys.modules, child_name, child)
 
-        # importlib's fromlist hasattr plus the attribute read, same as without the sandbox
-        pkg = __import__(pkg_name, fromlist=["dynamic_value"])
-        assert pkg.dynamic_value == 42
-        assert dyn_pkg.getattr_calls[before:] == ["dynamic_value", "dynamic_value"]
-
-        # A missing name is probed once by importlib and once by the read, not more
-        before = len(dyn_pkg.getattr_calls)
-        pkg = __import__(pkg_name, fromlist=["missing_value"])
-        with pytest.raises(AttributeError):
-            getattr(pkg, "missing_value")
-        assert dyn_pkg.getattr_calls[before:] == ["missing_value", "missing_value"]
+    assert _loaded_module_for_import(child_name, ("child",), 0) is None
+    assert _loaded_module_for_import(child_name, (), 1) is None
+    setattr(child_spec, "_initializing", True)
+    assert _loaded_module_for_import(child_name, (), 0) is None
+    setattr(child_spec, "_initializing", False)
+    setattr(top_spec, "_initializing", True)
+    assert _loaded_module_for_import(child_name, (), 0) is None
+    setattr(top_spec, "_initializing", False)
+    assert _loaded_module_for_import(child_name, (), 0) is top
 
 
 def test_workflow_sandbox_importer_passthrough_module():
