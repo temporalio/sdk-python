@@ -672,8 +672,9 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
         context = _serialization_type_hints.get()
-        # Legacy overrides can perform unrelated conversions before delegating.
-        # Only the original value sequence should receive the declared hints.
+        # Custom DataConverter.encode implementations can serialize other values
+        # before calling super().encode(values). Those nested calls inherit the
+        # context, so only the original sequence should receive these hints.
         type_hints = (
             context.type_hints
             if context is not None and context.values is values
