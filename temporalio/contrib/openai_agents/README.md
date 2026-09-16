@@ -9,8 +9,8 @@ The complete integration guide now lives in the
 
 ## Migrating to the standalone package
 
-Remove only the `openai-agents` extra from the existing Temporal dependency,
-preserve every other Temporal extra, and add the standalone package:
+Remove the `openai-agents` extra from the existing Temporal dependency and add
+the standalone package:
 
 ```toml
 # Before
@@ -26,9 +26,8 @@ dependencies = [
 ```
 
 Apply the same transformation regardless of how many extras are installed:
-delete only `openai-agents` from the bracketed list, preserve all other extras,
-and remove the brackets if no extras remain. Then install the standalone
-package directly:
+delete `openai-agents` from the bracketed list and remove the brackets if no
+extras remain. Then install the standalone package directly:
 
 ```bash
 uv add temporalio-openai-agents
