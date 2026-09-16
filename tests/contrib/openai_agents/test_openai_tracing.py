@@ -112,6 +112,7 @@ async def test_tracing(client: Client):
 
         def paired_span(a: tuple[Span[Any], bool], b: tuple[Span[Any], bool]) -> None:
             assert a[0].trace_id == b[0].trace_id
+            assert a[0].span_id == b[0].span_id
             assert a[1]
             assert not b[1]
 
@@ -124,65 +125,74 @@ async def test_tracing(client: Client):
             )
         )
 
+        # The workflow can begin executing before start_workflow returns, so
+        # this span's end event is not guaranteed to immediately follow its start.
+        start_workflow_events = [
+            event
+            for event in processor.span_events
+            if event[0].span_data.export().get("name")
+            == "temporal:startWorkflow:ResearchWorkflow"
+        ]
+        assert len(start_workflow_events) == 2
+        span_events = start_workflow_events + [
+            event
+            for event in processor.span_events
+            if event[0].span_id != start_workflow_events[0][0].span_id
+        ]
+
         # Start workflow traces
-        paired_span(processor.span_events[0], processor.span_events[1])
+        paired_span(span_events[0], span_events[1])
         assert (
-            processor.span_events[0][0].span_data.export().get("name")
+            span_events[0][0].span_data.export().get("name")
             == "temporal:startWorkflow:ResearchWorkflow"
         )
 
         # Execute workflow
-        paired_span(processor.span_events[2], processor.span_events[-1])
+        paired_span(span_events[2], span_events[-1])
         assert (
-            processor.span_events[2][0].span_data.export().get("name")
+            span_events[2][0].span_data.export().get("name")
             == "temporal:executeWorkflow"
         )
 
         # Research manager span
-        paired_span(processor.span_events[3], processor.span_events[-2])
-        assert (
-            processor.span_events[3][0].span_data.export().get("name")
-            == "Research manager"
-        )
+        paired_span(span_events[3], span_events[-2])
+        assert span_events[3][0].span_data.export().get("name") == "Research manager"
 
         # Initial planner spans - task wraps agent, agent wraps turn, turn wraps activity
-        paired_span(processor.span_events[4], processor.span_events[13])
-        assert processor.span_events[4][0].span_data.export().get("name") == "task"
+        paired_span(span_events[4], span_events[13])
+        assert span_events[4][0].span_data.export().get("name") == "task"
 
-        paired_span(processor.span_events[5], processor.span_events[12])
+        paired_span(span_events[5], span_events[12])
+        assert span_events[5][0].span_data.export().get("name") == "PlannerAgent"
+
+        paired_span(span_events[6], span_events[11])
+        assert span_events[6][0].span_data.export().get("name") == "turn"
+
+        paired_span(span_events[7], span_events[10])
         assert (
-            processor.span_events[5][0].span_data.export().get("name") == "PlannerAgent"
+            span_events[7][0].span_data.export().get("name") == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[6], processor.span_events[11])
-        assert processor.span_events[6][0].span_data.export().get("name") == "turn"
-
-        paired_span(processor.span_events[7], processor.span_events[10])
+        paired_span(span_events[8], span_events[9])
         assert (
-            processor.span_events[7][0].span_data.export().get("name")
-            == "temporal:startActivity"
-        )
-
-        paired_span(processor.span_events[8], processor.span_events[9])
-        assert (
-            processor.span_events[8][0].span_data.export().get("name")
+            span_events[8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
 
-        for span, start in processor.span_events[14:-12]:
+        for span, start in span_events[14:-12]:
             span_data = span.span_data.export()
 
             # All spans should be closed
             if start:
                 assert any(
                     span.span_id == s.span_id and not s_start
-                    for (s, s_start) in processor.span_events
+                    for (s, s_start) in span_events
                 )
 
             # Start activity is always parented to a turn span, which is parented to an agent
             if span_data.get("name") == "temporal:startActivity":
                 turn_spans = [
-                    s for (s, _) in processor.span_events if s.span_id == span.parent_id
+                    s for (s, _) in span_events if s.span_id == span.parent_id
                 ]
                 assert len(turn_spans) == 2
                 assert (
@@ -193,18 +203,14 @@ async def test_tracing(client: Client):
                     == "turn"
                 )
                 agent_spans = [
-                    s
-                    for (s, _) in processor.span_events
-                    if s.span_id == turn_spans[0].parent_id
+                    s for (s, _) in span_events if s.span_id == turn_spans[0].parent_id
                 ]
                 assert len(agent_spans) == 2
                 assert agent_spans[0].span_data.export()["type"] == "agent"
 
             # Execute is parented to start
             if span_data.get("name") == "temporal:executeActivity":
-                parents = [
-                    s for (s, _) in processor.span_events if s.span_id == span.parent_id
-                ]
+                parents = [s for (s, _) in span_events if s.span_id == span.parent_id]
                 assert (
                     len(parents) == 2
                     and parents[0].span_data.export()["name"]
@@ -212,27 +218,24 @@ async def test_tracing(client: Client):
                 )
 
         # Final writer spans - task wraps agent, agent wraps turn, turn wraps activity
-        paired_span(processor.span_events[-12], processor.span_events[-3])
-        assert processor.span_events[-12][0].span_data.export().get("name") == "task"
+        paired_span(span_events[-12], span_events[-3])
+        assert span_events[-12][0].span_data.export().get("name") == "task"
 
-        paired_span(processor.span_events[-11], processor.span_events[-4])
+        paired_span(span_events[-11], span_events[-4])
+        assert span_events[-11][0].span_data.export().get("name") == "WriterAgent"
+
+        paired_span(span_events[-10], span_events[-5])
+        assert span_events[-10][0].span_data.export().get("name") == "turn"
+
+        paired_span(span_events[-9], span_events[-6])
         assert (
-            processor.span_events[-11][0].span_data.export().get("name")
-            == "WriterAgent"
-        )
-
-        paired_span(processor.span_events[-10], processor.span_events[-5])
-        assert processor.span_events[-10][0].span_data.export().get("name") == "turn"
-
-        paired_span(processor.span_events[-9], processor.span_events[-6])
-        assert (
-            processor.span_events[-9][0].span_data.export().get("name")
+            span_events[-9][0].span_data.export().get("name")
             == "temporal:startActivity"
         )
 
-        paired_span(processor.span_events[-8], processor.span_events[-7])
+        paired_span(span_events[-8], span_events[-7])
         assert (
-            processor.span_events[-8][0].span_data.export().get("name")
+            span_events[-8][0].span_data.export().get("name")
             == "temporal:executeActivity"
         )
 
