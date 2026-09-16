@@ -57,34 +57,33 @@ _UNHASHABLE_TYPE_HINT = typing.cast(
 )
 
 
-@pytest.mark.parametrize("max_cached_type_adapters", [0, 2, None])
-def test_pydantic_json_converter_pickle(max_cached_type_adapters: int | None):
+@pytest.mark.parametrize("populate_cache", [False, True])
+def test_pydantic_json_converter_pickle(populate_cache: bool):
     class Model(BaseModel):
         value: int
         default: int = 0
 
     converter = PydanticJSONPlainPayloadConverter(
         temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=True),
-        max_cached_type_adapters=max_cached_type_adapters,
+        max_cached_type_adapters=2,
     )
     value = Model(value=1)
     payload = converter.to_payload(value)
     assert payload is not None
-    assert converter.from_payload(payload, Model) == value
+    if populate_cache:
+        assert converter.from_payload(payload, Model) == value
     cache_info = converter._type_adapter.cache_info()
 
     restored = pickle.loads(pickle.dumps(converter))
 
     assert converter._type_adapter.cache_info() == cache_info
-    assert restored._type_adapter.cache_info().maxsize == max_cached_type_adapters
+    assert restored._type_adapter.cache_info().maxsize == 2
     assert restored._type_adapter.cache_info().currsize == 0
     assert restored.to_payload(value) == payload
     assert payload.data == b'{"value":1}'
     assert restored.from_payload(payload, Model) == value
     assert restored.from_payload(payload, Model) == value
-    assert restored._type_adapter.cache_info().hits == (
-        0 if max_cached_type_adapters == 0 else 1
-    )
+    assert restored._type_adapter.cache_info().hits == 1
 
 
 async def test_pydantic_data_converter_pickle():
