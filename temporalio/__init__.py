@@ -12,6 +12,8 @@ from pkgutil import extend_path as _extend_path
 
 from .service import __version__ as __sdk_version
 
+# For example, find ``temporalio.openai_agents`` in site-packages when this SDK
+# is imported from an editable checkout in a different directory.
 __path__ = _extend_path(__path__, __name__)
 
 __version__ = __sdk_version

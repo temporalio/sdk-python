@@ -292,5 +292,3 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-# The SDK and integration releases are newer than the global cutoff.
-exclude-newer-package = { temporalio = "2026-09-16T00:00:00Z", temporalio-openai-agents = "2026-09-17T00:00:00Z" }
