@@ -351,7 +351,12 @@ class _ActivityWorker:
             result = await self._execute_activity(
                 start, running_activity, task_token, data_converter
             )
-            [payload] = await data_converter.encode([result])
+            activity_def = self._activities.get(
+                start.activity_type, self._dynamic_activity
+            )
+            [payload] = await data_converter.encode_with_type_hints(
+                [result], [activity_def.ret_type if activity_def else None]
+            )
             completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
             try:

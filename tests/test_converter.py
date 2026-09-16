@@ -396,7 +396,9 @@ def test_temporal_transfer_type_payload_converter_wraps_user_converter():
     assert isinstance(converter, _TemporalTransferTypePayloadConverter)
     value = TemporalTransferTypeValue("workflow-id")
 
-    payload = converter.to_payload(value)
+    payload = converter.to_payloads_with_type_hints(
+        [value], [TemporalTransferTypeValue]
+    )[0]
 
     assert payload.metadata["encoding"] == b"json/protobuf"
     assert (
@@ -412,11 +414,23 @@ def test_temporal_transfer_type_payload_converter_wraps_user_converter():
     assert plain_proto_payload.metadata["encoding"] == b"json/protobuf"
 
 
+def test_temporal_transfer_type_payload_converter_without_declared_type_hint():
+    converter = DataConverter.default.payload_converter
+    value = TemporalTransferTypeValue("workflow-id")
+
+    payload = converter.to_payload(value)
+
+    assert payload.metadata["encoding"] == b"json/plain"
+    assert converter.from_payload(payload) == {"value": "workflow-id"}
+
+
 def test_temporal_transfer_type_payload_converter_without_transfer_type_hint():
     converter = DataConverter.default.payload_converter
     value = TemporalTransferTypeValueWithoutHint("workflow-id")
 
-    payload = converter.to_payload(value)
+    payload = converter.to_payloads_with_type_hints(
+        [value], [TemporalTransferTypeValueWithoutHint]
+    )[0]
 
     assert payload.metadata["encoding"] == b"json/protobuf"
     assert (
@@ -446,7 +460,7 @@ def test_temporal_transfer_type_payload_converter_with_generic_value(
 ):
     converter = DataConverter.default.payload_converter
 
-    payload = converter.to_payload(value)
+    payload = converter.to_payloads_with_type_hints([value], [type_hint])[0]
 
     assert converter.from_payload(payload, type_hint) == value
 

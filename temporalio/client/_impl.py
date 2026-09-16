@@ -284,7 +284,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         req.workflow_type.name = input.workflow
         req.task_queue.name = input.task_queue
         if input.args:
-            req.input.payloads.extend(await data_converter.encode(input.args))
+            req.input.payloads.extend(
+                await data_converter.encode_with_type_hints(input.args, input.arg_types)
+            )
         if input.execution_timeout is not None:
             req.workflow_execution_timeout.FromTimedelta(input.execution_timeout)
         if input.run_timeout is not None:
@@ -422,7 +424,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         req.query.query_type = input.query
         if input.args:
             req.query.query_args.payloads.extend(
-                await data_converter.encode(input.args)
+                await data_converter.encode_with_type_hints(input.args, input.arg_types)
             )
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.query.header.fields)
@@ -484,7 +486,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             request_id=str(uuid.uuid4()),
         )
         if input.args:
-            req.input.payloads.extend(await data_converter.encode(input.args))
+            req.input.payloads.extend(
+                await data_converter.encode_with_type_hints(input.args, input.arg_types)
+            )
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
         temporalio.nexus._operation_context._apply_nexus_context_to_signal_workflow_request(
@@ -626,7 +630,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
         # Set input payloads
         if input.args:
-            req.input.payloads.extend(await data_converter.encode(input.args))
+            req.input.payloads.extend(
+                await data_converter.encode_with_type_hints(input.args, input.arg_types)
+            )
 
         # Set search attributes
         if input.search_attributes is not None:
@@ -939,7 +945,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             )
         if input.args:
             req.request.input.args.payloads.extend(
-                await data_converter.encode(input.args)
+                await data_converter.encode_with_type_hints(input.args, input.arg_types)
             )
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.request.input.header.fields)
@@ -1581,7 +1587,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
 
         # Set input payload
-        encoded = await data_converter.encode([input.arg])
+        encoded = await data_converter.encode_with_type_hints(
+            [input.arg], [input.input_type]
+        )
         if encoded:
             req.input.CopyFrom(encoded[0])
 

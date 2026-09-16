@@ -625,6 +625,11 @@ class Client:
         return await self._impl.start_workflow(
             StartWorkflowInput(
                 workflow=name,
+                arg_types=(
+                    temporalio.workflow._Definition.must_from_run_fn(workflow).arg_types
+                    if callable(workflow)
+                    else None
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
                 id=id,
                 task_queue=task_queue,
@@ -1187,6 +1192,11 @@ class Client:
         update_input = UpdateWithStartUpdateWorkflowInput(
             update_id=id,
             update=update_name,
+            arg_types=(
+                update._defn.arg_types
+                if isinstance(update, temporalio.workflow.UpdateMethodMultiParam)
+                else None
+            ),
             args=temporalio.common._arg_or_args(arg, args),
             headers={},
             ret_type=result_type or result_type_from_type_hint,
@@ -1521,6 +1531,13 @@ class Client:
         return await self._impl.start_activity(
             StartActivityInput(
                 activity_type=name,
+                arg_types=(
+                    temporalio.activity._Definition.must_from_callable(
+                        activity
+                    ).arg_types
+                    if callable(activity)
+                    else None
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
                 id=id,
                 task_queue=task_queue,

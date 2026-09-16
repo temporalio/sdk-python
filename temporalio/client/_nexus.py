@@ -940,16 +940,16 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
     def _resolve_operation(
         self,
         operation: nexusrpc.Operation[Any, Any] | str | Callable[..., Any],
-    ) -> tuple[str, type | None]:
-        """Resolve an operation to its name and output type."""
+    ) -> tuple[str, type | None, type | None]:
+        """Resolve an operation to its name, input type, and output type."""
         if isinstance(operation, str):
-            return operation, None
+            return operation, None, None
         elif isinstance(operation, nexusrpc.Operation):
-            return operation.name, operation.output_type
+            return operation.name, operation.input_type, operation.output_type
         elif callable(operation):
             _, op = temporalio.nexus._util.get_operation_factory(operation)
             if isinstance(op, nexusrpc.Operation):
-                return op.name, op.output_type
+                return op.name, op.input_type, op.output_type
             else:
                 raise ValueError(
                     f"Operation callable is not a Nexus operation: {operation}"
@@ -982,7 +982,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
         .. warning::
            This API is experimental and unstable.
         """
-        op_name, output_type = self._resolve_operation(operation)
+        op_name, input_type, output_type = self._resolve_operation(operation)
         final_result_type: type | None = (
             result_type if isinstance(operation, str) else output_type
         )
@@ -990,6 +990,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
         return await self._client._impl.start_nexus_operation(
             StartNexusOperationInput(
                 operation=op_name,
+                input_type=input_type,
                 arg=arg,
                 id=id,
                 endpoint=self._endpoint,

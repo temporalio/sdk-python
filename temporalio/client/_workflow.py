@@ -580,6 +580,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """
         query_name: str
         ret_type = result_type
+        arg_types: list[type] | None = None
         if callable(query):
             defn = temporalio.workflow._QueryDefinition.from_fn(query)
             if not defn:
@@ -592,6 +593,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
             # TODO(cretz): Check count/type of args at runtime?
             query_name = defn.name
             ret_type = defn.ret_type
+            arg_types = defn.arg_types
         else:
             query_name = str(query)
 
@@ -600,6 +602,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 id=self._id,
                 run_id=self._run_id,
                 query=query_name,
+                arg_types=arg_types,
                 args=temporalio.common._arg_or_args(arg, args),
                 reject_condition=reject_condition
                 or self._client._config["default_workflow_query_reject_condition"],
@@ -691,6 +694,12 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 run_id=self._run_id,
                 signal=temporalio.workflow._SignalDefinition.must_name_from_fn_or_str(
                     signal
+                ),
+                arg_types=(
+                    defn.arg_types
+                    if callable(signal)
+                    and (defn := temporalio.workflow._SignalDefinition.from_fn(signal))
+                    else None
                 ),
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
@@ -970,6 +979,11 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 first_execution_run_id=self._first_execution_run_id,
                 update_id=id,
                 update=update_name,
+                arg_types=(
+                    update._defn.arg_types
+                    if isinstance(update, temporalio.workflow.UpdateMethodMultiParam)
+                    else None
+                ),
                 args=temporalio.common._arg_or_args(arg, args),
                 headers={},
                 ret_type=result_type or result_type_from_type_hint,
@@ -1201,6 +1215,11 @@ class WithStartWorkflowOperation(Generic[SelfType, ReturnType]):
 
         self._start_workflow_input = UpdateWithStartStartWorkflowInput(
             workflow=name,
+            arg_types=(
+                temporalio.workflow._Definition.must_from_run_fn(workflow).arg_types
+                if callable(workflow)
+                else None
+            ),
             args=temporalio.common._arg_or_args(arg, args),
             id=id,
             task_queue=task_queue,

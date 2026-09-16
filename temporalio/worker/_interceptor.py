@@ -231,6 +231,7 @@ class SignalChildWorkflowInput:
     args: Sequence[Any]
     child_workflow_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -243,6 +244,7 @@ class SignalExternalWorkflowInput:
     workflow_id: str
     workflow_run_id: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -314,15 +316,18 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     headers: Mapping[str, str] | None
     summary: str | None
     output_type: type[OutputT] | None = None
+    input_type: type[InputT] | None = None
 
     def __post_init__(self) -> None:
         """Initialize operation-specific attributes after dataclass creation."""
         if isinstance(self.operation, nexusrpc.Operation):
             self.output_type = self.operation.output_type
+            self.input_type = self.operation.input_type
         elif callable(self.operation):
             _, op = temporalio.nexus._util.get_operation_factory(self.operation)
             if isinstance(op, nexusrpc.Operation):
                 self.output_type = op.output_type
+                self.input_type = op.input_type
             else:
                 raise ValueError(
                     f"Operation callable is not a Nexus operation: {self.operation}"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import collections
 import collections.abc
+import contextvars
 import dataclasses
 import functools
 import inspect
@@ -13,7 +14,8 @@ import typing
 import uuid
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from datetime import datetime
 from enum import IntEnum
 from itertools import zip_longest
@@ -57,8 +59,42 @@ TransferTypeT = TypeVar("TransferTypeT")
 _TRANSFER_TYPE_CONVERTER_ATTR = "__temporal_transfer_type_converter"
 
 
+@dataclasses.dataclass
+class _SerializationTypeHints:
+    values: Sequence[Any] | None
+    type_hints: tuple[type | None, ...]
+
+
+_serialization_type_hints: contextvars.ContextVar[_SerializationTypeHints | None] = (
+    contextvars.ContextVar("temporal_serialization_type_hints", default=None)
+)
+
+
+@contextmanager
+def _with_serialization_type_hints(
+    values: Sequence[Any] | None, type_hints: Sequence[type | None] | None
+) -> Iterator[None]:
+    context = (
+        _SerializationTypeHints(values, tuple(type_hints))
+        if values is not None and type_hints is not None
+        else None
+    )
+    token = _serialization_type_hints.set(context)
+    try:
+        yield
+    finally:
+        if context is not None:
+            # A task that inherited this context must not use hints after the
+            # originating serialization call has finished.
+            context.values = None
+        _serialization_type_hints.reset(token)
+
+
 class TransferTypeConverter(Generic[ValueT, TransferTypeT], ABC):
     """Converter between a user-facing value and a transfer type value.
+
+    The declared type determines which converter is used for serialization.
+    Without a declared type, no transfer type converter is used.
 
     .. warning::
         This API is experimental and subject to change.
@@ -122,6 +158,9 @@ def transfer_type_convertible(
 def _get_transfer_type_converter(
     value_type: object,
 ) -> TransferTypeConverter[Any, Any] | None:
+    while typing.get_origin(value_type) is typing.Annotated:
+        value_type = typing.get_args(value_type)[0]
+    value_type = typing.get_origin(value_type) or value_type
     converter = getattr(value_type, _TRANSFER_TYPE_CONVERTER_ATTR, None)
     if isinstance(converter, TransferTypeConverter):
         return converter
@@ -133,6 +172,22 @@ class PayloadConverter(ABC):
 
     default: ClassVar[PayloadConverter]
     """Default payload converter."""
+
+    def to_payloads_with_type_hints(
+        self,
+        values: Sequence[Any],
+        type_hints: Sequence[type | None] | None = None,
+    ) -> list[temporalio.api.common.v1.Payload]:
+        """Convert values using declared types for transfer converter selection.
+
+        Hints correspond to values by position. A missing or None hint disables
+        transfer conversion for that value; hints for omitted arguments are ignored.
+        Existing :py:meth:`to_payloads` overrides are invoked unchanged;
+        overrides should forward the original sequence to preserve hints when
+        delegating to another payload converter.
+        """
+        with _with_serialization_type_hints(values, type_hints):
+            return self.to_payloads(values)
 
     @abstractmethod
     def to_payloads(
@@ -616,13 +671,29 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
         """See base class."""
-        transfer_type_values: list[Any] = []
-        for value in values:
-            converter = _get_transfer_type_converter(type(value))
-            if converter is not None:
-                value = converter.to_transfer_type(value)
-            transfer_type_values.append(value)
-        return self._inner_payload_converter.to_payloads(transfer_type_values)
+        context = _serialization_type_hints.get()
+        # Custom DataConverter.encode implementations can serialize other values
+        # before calling super().encode(values). Those nested calls inherit the
+        # context, so only the original sequence should receive these hints.
+        type_hints = (
+            context.type_hints
+            if context is not None and context.values is values
+            else ()
+        )
+        with _with_serialization_type_hints(None, None):
+            transfer_type_values: list[Any] = []
+            for index, value in enumerate(values):
+                type_hint = type_hints[index] if index < len(type_hints) else None
+                converter = (
+                    None
+                    if type_hint is None
+                    or isinstance(value, temporalio.common.RawValue)
+                    else _get_transfer_type_converter(type_hint)
+                )
+                if converter is not None:
+                    value = converter.to_transfer_type(value)
+                transfer_type_values.append(value)
+            return self._inner_payload_converter.to_payloads(transfer_type_values)
 
     def from_payloads(
         self,

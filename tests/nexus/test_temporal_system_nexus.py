@@ -462,7 +462,9 @@ async def test_nexus_payload_serializer_decodes_system_input() -> None:
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
         data_converter.failure_converter,
-    ).to_payload(request)
+    ).to_payloads_with_type_hints(
+        [request], [workflow_service_models.SignalWithStartWorkflowRequest]
+    )[0]
     assert payload is not None
     assert payload.metadata[SYSTEM_NEXUS_PAYLOAD_METADATA_KEY] == b"true"
     assert payload.metadata["encoding"] == b"binary/protobuf"
@@ -496,7 +498,9 @@ async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
         data_converter.failure_converter,
-    ).to_payload(request)
+    ).to_payloads_with_type_hints(
+        [request], [workflow_service_models.SignalWithStartWorkflowRequest]
+    )[0]
     assert payload is not None
 
     decoded = await _NexusPayloadSerializer(
@@ -713,8 +717,8 @@ def test_system_nexus_uses_user_failure_converter() -> None:
         payload_converter, failure_converter
     )
 
-    payload = system_converter.to_payload(
-        _FailureTransferValue(RuntimeError("test failure"))
+    [payload] = system_converter.to_payloads_with_type_hints(
+        [_FailureTransferValue(RuntimeError("test failure"))], [_FailureTransferValue]
     )
     converted = system_converter.from_payload(payload, _FailureTransferValue)
 
@@ -756,8 +760,9 @@ def test_system_nexus_payload_converter_restores_user_context_on_failure() -> No
     with nexus_system._user_converter_context(outer_converters):
         assert nexus_system._current_user_converters() is outer_converters
         with pytest.raises(ValueError, match="conversion failed"):
-            inner_system_converter.to_payload(
-                _FailureTransferValue(RuntimeError("test failure"))
+            inner_system_converter.to_payloads_with_type_hints(
+                [_FailureTransferValue(RuntimeError("test failure"))],
+                [_FailureTransferValue],
             )
         assert nexus_system._current_user_converters() is outer_converters
 
