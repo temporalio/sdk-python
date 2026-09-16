@@ -9,8 +9,9 @@ The complete integration guide now lives in the
 
 ## Migrating to Temporal 1.34
 
-Existing users can keep their complete Temporal extras list, including
-`openai-agents`. Update the Temporal SDK version to 1.34.0 or later:
+Remove only the `openai-agents` extra from the existing Temporal dependency,
+preserve every other Temporal extra, update the Temporal SDK to 1.34.0 or
+later, and add the standalone package:
 
 ```toml
 # Before
@@ -20,13 +21,21 @@ dependencies = [
 
 # After
 dependencies = [
-    "temporalio[openai-agents,otel,pydantic]>=1.34.0",
+    "temporalio[otel,pydantic]>=1.34.0",
+    "temporalio-openai-agents",
 ]
 ```
 
-Starting with Temporal 1.34.0, the `openai-agents` extra installs the
-standalone distribution. Existing public imports continue to work through
-compatibility modules:
+Apply the same transformation regardless of how many extras are installed:
+delete only `openai-agents` from the bracketed list, preserve all other extras,
+and remove the brackets if no extras remain. Then install the standalone
+package directly:
+
+```bash
+uv add temporalio-openai-agents
+```
+
+Existing public imports continue to work through compatibility modules:
 
 ```python
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
@@ -36,13 +45,6 @@ Applications can migrate independently to the canonical import:
 
 ```python
 from temporalio.openai_agents import OpenAIAgentsPlugin
-```
-
-New applications may depend on the standalone package directly instead of
-using the forwarding extra:
-
-```bash
-uv add temporalio-openai-agents
 ```
 
 The standalone package can coexist with Temporal 1.33 because it installs at
