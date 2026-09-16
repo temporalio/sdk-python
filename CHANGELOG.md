@@ -20,6 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 ### Deprecated
@@ -34,6 +35,9 @@ to include examples, links to docs, or any other relevant information.
   `temporalio-openai-agents` directly and import `temporalio.openai_agents`.
 
 ### Fixed
+
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 
