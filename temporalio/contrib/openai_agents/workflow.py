@@ -1,6 +1,6 @@
 """Compatibility imports for OpenAI Agents workflow helpers."""
 
-from temporalio.openai_agents.workflow import (
+from temporalio.openai_agents.workflow import (  # pyright: ignore[reportMissingImports]
     AgentsWorkflowError,
     ToolSerializationError,
     activity_as_tool,

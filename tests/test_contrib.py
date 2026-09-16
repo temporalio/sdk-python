@@ -1,13 +1,13 @@
 import importlib
 
 import pytest
+import temporalio.openai_agents as standalone  # pyright: ignore[reportMissingImports]
+import temporalio.openai_agents.testing as standalone_testing  # pyright: ignore[reportMissingImports]
+import temporalio.openai_agents.workflow as standalone_workflow  # pyright: ignore[reportMissingImports]
 
 import temporalio.contrib.openai_agents as compatibility
 import temporalio.contrib.openai_agents.testing as compatibility_testing
 import temporalio.contrib.openai_agents.workflow as compatibility_workflow
-import temporalio.openai_agents as standalone
-import temporalio.openai_agents.testing as standalone_testing
-import temporalio.openai_agents.workflow as standalone_workflow
 
 
 def test_openai_agents_compatibility_deprecation() -> None:

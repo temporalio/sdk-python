@@ -1,6 +1,6 @@
 """Compatibility imports for OpenAI Agents testing helpers."""
 
-from temporalio.openai_agents.testing import (
+from temporalio.openai_agents.testing import (  # pyright: ignore[reportMissingImports]
     AgentEnvironment,
     ResponseBuilders,
     TestModel,

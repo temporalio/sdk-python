@@ -9,7 +9,7 @@ New code should import :mod:`temporalio.openai_agents` directly.
 
 import warnings
 
-from temporalio.openai_agents import (
+from temporalio.openai_agents import (  # pyright: ignore[reportMissingImports]
     AgentsWorkflowError,
     AllowAllWorkerEnvVars,
     ModelActivityParameters,
