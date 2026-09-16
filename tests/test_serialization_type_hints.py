@@ -339,10 +339,6 @@ class TypedWorkflow:
         assert type(value) is DeclaredValue
         return cast(DeclaredValue, str(value))
 
-    @temporalio.workflow.query
-    def continued(self) -> bool:
-        return bool(temporalio.workflow.info().continued_run_id)
-
 
 async def test_transfer_serialization_workflow_and_activity(
     client: temporalio.client.Client,
@@ -361,12 +357,29 @@ async def test_transfer_serialization_workflow_and_activity(
             id=str(uuid4()),
             task_queue=task_queue,
         )
-        while not await handle.query(TypedWorkflow.continued):
+        # A query sent during continue-as-new can remain attached to the closing
+        # run on the time-skipping server.
+        while (await handle.describe()).run_id == handle.result_run_id:
             await asyncio.sleep(0.01)
         assert await handle.query(TypedWorkflow.echo_query, value) == "value"
         assert await handle.execute_update(TypedWorkflow.echo_update, value) == "value"
         await handle.signal(TypedWorkflow.finish, value)
         assert await handle.result() == "value"
+
+
+async def test_transfer_serialization_standalone_activity(
+    env: temporalio.testing.WorkflowEnvironment,
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone activities are not supported by the time-skipping server"
+        )
+    client = env.client
+    task_queue = str(uuid4())
+    value = cast(DeclaredValue, str("value"))
+    async with temporalio.worker.Worker(
+        client, task_queue=task_queue, activities=[typed_activity]
+    ):
         activity = await client.start_activity(
             typed_activity,
             value,
@@ -427,6 +440,8 @@ class TypedNexusWorkflow:
 async def test_transfer_serialization_nexus(
     env: temporalio.testing.WorkflowEnvironment,
 ):
+    if env.supports_time_skipping:
+        pytest.skip("Nexus operations are not supported by the time-skipping server")
     task_queue = str(uuid4())
     endpoint = await env.create_nexus_endpoint(f"typed-{task_queue}", task_queue)
     try:
