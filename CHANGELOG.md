@@ -20,7 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added the `temporalio.contrib.gcp.cloud_run.id` module plugin to help set the worker identity on Cloud Run.
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 ### Deprecated

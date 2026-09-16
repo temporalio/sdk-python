@@ -15,7 +15,7 @@ from temporalio.contrib.gcp.cloud_run.id._metadata import (
 from temporalio.service import ConnectConfig, ServiceClient
 
 
-class CloudRunIDPlugin(temporalio.plugin.SimplePlugin):
+class CloudRunIdPlugin(temporalio.plugin.SimplePlugin):
     """Set a Temporal client's identity from Google Cloud Run instance metadata.
 
     Install this plugin once when connecting the client; the identity it sets
@@ -58,7 +58,7 @@ class CloudRunIDPlugin(temporalio.plugin.SimplePlugin):
                 ``os.environ.get`` and exists primarily for testing. Ignored when
                 ``metadata`` is supplied.
         """
-        super().__init__("CloudRunIDPlugin")
+        super().__init__("CloudRunIdPlugin")
         self._metadata = metadata
         self._timeout = timeout
         self._metadata_url = metadata_url
