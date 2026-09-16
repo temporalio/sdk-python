@@ -9,8 +9,7 @@ The complete integration guide now lives in the
 
 ## Migrating to the standalone package
 
-Remove the `openai-agents` extra from the existing Temporal dependency and add
-the standalone package:
+Remove the `openai-agents` extra from the existing Temporal dependency:
 
 ```toml
 # Before
@@ -21,13 +20,10 @@ dependencies = [
 # After
 dependencies = [
     "temporalio[otel,pydantic]",
-    "temporalio-openai-agents",
 ]
 ```
 
-Apply the same transformation regardless of how many extras are installed:
-delete `openai-agents` from the bracketed list and remove the brackets if no
-extras remain. Then install the standalone package directly:
+Remove the brackets if no extras remain. Then install the standalone package directly:
 
 ```bash
 uv add temporalio-openai-agents
