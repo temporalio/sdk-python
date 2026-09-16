@@ -137,7 +137,7 @@ def _workflow_adk_random() -> random.Random:
 
 def _deterministic_id_provider() -> str:
     if workflow.in_workflow():
-        return str(workflow.uuid4(random=_workflow_adk_random()))
+        return str(workflow.uuid4(rng=_workflow_adk_random()))
     return str(uuid.uuid4())
 
 

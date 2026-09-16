@@ -20,7 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- `workflow.uuid4()` now accepts an optional keyword-only `random` argument to derive the
+- `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
   UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
   without reading or advancing any workflow state.
 

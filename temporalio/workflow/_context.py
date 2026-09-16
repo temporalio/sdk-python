@@ -890,14 +890,14 @@ def upsert_search_attributes(
     _Runtime.current().workflow_upsert_search_attributes(attributes)
 
 
-def uuid4(*, random: Random | None = None) -> uuid.UUID:
+def uuid4(*, rng: Random | None = None) -> uuid.UUID:
     """Get a new, determinism-safe v4 UUID based on :py:func:`random`.
 
     Note, this UUID is not cryptographically safe and should not be used for
     security purposes.
 
     Args:
-        random: Generator to draw from instead of the workflow's shared one,
+        rng: Generator to draw from instead of the workflow's shared one,
             e.g. a private stream from :py:func:`new_random`. When provided,
             no workflow state is read or advanced, so this form also works in
             read-only contexts and outside a workflow.
@@ -905,9 +905,9 @@ def uuid4(*, random: Random | None = None) -> uuid.UUID:
     Returns:
         A v4 UUID deterministically derived from the generator.
     """
-    if random is None:
-        random = _Runtime.current().workflow_random()
-    return uuid.UUID(bytes=random.getrandbits(16 * 8).to_bytes(16, "big"), version=4)
+    if rng is None:
+        rng = random()
+    return uuid.UUID(bytes=rng.getrandbits(16 * 8).to_bytes(16, "big"), version=4)
 
 
 def uuid7() -> uuid.UUID:

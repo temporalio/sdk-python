@@ -238,7 +238,7 @@ def _get_workflow_random() -> random.Random | None:
 
 def _uuid_from_random(rng: random.Random) -> uuid.UUID:
     """Generate a deterministic UUID4 from a workflow-bound random generator."""
-    return temporalio.workflow.uuid4(random=rng)
+    return temporalio.workflow.uuid4(rng=rng)
 
 
 # ---------------------------------------------------------------------------
