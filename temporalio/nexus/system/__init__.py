@@ -174,7 +174,7 @@ def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
     user_payload_converter: temporalio.converter.PayloadConverter,
     user_failure_converter: temporalio.converter.FailureConverter,
 ) -> temporalio.converter.PayloadConverter:
-    """Return the fixed payload converter for system Nexus outer envelopes."""
+    """Return the system envelope converter given an internal, wrapped payload converter."""
     return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
 
 
