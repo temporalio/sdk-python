@@ -29,8 +29,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- Current workflow and activity payload converter accessors now return the configured converter
-  without SDK-internal transfer type conversion.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
 
 ### Security
 

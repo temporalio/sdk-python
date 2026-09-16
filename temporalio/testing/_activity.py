@@ -49,7 +49,7 @@ class ActivityEnvironment:
         self.info = ActivityEnvironment.default_info()
         self.on_heartbeat: Callable[..., None] = lambda *args: None
         self.payload_converter = (
-            temporalio.converter.DataConverter.default.payload_converter
+            temporalio.converter.DataConverter.default.payload_converter  # raw-payload-converter: Public ActivityEnvironment configuration.
         )
         self.metric_meter = temporalio.common.MetricMeter.noop
         self._cancelled = False

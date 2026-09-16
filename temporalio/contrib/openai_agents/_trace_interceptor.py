@@ -82,7 +82,7 @@ class OpenAIAgentsContextPropagationInterceptor(
 
     def __init__(
         self,
-        payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,
+        payload_converter: temporalio.converter.PayloadConverter = temporalio.converter.default().payload_converter,  # raw-payload-converter: User-configurable tracing header converter.
         add_temporal_spans: bool = True,
         start_traces: bool = False,
     ) -> None:

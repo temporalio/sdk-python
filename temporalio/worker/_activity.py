@@ -662,7 +662,7 @@ class _ActivityWorker:
                     if not running_activity.cancel_thread_raiser
                     else running_activity.cancel_thread_raiser.shielded
                 ),
-                payload_converter_class_or_instance=data_converter.payload_converter,
+                payload_converter_class_or_instance=data_converter.payload_converter,  # raw-payload-converter: Activity context handles wrapping.
                 runtime_metric_meter=None if sync_non_threaded else self._metric_meter,
                 client=self._client if not running_activity.sync else None,
                 cancellation_details=running_activity.cancellation_details,
@@ -847,7 +847,7 @@ class _ActivityInboundImpl(ActivityInboundInterceptor):
             # The payload converter is the already instantiated one for thread
             # or the picklable class for non-thread
             payload_converter_class_or_instance = (
-                self._worker._data_converter.payload_converter
+                self._worker._data_converter.payload_converter  # raw-payload-converter: Activity context handles wrapping.
                 if isinstance(input.executor, concurrent.futures.ThreadPoolExecutor)
                 else self._worker._data_converter.payload_converter_class
             )

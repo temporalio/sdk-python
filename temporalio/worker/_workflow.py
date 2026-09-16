@@ -452,7 +452,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 try:
                     data_converter.failure_converter.to_failure(
                         err,
-                        data_converter.payload_converter,
+                        data_converter._get_internal_payload_converter(),
                         failure,
                     )
                 except Exception as inner_err:
@@ -468,7 +468,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 try:
                     data_converter.failure_converter.to_failure(
                         err,
-                        data_converter.payload_converter,
+                        data_converter._get_internal_payload_converter(),
                         completion.failed.failure,
                     )
                 except Exception as inner_err:

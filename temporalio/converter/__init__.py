@@ -102,6 +102,8 @@ __all__ = [
 
 DataConverter.default = DataConverter()
 
-PayloadConverter.default = DataConverter.default.payload_converter
+PayloadConverter.default = (
+    DataConverter.default.payload_converter  # raw-payload-converter: Public default instance.
+)
 
 FailureConverter.default = DataConverter.default.failure_converter
