@@ -24,6 +24,7 @@ to include examples, links to docs, or any other relevant information.
   UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
   without reading or advancing any workflow state.
 
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 ### Deprecated
