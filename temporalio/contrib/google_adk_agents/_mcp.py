@@ -333,8 +333,6 @@ def _handle_worker_failure(func: Callable) -> Callable:
     state, so we re-raise as an ``ApplicationError`` of type
     ``"DedicatedWorkerFailure"`` for the caller to handle.
 
-    Kept local rather than shared with the separately distributed OpenAI Agents
-    integration so the two packages do not depend on each other's internals.
     """
 
     @functools.wraps(func)
