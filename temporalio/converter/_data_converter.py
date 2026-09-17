@@ -94,10 +94,14 @@ class DataConverter(WithSerializationContext):
 
     def _get_internal_payload_converter(self) -> PayloadConverter:
         """Return the configured converter with SDK transfer type hooks enabled."""
+        # Reuse the configured instance so its state and any applied serialization
+        # context are preserved. A new wrapper does not create a new user converter.
         return _TemporalTransferTypePayloadConverter.wrap(self.payload_converter)
 
     def _new_internal_payload_converter(self) -> PayloadConverter:
         """Create a payload converter instance with SDK transfer type hooks enabled."""
+        # Unlike _get_internal_payload_converter, instantiate a fresh user converter
+        # so workflow instances do not share mutable custom converter state.
         return _TemporalTransferTypePayloadConverter.wrap(
             self.payload_converter_class()
         )
