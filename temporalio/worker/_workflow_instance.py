@@ -2464,9 +2464,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         elif (
             command_info.command_type
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
-            and command_info.command_seq in self._pending_nexus_operations
         ):
-            nexus_operation = self._pending_nexus_operations[command_info.command_seq]
+            nexus_operation = self._pending_nexus_operations.get(
+                command_info.command_seq
+            )
+            if nexus_operation is None:
+                # The handle is gone, so the endpoint/service/operation that would name the
+                # context are no longer available. This happens when a duplicate
+                # ResolveNexusOperation arrives after the handle was resolved and popped; the
+                # payload is discarded by the job handler. Use no context rather than the
+                # workflow's: this payload was never encoded under a workflow context, and
+                # claiming otherwise would hand a context-keyed codec the wrong key.
+                return None
             if temporalio.nexus.system.is_system_endpoint(
                 nexus_operation._input.endpoint
             ):

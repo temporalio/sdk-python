@@ -39,6 +39,9 @@ to include examples, links to docs, or any other relevant information.
   size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
+- A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
+  workflow and activity user metadata are serialized with theirs. This covers the static summary
+  sent when starting an operation, and the summary and details read back from a description.
 
 ### Security
 
@@ -56,9 +59,7 @@ to include examples, links to docs, or any other relevant information.
 - Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
   and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
   synchronous results, and failures. Asynchronous handler results and detached standalone handles
-  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context. A
-  Nexus operation's static summary and details are serialized with this context, the same way
-  workflow and activity user metadata are serialized with theirs.
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
 
 ### Changed
 

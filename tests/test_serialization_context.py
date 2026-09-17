@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import json
+import logging
 import uuid
 from collections import defaultdict
 from collections.abc import Sequence
@@ -1729,14 +1730,25 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
         self,
         markers: dict[NexusSerializationContext, bytes],
         context: SerializationContext | None = None,
+        allow_contextless_decode_of_marked_payload: bool = False,
     ):
         self.markers = markers
         self.context = context
+        # A handle obtained by operation ID legitimately decodes a payload that was encoded under
+        # a Nexus context without one. Every other caller must decode under the same context it
+        # encoded with, so that direction is an error unless a test opts out here.
+        self.allow_contextless_decode_of_marked_payload = (
+            allow_contextless_decode_of_marked_payload
+        )
 
     def with_context(
         self, context: SerializationContext
     ) -> NexusContextMarkerPayloadCodec:
-        return NexusContextMarkerPayloadCodec(self.markers, context)
+        return NexusContextMarkerPayloadCodec(
+            self.markers,
+            context,
+            self.allow_contextless_decode_of_marked_payload,
+        )
 
     def _marker(self) -> bytes | None:
         if not isinstance(self.context, NexusSerializationContext):
@@ -1767,6 +1779,12 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         marker = self._marker()
         if marker is None:
+            if not self.allow_contextless_decode_of_marked_payload:
+                for payload in payloads:
+                    assert self.MARKER_KEY not in payload.metadata, (
+                        f"payload encoded under a Nexus context was decoded under "
+                        f"{self.context!r}"
+                    )
             return list(payloads)
         decoded = []
         for payload in payloads:
@@ -2414,3 +2432,111 @@ async def test_user_customization_of_default_payload_converter(
                 id=wf_id,
                 task_queue=task_queue,
             )
+
+
+class _ContextRecordingCodec(PayloadCodec, WithSerializationContext):
+    """Records the serialization context it is handed, so a test can assert which one was used."""
+
+    def __init__(
+        self,
+        seen: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ):
+        self.seen = seen
+        self.context = context
+
+    def with_context(self, context: SerializationContext) -> _ContextRecordingCodec:
+        return _ContextRecordingCodec(self.seen, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+
+def _nexus_worker_for_warning_test(seen: list[SerializationContext | None]):
+    """A _NexusWorker with just enough wired up to call _data_converter_for_nexus_task."""
+    from unittest import mock
+
+    from temporalio.worker._nexus import _NexusWorker
+
+    return _NexusWorker(
+        bridge_worker=lambda: mock.MagicMock(),
+        client=mock.MagicMock(namespace="ns"),
+        namespace="ns",
+        task_queue="tq",
+        service_handlers=[NexusOperationTestServiceHandler()],
+        data_converter=dataclasses.replace(
+            DataConverter.default, payload_codec=_ContextRecordingCodec(seen)
+        ),
+        interceptors=[],
+        metric_meter=mock.MagicMock(),
+        executor=None,
+    )
+
+
+async def _encode_through_codec(data_converter: DataConverter) -> None:
+    """Drive the converter's codec so it records the context it was scoped to."""
+    assert data_converter.payload_codec is not None
+    await data_converter.payload_codec.encode([])
+
+
+async def test_nexus_worker_warns_once_when_task_reports_no_endpoint(
+    caplog: pytest.LogCaptureFixture,
+):
+    """A task with no endpoint still gets a context, and the warning is emitted once per worker."""
+    seen: list[SerializationContext | None] = []
+    worker = _nexus_worker_for_warning_test(seen)
+
+    with caplog.at_level(logging.WARNING, logger="temporalio.worker._nexus"):
+        for _ in range(3):
+            await _encode_through_codec(
+                worker._data_converter_for_nexus_task("", "Service", "operation")
+            )
+
+    warnings = [
+        record
+        for record in caplog.records
+        if "did not report the endpoint" in record.getMessage()
+    ]
+    assert len(warnings) == 1, (
+        "expected the missing-endpoint warning exactly once per worker"
+    )
+    # Servers before 1.30.0 do not report the endpoint, so the context is scoped by an empty one
+    # and will not agree with the caller's. It is still a Nexus context, not an absent one.
+    assert (
+        seen
+        == [
+            NexusSerializationContext(
+                endpoint="", service="Service", operation="operation"
+            )
+        ]
+        * 3
+    )
+
+    # A populated endpoint never warns, even on a worker that has not warned yet.
+    caplog.clear()
+    other_seen: list[SerializationContext | None] = []
+    other = _nexus_worker_for_warning_test(other_seen)
+    with caplog.at_level(logging.WARNING, logger="temporalio.worker._nexus"):
+        await _encode_through_codec(
+            other._data_converter_for_nexus_task("endpoint", "Service", "operation")
+        )
+    assert not [
+        record
+        for record in caplog.records
+        if "did not report the endpoint" in record.getMessage()
+    ]
+    assert other._warned_missing_endpoint is False
+    assert other_seen == [
+        NexusSerializationContext(
+            endpoint="endpoint", service="Service", operation="operation"
+        )
+    ]

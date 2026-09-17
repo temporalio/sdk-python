@@ -1642,18 +1642,13 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        # A response that does not report the endpoint would otherwise scope by an empty one and
-        # silently disagree with the start request, so it falls back to no context, matching the
-        # handler path.
-        data_converter = self._client.data_converter
-        if resp.info.endpoint:
-            data_converter = data_converter.with_context(
-                temporalio.converter.NexusSerializationContext(
-                    endpoint=resp.info.endpoint,
-                    service=resp.info.service,
-                    operation=resp.info.operation,
-                )
+        data_converter = self._client.data_converter.with_context(
+            temporalio.converter.NexusSerializationContext(
+                endpoint=resp.info.endpoint,
+                service=resp.info.service,
+                operation=resp.info.operation,
             )
+        )
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
             data_converter=data_converter,
@@ -1664,6 +1659,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     ) -> Any:
         """Poll for nexus operation result until it's available."""
         data_converter = self._client.data_converter
+        # These three are set together or not at all: a handle that started the operation has all
+        # of them, and a handle obtained by operation ID alone has none and defaults them to "".
+        # An empty endpoint therefore means "no operation to build a context from", not "an
+        # operation named the empty string".
         if input.endpoint and input.service and input.operation:
             data_converter = data_converter.with_context(
                 temporalio.converter.NexusSerializationContext(

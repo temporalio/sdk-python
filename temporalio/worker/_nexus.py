@@ -104,6 +104,9 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
         self._data_converter = data_converter
 
+        # Warn once per worker rather than once per task if the server does not report Nexus
+        # endpoints.
+        self._warned_missing_endpoint = False
         self._running_tasks: dict[bytes, _RunningNexusTask] = {}
         self._fail_worker_exception_queue: asyncio.Queue[Exception] = asyncio.Queue()
         self._worker_shutdown_event: temporalio.common._CompositeEvent | None = None
@@ -247,11 +250,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
     def _data_converter_for_nexus_task(
         self, endpoint: str, service: str, operation: str
     ) -> temporalio.converter.DataConverter:
-        if not endpoint:
-            # Servers before 1.30.0 do not report the endpoint the task was addressed to. Scoping
-            # by an empty endpoint would silently disagree with the caller, which scoped by the
-            # real one, so serialize without a context instead.
-            return self._data_converter
+        if not endpoint and not self._warned_missing_endpoint:
+            self._warned_missing_endpoint = True
+            logger.warning(
+                "Nexus task did not report the endpoint it was addressed to, which requires "
+                "server 1.30.0 or later. Payloads this worker serializes for Nexus operations "
+                "will use a serialization context that does not match the caller's, so a data "
+                "converter that varies by context will not round-trip them."
+            )
         return self._data_converter.with_context(
             temporalio.converter.NexusSerializationContext(
                 endpoint=endpoint,
