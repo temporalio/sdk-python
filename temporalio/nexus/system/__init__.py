@@ -59,7 +59,9 @@ def _current_user_converters() -> _SystemNexusUserConverters:
 
 def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:  # pyright: ignore[reportUnusedFunction]
     """Return the active user payload converter for system Nexus model conversion."""
-    return _current_user_converters().payload_converter
+    return _TemporalTransferTypePayloadConverter.unwrap(
+        _current_user_converters().payload_converter
+    )
 
 
 def _current_user_failure_converter() -> temporalio.converter.FailureConverter:  # pyright: ignore[reportUnusedFunction]

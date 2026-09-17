@@ -20,6 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 - The `deepagents` extra now requires `deepagents>=0.7.12,<0.8` (was `<0.7`). Because
@@ -36,6 +37,8 @@ to include examples, links to docs, or any other relevant information.
   `delete` support at class level, which deepagents 0.7 checks before offering the delete
   tool; `delete` / `adelete` on a delete-capable backend run as `deepagents.backend_op`
   Activities like every other op.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 
