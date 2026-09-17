@@ -612,6 +612,13 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
             return payload_converter
         return _TemporalTransferTypePayloadConverter(payload_converter)
 
+    @staticmethod
+    def unwrap(payload_converter: PayloadConverter) -> PayloadConverter:
+        """Remove this wrapper from a payload converter, if present."""
+        if isinstance(payload_converter, _TemporalTransferTypePayloadConverter):
+            return payload_converter._inner_payload_converter
+        return payload_converter
+
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
