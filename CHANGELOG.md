@@ -27,6 +27,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+
 ### Fixed
 
 - Current workflow and activity payload converter accessors now return the configured converter
