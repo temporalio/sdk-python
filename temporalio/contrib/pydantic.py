@@ -51,6 +51,8 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     types from the datetime module, sets, UUID, etc, and custom types composed
     of any of these.
 
+    Pickling preserves the cache size limit but excludes cached type adapters.
+
     See https://docs.pydantic.dev/latest/api/standard_library_types/
     """
 
@@ -74,6 +76,19 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         self._schema_serializer = SchemaSerializer(any_schema())
         self._to_json_options = to_json_options
         self._type_adapter = functools.lru_cache(maxsize=max_cached_type_adapters)(
+            TypeAdapter
+        )
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Pickle without the type adapter cache, whose wrapper is not picklable."""
+        state = self.__dict__.copy()
+        state["_type_adapter"] = self._type_adapter.cache_info().maxsize
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore state with an empty type adapter cache."""
+        self.__dict__.update(state)
+        self._type_adapter = functools.lru_cache(maxsize=state["_type_adapter"])(
             TypeAdapter
         )
 

@@ -20,6 +20,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 ### Deprecated
@@ -29,6 +30,10 @@ to include examples, links to docs, or any other relevant information.
 ### Fixed
 
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 
