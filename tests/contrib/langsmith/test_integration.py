@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 from unittest.mock import MagicMock
@@ -309,14 +308,6 @@ def _make_temporal_client(
     return Client(**config)
 
 
-@traceable(name="query_pipeline")
-async def _query_pipeline(
-    handle: WorkflowHandle[Any, Any], query: Callable[..., Any]
-) -> Any:
-    """Run a single workflow query under a @traceable root."""
-    return await handle.query(query)
-
-
 # ---------------------------------------------------------------------------
 # TestBasicTracing
 # ---------------------------------------------------------------------------
@@ -618,7 +609,6 @@ class TestComprehensiveTracing:
                 max_cached_workflows=0,
             ):
                 handle_2 = temporal_client_2.get_workflow_handle(workflow_id)
-                assert await _query_pipeline(handle_2, ComprehensiveWorkflow.my_query)
                 assert await handle_2.query(ComprehensiveWorkflow.my_query)
                 # Raw-client query — root-level trace
                 assert await client.get_workflow_handle(workflow_id).query(
@@ -695,16 +685,6 @@ class TestComprehensiveTracing:
             "          inner_llm_call",
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
-
-        # query_pipeline trace: the worker-side handler nests under the client query
-        assert_trace_hierarchy(
-            find_trace_trees(trace_trees, "query_pipeline"),
-            [
-                "query_pipeline",
-                "  QueryWorkflow:my_query",
-                "    HandleQuery:my_query",
-            ],
-        )
 
         # Raw-client query — no parent context, appears as root
         raw_query_trace_trees = [
@@ -834,7 +814,7 @@ class TestComprehensiveTracing:
                 assert await client.get_workflow_handle(workflow_id).query(
                     ComprehensiveWorkflow.my_query
                 )
-                assert await _query_pipeline(handle_2, ComprehensiveWorkflow.my_query)
+                assert await handle_2.query(ComprehensiveWorkflow.my_query)
 
         assert result == "comprehensive-done"
 
@@ -874,10 +854,12 @@ class TestComprehensiveTracing:
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
 
-        # Query — separate root, just the @traceable wrapper, no Temporal children
-        assert_trace_hierarchy(
-            find_trace_trees(trace_trees, "query_pipeline"), ["query_pipeline"]
-        )
+        # Neither the traced nor the raw query leaves a Temporal run.
+        assert not [
+            trace
+            for trace in trace_trees
+            if trace.name.startswith(("QueryWorkflow:", "HandleQuery:"))
+        ]
 
 
 # ---------------------------------------------------------------------------

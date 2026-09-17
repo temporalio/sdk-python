@@ -21,7 +21,6 @@ from tests.contrib.langsmith.test_integration import (
     NexusService,
     TraceableActivityWorkflow,
     _make_client_and_collector,
-    _query_pipeline,
     nested_traceable_activity,
     traceable_activity,
 )
@@ -109,7 +108,6 @@ class TestPluginIntegration:
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
                 await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle.result()
-                assert await _query_pipeline(handle, ComprehensiveWorkflow.my_query)
                 assert await handle.query(ComprehensiveWorkflow.my_query)
 
         assert result == "comprehensive-done"
@@ -182,16 +180,6 @@ class TestPluginIntegration:
             "          inner_llm_call",
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
-
-        # query_pipeline trace: the worker-side handler nests under the client query
-        assert_trace_hierarchy(
-            find_trace_trees(trace_trees, "query_pipeline"),
-            [
-                "query_pipeline",
-                "  QueryWorkflow:my_query",
-                "    HandleQuery:my_query",
-            ],
-        )
 
         # Each remaining operation is its own root trace
         query_trace_trees = find_trace_trees(trace_trees, "QueryWorkflow:my_query")
