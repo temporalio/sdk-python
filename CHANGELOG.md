@@ -31,6 +31,8 @@ to include examples, links to docs, or any other relevant information.
 
 - OpenAI Agents tracing preserves caller spans across workers and restores context
   after activity, local-activity, and child-workflow completion callbacks.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 
