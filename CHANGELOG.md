@@ -20,6 +20,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `temporalio.contrib.deepagents` runs Deep Agents' `langchain-quickjs` code interpreter
+  in-workflow: the QuickJS REPL executes on the workflow event loop (upstream's dedicated
+  thread cannot wake the deterministic loop, which parked the workflow forever), a sub-agent
+  dispatched from JavaScript via `task()` gets its own `deepagents.invoke_model` Activities,
+  and the interpreter's modules pass through the sandbox. `langchain-quickjs` remains
+  optional; nothing is imported unless the workflow imports it.
+
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 

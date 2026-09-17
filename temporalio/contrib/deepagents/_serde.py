@@ -383,6 +383,12 @@ _DEFAULT_PASSTHROUGH: tuple[str, ...] = (
     "langchain_anthropic",
     "langgraph",
     "deepagents",
+    # The langchain-quickjs code interpreter and its VM; a name-only allowlist,
+    # so nothing here is imported unless the workflow imports it.
+    "langchain_quickjs",
+    "quickjs_rs",
+    "wasmtime",
+    "bsdiff4",
     "langsmith",
     "numpy",
     "pydantic",
