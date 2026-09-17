@@ -603,9 +603,11 @@ class _NexusPayloadSerializer:
         try:
             payload_converter = dc._get_internal_payload_converter()
             if temporalio.nexus.system._is_system_payload(payload):
-                payload_converter = temporalio.nexus.system._get_payload_converter(
-                    payload_converter,
-                    dc.failure_converter,
+                payload_converter = (
+                    temporalio.nexus.system._get_system_nexus_payload_converter(
+                        payload_converter,
+                        dc.failure_converter,
+                    )
                 )
             [input] = payload_converter.from_payloads(
                 [payload],
