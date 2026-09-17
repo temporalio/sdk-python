@@ -480,11 +480,13 @@ _BACKEND_OPS = (
     "adelete",
 )
 
-# ``delete`` is optional in the deepagents protocol, and deepagents decides
-# whether a backend has it from the CLASS (``type(backend).delete`` compared
-# against the protocol default), not the instance. The wrapper therefore has to
-# mirror the inner backend at class level; see :func:`_wrapper_class_for`.
-_OPTIONAL_OPS = frozenset({"delete", "adelete"})
+# Capability-gated ops. deepagents decides whether a backend has ``delete`` from
+# the CLASS (``type(backend).delete`` against the protocol default) and whether
+# it can ``execute`` from a nominal ``isinstance`` check against
+# ``SandboxBackendProtocol`` (an ABC subclass, not a structural Protocol).
+# Neither can be answered per instance, so the wrapper mirrors the inner
+# backend at class level; see :func:`_wrapper_class_for`.
+_OPTIONAL_OPS = frozenset({"delete", "adelete", "execute", "aexecute"})
 
 
 class TemporalBackend:
@@ -506,9 +508,16 @@ class TemporalBackend:
         *,
         activity_options: Mapping[str, Any] | None = None,
     ) -> "TemporalBackend":
-        """Pick the wrapper class that mirrors ``inner``'s optional capabilities."""
+        """Pick the wrapper class that mirrors ``inner``'s optional capabilities.
+
+        Applies to subclasses too: a user's ``class MyBackend(TemporalBackend)``
+        gets a mirrored subclass of ``MyBackend``, so ``isinstance`` and any
+        methods it defines are preserved.
+        """
         target: type[TemporalBackend] = (
-            _wrapper_class_for(inner) if cls is TemporalBackend else cls
+            cls
+            if getattr(cls, "_temporal_mirror_of", None) is not None
+            else _wrapper_class_for(inner, cls)
         )
         return object.__new__(target)
 
@@ -572,37 +581,62 @@ for _op_name in _BACKEND_OPS:
     if _op_name not in _OPTIONAL_OPS:
         setattr(TemporalBackend, _op_name, _make_backend_op(_op_name))
 
-_wrapper_classes: dict[bool, type[TemporalBackend]] = {}
+_wrapper_classes: dict[tuple[type, bool, bool], type[TemporalBackend]] = {}
 
 
-def _wrapper_class_for(inner: Any) -> type[TemporalBackend]:
-    """Return the ``TemporalBackend`` subclass whose optional ops mirror ``inner``.
+def _wrapper_class_for(
+    inner: Any, base: type[TemporalBackend]
+) -> type[TemporalBackend]:
+    """Return the subclass of ``base`` whose optional capabilities mirror ``inner``.
 
-    A delete-capable inner backend gets a class whose ``delete`` / ``adelete``
-    dispatch activities like every other op. Any other inner backend keeps the
-    protocol defaults for both, so deepagents disables its delete tool exactly
-    as it would for the unwrapped backend. Without deepagents installed there
-    is no protocol to mirror and the base class is used as-is.
+    ``delete`` / ``adelete``: a delete-capable inner backend gets dispatchers
+    like every other op; any other inner backend keeps the protocol defaults,
+    so deepagents disables its delete tool exactly as it would for the
+    unwrapped backend. Execution: deepagents offers its shell tool only to a
+    nominal ``SandboxBackendProtocol`` instance, so when deepagents reports the
+    inner backend as execution-capable the mirror also derives from that class
+    (with ``execute`` / ``aexecute`` dispatchers and ``id`` forwarded); a wrapper
+    around a plain filesystem or store backend stays a non-sandbox class. An op
+    that ``base`` already defines (a user subclass) is left alone. Without
+    deepagents installed there is nothing to mirror and ``base`` is used as-is.
     """
     try:
         protocol = importlib.import_module("deepagents.backends.protocol")
+        filesystem = importlib.import_module("deepagents.middleware.filesystem")
     except ImportError:
-        return TemporalBackend
+        return base
     default_delete = protocol.BackendProtocol.delete
-    supports = getattr(type(inner), "delete", default_delete) is not default_delete
-    cls = _wrapper_classes.get(supports)
+    has_delete = getattr(type(inner), "delete", default_delete) is not default_delete
+    has_execute = bool(filesystem.supports_execution(inner))
+    key = (base, has_delete, has_execute)
+    cls = _wrapper_classes.get(key)
     if cls is None:
         namespace: dict[str, Any] = {
-            "__module__": __name__,
-            "__qualname__": TemporalBackend.__qualname__,
-            "__doc__": TemporalBackend.__doc__,
+            "__module__": base.__module__,
+            "__qualname__": base.__qualname__,
+            "__doc__": base.__doc__,
+            "_temporal_mirror_of": base,
         }
-        if supports:
-            namespace["delete"] = _make_backend_op("delete")
-            namespace["adelete"] = _make_backend_op("adelete")
-        else:
-            namespace["delete"] = default_delete
-            namespace["adelete"] = protocol.BackendProtocol.adelete
-        cls = type(TemporalBackend.__name__, (TemporalBackend,), namespace)
-        _wrapper_classes[supports] = cls
+        for op in ("delete", "adelete"):
+            if hasattr(base, op):
+                continue
+            namespace[op] = (
+                _make_backend_op(op)
+                if has_delete
+                else getattr(protocol.BackendProtocol, op)
+            )
+        bases: tuple[type, ...] = (base,)
+        if has_execute:
+            sandbox_cls = protocol.SandboxBackendProtocol
+            if not issubclass(base, sandbox_cls):
+                bases = (base, sandbox_cls)
+            for op in ("execute", "aexecute"):
+                if not hasattr(base, op):
+                    namespace[op] = _make_backend_op(op)
+            if not hasattr(base, "id"):
+                # The sandbox class defines ``id``; keep reading the inner
+                # backend's, which ``__getattr__`` would otherwise have served.
+                namespace["id"] = property(lambda self: self._inner.id)
+        cls = type(base.__name__, bases, namespace)
+        _wrapper_classes[key] = cls
     return cls

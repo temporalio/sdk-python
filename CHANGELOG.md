@@ -34,9 +34,11 @@ to include examples, links to docs, or any other relevant information.
 ### Fixed
 
 - `temporalio.contrib.deepagents.TemporalBackend` mirrors the wrapped backend's optional
-  `delete` support at class level, which deepagents 0.7 checks before offering the delete
-  tool; `delete` / `adelete` on a delete-capable backend run as `deepagents.backend_op`
-  Activities like every other op.
+  capabilities at class level, where deepagents 0.7 checks them: `delete` / `adelete` are
+  offered (and run as `deepagents.backend_op` Activities) only for a delete-capable backend,
+  and `execute` / `aexecute` only for an execution-capable one, so a wrapped filesystem or
+  store backend no longer advertises a shell tool that could only fail. User subclasses of
+  `TemporalBackend` get the same mirroring.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
 
