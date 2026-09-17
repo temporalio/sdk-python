@@ -422,11 +422,8 @@ def test_providers_fall_back_outside_workflow() -> None:
         adk_random._random_provider_context_var.get()
         is _plugin._deterministic_random_provider
     )
-    # One shared instance, so RNG state carries across calls as ADK expects.
-    rng = adk_random.get_random()
-    assert isinstance(rng, random.Random)
-    assert rng is _plugin._random_outside_workflow
-    assert adk_random.get_random() is rng
+    # A fresh unseeded generator, not a workflow stream.
+    assert isinstance(adk_random.get_random(), random.Random)
 
 
 def test_setup_deterministic_runtime_is_idempotent() -> None:

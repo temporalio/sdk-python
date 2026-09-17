@@ -111,22 +111,19 @@ def _deterministic_time_provider() -> float:
 
 _ADK_RANDOM_ATTR = "__temporal_adk_random"
 
-# Read-only contexts (query handlers, update validators) get entropy rather
-# than the workflow's private stream: their results are never replayed, so
-# nondeterminism there is harmless, while a draw from the cached stream would
-# advance it and diverge later activations from replay. Same fallback approach
-# as the opentelemetry and langsmith integrations.
-_random_read_only = random.Random()
-
 
 def _workflow_adk_random() -> random.Random:
     # ADK draws from a private stream (a workflow.new_random() cached on the
     # workflow instance, as the opentelemetry and langsmith integrations do)
     # rather than sharing workflow.random(), so how many values ADK consumes
     # never shifts the sequence user code sees. The read-only check must come
-    # first, so a query handler can never touch the cached stream.
+    # first, so a query handler can never touch the cached stream: read-only
+    # contexts (query handlers, update validators) get a fresh unseeded
+    # generator instead, since their results are never replayed while a draw
+    # from the cached stream would advance it and diverge later activations
+    # from replay.
     if workflow.unsafe.is_read_only():
-        return _random_read_only
+        return random.Random()
     inst = workflow.instance()
     rng: random.Random | None = getattr(inst, _ADK_RANDOM_ATTR, None)
     if rng is None:
@@ -141,17 +138,15 @@ def _deterministic_id_provider() -> str:
     return str(uuid.uuid4())
 
 
-# ADK's own default is one process-wide random.Random, and its
-# set_random_provider docstring asks providers to return an existing instance
-# so RNG state carries across get_random() calls; keep one for outside
-# workflows too.
-_random_outside_workflow = random.Random()
-
-
 def _deterministic_random_provider() -> random.Random:
+    # Outside a workflow, a fresh unseeded generator per call. ADK's
+    # set_random_provider docstring asks providers to return an existing
+    # instance so a seeded generator keeps its sequence across get_random()
+    # calls; an unseeded one draws fresh OS entropy either way, and ADK's only
+    # caller uses the result immediately (retry jitter).
     if workflow.in_workflow():
         return _workflow_adk_random()
-    return _random_outside_workflow
+    return random.Random()
 
 
 _install_provider_lock = threading.Lock()
@@ -216,8 +211,8 @@ def setup_deterministic_runtime() -> None:
     and randoms come from a nondeterministic fallback stream that leaves the
     private stream untouched, since read-only results are never replayed.
     Outside a workflow in the same process (activities, client code) they fall
-    back to ``time.time()``, ``uuid.uuid4()``, and a process-wide
-    ``random.Random``.
+    back to ``time.time()``, ``uuid.uuid4()``, and an unseeded
+    ``random.Random()``.
 
     Overrides through ADK's ``set_*_provider`` functions must be made after
     this runs (after the worker starts, or from workflow code); one made
