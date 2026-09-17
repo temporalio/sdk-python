@@ -2006,6 +2006,59 @@ async def test_workflow_nexus_payload_codec_receives_context(
 
 
 @pytest.mark.requires_local_server
+async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
+    env: WorkflowEnvironment,
+):
+    """A handle obtained by operation ID alone decodes its result without a Nexus context.
+
+    Such a handle never issued a start request, so it has no endpoint, service or operation to
+    build a context from. The result was still encoded by the handler under the operation's
+    context, so this is the one asymmetry the strict codec has to tolerate.
+    """
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = "standalone-nexus-detached-handle-task-queue"
+    endpoint_name = f"standalone-detached-nexus-endpoint-{uuid.uuid4()}"
+    context = NexusSerializationContext(
+        endpoint=endpoint_name,
+        service="NexusOperationTestServiceHandler",
+        operation="operation",
+    )
+    config = env.client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=NexusContextMarkerPayloadCodec(
+            {context: b"detached"},
+            allow_contextless_decode_of_marked_payload=True,
+        ),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[NexusOperationTestServiceHandler()],
+    ) as worker:
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
+        operation_id = str(uuid.uuid4())
+        started = await client.create_nexus_client(
+            service=NexusOperationTestServiceHandler,
+            endpoint=endpoint_name,
+        ).start_operation(
+            NexusOperationTestServiceHandler.operation,
+            "detached",
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        assert await started.result() == "detached"
+
+        # The fresh handle knows only the operation ID, so it decodes without a context.
+        detached = client.get_nexus_operation_handle(operation_id, result_type=str)
+        assert await detached.result() == "detached"
+
+
+@pytest.mark.requires_local_server
 async def test_standalone_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
