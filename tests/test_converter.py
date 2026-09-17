@@ -52,6 +52,7 @@ from temporalio.converter import (
     create_payload_validation_error,
     decode_search_attributes,
     encode_search_attribute_values,
+    encode_typed_search_attribute_value,
     transfer_type_convertible,
     value_to_type,
 )
@@ -465,6 +466,18 @@ def test_encode_search_attribute_values():
         encode_search_attribute_values([datetime.utcnow()])  # type: ignore[reportDeprecated]
     with pytest.raises(TypeError, match="must have the same type"):
         encode_search_attribute_values(["foo", 123])  # type: ignore[arg-type]
+
+
+def test_encode_typed_search_attribute_value_datetime_requires_timezone():
+    key = temporalio.common.SearchAttributeKey.for_datetime("checkout_time")
+    with pytest.raises(ValueError, match="Timezone must be present"):
+        encode_typed_search_attribute_value(
+            key, datetime(2024, 7, 5, 15, 43, 7, 875302)
+        )
+    payload = encode_typed_search_attribute_value(
+        key, datetime(2024, 7, 5, 15, 43, 7, 875302, tzinfo=timezone.utc)
+    )
+    assert payload.metadata["type"] == b"Datetime"
 
 
 def test_decode_search_attributes():
