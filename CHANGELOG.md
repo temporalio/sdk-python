@@ -48,6 +48,8 @@ to include examples, links to docs, or any other relevant information.
   providers rather than the standard-library ones; and read-only contexts (query handlers,
   update validators) receive wall-clock time and nondeterministic entropy that leave the
   private stream untouched.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 
