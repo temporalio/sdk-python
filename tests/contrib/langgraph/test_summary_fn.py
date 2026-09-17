@@ -19,7 +19,6 @@ from temporalio.client import Client
 from temporalio.contrib.langgraph import LangGraphPlugin, graph
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
-from tests.helpers import wait_for_workflow_idle
 
 SummaryFn = Callable[[tuple[Any, ...], dict[str, Any]], "str | None"]
 
@@ -234,17 +233,10 @@ async def test_summary_fn_not_in_node_metadata(client: Client) -> None:
 class WorkflowNodeSummaryWorkflow:
     def __init__(self) -> None:
         self.app = graph("wf-node-graph").compile()
-        self._done = False
 
     @workflow.run
     async def run(self, input: str) -> Any:
-        result = await self.app.ainvoke({"value": input})
-        await workflow.wait_condition(lambda: self._done)
-        return result
-
-    @workflow.signal
-    def finish(self) -> None:
-        self._done = True
+        return await self.app.ainvoke({"value": input})
 
 
 async def test_workflow_node_sets_current_details(
@@ -275,14 +267,15 @@ async def test_workflow_node_sets_current_details(
             id=f"wf-node-{uuid.uuid4()}",
             task_queue=task_queue,
         )
-        await wait_for_workflow_idle(handle)
+        assert await handle.result() == {"value": "ready"}
+        # Details are set last-writer-wins by the workflow-side node and nothing
+        # clears them at graph end, so the completed workflow answers the same
+        # as a mid-run probe would, with no workflow task in flight.
         md: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
             "__temporal_workflow_metadata",
             result_type=temporalio.api.sdk.v1.WorkflowMetadata,
         )
         assert md.current_details == "wf:ready"
-        await handle.signal(WorkflowNodeSummaryWorkflow.finish)
-        assert await handle.result() == {"value": "ready"}
 
 
 async def test_workflow_node_clears_current_details_on_empty(
@@ -316,14 +309,12 @@ async def test_workflow_node_clears_current_details_on_empty(
             id=f"wf-node-clear-{uuid.uuid4()}",
             task_queue=task_queue,
         )
-        await wait_for_workflow_idle(handle)
+        await handle.result()
         md: temporalio.api.sdk.v1.WorkflowMetadata = await handle.query(
             "__temporal_workflow_metadata",
             result_type=temporalio.api.sdk.v1.WorkflowMetadata,
         )
         assert md.current_details == ""
-        await handle.signal(WorkflowNodeSummaryWorkflow.finish)
-        await handle.result()
 
 
 async def test_replay_with_summary_fn(client: Client) -> None:
