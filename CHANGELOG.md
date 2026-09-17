@@ -84,6 +84,7 @@ to include examples, links to docs, or any other relevant information.
   workflow's deterministic random stream. A workflow started under an earlier release that calls
   `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
   across the upgrade; drain such workflows or use worker versioning.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
 
 ### Fixed
 
