@@ -2470,11 +2470,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
             if nexus_operation is None:
                 # The handle is gone, so the endpoint/service/operation that would name the
-                # context are no longer available. This happens when a duplicate
-                # ResolveNexusOperation arrives after the handle was resolved and popped; the
-                # payload is discarded by the job handler. Use no context rather than the
-                # workflow's: this payload was never encoded under a workflow context, and
-                # claiming otherwise would hand a context-keyed codec the wrong key.
+                # context are no longer available. Use no context rather than this workflow's:
+                # the payload came from the operation's handler, so the caller's workflow id
+                # is not a key anything encoded it under.
                 return None
             if temporalio.nexus.system.is_system_endpoint(
                 nexus_operation._input.endpoint
