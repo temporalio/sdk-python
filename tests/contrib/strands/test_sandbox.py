@@ -137,7 +137,7 @@ class SandboxWorkflow:
         )
 
 
-async def test_sandbox_operations_are_durable_and_cached(
+async def test_sandbox_operations_are_durable_and_factory_runs_for_each_activity(
     client: Client, monkeypatch: pytest.MonkeyPatch
 ):
     task_queue = f"test_sandbox-{uuid4()}"
@@ -145,11 +145,15 @@ async def test_sandbox_operations_are_durable_and_cached(
     monkeypatch.setenv("STRANDS_TEST_SECRET", secret)
     constructed: list[RecordingSandbox] = []
     contexts: list[SandboxWorkflowContext] = []
+    sandboxes: dict[SandboxWorkflowChain, RecordingSandbox] = {}
 
     def factory(context: SandboxWorkflowContext) -> RecordingSandbox:
-        sandbox = RecordingSandbox()
         contexts.append(context)
-        constructed.append(sandbox)
+        sandbox = sandboxes.get(context.chain)
+        if sandbox is None:
+            sandbox = RecordingSandbox()
+            sandboxes[context.chain] = sandbox
+            constructed.append(sandbox)
         return sandbox
 
     plugin = StrandsPlugin(
@@ -176,16 +180,20 @@ async def test_sandbox_operations_are_durable_and_cached(
     assert result.binary_values_match
     assert result.files == [FileInfo("binary", False, 2)]
     assert len(constructed) == 1
-    assert contexts == [
-        SandboxWorkflowContext(
-            chain=SandboxWorkflowChain(
-                namespace=client.namespace,
-                workflow_id=handle.id,
-                first_execution_run_id=handle.first_execution_run_id or "",
-            ),
-            run_id=handle.result_run_id or "",
-        )
-    ]
+    assert (
+        contexts
+        == [
+            SandboxWorkflowContext(
+                chain=SandboxWorkflowChain(
+                    namespace=client.namespace,
+                    workflow_id=handle.id,
+                    first_execution_run_id=handle.first_execution_run_id or "",
+                ),
+                run_id=handle.result_run_id or "",
+            )
+        ]
+        * 7
+    )
     assert constructed[0].calls == [
         (
             "execute",
@@ -242,13 +250,11 @@ class IsolatedSandboxWorkflow:
 
 async def test_sandbox_isolated_per_workflow_with_async_factory(client: Client):
     task_queue = f"test_sandbox_isolation-{uuid4()}"
-    sandboxes: dict[SandboxWorkflowContext, RecordingSandbox] = {}
+    sandboxes: dict[SandboxWorkflowChain, RecordingSandbox] = {}
 
     async def factory(context: SandboxWorkflowContext) -> RecordingSandbox:
         await asyncio.sleep(0)
-        sandbox = RecordingSandbox()
-        sandboxes[context] = sandbox
-        return sandbox
+        return sandboxes.setdefault(context.chain, RecordingSandbox())
 
     plugin = StrandsPlugin(models={}, sandboxes={"recording": factory})
     async with Worker(
@@ -273,7 +279,7 @@ async def test_sandbox_isolated_per_workflow_with_async_factory(client: Client):
         ]
 
     assert len(sandboxes) == 2
-    assert {context.workflow_id for context in sandboxes} == {
+    assert {chain.workflow_id for chain in sandboxes} == {
         handle.id for handle in handles
     }
     assert {sandbox.files["/value"] for sandbox in sandboxes.values()} == {
@@ -298,10 +304,11 @@ class ContinueAsNewSandboxWorkflow:
 async def test_sandbox_reused_across_continue_as_new(client: Client):
     task_queue = f"test_sandbox_continue_as_new-{uuid4()}"
     contexts: list[SandboxWorkflowContext] = []
+    sandboxes: dict[SandboxWorkflowChain, RecordingSandbox] = {}
 
     def factory(context: SandboxWorkflowContext) -> RecordingSandbox:
         contexts.append(context)
-        return RecordingSandbox()
+        return sandboxes.setdefault(context.chain, RecordingSandbox())
 
     plugin = StrandsPlugin(models={}, sandboxes={"recording": factory})
     async with Worker(
@@ -318,9 +325,12 @@ async def test_sandbox_reused_across_continue_as_new(client: Client):
         )
         assert await handle.result() == b"same sandbox"
 
-    assert len(contexts) == 1
-    assert contexts[0].first_execution_run_id == handle.first_execution_run_id
+    assert len(contexts) == 2
+    assert {context.first_execution_run_id for context in contexts} == {
+        handle.first_execution_run_id
+    }
     assert contexts[0].run_id == handle.first_execution_run_id
+    assert contexts[1].run_id != contexts[0].run_id
 
 
 @workflow.defn
@@ -339,10 +349,11 @@ class RetriedSandboxWorkflow:
 async def test_sandbox_reused_across_workflow_retry(client: Client):
     task_queue = f"test_sandbox_workflow_retry-{uuid4()}"
     contexts: list[SandboxWorkflowContext] = []
+    sandboxes: dict[SandboxWorkflowChain, RecordingSandbox] = {}
 
     def factory(context: SandboxWorkflowContext) -> RecordingSandbox:
         contexts.append(context)
-        return RecordingSandbox()
+        return sandboxes.setdefault(context.chain, RecordingSandbox())
 
     plugin = StrandsPlugin(models={}, sandboxes={"recording": factory})
     async with Worker(
@@ -363,9 +374,12 @@ async def test_sandbox_reused_across_workflow_retry(client: Client):
         )
         assert await handle.result() == b"same sandbox"
 
-    assert len(contexts) == 1
-    assert contexts[0].first_execution_run_id == handle.first_execution_run_id
+    assert len(contexts) == 2
+    assert {context.first_execution_run_id for context in contexts} == {
+        handle.first_execution_run_id
+    }
     assert contexts[0].run_id == handle.first_execution_run_id
+    assert contexts[1].run_id != contexts[0].run_id
 
 
 @workflow.defn
@@ -380,7 +394,7 @@ class IdleSandboxWorkflow:
         await sandbox.read_file("/binary")
 
 
-async def test_sandbox_cache_evicts_when_idle(client: Client):
+async def test_sandbox_context_manager_is_scoped_to_activity(client: Client):
     task_queue = f"test_sandbox_idle-{uuid4()}"
     contexts: list[SandboxWorkflowContext] = []
     closed: list[SandboxWorkflowContext] = []
@@ -396,7 +410,6 @@ async def test_sandbox_cache_evicts_when_idle(client: Client):
     plugin = StrandsPlugin(
         models={},
         sandboxes={"recording": factory},
-        sandbox_cache_idle_timeout=timedelta(milliseconds=50),
     )
     async with Worker(
         client,
@@ -436,10 +449,10 @@ class ConcurrentSandboxWorkflow:
         )
 
 
-async def test_sandbox_factory_is_single_flight_and_not_evicted_in_use(
+async def test_sandbox_factory_called_for_concurrent_activities(
     client: Client,
 ):
-    task_queue = f"test_sandbox_single_flight-{uuid4()}"
+    task_queue = f"test_sandbox_concurrent_factory-{uuid4()}"
     contexts: list[SandboxWorkflowContext] = []
 
     async def factory(context: SandboxWorkflowContext) -> SlowSandbox:
@@ -450,7 +463,6 @@ async def test_sandbox_factory_is_single_flight_and_not_evicted_in_use(
     plugin = StrandsPlugin(
         models={},
         sandboxes={"recording": factory},
-        sandbox_cache_idle_timeout=timedelta(milliseconds=25),
     )
     async with Worker(
         client,
@@ -461,56 +473,12 @@ async def test_sandbox_factory_is_single_flight_and_not_evicted_in_use(
     ):
         result = await client.execute_workflow(
             ConcurrentSandboxWorkflow.run,
-            id=f"test_sandbox_single_flight-{uuid4()}",
+            id=f"test_sandbox_concurrent_factory-{uuid4()}",
             task_queue=task_queue,
         )
 
     assert result == [b"\x00\xff", b"\x00\xff"]
-    assert len(contexts) == 1
-
-
-async def test_cancelled_waiter_preserves_completed_sandbox(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    factory_calls = 0
-
-    def factory(_: SandboxWorkflowContext) -> RecordingSandbox:
-        nonlocal factory_calls
-        factory_calls += 1
-        return RecordingSandbox()
-
-    sandbox_activities = temporalio.contrib.strands._sandbox_activity.SandboxActivities(
-        {"recording": factory}
-    )
-    read_file = sandbox_activities.activities()[2]
-    input = temporalio.contrib.strands._sandbox_activity._PathInput(
-        "/binary",
-        sandbox_name="recording",
-        first_execution_run_id="first-run",
-    )
-    activity_environment = temporalio.testing.ActivityEnvironment()
-    original_sandbox = (
-        temporalio.contrib.strands._sandbox_activity._SandboxRecord.sandbox
-    )
-
-    async def cancel_after_creation(
-        record: temporalio.contrib.strands._sandbox_activity._SandboxRecord,
-    ) -> Sandbox:
-        await original_sandbox(record)
-        raise asyncio.CancelledError
-
-    with monkeypatch.context() as patch:
-        patch.setattr(
-            temporalio.contrib.strands._sandbox_activity._SandboxRecord,
-            "sandbox",
-            cancel_after_creation,
-        )
-        with pytest.raises(asyncio.CancelledError):
-            await activity_environment.run(read_file, input)
-
-    assert await activity_environment.run(read_file, input) == b"\x00\xff"
-    assert factory_calls == 1
-    await sandbox_activities.aclose()
+    assert len(contexts) == 2
 
 
 @pytest.mark.parametrize(
@@ -578,44 +546,6 @@ async def test_unknown_sandbox_name_is_retryable() -> None:
         == temporalio.contrib.strands._sandbox_activity.SANDBOX_NOT_FOUND_ERROR_TYPE
     )
     assert not err.value.non_retryable
-
-
-async def test_shared_sandbox_cache_closes_after_last_run_context(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    close_calls = 0
-
-    async def aclose(
-        _: temporalio.contrib.strands._sandbox_activity.SandboxActivities,
-    ) -> None:
-        nonlocal close_calls
-        close_calls += 1
-
-    monkeypatch.setattr(
-        temporalio.contrib.strands._sandbox_activity.SandboxActivities,
-        "aclose",
-        aclose,
-    )
-    plugin = StrandsPlugin(
-        models={}, sandboxes={"recording": lambda _: RecordingSandbox()}
-    )
-    assert plugin.run_context is not None
-
-    async with plugin.run_context():
-        async with plugin.run_context():
-            pass
-        assert close_calls == 0
-
-    assert close_calls == 1
-
-
-def test_sandbox_cache_idle_timeout_must_be_positive() -> None:
-    with pytest.raises(ValueError, match="must be positive"):
-        StrandsPlugin(
-            models={},
-            sandboxes={"recording": lambda _: RecordingSandbox()},
-            sandbox_cache_idle_timeout=timedelta(0),
-        )
 
 
 @pytest.mark.parametrize(
@@ -968,6 +898,6 @@ async def test_sandbox_retries_and_reconstructs_errors(client: Client):
         "cat: /missing: No such file or directory",
         "Execution timed out after 90 seconds",
     )
-    assert factory_attempts == 2
+    assert factory_attempts == 5
     assert retried.attempts == 2
     assert failing.attempts == 2

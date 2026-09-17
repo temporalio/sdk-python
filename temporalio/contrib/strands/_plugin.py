@@ -57,9 +57,9 @@ class StrandsPlugin(SimplePlugin):
     When ``sandboxes`` is supplied, registers one stable set of activities that
     dispatches each operation by sandbox name. Each factory receives the
     requesting Workflow run's context and may return a sandbox directly or
-    awaitably. Worker-local adapters are cached by sandbox name and Workflow
-    chain until ``sandbox_cache_idle_timeout`` elapses. Use the same name in
-    workflow-side ``TemporalSandbox(name)`` instances.
+    awaitably. The factory is called for every Activity so it can find or recover
+    the backing environment. Use the same name in workflow-side
+    ``TemporalSandbox(name)`` instances.
 
     ``resolvable_worker_env_vars`` controls which worker environment variables
     sandbox command ``env`` references may resolve immediately before execution.
@@ -72,7 +72,6 @@ class StrandsPlugin(SimplePlugin):
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
         sandboxes: dict[str, SandboxFactory] | None = None,
         mcp_connection_idle_timeout: timedelta | None = None,
-        sandbox_cache_idle_timeout: timedelta | None = None,
         resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Build the plugin from optional model, MCP, and sandbox factories.
@@ -80,8 +79,8 @@ class StrandsPlugin(SimplePlugin):
         If ``models`` is omitted, registers a single ``BedrockModel`` factory
         under the name ``"bedrock"`` with Botocore retries disabled.
 
-        A sandbox factory may return an async context manager when its worker-local
-        adapter needs cleanup after cache eviction or Worker shutdown.
+        A sandbox factory may return an async context manager when its adapter
+        needs cleanup after the Activity finishes.
         """
         default_name: str | None = None
         if models is None:
@@ -95,7 +94,6 @@ class StrandsPlugin(SimplePlugin):
         sandbox_activities = (
             SandboxActivities(
                 sandboxes,
-                sandbox_cache_idle_timeout,
                 resolvable_worker_env_vars,
             )
             if sandboxes
@@ -117,21 +115,11 @@ class StrandsPlugin(SimplePlugin):
                 )
             )
 
-        sandbox_run_contexts = 0
-
         @asynccontextmanager
         async def run_context() -> AsyncGenerator[None, None]:
-            nonlocal sandbox_run_contexts
-            if sandbox_activities is not None:
-                sandbox_run_contexts += 1
             try:
                 yield
             finally:
-                if sandbox_activities is not None:
-                    sandbox_run_contexts -= 1
-                    # One plugin instance can be shared by multiple Workers.
-                    if sandbox_run_contexts == 0:
-                        await sandbox_activities.aclose()
                 for server in mcp_clients:
                     await _evict_connection(server)
 

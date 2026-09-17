@@ -220,19 +220,12 @@ many factories are configured. Each operation carries the selected sandbox
 name in its activity input so the worker can dispatch it to the matching
 factory.
 
-The factory is called lazily with a `SandboxWorkflowContext` containing the
-current `run_id` and a `chain` identity with the Workflow's namespace, Workflow
-ID, and first execution Run ID. The worker-local cache uses the sandbox name and
-chain identity, so each Workflow chain gets a separate sandbox for each
-registered name. Retries, Continue-As-New, Reset, and Cron runs belong to the
-same chain and therefore use the same sandbox; unrelated Workflow chains do not
-share one. Multiple `TemporalSandbox` objects with the same name in one chain
-intentionally share that chain's sandbox.
-
-The factory receives the current Run ID only when a worker-local cache entry is
-created. A later run in the same chain reuses a warm entry without calling the
-factory again. After eviction, the next factory call receives the Run ID of the
-run that recreates the entry.
+The factory is called for every sandbox Activity with a `SandboxWorkflowContext`
+containing the current `run_id` and a `chain` identity with the Workflow's
+namespace, Workflow ID, and first execution Run ID. Use the chain identity to
+find or recreate the same backing environment across Activity retries, Worker
+restarts, Continue-As-New, Reset, and Cron runs. Unrelated Workflow chains
+should not share an environment unless the application explicitly intends that.
 
 The first execution Run ID is supplied by workflow code because Activity
 metadata only identifies the current run. Treat sandbox activities as trusted
@@ -244,17 +237,21 @@ environment, for example by expiring old environments before ID reuse.
 
 Factories may be synchronous or asynchronous. Synchronous factories must only
 construct a lightweight adapter and must not block the activity event loop;
-use an asynchronous factory for remote lookup or provisioning. A factory may
-run more than once for the same context after cache eviction or on different
-workers, so provisioning must be idempotent. Strands' `DockerSandbox` only
-connects to an already-running container; it does not create one.
+use an asynchronous factory for remote lookup or provisioning. Calls may run
+concurrently or on different workers, so lookup and provisioning must be
+idempotent. Strands' `DockerSandbox` only connects to an already-running
+container; it does not create one.
 
-Worker-local adapters are reused until they have been idle for five minutes.
-Set `sandbox_cache_idle_timeout` on `StrandsPlugin` to change that duration.
+The plugin does not cache adapters. If constructing an adapter is expensive,
+cache it in the factory along with any backend-specific liveness and recovery
+logic. The cache remains an optimization: every worker process must still be
+able to reconnect to the same Workflow-scoped backing environment. Protect
+in-process cache misses when concurrent Activities could otherwise provision
+the same environment twice.
+
 Return an async context manager from the factory when an adapter owns clients,
-sockets, subprocess handles, tunnels, or leases. Its exit method runs after
-cache eviction and Worker shutdown. Returning a plain `Sandbox` only drops the
-adapter from the cache:
+sockets, subprocess handles, tunnels, or leases that should be scoped to one
+Activity. Its exit method runs after that Activity finishes:
 
 ```python
 from contextlib import asynccontextmanager
@@ -272,12 +269,12 @@ In either case, provisioning, teardown, and cleanup of orphaned backing
 environments remain the application's responsibility; use a backend TTL or
 reaper for workflows that are terminated before normal cleanup.
 
-That cache is per worker *process*, while successive sandbox activities from one
-workflow are routed independently across the task queue. With more than one
-worker on the queue, a `write-file` can land on one worker and the following
-`read-file` on another. The context factory must therefore reconnect every
-worker to the same Workflow-scoped backing environment rather than relying on
-per-process state. A single worker on the queue also satisfies this.
+Successive sandbox Activities from one Workflow are routed independently across
+the task queue. With more than one worker on the queue, a `write-file` can land
+on one worker and the following `read-file` on another. The context factory must
+therefore reconnect every worker to the same Workflow-scoped backing environment
+rather than relying on per-process state. A single worker on the queue also
+satisfies this.
 
 Reset does not roll back commands or filesystem mutations already performed in
 the external sandbox, just as it does not roll back other Activity side effects.

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import inspect
-import logging
 from collections.abc import (
     AsyncGenerator,
     Awaitable,
@@ -33,8 +31,6 @@ from ._worker_env_ref import AllowAllWorkerEnvVars, _WorkerEnvRefResolver
 SANDBOX_TIMEOUT_ERROR_TYPE = "StrandsSandboxTimeoutError"
 SANDBOX_PATH_NOT_FOUND_ERROR_TYPE = "StrandsSandboxPathNotFoundError"
 SANDBOX_NOT_FOUND_ERROR_TYPE = "StrandsSandboxNotFoundError"
-_SANDBOX_CACHE_IDLE_TIMEOUT = timedelta(minutes=5)
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -84,7 +80,6 @@ _SandboxFactoryResult = Sandbox | AbstractAsyncContextManager[Sandbox]
 SandboxFactory = Callable[
     [SandboxWorkflowContext], _SandboxFactoryResult | Awaitable[_SandboxFactoryResult]
 ]
-_SandboxKey = tuple[str, SandboxWorkflowChain]
 
 
 @dataclass
@@ -132,93 +127,16 @@ class _StreamItem:
     value: dict[str, Any]
 
 
-class _SandboxRecord:
-    def __init__(
-        self,
-        owner: SandboxActivities,
-        key: _SandboxKey,
-        context: SandboxWorkflowContext,
-        factory: SandboxFactory,
-        idle_timeout: timedelta,
-    ) -> None:
-        self._owner = owner
-        self._key = key
-        self._context = context
-        self._idle_timeout = idle_timeout
-        self._inflight = 0
-        self._idle_handle: asyncio.TimerHandle | None = None
-        self._sandbox_context_manager: AbstractAsyncContextManager[Sandbox] | None = (
-            None
-        )
-        self._sandbox_task = asyncio.create_task(self._create(factory))
-
-    async def _create(self, factory: SandboxFactory) -> Sandbox:
-        result = factory(self._context)
-        if inspect.isawaitable(result):
-            result = await result
-        if isinstance(result, Sandbox):
-            return result
-        self._sandbox_context_manager = result
-        return await result.__aenter__()
-
-    def acquire(self) -> None:
-        self._inflight += 1
-        if self._idle_handle is not None:
-            self._idle_handle.cancel()
-            self._idle_handle = None
-
-    def release(self) -> None:
-        self._inflight -= 1
-        if self._inflight == 0 and self._owner._has_record(self._key, self):
-            self._idle_handle = asyncio.get_running_loop().call_later(
-                self._idle_timeout.total_seconds(), self._on_idle
-            )
-
-    def _on_idle(self) -> None:
-        self._idle_handle = None
-        if self._inflight == 0:
-            self._owner._evict(self._key, self)
-
-    async def sandbox(self) -> Sandbox:
-        return await asyncio.shield(self._sandbox_task)
-
-    def creation_failed(self) -> bool:
-        return self._sandbox_task.done() and (
-            self._sandbox_task.cancelled() or self._sandbox_task.exception() is not None
-        )
-
-    async def aclose(self) -> None:
-        if self._idle_handle is not None:
-            self._idle_handle.cancel()
-            self._idle_handle = None
-        if not self._sandbox_task.done():
-            self._sandbox_task.cancel()
-        try:
-            await self._sandbox_task
-        except BaseException:
-            return
-        if self._sandbox_context_manager is not None:
-            await self._sandbox_context_manager.__aexit__(None, None, None)
-
-
 class SandboxActivities:
-    """Lazily resolves Workflow-scoped sandboxes and exposes their activities."""
+    """Resolves Workflow-scoped sandboxes and exposes their activities."""
 
     def __init__(
         self,
         factories: dict[str, SandboxFactory],
-        idle_timeout: timedelta | None = None,
         resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
         """Store named Workflow-scoped worker-side sandbox factories."""
         self._factories = dict(factories)
-        self._idle_timeout = (
-            idle_timeout if idle_timeout is not None else _SANDBOX_CACHE_IDLE_TIMEOUT
-        )
-        if self._idle_timeout <= timedelta(0):
-            raise ValueError("Sandbox cache idle timeout must be positive")
-        self._records: dict[_SandboxKey, _SandboxRecord] = {}
-        self._closing_records: set[asyncio.Task[None]] = set()
         self._worker_env_refs = _WorkerEnvRefResolver(resolvable_worker_env_vars)
 
     @asynccontextmanager
@@ -247,51 +165,14 @@ class SandboxActivities:
                 f"Known: {sorted(self._factories)}",
                 type=SANDBOX_NOT_FOUND_ERROR_TYPE,
             )
-        key = (input.sandbox_name, context.chain)
-        record = self._records.get(key)
-        if record is None:
-            record = _SandboxRecord(self, key, context, factory, self._idle_timeout)
-            self._records[key] = record
-        record.acquire()
-        try:
-            try:
-                sandbox = await record.sandbox()
-            except asyncio.CancelledError:
-                # A cancelled waiter must not discard a sandbox that another
-                # activity for the same Workflow may already be using.
-                if record.creation_failed():
-                    self._evict(key, record)
-                raise
-            except BaseException:
-                self._evict(key, record)
-                raise
-            yield sandbox
-        finally:
-            record.release()
-
-    def _has_record(self, key: _SandboxKey, record: _SandboxRecord) -> bool:
-        return self._records.get(key) is record
-
-    def _evict(self, key: _SandboxKey, record: _SandboxRecord) -> None:
-        if self._has_record(key, record):
-            del self._records[key]
-            task = asyncio.create_task(record.aclose())
-            self._closing_records.add(task)
-            task.add_done_callback(self._record_closed)
-
-    def _record_closed(self, task: asyncio.Task[None]) -> None:
-        self._closing_records.discard(task)
-        if not task.cancelled() and (error := task.exception()) is not None:
-            logger.error("Failed closing a sandbox adapter", exc_info=error)
-
-    async def aclose(self) -> None:
-        """Cancel cache timers and discard all worker-local sandbox adapters."""
-        records = list(self._records.values())
-        self._records.clear()
-        for record in records:
-            await record.aclose()
-        if self._closing_records:
-            await asyncio.gather(*self._closing_records, return_exceptions=True)
+        result = factory(context)
+        if inspect.isawaitable(result):
+            result = await result
+        if isinstance(result, Sandbox):
+            yield result
+        else:
+            async with result as sandbox:
+                yield sandbox
 
     def activities(self) -> list[Callable[..., Any]]:
         """Build one stable activity set that dispatches by sandbox name."""
