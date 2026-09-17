@@ -2464,16 +2464,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         elif (
             command_info.command_type
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
+            and command_info.command_seq in self._pending_nexus_operations
         ):
-            nexus_operation = self._pending_nexus_operations.get(
-                command_info.command_seq
-            )
-            if nexus_operation is None:
-                # The handle is gone, so the endpoint/service/operation that would name the
-                # context are no longer available. Use no context rather than this workflow's:
-                # the payload came from the operation's handler, so the caller's workflow id
-                # is not a key anything encoded it under.
-                return None
+            nexus_operation = self._pending_nexus_operations[command_info.command_seq]
             if temporalio.nexus.system.is_system_endpoint(
                 nexus_operation._input.endpoint
             ):
