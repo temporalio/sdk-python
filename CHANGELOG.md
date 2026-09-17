@@ -29,6 +29,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
 - Restore pickling of Pydantic data converters, preserving the type adapter cache
   size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
