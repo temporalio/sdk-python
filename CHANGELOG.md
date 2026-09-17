@@ -29,6 +29,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
+
 ### Security
 
 ## [1.33.0] - 2026-09-14
