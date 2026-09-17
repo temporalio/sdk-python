@@ -323,7 +323,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 )
                 data_converter.failure_converter.to_failure(
                     handler_error,
-                    data_converter.payload_converter,
+                    data_converter._get_internal_payload_converter(),
                     completion.failure,
                 )
                 await self._encode_completion(completion, data_converter)
@@ -385,7 +385,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 handler_error = _exception_to_handler_error(err)
                 data_converter.failure_converter.to_failure(
                     handler_error,
-                    data_converter.payload_converter,
+                    data_converter._get_internal_payload_converter(),
                     completion.failure,
                 )
 
@@ -471,7 +471,11 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     )
                 )
             elif isinstance(result, nexusrpc.handler.StartOperationResultSync):
-                [payload] = data_converter.payload_converter.to_payloads([result.value])
+                [payload] = (
+                    data_converter._get_internal_payload_converter().to_payloads(
+                        [result.value]
+                    )
+                )
                 return temporalio.api.nexus.v1.StartOperationResponse(
                     sync_success=temporalio.api.nexus.v1.StartOperationResponse.Sync(
                         payload=payload,
@@ -502,7 +506,7 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 response = temporalio.api.nexus.v1.StartOperationResponse()
                 data_converter.failure_converter.to_failure(
                     new_err,
-                    data_converter.payload_converter,
+                    data_converter._get_internal_payload_converter(),
                     response.failure,
                 )
                 return response
@@ -597,11 +601,13 @@ class _NexusPayloadSerializer:
             ) from err
 
         try:
-            payload_converter = dc.payload_converter
+            payload_converter = dc._get_internal_payload_converter()
             if temporalio.nexus.system._is_system_payload(payload):
-                payload_converter = temporalio.nexus.system._get_payload_converter(
-                    dc.payload_converter,
-                    dc.failure_converter,
+                payload_converter = (
+                    temporalio.nexus.system._get_system_nexus_payload_converter(
+                        payload_converter,
+                        dc.failure_converter,
+                    )
                 )
             [input] = payload_converter.from_payloads(
                 [payload],
