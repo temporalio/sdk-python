@@ -29,6 +29,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
 
