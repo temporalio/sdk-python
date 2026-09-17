@@ -23,11 +23,7 @@ to include examples, links to docs, or any other relevant information.
 - **Experimental**: `temporalio.contrib.strands` now supports durable,
   Workflow-isolated Strands sandboxes through `TemporalSandbox` and
   worker-side factories with run and Workflow-chain context registered with
-  `StrandsPlugin(sandboxes=...)`. Each Activity calls the selected factory so it
-  can find or recover the backing environment. The integration uses one shared
-  activity set with optional correlated live Workflow Streams output,
-  worker-side environment references, and Activity-scoped async-context-manager
-  factories.
+  `StrandsPlugin(sandboxes=...)`.
 
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
