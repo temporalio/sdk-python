@@ -17,6 +17,7 @@ import sys
 import uuid
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -29,8 +30,10 @@ pytest.importorskip("deepagents")
 pytest.importorskip("langchain_core")
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalBackend
 from temporalio.contrib.deepagents._tools import (
+    lookup_backend,
     register_backend,
     registered_backends,
 )
@@ -150,6 +153,21 @@ def test_temporal_backend_unregisters_on_gc() -> None:
     del wrapper
     gc.collect()
     assert ref not in registered_backends()
+
+
+def test_temporal_backend_gc_keeps_ref_resolvable_for_inflight_activity() -> None:
+    # A backend_op activity scheduled just before a cache eviction can start
+    # AFTER the evicted wrapper is collected, and the replay that would
+    # re-register the ref only happens once that activity completes. The
+    # activity-side lookup must therefore still resolve a retired ref.
+    inner = RecordingBackend()
+    before = set(registered_backends())
+    wrapper = TemporalBackend(inner)
+    (ref,) = set(registered_backends()) - before
+    del wrapper
+    gc.collect()
+    assert ref not in registered_backends()
+    assert lookup_backend(ref) is inner
 
 
 def test_temporal_backend_gc_keeps_reregistered_ref() -> None:
@@ -313,3 +331,92 @@ async def test_builtin_tool_on_default_backend_runs_in_workflow(
     # The state-backend op stays in-workflow: model turns are the ONLY activities.
     assert counts[BACKEND_OP] == 0, counts
     assert counts["deepagents.invoke_model"] == 2, counts
+
+
+class MutatingBackend:
+    """Read result depends on op order: each read returns the write count so a
+    served-stale-cache regression is observable.
+
+    State lives on DISK, like a real backend's. In-memory state (instance or
+    class level) cannot work here: the workflow re-constructs and re-registers
+    the fake from a FRESH sandbox on every replayed activation under
+    ``max_cached_workflows=0``, so a replay landing between the write and the
+    second read swaps in a new module copy with reset in-memory state.
+    """
+
+    def __init__(self, root: str) -> None:
+        self._log = Path(root) / "writes.log"
+
+    def _count(self) -> int:
+        return len(self._log.read_text().splitlines()) if self._log.exists() else 0
+
+    def write(self, _file_path: str, _content: str) -> str:
+        with self._log.open("a") as f:
+            f.write("w\n")
+        return f"wrote:{self._count()}"
+
+    def read(self, _file_path: str) -> str:
+        return f"read-at-write-count:{self._count()}"
+
+
+class _RepeatedOpsAgent:
+    """ainvoke-shaped driver: read, write, read the SAME path — under
+    run_deep_agent so the continue-as-new result cache is active."""
+
+    def __init__(self, backend: Any) -> None:
+        self._backend = backend
+
+    async def ainvoke(self, _input: Any) -> dict:
+        first = await self._backend.read("a.txt")
+        await self._backend.write("a.txt", "x")
+        second = await self._backend.read("a.txt")
+        return {"messages": [f"{first}|{second}"], "todos": []}
+
+
+@workflow.defn
+class RepeatedBackendOpWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> str:
+        from temporalio.contrib.deepagents import run_deep_agent
+
+        backend = TemporalBackend(
+            MutatingBackend(input["root"]),
+            # No retries: the disk log grows per activity ATTEMPT and the
+            # assertions are exact counts.
+            activity_options={
+                "start_to_close_timeout": timedelta(seconds=30),
+                "retry_policy": RetryPolicy(maximum_attempts=1),
+            },
+        )
+        result = await run_deep_agent(
+            _RepeatedOpsAgent(backend), input, state_snapshot=state_snapshot
+        )
+        return str(result["messages"][-1])
+
+
+@pytest.mark.asyncio
+async def test_repeated_backend_op_sees_fresh_state(
+    env: WorkflowEnvironment, tmp_path: Path
+) -> None:
+    """A repeated identical read after an intervening write runs its own
+    Activity and sees the write — under the active CAN cache, the old
+    payload-only key served the FIRST read's stale result."""
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-repeated-backend-op",
+        workflows=[RepeatedBackendOpWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            RepeatedBackendOpWorkflow.run,
+            {"messages": [], "root": str(tmp_path)},
+            id=f"da-repeated-backend-op-{uuid.uuid4()}",
+            task_queue="da-repeated-backend-op",
+        )
+        out = await handle.result()
+
+    assert out == "read-at-write-count:0|read-at-write-count:1", out
+    counts = await count_scheduled_activities(handle)
+    assert counts[BACKEND_OP] == 3, counts
