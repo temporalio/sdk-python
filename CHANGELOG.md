@@ -42,6 +42,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+
 ### Fixed
 
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
