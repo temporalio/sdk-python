@@ -20,6 +20,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
+
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
@@ -39,6 +43,11 @@ to include examples, links to docs, or any other relevant information.
   and `execute` / `aexecute` only for an execution-capable one, so a wrapped filesystem or
   store backend no longer advertises a shell tool that could only fail. User subclasses of
   `TemporalBackend` get the same mirroring.
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
 
