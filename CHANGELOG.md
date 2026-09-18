@@ -20,11 +20,22 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
+  Workflow-level metadata that allows for improved visibility into a Workflow execution's history
+  by grouping logically related Events together based on user-defined or system-inferred criteria.
+  `workflow.create_event_group(...)` takes the Event Group's ID as its first and only required
+  argument; the user-provided ID is used verbatim and should not contain sensitive information.
+  The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
+
+- Added `workflow.Info.original_execution_run_id`, the run ID recorded on the workflow
+  execution started event. Unlike `run_id`, this value is preserved across workflow resets.
+
 - **Experimental**: `temporalio.contrib.strands` now supports durable,
   Workflow-isolated Strands sandboxes through `TemporalSandbox` and
   worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
 
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
+
 ### Changed
 
 ### Deprecated
