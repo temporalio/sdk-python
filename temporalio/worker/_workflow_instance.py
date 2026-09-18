@@ -2896,6 +2896,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         def apply_cancel(
             _err: asyncio.CancelledError,
         ) -> None:
+            # `cancel_signal_workflow` is a Core-only command and apply only if the Signal command
+            # has not yet been sent to the server. The cancel request itself can't produce a WFT
+            # command. Hence there's no point in attaching Event Groups or User Metadata to it.
             command = self._add_command()
             command.cancel_signal_workflow.seq = seq
 

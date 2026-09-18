@@ -27,6 +27,9 @@ to include examples, links to docs, or any other relevant information.
   argument; the user-provided ID is used verbatim and should not contain sensitive information.
   The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
 
+- Added `workflow.Info.original_execution_run_id`, the run ID recorded on the workflow
+  execution started event. Unlike `run_id`, this value is preserved across workflow resets.
+
 - **Experimental**: `temporalio.contrib.strands` now supports durable,
   Workflow-isolated Strands sandboxes through `TemporalSandbox` and
   worker-side factories registered with `StrandsPlugin(sandboxes=...)`.

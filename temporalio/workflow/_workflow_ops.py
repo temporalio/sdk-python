@@ -163,6 +163,8 @@ class ParentClosePolicy(IntEnum):
 class ChildWorkflowConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_child_workflow`
     and :py:func:`execute_child_workflow`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     id: str | None

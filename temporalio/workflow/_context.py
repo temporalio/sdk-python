@@ -1039,8 +1039,7 @@ async def wait_condition(
             as a timer ID.
         event_groups: Event Groups to associate the timer command (created if
             ``timeout`` is present) with, in addition to those active in the
-            current scope. See
-            :py:func:`temporalio.workflow.create_event_group`.
+            current scope. See :py:func:`temporalio.workflow.create_event_group`.
     """
     await _Runtime.current().workflow_wait_condition(
         fn,

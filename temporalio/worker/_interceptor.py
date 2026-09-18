@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import (
     Any,
@@ -177,9 +177,12 @@ class ContinueAsNewInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: VersioningIntent | None
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
-    event_groups: Sequence[temporalio.workflow.EventGroup] | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     # The types may be absent
-    arg_types: list[type] | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -233,6 +236,9 @@ class SignalChildWorkflowInput:
     child_workflow_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
 
 @dataclass
@@ -246,6 +252,9 @@ class SignalExternalWorkflowInput:
     workflow_run_id: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
 
 @dataclass
@@ -266,7 +275,12 @@ class StartActivityInput:
     disable_eager_execution: bool
     versioning_intent: VersioningIntent | None
     summary: str | None
-    event_groups: Sequence[temporalio.workflow.EventGroup] | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = field(
+        default=None, kw_only=True
+    )
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -297,7 +311,12 @@ class StartChildWorkflowInput:
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
-    event_groups: Sequence[temporalio.workflow.EventGroup] | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = field(
+        default=None, kw_only=True
+    )
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -319,6 +338,9 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     headers: Mapping[str, str] | None
     summary: str | None
     event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     output_type: type[OutputT] | None = None
 
     def __post_init__(self) -> None:
@@ -372,11 +394,14 @@ class StartLocalActivityInput:
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     summary: str | None
-    event_groups: Sequence[temporalio.workflow.EventGroup] | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
     # The types may be absent
-    arg_types: list[type] | None
-    ret_type: type | None
+    arg_types: list[type] | None = None
+    ret_type: type | None = None
 
 
 class WorkflowInboundInterceptor:

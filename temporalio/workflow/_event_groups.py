@@ -233,7 +233,7 @@ def _capture_event_group_markers(
                     "Event groups must be created with workflow.create_event_group()"
                 )
             explicit[group._id] = group
-    groups: list[EventGroup] = list(explicit.values())
+    markers = [group._to_proto() for group in explicit.values()]
     if active.implicit:
-        groups.insert(0, active.implicit)
-    return [group._to_proto() for group in groups]
+        markers.insert(0, active.implicit._to_proto())
+    return markers

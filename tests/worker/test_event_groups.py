@@ -1135,6 +1135,55 @@ async def test_timer_commands_carry_markers(client: Client, env: WorkflowEnviron
 
 
 @workflow.defn
+class AsyncioTimerCommandsWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        scope = workflow.create_event_group("scope")
+        sleep_task: asyncio.Task[None] | None = None
+        later: asyncio.TimerHandle | None = None
+        with scope.scope():
+            # asyncio.sleep / call_later expose no event_groups argument, so the
+            # ambient scope is all they can carry.
+            sleep_task = asyncio.create_task(asyncio.sleep(60))
+            later = asyncio.get_running_loop().call_later(60, lambda: None)
+        # Force a Workflow Task boundary so the timer commands reach the server
+        # before they are cancelled.
+        await workflow.sleep(0.001)
+        assert sleep_task is not None and later is not None
+        sleep_task.cancel()
+        later.cancel()
+        await _swallow(sleep_task)
+
+
+async def test_asyncio_sleep_and_call_later_carry_ambient_markers(
+    client: Client, env: WorkflowEnvironment
+):
+    _require_event_groups_server(env)
+
+    async with new_worker(client, AsyncioTimerCommandsWorkflow) as worker:
+        handle = await client.start_workflow(
+            AsyncioTimerCommandsWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+        events = await _fetch_events(handle)
+        ambient = (_label_marker_id("scope"),)
+
+        timers = _events_of_type(events, EventType.EVENT_TYPE_TIMER_STARTED)
+        assert len(timers) == 3
+        cancels = _events_of_type(events, EventType.EVENT_TYPE_TIMER_CANCELED)
+        assert len(cancels) == 2
+
+        ambient_timers = [t for t in timers if _markers(t) == sorted(ambient)]
+        unscoped_timers = [t for t in timers if _markers(t) == []]
+        assert len(ambient_timers) == 2
+        assert len(unscoped_timers) == 1
+        for cancel in cancels:
+            _assert_markers(cancel, *ambient)
+
+
+@workflow.defn
 class ActivityCommandsWorkflow:
     @workflow.run
     async def run(self) -> None:

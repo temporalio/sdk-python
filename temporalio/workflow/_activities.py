@@ -86,6 +86,8 @@ class ActivityCancellationType(IntEnum):
 class ActivityConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_activity` and
     :py:func:`execute_activity`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     task_queue: str | None
@@ -1186,6 +1188,8 @@ async def execute_activity_method(
 class LocalActivityConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_local_activity`
     and :py:func:`execute_local_activity`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     schedule_to_close_timeout: timedelta | None
