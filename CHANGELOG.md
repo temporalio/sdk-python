@@ -33,6 +33,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
 - Restore pickling of Pydantic data converters, preserving the type adapter cache
