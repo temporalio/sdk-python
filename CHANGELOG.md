@@ -23,6 +23,9 @@ to include examples, links to docs, or any other relevant information.
 - `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
   UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
   without reading or advancing any workflow state.
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
 
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
@@ -48,6 +51,11 @@ to include examples, links to docs, or any other relevant information.
   providers rather than the standard-library ones; and read-only contexts (query handlers,
   update validators) receive wall-clock time and nondeterministic entropy that leave the
   private stream untouched.
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
 
