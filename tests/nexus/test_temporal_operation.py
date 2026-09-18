@@ -137,6 +137,7 @@ class TestServiceHandler:
         self.started_custom_cancel_workflow = asyncio.Event()
         self.started_custom_cancel_activity = asyncio.Event()
         self.custom_cancel_activity_called = asyncio.Event()
+        self.bad_update_stage_error: ValueError | None = None
 
     @nexus.temporal_operation
     async def echo(
@@ -304,15 +305,18 @@ class TestServiceHandler:
         client: nexus.TemporalNexusClient,
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
-        # Only ACCEPTED is allowed; the cast is what a handler that bypasses the
-        # type checker would do.
-        return await client.start_workflow_update(
-            input.value,
-            UpdatableWorkflow.do_update,
-            input.update_value,
-            wait_for_stage=cast(Any, WorkflowUpdateStage.COMPLETED),
-            update_id=input.update_id,
-        )
+        try:
+            return await client.start_workflow_update(
+                input.value,
+                UpdatableWorkflow.do_update,
+                input.update_value,
+                # cast to bypass type checker
+                wait_for_stage=cast(Any, WorkflowUpdateStage.COMPLETED),
+                update_id=input.update_id,
+            )
+        except ValueError as err:
+            self.bad_update_stage_error = err
+            return nexus.TemporalOperationResult.sync(str(err))
 
     @nexus.temporal_operation
     async def query_op(
@@ -778,35 +782,31 @@ async def test_start_workflow_update_rejects_non_accepted_wait_for_stage(
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
+    service_handler = TestServiceHandler()
     async with Worker(
         env.client,
         task_queue=task_queue,
-        nexus_service_handlers=[TestServiceHandler()],
+        nexus_service_handlers=[service_handler],
         workflows=[UpdatableWorkflow, BadUpdateStageCaller],
     ):
         update_workflow_id = f"updatable-workflow-{uuid.uuid4()}"
         await client.start_workflow(
             UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
         )
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                BadUpdateStageCaller.run,
-                Input(
-                    value=update_workflow_id,
-                    task_queue=task_queue,
-                    update_value="Created",
-                ),
+        result = await client.execute_workflow(
+            BadUpdateStageCaller.run,
+            Input(
+                value=update_workflow_id,
                 task_queue=task_queue,
-                id=f"bad-update-stage-caller-{uuid.uuid4()}",
-            )
+                update_value="Created",
+            ),
+            task_queue=task_queue,
+            id=f"bad-update-stage-caller-{uuid.uuid4()}",
+        )
 
-    assert isinstance(err.value.cause, temporalio.exceptions.NexusOperationError)
-    assert isinstance(err.value.cause.cause, nexusrpc.HandlerError)
-    assert err.value.cause.cause.type == HandlerErrorType.BAD_REQUEST
-    assert (
-        "Nexus operations only support workflow updates with "
-        "wait_for_stage=WorkflowUpdateStage.ACCEPTED" in err.value.cause.cause.message
-    )
+    assert isinstance(service_handler.bad_update_stage_error, ValueError)
+    assert result == str(service_handler.bad_update_stage_error)
+    assert result == "Only ACCEPTED wait stage is supported"
 
 
 async def test_temporal_operation_cancel_rejects_unknown_tokens():

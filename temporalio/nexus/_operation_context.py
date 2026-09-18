@@ -19,14 +19,11 @@ from typing import (
     Any,
     Concatenate,
     Generic,
-    Literal,
     TypeVar,
-    cast,
     overload,
 )
 
 import nexusrpc
-from nexusrpc import HandlerError, HandlerErrorType
 from nexusrpc.handler import (
     CancelOperationContext,
     OperationContext,
@@ -714,7 +711,7 @@ async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnuse
     update: str | Callable,
     arg: Any = temporalio.common._arg_unset,
     args: Sequence[Any] = [],
-    wait_for_stage: Literal[temporalio.client.WorkflowUpdateStage.ACCEPTED],
+    wait_for_stage: temporalio.client.WorkflowUpdateStage,
     update_id: str | None = None,
     result_type: type | None = None,
     rpc_metadata: Mapping[str, str | bytes] = {},
@@ -722,14 +719,8 @@ async def _start_nexus_operation_workflow_update(  # pyright: ignore[reportUnuse
     run_id: str | None = None,
     first_execution_run_id: str | None = None,
 ) -> temporalio.client.WorkflowUpdateHandle[Any]:
-    # Annotations are not enforced at runtime, so validate anyway. The cast widens the
-    # narrowed Literal; without it the check reads as unreachable to the type checker.
-    if cast(Any, wait_for_stage) != temporalio.client.WorkflowUpdateStage.ACCEPTED:
-        raise HandlerError(
-            "Nexus operations only support workflow updates with "
-            "wait_for_stage=WorkflowUpdateStage.ACCEPTED",
-            type=HandlerErrorType.BAD_REQUEST,
-        )
+    if wait_for_stage != temporalio.client.WorkflowUpdateStage.ACCEPTED:
+        raise ValueError("Only ACCEPTED wait stage is supported")
     # Default update ID to the Nexus request ID for retry-safety (matches sdk-go).
     update_id = update_id or temporal_context.nexus_context.request_id
     workflow_handle = temporal_context.client.get_workflow_handle(
