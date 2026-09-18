@@ -452,7 +452,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 try:
                     data_converter.failure_converter.to_failure(
                         err,
-                        data_converter.payload_converter,
+                        data_converter._get_internal_payload_converter(),
                         failure,
                     )
                 except Exception as inner_err:
@@ -468,7 +468,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 try:
                     data_converter.failure_converter.to_failure(
                         err,
-                        data_converter.payload_converter,
+                        data_converter._get_internal_payload_converter(),
                         completion.failed.failure,
                     )
                 except Exception as inner_err:
@@ -728,7 +728,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Create instance from details
         det = WorkflowInstanceDetails(
-            payload_converter_factory=self._data_converter._new_payload_converter,
+            # Sharing the underlying converter could let another workflow's state
+            # affect conversion and replay, so each instance needs a fresh one.
+            payload_converter_factory=self._data_converter._new_internal_payload_converter,
             failure_converter_class=self._data_converter.failure_converter_class,
             interceptor_classes=self._interceptor_classes,
             defn=defn,

@@ -27,6 +27,12 @@ to include examples, links to docs, or any other relevant information.
   argument; the user-provided ID is used verbatim and should not contain sensitive information.
   The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
 
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
+
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
+
 ### Changed
 
 ### Deprecated
@@ -34,6 +40,14 @@ to include examples, links to docs, or any other relevant information.
 ### :boom: Breaking Changes
 
 ### Fixed
+
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
 
 ### Security
 

@@ -55,8 +55,6 @@ def test_sdk_core_changelog_entries_runs_core_script(
                 "run",
                 "--quiet",
                 "-p",
-                "temporalio-sdk-core",
-                "--bin",
                 "changelog-release-notes",
                 "--",
                 "--from",
