@@ -394,6 +394,7 @@ async def test_schedule_update_retries_conflict_token() -> None:
         b"second-token",
     ]
 
+
 async def test_cancel_not_found(client: Client):
     with pytest.raises(RPCError) as err:
         await client.get_workflow_handle("does-not-exist").cancel()
