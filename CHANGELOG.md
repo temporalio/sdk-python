@@ -44,6 +44,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
+  when calling the model. The schema type is now sent to the model activity as its JSON schema.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.

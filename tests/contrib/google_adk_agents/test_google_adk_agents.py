@@ -43,6 +43,7 @@ from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import get_tracer_provider, set_tracer_provider
+from pydantic import BaseModel, TypeAdapter
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
@@ -52,6 +53,9 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSet,
     TemporalMcpToolSetProvider,
     TemporalModel,
+)
+from temporalio.contrib.google_adk_agents._model import (
+    _with_serializable_response_schema,
 )
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
@@ -1168,3 +1172,109 @@ def test_activity_as_tool_preserves_metadata() -> None:
     assert params == ["city", "count"]
     assert sig.parameters["city"].annotation is str
     assert sig.parameters["count"].default == 1
+
+
+class CityWeather(BaseModel):
+    city: str
+    temperature_c: float
+
+
+class OutputSchemaModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text='{"city": "Paris", "temperature_c": 17.5}')],
+                )
+            )
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["output_schema_model"]
+
+
+@workflow.defn
+class OutputSchemaAgentWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> dict[str, Any] | None:
+        agent = LlmAgent(
+            name="output_schema_agent",
+            model=TemporalModel("output_schema_model"),
+            output_schema=CityWeather,
+            output_key="weather",
+        )
+        runner = InMemoryRunner(agent=agent, app_name="output_schema_app")
+        session = await runner.session_service.create_session(
+            app_name="output_schema_app", user_id="test"
+        )
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text=prompt)]),
+            )
+        ) as agen:
+            async for _ in agen:
+                pass
+
+        final_session = await runner.session_service.get_session(
+            app_name="output_schema_app", user_id="test", session_id=session.id
+        )
+        return final_session.state.get("weather") if final_session else None
+
+
+@pytest.mark.asyncio
+async def test_agent_with_output_schema(client: Client):
+    LLMRegistry.register(OutputSchemaModel)
+
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    async with Worker(
+        client,
+        task_queue="adk-task-queue-output-schema",
+        workflows=[OutputSchemaAgentWorkflow],
+        max_cached_workflows=0,
+    ):
+        result = await client.execute_workflow(
+            OutputSchemaAgentWorkflow.run,
+            "What is the weather in Paris?",
+            id=f"output-schema-agent-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue-output-schema",
+            execution_timeout=timedelta(seconds=60),
+        )
+
+    assert result == {"city": "Paris", "temperature_c": 17.5}
+
+
+@pytest.mark.parametrize("schema", [CityWeather, list[CityWeather]])
+def test_output_schema_type_sent_as_json_schema(schema: Any) -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(role="user", parts=[Part(text="hello")])],
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(schema)
+
+    converted = _with_serializable_response_schema(request)
+
+    assert request.config.response_schema is schema
+    assert converted.config.response_mime_type == "application/json"
+    converter = GoogleAdkPlugin()._configure_data_converter(None)
+    payloads = converter.payload_converter.to_payloads([converted])
+    serialized = json.loads(payloads[0].data)
+    assert serialized["config"]["response_schema"] == TypeAdapter(schema).json_schema()
+
+
+def test_json_output_schema_left_unchanged() -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(role="user", parts=[Part(text="hello")])],
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(CityWeather.model_json_schema())
+
+    assert _with_serializable_response_schema(request) is request
