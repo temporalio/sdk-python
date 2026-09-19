@@ -336,8 +336,13 @@ class _ReplaySafeRunTree(RunTree):
             kwargs.setdefault("end_time", temporalio.workflow.now())
         self._run.end(**kwargs)
 
-    def patch(self, *, exclude_inputs: bool = False) -> None:
-        """Patch the run to LangSmith, skipping during replay."""
+    def patch(self, *, exclude_inputs: bool | None = None) -> None:
+        """Patch the run to LangSmith, skipping during replay.
+
+        ``exclude_inputs`` is forwarded untouched so LangSmith's own default
+        applies (a plain ``False`` before 0.12; the
+        ``LANGSMITH_EXCLUDE_INPUTS_ON_PATCH`` setting from 0.12 on).
+        """
         if temporalio.workflow.in_workflow():
             if _is_replaying():
                 return
@@ -394,7 +399,7 @@ class _RootReplaySafeRunTreeFactory(_ReplaySafeRunTree):
         """Factory must never be posted."""
         raise RuntimeError("_RootReplaySafeRunTreeFactory must never be posted")
 
-    def patch(self, *, exclude_inputs: bool = False) -> NoReturn:
+    def patch(self, *, exclude_inputs: bool | None = None) -> NoReturn:
         """Factory must never be patched."""
         raise RuntimeError("_RootReplaySafeRunTreeFactory must never be patched")
 

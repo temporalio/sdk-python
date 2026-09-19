@@ -38,12 +38,22 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- The `deepagents` extra now requires `deepagents>=0.7.12,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.11.2`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
 ### Deprecated
 
 ### :boom: Breaking Changes
 
 ### Fixed
 
+- `temporalio.contrib.deepagents.TemporalBackend` mirrors the wrapped backend's optional
+  capabilities at class level, where deepagents 0.7 checks them: `delete` / `adelete` are
+  offered (and run as `deepagents.backend_op` Activities) only for a delete-capable backend,
+  and `execute` / `aexecute` only for an execution-capable one, so a wrapped filesystem or
+  store backend no longer advertises a shell tool that could only fail. User subclasses of
+  `TemporalBackend` get the same mirroring.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.

@@ -57,6 +57,14 @@ class RecordingBackend:
     async def aread(self, file_path: str) -> str:
         return f"acontents of {file_path}"
 
+    # ``delete`` is optional in the protocol (deepagents >= 0.7); a backend that
+    # has it must still cross the activity boundary like every other op.
+    async def adelete(self, file_path: str) -> str:
+        return f"deleted {file_path}"
+
+    def delete(self, file_path: str) -> str:
+        return f"deleted {file_path}"
+
 
 @workflow.defn
 class BackendWorkflow:
@@ -68,7 +76,8 @@ class BackendWorkflow:
         )
         sync_out = await backend.read(path)
         async_out = await backend.aread(path)
-        return f"{sync_out}|{async_out}"
+        deleted = await backend.adelete(path)
+        return f"{sync_out}|{async_out}|{deleted}"
 
 
 # Bind deepagents symbols off the module importorskip returns: a static
@@ -79,6 +88,7 @@ _deepagents_mod = pytest.importorskip("deepagents")
 _backends_mod = pytest.importorskip("deepagents.backends")
 create_deep_agent = _deepagents_mod.create_deep_agent
 FilesystemBackend = _backends_mod.FilesystemBackend
+LocalShellBackend = _backends_mod.LocalShellBackend
 StateBackend = _backends_mod.StateBackend
 
 
@@ -136,10 +146,120 @@ async def test_temporal_backend_op_activity(env: WorkflowEnvironment) -> None:
         )
         out = await handle.result()
 
-    assert out == "contents of notes.txt|acontents of notes.txt"
+    assert out == "contents of notes.txt|acontents of notes.txt|deleted notes.txt"
     counts = await count_scheduled_activities(handle)
-    # One activity per op — the sync read AND the async aread both cross.
-    assert counts[BACKEND_OP] == 2, counts
+    # One activity per op — the sync read, the async aread, and the optional
+    # adelete all cross.
+    assert counts[BACKEND_OP] == 3, counts
+
+
+def test_temporal_backend_mirrors_inner_delete_support() -> None:
+    # deepagents decides delete support from the wrapper CLASS, so a wrapper
+    # around a delete-capable backend must advertise it and one around a
+    # backend without delete must not (or the agent gets a delete tool that
+    # can only fail).
+    protocol = pytest.importorskip("deepagents.backends.protocol")
+
+    class NoDelete:
+        def read(self, file_path: str) -> str:
+            return f"contents of {file_path}"
+
+    with_delete = TemporalBackend(RecordingBackend())
+    without_delete = TemporalBackend(NoDelete())
+    assert protocol._supports_delete(with_delete) is True
+    assert protocol._supports_delete(without_delete) is False
+    assert isinstance(with_delete, TemporalBackend)
+    assert isinstance(without_delete, TemporalBackend)
+    # The real deepagents backends resolve the same way wrapped or not.
+    state_backend = StateBackend()
+    assert protocol._supports_delete(
+        TemporalBackend(state_backend)
+    ) is protocol._supports_delete(state_backend)
+
+
+def test_temporal_backend_mirrors_inner_execution_support(tmp_path: Path) -> None:
+    # deepagents offers its shell tool when the backend passes an isinstance
+    # check against the sandbox protocol, i.e. when execute/aexecute exist on
+    # the object. A wrapper must only grow them when the inner backend is
+    # execution-capable, or a plain filesystem backend gets a shell tool whose
+    # every call fails in the activity.
+    supports_execution = pytest.importorskip(
+        "deepagents.middleware.filesystem"
+    ).supports_execution
+
+    plain = TemporalBackend(
+        FilesystemBackend(root_dir=str(tmp_path), virtual_mode=True)
+    )
+    assert supports_execution(plain) is False
+    assert not hasattr(plain, "aexecute")
+
+    shell_inner = LocalShellBackend(root_dir=str(tmp_path))
+    shell = TemporalBackend(shell_inner)
+    assert supports_execution(shell) is True
+    # The op is the activity dispatcher, not the inner backend's own method.
+    assert getattr(type(shell), "aexecute") is not type(shell_inner).aexecute
+    assert supports_execution(shell_inner) is True
+
+
+def test_temporal_backend_subclass_keeps_capability_mirroring() -> None:
+    protocol = pytest.importorskip("deepagents.backends.protocol")
+
+    class MyBackend(TemporalBackend):
+        def extra(self) -> str:
+            return "extra"
+
+    class NoDelete:
+        def read(self, file_path: str) -> str:
+            return f"contents of {file_path}"
+
+    class OwnDelete(TemporalBackend):
+        def delete(self, file_path: str) -> str:
+            return f"own {file_path}"
+
+    wrapped = MyBackend(RecordingBackend())
+    assert isinstance(wrapped, MyBackend)
+    assert wrapped.extra() == "extra"
+    assert protocol._supports_delete(wrapped) is True
+    assert protocol._supports_delete(MyBackend(NoDelete())) is False
+    # An op the subclass defines itself is left alone.
+    own = OwnDelete(NoDelete())
+    assert getattr(type(own), "delete") is OwnDelete.delete
+
+
+@workflow.defn
+class ShellBackendWorkflow:
+    @workflow.run
+    async def run(self, root_dir: str) -> str:
+        backend = TemporalBackend(
+            LocalShellBackend(root_dir=root_dir),
+            activity_options={"start_to_close_timeout": timedelta(seconds=30)},
+        )
+        result = await backend.aexecute("echo shell-ok")
+        return str(getattr(result, "output", result))
+
+
+@pytest.mark.asyncio
+async def test_temporal_backend_execute_runs_as_activity(
+    env: WorkflowEnvironment, tmp_path: Path
+) -> None:
+    plugin = DeepAgentsPlugin()
+    async with Worker(
+        env.client,
+        task_queue="da-shell-backend",
+        workflows=[ShellBackendWorkflow],
+        plugins=[plugin],
+    ):
+        handle = await env.client.start_workflow(
+            ShellBackendWorkflow.run,
+            str(tmp_path),
+            id=f"da-shell-backend-{uuid.uuid4()}",
+            task_queue="da-shell-backend",
+        )
+        out = await handle.result()
+
+    assert "shell-ok" in out
+    counts = await count_scheduled_activities(handle)
+    assert counts[BACKEND_OP] == 1, counts
 
 
 def test_temporal_backend_unregisters_on_gc() -> None:
