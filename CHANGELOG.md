@@ -53,17 +53,7 @@ to include examples, links to docs, or any other relevant information.
 ### Fixed
 
 - `GoogleAdkPlugin` now applies its deterministic time, id, and random providers inside
-  workflow tasks. ADK reads them from `contextvars` and workflow tasks run on worker threads
-  whose context is empty, so on a standard `Worker` or `Replayer` ADK-generated session,
-  event, invocation, and function-call ids came from wall-clock time and `uuid.uuid4()`; only
-  debug mode, which runs tasks inline, saw the deterministic values. The providers are now
-  installed as process-wide defaults that fall back to the real clock and RNG outside a
-  workflow. Inside a workflow, ADK ids and randoms draw from a workflow-private deterministic
-  stream, so they never shift the sequences user code sees from `workflow.random()` and
-  `workflow.uuid4()`; ADK's `reset_*_provider()` functions restore the deterministic
-  providers rather than the standard-library ones; and read-only contexts (query handlers,
-  update validators) receive wall-clock time and nondeterministic entropy that leave the
-  private stream untouched.
+  workflow tasks.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
