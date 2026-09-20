@@ -20,6 +20,7 @@ from ..types import (
 )
 from ._activities import _AsyncioTask
 from ._context import _Runtime, uuid4
+from ._event_groups import EventGroup
 from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
 
 __all__ = [
@@ -72,6 +73,8 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @overload
@@ -79,6 +82,8 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @overload
@@ -87,6 +92,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         signal: Callable[Concatenate[SelfType, MultiParamSpec], Awaitable[None] | None],
         *,
         args: Sequence[Any],
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @overload
@@ -96,6 +102,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     async def signal(
@@ -104,6 +111,7 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
         arg: Any = temporalio.common._arg_unset,  # type: ignore[reportUnusedParameter]
         *,
         args: Sequence[Any] = [],  # type: ignore[reportUnusedParameter]
+        event_groups: Sequence[EventGroup] | None = None,  # type: ignore[reportUnusedParameter]
     ) -> None:
         """Signal this child workflow.
 
@@ -111,6 +119,8 @@ class ChildWorkflowHandle(_AsyncioTask[ReturnType], Generic[SelfType, ReturnType
             signal: Name or method reference for the signal.
             arg: Single argument to the signal.
             args: Multiple arguments to the signal. Cannot be set if arg is.
+            event_groups: Event Groups to associate this command with, in
+                addition to any from the current Event Group scope.
 
         """
         raise NotImplementedError
@@ -153,6 +163,8 @@ class ParentClosePolicy(IntEnum):
 class ChildWorkflowConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_child_workflow`
     and :py:func:`execute_child_workflow`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     id: str | None
@@ -172,6 +184,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
+    event_groups: Sequence[EventGroup] | None
     priority: temporalio.common.Priority
 
 
@@ -198,6 +211,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -226,6 +240,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -254,6 +269,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
@@ -284,6 +300,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[Any, Any]: ...
 
@@ -312,6 +329,7 @@ async def start_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
@@ -349,6 +367,9 @@ async def start_child_workflow(
             UI/CLI. This can be in Temporal markdown format and can span multiple lines. This is
             a fixed value on the workflow that cannot be updated. For details that can be
             updated, use :py:meth:`get_current_details` within the workflow.
+        event_groups: Event Groups to associate this command with, in
+            addition to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
         priority: Priority to use for this workflow.
 
     Returns:
@@ -374,6 +395,7 @@ async def start_child_workflow(
         versioning_intent=versioning_intent,
         static_summary=static_summary,
         static_details=static_details,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -401,6 +423,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -429,6 +452,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -457,6 +481,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -487,6 +512,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -515,6 +541,7 @@ async def execute_child_workflow(
     versioning_intent: VersioningIntent | None = None,
     static_summary: str | None = None,
     static_details: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start a child workflow and wait for completion.
@@ -543,6 +570,7 @@ async def execute_child_workflow(
         versioning_intent=versioning_intent,
         static_summary=static_summary,
         static_details=static_details,
+        event_groups=event_groups,
         priority=priority,
     )
     return await handle
@@ -569,6 +597,8 @@ class ExternalWorkflowHandle(Generic[SelfType]):
     async def signal(
         self,
         signal: MethodSyncOrAsyncNoParam[SelfType, None],
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @overload
@@ -576,6 +606,8 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         self,
         signal: MethodSyncOrAsyncSingleParam[SelfType, ParamType, None],
         arg: ParamType,
+        *,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     @overload
@@ -585,6 +617,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         arg: Any = temporalio.common._arg_unset,
         *,
         args: Sequence[Any] = [],
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> None: ...
 
     async def signal(
@@ -593,6 +626,7 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         arg: Any = temporalio.common._arg_unset,  # type: ignore[reportUnusedParameter]
         *,
         args: Sequence[Any] = [],  # type: ignore[reportUnusedParameter]
+        event_groups: Sequence[EventGroup] | None = None,  # type: ignore[reportUnusedParameter]
     ) -> None:
         """Signal this external workflow.
 
@@ -600,11 +634,18 @@ class ExternalWorkflowHandle(Generic[SelfType]):
             signal: Name or method reference for the signal.
             arg: Single argument to the signal.
             args: Multiple arguments to the signal. Cannot be set if arg is.
+            event_groups: Event Groups to associate this command with, in
+                addition to any from the current Event Group scope.
 
         """
         raise NotImplementedError
 
-    async def cancel(self, *, reason: str = "") -> None:  # pyright: ignore[reportUnusedParameter]
+    async def cancel(
+        self,
+        *,
+        reason: str = "",  # pyright: ignore[reportUnusedParameter]
+        event_groups: Sequence[EventGroup] | None = None,  # pyright: ignore[reportUnusedParameter]
+    ) -> None:
         """Send a cancellation request to this external workflow.
 
         This will fail if the workflow cannot accept the request (e.g. if the
@@ -613,6 +654,8 @@ class ExternalWorkflowHandle(Generic[SelfType]):
         Args:
             reason: Reason recorded with the cancellation request. Available in
                 the target workflow via :py:func:`cancellation_reason`.
+            event_groups: Event Groups to associate this command with, in
+                addition to any from the current Event Group scope.
         """
         raise NotImplementedError
 
@@ -692,6 +735,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -712,6 +756,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -733,6 +778,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -754,6 +800,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -775,6 +822,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn: ...
 
 
@@ -795,6 +843,7 @@ def continue_as_new(
     ) = None,
     versioning_intent: VersioningIntent | None = None,
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> NoReturn:
     """Stop the workflow immediately and continue as new.
 
@@ -819,6 +868,9 @@ def continue_as_new(
         versioning_intent: When using the Worker Versioning feature, specifies whether this Workflow
             should Continue-as-New onto a worker with a compatible Build Id or not.
             Deprecated: Use Worker Deployment versioning instead.
+        event_groups: Event Groups to associate this command with, in
+            addition to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
 
     Returns:
         Never returns, always raises a :py:class:`ContinueAsNewError`.
@@ -840,6 +892,7 @@ def continue_as_new(
         search_attributes=search_attributes,
         versioning_intent=versioning_intent,
         initial_versioning_behavior=initial_versioning_behavior,
+        event_groups=event_groups,
     )
 
 

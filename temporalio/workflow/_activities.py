@@ -25,6 +25,7 @@ from ..types import (
     SelfType,
 )
 from ._context import _Runtime
+from ._event_groups import EventGroup
 from ._exceptions import VersioningIntent
 
 __all__ = [
@@ -85,6 +86,8 @@ class ActivityCancellationType(IntEnum):
 class ActivityConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_activity` and
     :py:func:`execute_activity`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     task_queue: str | None
@@ -97,6 +100,7 @@ class ActivityConfig(TypedDict, total=False):
     activity_id: str | None
     versioning_intent: VersioningIntent | None
     summary: str | None
+    event_groups: Sequence[EventGroup] | None
     priority: temporalio.common.Priority
 
 
@@ -115,6 +119,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -134,6 +139,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -154,6 +160,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -174,6 +181,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -194,6 +202,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -214,6 +223,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -236,6 +246,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]: ...
 
@@ -256,6 +267,7 @@ def start_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
@@ -293,6 +305,9 @@ def start_activity(
             Deprecated: Use Worker Deployment versioning instead.
         summary: A single-line fixed summary for this activity that may appear in UI/CLI.
             This can be in single-line Temporal markdown format.
+        event_groups: Event Groups to associate this command with, in
+            addition to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
         priority: Priority of the activity.
 
     Returns:
@@ -312,6 +327,7 @@ def start_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -331,6 +347,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -350,6 +367,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -370,6 +388,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -390,6 +409,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -410,6 +430,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -430,6 +451,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -452,6 +474,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any: ...
 
@@ -472,6 +495,7 @@ async def execute_activity(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start an activity and wait for completion.
@@ -494,6 +518,7 @@ async def execute_activity(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -513,6 +538,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -532,6 +558,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -552,6 +579,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -572,6 +600,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -592,6 +621,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -612,6 +642,7 @@ def start_activity_class(  # type: ignore[reportOverlappingOverload]
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -631,6 +662,7 @@ def start_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
@@ -651,6 +683,7 @@ def start_activity_class(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -670,6 +703,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -689,6 +723,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -709,6 +744,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -729,6 +765,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -749,6 +786,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -769,6 +807,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -788,6 +827,7 @@ async def execute_activity_class(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
@@ -808,6 +848,7 @@ async def execute_activity_class(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -827,6 +868,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -846,6 +888,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -866,6 +909,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -886,6 +930,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -906,6 +951,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -926,6 +972,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[ReturnType]: ...
 
@@ -945,6 +992,7 @@ def start_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
@@ -965,6 +1013,7 @@ def start_activity_method(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -984,6 +1033,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1003,6 +1053,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1023,6 +1074,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1043,6 +1095,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1063,6 +1116,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1083,6 +1137,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> ReturnType: ...
 
@@ -1102,6 +1157,7 @@ async def execute_activity_method(
     activity_id: str | None = None,
     versioning_intent: VersioningIntent | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
 ) -> Any:
     """Start an activity from a method and wait for completion.
@@ -1124,6 +1180,7 @@ async def execute_activity_method(
         activity_id=activity_id,
         versioning_intent=versioning_intent,
         summary=summary,
+        event_groups=event_groups,
         priority=priority,
     )
 
@@ -1131,6 +1188,8 @@ async def execute_activity_method(
 class LocalActivityConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_local_activity`
     and :py:func:`execute_local_activity`.
+
+    ``event_groups`` is experimental and may change without notice.
     """
 
     schedule_to_close_timeout: timedelta | None
@@ -1141,6 +1200,7 @@ class LocalActivityConfig(TypedDict, total=False):
     cancellation_type: ActivityCancellationType
     activity_id: str | None
     summary: str | None
+    event_groups: Sequence[EventGroup] | None
 
 
 # Overload for async no-param activity
@@ -1156,6 +1216,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1164,14 +1225,15 @@ def start_local_activity(
 def start_local_activity(
     activity: CallableSyncNoParam[ReturnType],
     *,
-    activity_id: str | None = None,
     schedule_to_close_timeout: timedelta | None = None,
     schedule_to_start_timeout: timedelta | None = None,
     start_to_close_timeout: timedelta | None = None,
     retry_policy: temporalio.common.RetryPolicy | None = None,
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
+    activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1189,6 +1251,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1206,6 +1269,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1223,6 +1287,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1240,6 +1305,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1259,6 +1325,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[Any]: ...
 
 
@@ -1276,6 +1343,7 @@ def start_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity and return its handle.
 
@@ -1304,6 +1372,9 @@ def start_local_activity(
             advanced setting that should not be set unless users are sure they
             need to. Contact Temporal before setting this value.
         summary: Optional summary for the activity.
+        event_groups: Event Groups to associate this command with, in
+            addition to those active in the current scope. See
+            :py:func:`temporalio.workflow.create_event_group`.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -1320,6 +1391,7 @@ def start_local_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -1336,6 +1408,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1352,6 +1425,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1369,6 +1443,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1386,6 +1461,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1403,6 +1479,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1420,6 +1497,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1439,6 +1517,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> Any: ...
 
 
@@ -1456,6 +1535,7 @@ async def execute_local_activity(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> Any:
     """Start a local activity and wait for completion.
 
@@ -1475,6 +1555,7 @@ async def execute_local_activity(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -1490,6 +1571,8 @@ def start_local_activity_class(
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1505,6 +1588,8 @@ def start_local_activity_class(
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1521,6 +1606,8 @@ def start_local_activity_class(
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1537,6 +1624,8 @@ def start_local_activity_class(
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1553,6 +1642,8 @@ def start_local_activity_class(
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1569,6 +1660,8 @@ def start_local_activity_class(  # type: ignore[reportOverlappingOverload]
     local_retry_threshold: timedelta | None = None,
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
+    summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1585,6 +1678,7 @@ def start_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a callable class.
 
@@ -1602,6 +1696,7 @@ def start_local_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -1618,6 +1713,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1634,6 +1730,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1651,6 +1748,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1668,6 +1766,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1685,6 +1784,7 @@ async def execute_local_activity_class(  # type: ignore[reportOverlappingOverloa
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1702,6 +1802,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1718,6 +1819,7 @@ async def execute_local_activity_class(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> Any:
     """Start a local activity from a callable class and wait for completion.
 
@@ -1737,6 +1839,7 @@ async def execute_local_activity_class(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -1753,6 +1856,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1769,6 +1873,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1786,6 +1891,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1803,6 +1909,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1820,6 +1927,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1837,6 +1945,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -1853,6 +1962,7 @@ def start_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ActivityHandle[Any]:
     """Start a local activity from a method.
 
@@ -1870,6 +1980,7 @@ def start_local_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
 
 
@@ -1886,6 +1997,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1902,6 +2014,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1919,6 +2032,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1936,6 +2050,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1953,6 +2068,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1970,6 +2086,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> ReturnType: ...
 
 
@@ -1986,6 +2103,7 @@ async def execute_local_activity_method(
     cancellation_type: ActivityCancellationType = ActivityCancellationType.TRY_CANCEL,
     activity_id: str | None = None,
     summary: str | None = None,
+    event_groups: Sequence[EventGroup] | None = None,
 ) -> Any:
     """Start a local activity from a method and wait for completion.
 
@@ -2005,4 +2123,5 @@ async def execute_local_activity_method(
         cancellation_type=cancellation_type,
         activity_id=activity_id,
         summary=summary,
+        event_groups=event_groups,
     )
