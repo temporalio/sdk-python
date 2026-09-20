@@ -27,8 +27,8 @@ to include examples, links to docs, or any other relevant information.
 - Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
-- The `deepagents` extra now requires `deepagents>=0.7.12,<0.8` (was `<0.7`). Because
-  deepagents 0.7 requires `langsmith>=0.11.2`, the `langsmith` extra now allows
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
   `langsmith<0.13` (was `<0.9`).
 
 ### Deprecated
