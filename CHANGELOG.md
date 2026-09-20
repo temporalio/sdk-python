@@ -56,16 +56,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `temporalio.contrib.deepagents.TemporalBackend` mirrors the wrapped backend's optional
-  capabilities at class level, where deepagents 0.7 checks them: `delete` / `adelete` are
-  offered (and run as `deepagents.backend_op` Activities) only for a delete-capable backend,
-  and `execute` / `aexecute` only for an execution-capable one, so a wrapped filesystem or
-  store backend no longer advertises a shell tool that could only fail. User subclasses of
-  `TemporalBackend` get the same mirroring.
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
 - `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
-  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`: its
-  `execute` / `aexecute` dispatchers carry the wrapped backend's signatures, which deepagents
-  inspects to decide whether a backend accepts `timeout`.
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
