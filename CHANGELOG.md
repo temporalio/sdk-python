@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
   Workflow-level metadata that allows for improved visibility into a Workflow execution's history
   by grouping logically related Events together based on user-defined or system-inferred criteria.
@@ -42,8 +44,16 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
 ### Fixed
 
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
