@@ -340,8 +340,8 @@ class _ReplaySafeRunTree(RunTree):
         """Patch the run to LangSmith, skipping during replay.
 
         ``exclude_inputs`` is forwarded untouched so LangSmith's own default
-        applies (a plain ``False`` before 0.12; the
-        ``LANGSMITH_EXCLUDE_INPUTS_ON_PATCH`` setting from 0.12 on).
+        applies (a plain ``False`` before 0.11; the
+        ``LANGSMITH_EXCLUDE_INPUTS_ON_PATCH`` setting from 0.11 on).
         """
         if temporalio.workflow.in_workflow():
             if _is_replaying():

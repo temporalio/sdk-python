@@ -236,7 +236,7 @@ class TestExecutorBackedPostPatch:
 
         executor.shutdown(wait=True)
         # No argument means "LangSmith's default": forwarded as None, never
-        # resolved to a bool here (0.12 reads LANGSMITH_EXCLUDE_INPUTS_ON_PATCH).
+        # resolved to a bool here (0.11 reads LANGSMITH_EXCLUDE_INPUTS_ON_PATCH).
         mock_run.patch.assert_called_once_with(exclude_inputs=None)
 
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
