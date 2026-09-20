@@ -13,6 +13,7 @@ A state-only backend needs no wrapping — that path is covered against the real
 from __future__ import annotations
 
 import gc
+import inspect
 import sys
 import uuid
 from datetime import timedelta
@@ -201,6 +202,45 @@ def test_temporal_backend_mirrors_inner_execution_support(tmp_path: Path) -> Non
     assert supports_execution(shell_inner) is True
 
 
+def test_temporal_backend_mirrors_execute_timeout_support(tmp_path: Path) -> None:
+    # deepagents gates the execute tool's per-command ``timeout`` on a
+    # SIGNATURE probe: ``execute_accepts_timeout(type(backend))`` looks for a
+    # ``timeout`` parameter on ``execute`` and, unlike the ``max_count`` probe,
+    # does not take ``**kwargs`` as a stand-in. A bare ``(*args, **kwargs)``
+    # dispatcher read False, so a wrapped LocalShellBackend refused a timeout
+    # its unwrapped self accepts.
+    protocol = pytest.importorskip("deepagents.backends.protocol")
+
+    shell_inner = LocalShellBackend(root_dir=str(tmp_path))
+    shell = TemporalBackend(shell_inner)
+    assert protocol.execute_accepts_timeout(type(shell_inner)) is True
+    assert protocol.execute_accepts_timeout(type(shell)) is True
+    for op in ("execute", "aexecute"):
+        assert inspect.signature(getattr(type(shell), op)) == inspect.signature(
+            getattr(type(shell_inner), op)
+        )
+    # The ``max_count`` probe, which does accept ``**kwargs``, still passes.
+    assert protocol._method_accepts_max_count(type(shell), "grep") is True
+
+    # A sandbox whose execute takes no timeout (deepagents' "older backend
+    # package" case) must read False wrapped too: deepagents then declines the
+    # call up front instead of the forwarded keyword failing inside the
+    # activity. Built with type(): a class statement cannot name its base off
+    # the importorskip module for the type checkers.
+    def execute_without_timeout(_self: Any, command: str) -> str:
+        return command
+
+    NoTimeoutSandbox = type(
+        "NoTimeoutSandbox",
+        (protocol.SandboxBackendProtocol,),
+        {"execute": execute_without_timeout},
+    )
+    no_timeout = TemporalBackend(NoTimeoutSandbox())
+    assert protocol.execute_accepts_timeout(NoTimeoutSandbox) is False
+    assert protocol.execute_accepts_timeout(type(no_timeout)) is False
+    assert type(no_timeout) is not type(shell)
+
+
 def test_temporal_backend_subclass_keeps_capability_mirroring() -> None:
     protocol = pytest.importorskip("deepagents.backends.protocol")
 
@@ -235,7 +275,10 @@ class ShellBackendWorkflow:
             activity_options={"start_to_close_timeout": timedelta(seconds=30)},
         )
         result = await backend.aexecute("echo shell-ok")
-        return str(getattr(result, "output", result))
+        # The per-command timeout deepagents forwards to a timeout-capable
+        # sandbox crosses the activity boundary along with the command.
+        timed = await backend.aexecute("echo shell-timeout-ok", timeout=5)
+        return f"{getattr(result, 'output', result)}|{getattr(timed, 'output', timed)}"
 
 
 @pytest.mark.asyncio
@@ -258,8 +301,85 @@ async def test_temporal_backend_execute_runs_as_activity(
         out = await handle.result()
 
     assert "shell-ok" in out
+    assert "shell-timeout-ok" in out
     counts = await count_scheduled_activities(handle)
+    # One activity per execute call; the second carried ``timeout=5``.
+    assert counts[BACKEND_OP] == 2, counts
+
+
+@workflow.defn
+class ShellAgentWorkflow:
+    @workflow.run
+    async def run(self, root_dir: str) -> str:
+        backend = TemporalBackend(
+            LocalShellBackend(root_dir=root_dir),
+            activity_options={"start_to_close_timeout": timedelta(seconds=30)},
+        )
+        agent = create_deep_agent(
+            model="anthropic:claude-sonnet-4-5",
+            backend=backend,
+            system_prompt="Run the command, then report its output.",
+        )
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": "Run it."}]}
+        )
+        # The execute tool's own message says whether deepagents ran the
+        # command or declined the timeout up front.
+        return "\n".join(str(m.content) for m in result["messages"] if m.type == "tool")
+
+
+@pytest.mark.asyncio
+async def test_agent_execute_tool_forwards_timeout_through_backend(
+    env: WorkflowEnvironment, tmp_path: Path
+) -> None:
+    """deepagents' built-in ``execute`` tool, called WITH a per-command
+    ``timeout``, runs through a TemporalBackend-wrapped LocalShellBackend.
+
+    Regression: deepagents gates the timeout on
+    ``execute_accepts_timeout(type(backend))``, a signature probe for a
+    ``timeout`` parameter on ``execute``. The dispatcher's bare
+    ``(*args, **kwargs)`` read False, so the tool answered "does not support
+    per-command timeout overrides" for a backend that accepts one unwrapped.
+    """
+    from langchain_core.messages import AIMessage
+
+    from temporalio.contrib.deepagents.testing import mock_model_provider
+
+    execute_turn = AIMessage(
+        content="",
+        tool_calls=[
+            {
+                "name": "execute",
+                "args": {"command": "echo tool-timeout-ok", "timeout": 5},
+                "id": "call-execute",
+            }
+        ],
+    )
+    final = AIMessage(content="Done.")
+    plugin = DeepAgentsPlugin(
+        model_provider=mock_model_provider([execute_turn, final]),
+    )
+    async with Worker(
+        env.client,
+        task_queue="da-shell-agent",
+        workflows=[ShellAgentWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            ShellAgentWorkflow.run,
+            str(tmp_path),
+            id=f"da-shell-agent-{uuid.uuid4()}",
+            task_queue="da-shell-agent",
+        )
+        out = await handle.result()
+
+    assert "tool-timeout-ok" in out, out
+    assert "does not support per-command timeout" not in out, out
+    counts = await count_scheduled_activities(handle)
+    # The command ran as an activity, not in the workflow.
     assert counts[BACKEND_OP] == 1, counts
+    assert counts["deepagents.invoke_model"] == 2, counts
 
 
 def test_temporal_backend_unregisters_on_gc() -> None:

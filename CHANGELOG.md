@@ -43,6 +43,10 @@ to include examples, links to docs, or any other relevant information.
   and `execute` / `aexecute` only for an execution-capable one, so a wrapped filesystem or
   store backend no longer advertises a shell tool that could only fail. User subclasses of
   `TemporalBackend` get the same mirroring.
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`: its
+  `execute` / `aexecute` dispatchers carry the wrapped backend's signatures, which deepagents
+  inspects to decide whether a backend accepts `timeout`.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
