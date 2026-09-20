@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
+  UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
+  without reading or advancing any workflow state.
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
   graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
@@ -44,14 +47,13 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
-- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
-- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
-  workflow's deterministic random stream. A workflow started under an earlier release that calls
-  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
-  across the upgrade; drain such workflows or use worker versioning.
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`; 2.8.0 is the
+  first release with the `google.adk.platform._random` seam the plugin now installs a provider for.
 
 ### Fixed
 
+- `GoogleAdkPlugin` now applies its deterministic time, id, and random providers inside
+  workflow tasks.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
