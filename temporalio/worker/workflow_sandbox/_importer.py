@@ -258,7 +258,9 @@ class Importer:
                 sys.modules[full_name] = new_mod
                 new_spec.loader.exec_module(new_mod)
 
-        mod = importlib.__import__(name, globals, locals, fromlist, level)
+        mod = _loaded_module_for_import(full_name, fromlist, level)
+        if mod is None:
+            mod = importlib.__import__(name, globals, locals, fromlist, level)
         # Check for restrictions if necessary and apply
         if mod.__name__ not in self.modules_checked_for_restrictions:
             self.modules_checked_for_restrictions.add(mod.__name__)
@@ -537,6 +539,27 @@ def _get_thread_local_builtin(name: str) -> _ThreadLocalCallable:
         ret = _ThreadLocalCallable(getattr(builtins, name))
         _thread_local_builtins[name] = ret
     return ret
+
+
+def _loaded_module_for_import(
+    full_name: str, fromlist: Sequence[str], level: int
+) -> types.ModuleType | None:
+    # The failing GC warning path uses an ordinary absolute import. Leave the
+    # more involved forms, which may load children or run module hooks, to importlib.
+    if fromlist or level:
+        return None
+    mod = _fully_imported(full_name)
+    if mod is None:
+        return None
+    top = full_name.partition(".")[0]
+    return mod if top == full_name else _fully_imported(top)
+
+
+def _fully_imported(name: str) -> types.ModuleType | None:
+    mod = sys.modules.get(name)
+    if mod is None or getattr(getattr(mod, "__spec__", None), "_initializing", False):
+        return None
+    return mod
 
 
 def _resolve_module_name(
