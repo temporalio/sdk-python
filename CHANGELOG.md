@@ -64,6 +64,8 @@ to include examples, links to docs, or any other relevant information.
 - A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
   workflow and activity user metadata are serialized with theirs. This covers the static summary
   sent when starting an operation, and the summary and details read back from a description.
+- Unified the Nexus link converters. Link URLs are now checked for the `temporal` scheme, and
+  `eventID` is omitted when unset rather than sent as `0`.
 
 ### Security
 
