@@ -578,6 +578,8 @@ class Client:
             id_conflict_policy: Behavior when a workflow is currently running with the same ID.
                 Default is UNSPECIFIED, which effectively means fail the start attempt.
                 Set to USE_EXISTING for idempotent deduplication on workflow ID.
+                With Temporal Server 1.32.0 or later, the returned handle is
+                scoped to the existing workflow's run chain.
                 Cannot be set if ``id_reuse_policy`` is set to TERMINATE_IF_RUNNING.
             id_reuse_policy: Behavior when a closed workflow with the same ID exists.
                 Default is ALLOW_DUPLICATE.
@@ -1200,7 +1202,9 @@ class Client:
                 WorkflowHandle(
                     self,
                     start_workflow_operation._start_workflow_input.id,
-                    first_execution_run_id=start_response.run_id,
+                    first_execution_run_id=(
+                        start_response.first_execution_run_id or start_response.run_id
+                    ),
                     result_run_id=start_response.run_id,
                     result_type=start_workflow_operation._start_workflow_input.ret_type,
                 )

@@ -16,6 +16,7 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.errordetails.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -324,6 +325,38 @@ async def test_rpc_already_exists_error_is_raised(client: Client):
         with pytest.raises(RPCError) as err:
             await client.start_workflow("fake", id="fake", task_queue="fake")
     assert err.value.status == RPCStatusCode.ALREADY_EXISTS
+
+
+async def test_workflow_already_started_error_has_first_run_id(client: Client):
+    details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure(
+        run_id="current-run-id",
+        first_execution_run_id="first-run-id",
+    )
+    packed_details = google.protobuf.any_pb2.Any()
+    packed_details.Pack(details)
+    already_exists_err = RPCError(
+        "fake already exists error", RPCStatusCode.ALREADY_EXISTS, b""
+    )
+    already_exists_err._grpc_status = temporalio.api.common.v1.GrpcStatus(
+        details=[packed_details]
+    )
+
+    async def start_workflow_execution(
+        req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
+        *,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse:
+        raise already_exists_err
+
+    with mock.patch.object(
+        client.workflow_service, "start_workflow_execution", start_workflow_execution
+    ):
+        with pytest.raises(WorkflowAlreadyStartedError) as err:
+            await client.start_workflow("fake", id="fake", task_queue="fake")
+    assert err.value.run_id == "current-run-id"
+    assert err.value.first_run_id == "first-run-id"
 
 
 async def test_cancel_not_found(client: Client):

@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
+  ID when provided by the server.
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
   graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
@@ -52,6 +54,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Workflow handles returned when a start attaches to a running workflow now use
+  the server-provided first execution run ID with Temporal Server 1.32.0 or
+  later.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
