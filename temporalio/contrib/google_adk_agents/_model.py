@@ -5,6 +5,8 @@ from datetime import timedelta
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
+from google.genai import types
+from pydantic import TypeAdapter
 
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -89,6 +91,25 @@ async def invoke_model_streaming(
             events.publish(response)
 
     return responses
+
+
+def _with_serializable_response_schema(llm_request: LlmRequest) -> LlmRequest:
+    """Return the request with a ``response_schema`` that can be serialized.
+
+    ADK stores an agent's ``output_schema`` on the request as a Python type
+    (for example a Pydantic model class), which the payload converter cannot
+    serialize. google-genai and ADK's LiteLlm both turn such a type into its
+    JSON schema before calling the model, so sending the JSON schema instead
+    is equivalent.
+    """
+    schema = llm_request.config.response_schema
+    if schema is None or isinstance(schema, (dict, types.Schema)):
+        return llm_request
+    request = llm_request.model_copy()
+    request.config = llm_request.config.model_copy(
+        update={"response_schema": TypeAdapter(schema).json_schema()}
+    )
+    return request
 
 
 class TemporalModel(BaseLlm):
@@ -183,6 +204,7 @@ class TemporalModel(BaseLlm):
                 if agent_name:
                     config["summary"] = agent_name
 
+        llm_request = _with_serializable_response_schema(llm_request)
         if stream:
             if self._streaming_topic is None:
                 raise ApplicationError(
