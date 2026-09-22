@@ -141,6 +141,7 @@ async def test_start_id_reuse(
         )
         await handle.result()
     assert err.value.run_id == handle.result_run_id
+    assert err.value.first_run_id == handle.first_execution_run_id
 
     # Run again allowing duplicate (the default)
     handle = await client.start_workflow(

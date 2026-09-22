@@ -7072,6 +7072,19 @@ class IDConflictWorkflow:
         await workflow.wait_condition(lambda: False)
 
 
+@workflow.defn
+class IDConflictContinueAsNewWorkflow:
+    @workflow.run
+    async def run(self, continue_as_new: bool) -> None:
+        if continue_as_new:
+            workflow.continue_as_new(False)
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.signal
+    def attach(self) -> None:
+        pass
+
+
 async def test_workflow_id_conflict(client: Client):
     async with new_worker(client, IDConflictWorkflow) as worker:
         # Start a workflow
@@ -7128,6 +7141,50 @@ async def test_workflow_id_conflict(client: Client):
         assert new_handle.run_id != handle.run_id
         assert (await handle.describe()).status == WorkflowExecutionStatus.TERMINATED
         assert (await new_handle.describe()).status == WorkflowExecutionStatus.RUNNING
+
+
+@pytest.mark.parametrize("signal_with_start", [False, True])
+async def test_workflow_id_conflict_use_existing_first_execution_run_id(
+    client: Client, env: WorkflowEnvironment, signal_with_start: bool
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server does not return first execution run ID from start"
+        )
+    async with new_worker(client, IDConflictContinueAsNewWorkflow) as worker:
+        workflow_id = f"wf-{uuid.uuid4()}"
+        original_handle = await client.start_workflow(
+            IDConflictContinueAsNewWorkflow.run,
+            True,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+        first_execution_run_id = original_handle.first_execution_run_id
+        assert first_execution_run_id is not None
+
+        async def current_run_id() -> str:
+            return (await client.get_workflow_handle(workflow_id).describe()).run_id
+
+        async def assert_continued_as_new() -> None:
+            assert await current_run_id() != first_execution_run_id
+
+        await assert_eventually(assert_continued_as_new)
+        current_execution_run_id = await current_run_id()
+
+        attached_handle = await client.start_workflow(
+            IDConflictContinueAsNewWorkflow.run,
+            False,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            start_signal="attach" if signal_with_start else None,
+        )
+        assert attached_handle.result_run_id == current_execution_run_id
+        assert attached_handle.first_execution_run_id == first_execution_run_id
+
+        await attached_handle.cancel()
+        with pytest.raises(WorkflowFailureError):
+            await original_handle.result()
 
 
 @workflow.defn

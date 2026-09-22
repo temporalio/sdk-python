@@ -58,16 +58,24 @@ class WorkflowAlreadyStartedError(FailureError):
         workflow_type: Workflow type name of the already-started workflow.
         run_id: Run ID of the already-started workflow if this was raised by the
             client.
+        first_run_id: First execution run ID of the already-started workflow if
+            this was raised by the client and provided by the server.
     """
 
     def __init__(
-        self, workflow_id: str, workflow_type: str, *, run_id: str | None = None
+        self,
+        workflow_id: str,
+        workflow_type: str,
+        *,
+        run_id: str | None = None,
+        first_run_id: str | None = None,
     ) -> None:
         """Initialize a workflow already started error."""
         super().__init__("Workflow execution already started")
         self.workflow_id = workflow_id
         self.workflow_type = workflow_type
         self.run_id = run_id
+        self.first_run_id = first_run_id
 
 
 class ActivityAlreadyStartedError(FailureError):
