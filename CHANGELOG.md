@@ -34,11 +34,7 @@ to include examples, links to docs, or any other relevant information.
   `temporalio.contrib.openai_agents` imports. New code should depend on
   `temporalio-openai-agents` directly and import `temporalio.openai_agents`.
 - `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and
-  `seed_trace_id()`. They existed for the OpenAI Agents OTel interceptor, which now propagates
-  the caller's span as a remote parent instead of re-minting it under the caller's IDs; nothing
-  in the SDK or in `temporalio-openai-agents` calls them. To connect a trace across a boundary,
-  set a remote-parent `SpanContext`; to control the ID sequence, pass your own `IdGenerator` to
-  `create_tracer_provider(id_generator=...)`.
+  `seed_trace_id()`.
 
 ### Fixed
 
