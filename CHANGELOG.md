@@ -52,6 +52,7 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Clarify activity and child workflow return-value conversion errors without hiding their original causes.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.

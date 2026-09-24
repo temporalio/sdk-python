@@ -907,9 +907,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if job.result.completed.HasField("result"):
                 ret_types = [handle._input.ret_type] if handle._input.ret_type else None
                 ret_vals = self._convert_payloads(
-                    [job.result.completed.result],
-                    ret_types,
-                    payload_converter,
+                    payloads=[job.result.completed.result],
+                    types=ret_types,
+                    payload_converter=payload_converter,
+                    failure_message=f"Failed to decode return value of activity {handle._input.activity}",
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
@@ -945,9 +946,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             if job.result.completed.HasField("result"):
                 ret_types = [handle._input.ret_type] if handle._input.ret_type else None
                 ret_vals = self._convert_payloads(
-                    [job.result.completed.result],
-                    ret_types,
-                    handle._payload_converter,
+                    payloads=[job.result.completed.result],
+                    types=ret_types,
+                    payload_converter=handle._payload_converter,
+                    failure_message=f"Failed to decode return value of child workflow {handle._input.workflow}",
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
@@ -1162,9 +1164,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
-                result_payloads = self._workflow_context_payload_converter.to_payloads(
-                    [result]
-                )
+                try:
+                    result_payloads = (
+                        self._workflow_context_payload_converter.to_payloads([result])
+                    )
+                except Exception as err:
+                    error = RuntimeError(
+                        f"Failed to encode return value of workflow {self._info.workflow_type}"
+                    )
+                    # Wrapping must not change whether the workflow or its task fails.
+                    if self.workflow_is_failure_exception(
+                        err
+                    ) or self.workflow_is_failure_exception(error):
+                        raise
+                    raise error from err
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
@@ -2416,6 +2429,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         payloads: Sequence[temporalio.api.common.v1.Payload],
         types: list[type] | None,
         payload_converter: temporalio.converter.PayloadConverter,
+        *,
+        failure_message: str = "Failed decoding arguments",
     ) -> list[Any]:
         if not payloads:
             return []
@@ -2430,7 +2445,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         except Exception as err:
             if self.workflow_is_failure_exception(err):
                 raise
-            raise RuntimeError("Failed decoding arguments") from err
+            raise RuntimeError(failure_message) from err
 
     def _payload_converter_with_context(
         self,
