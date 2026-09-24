@@ -99,10 +99,11 @@ temporalio.converter.transfer_type_convertible(_FailureTransferValueConverter)(
 
 class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
     def __init__(
-        self, expected_payload_converter: temporalio.converter.PayloadConverter
+        self,
+        expected_payload_converter_type: type[temporalio.converter.PayloadConverter],
     ) -> None:
         super().__init__()
-        self.expected_payload_converter = expected_payload_converter
+        self.expected_payload_converter_type = expected_payload_converter_type
         self.to_failure_calls = 0
         self.from_failure_calls = 0
 
@@ -112,7 +113,7 @@ class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
         payload_converter: temporalio.converter.PayloadConverter,
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
-        assert payload_converter is self.expected_payload_converter
+        assert isinstance(payload_converter, self.expected_payload_converter_type)
         self.to_failure_calls += 1
         super().to_failure(exception, payload_converter, failure)
 
@@ -121,7 +122,7 @@ class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
         failure: temporalio.api.failure.v1.Failure,
         payload_converter: temporalio.converter.PayloadConverter,
     ) -> BaseException:
-        assert payload_converter is self.expected_payload_converter
+        assert isinstance(payload_converter, self.expected_payload_converter_type)
         self.from_failure_calls += 1
         return super().from_failure(failure, payload_converter)
 
@@ -433,8 +434,8 @@ def _new_system_nexus_request_payload() -> temporalio.api.common.v1.Payload:
     assert nested_payload is not None
     request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest()
     request.input.payloads.add().CopyFrom(nested_payload)
-    payload = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     ).to_payload(request)
     assert payload is not None
@@ -459,8 +460,8 @@ async def test_nexus_payload_serializer_decodes_system_input() -> None:
         namespace="target-namespace",
         headers={"test-header": "header-value"},
     )
-    payload = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     ).to_payload(request)
     assert payload is not None
@@ -493,8 +494,8 @@ async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
         signal="test-signal",
         namespace="target-namespace",
     )
-    payload = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     ).to_payload(request)
     assert payload is not None
@@ -541,8 +542,8 @@ async def test_schedule_marked_system_nexus_payload_ignores_endpoint() -> None:
 
     schedule = completion.successful.commands[0].schedule_nexus_operation
     data_converter = temporalio.converter.default()
-    decoded = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    decoded = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     ).from_payload(schedule.input)
     assert isinstance(
@@ -568,8 +569,8 @@ async def test_schedule_unmarked_system_nexus_payload_visits_input_as_regular_pa
     schedule = completion.successful.commands[0].schedule_nexus_operation
     assert schedule.input.metadata["visited"] == b"true"
     data_converter = temporalio.converter.default()
-    decoded = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    decoded = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     ).from_payload(schedule.input)
     assert isinstance(
@@ -691,8 +692,8 @@ def _field_is_repeated(field: FieldDescriptor) -> bool:
 )
 def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
     data_converter = temporalio.converter.default()
-    payload_converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload_converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     )
     proto_value = _build_proto_sample(message_type)
@@ -707,9 +708,9 @@ def test_system_nexus_proto_roundtrip(message_type: type[Message]) -> None:
 
 
 def test_system_nexus_uses_user_failure_converter() -> None:
-    payload_converter = temporalio.converter.default().payload_converter
-    failure_converter = _TrackingFailureConverter(payload_converter)
-    system_converter = nexus_system._get_payload_converter(
+    payload_converter = temporalio.converter.default()._get_internal_payload_converter()
+    failure_converter = _TrackingFailureConverter(DefaultPayloadConverter)
+    system_converter = nexus_system._get_system_nexus_payload_converter(
         payload_converter, failure_converter
     )
 
@@ -733,7 +734,7 @@ def test_system_nexus_uses_user_failure_converter() -> None:
 def test_system_nexus_payload_converter_restores_user_context_on_failure() -> None:
     outer_data_converter = temporalio.converter.default()
     outer_converters = nexus_system._SystemNexusUserConverters(
-        outer_data_converter.payload_converter,
+        outer_data_converter._get_internal_payload_converter(),
         outer_data_converter.failure_converter,
     )
     inner_data_converter = temporalio.converter.DataConverter()
@@ -745,11 +746,11 @@ def test_system_nexus_payload_converter_restores_user_context_on_failure() -> No
             payload_converter: temporalio.converter.PayloadConverter,
             failure: temporalio.api.failure.v1.Failure,
         ) -> None:
-            assert payload_converter is inner_data_converter.payload_converter
+            assert isinstance(payload_converter, DefaultPayloadConverter)
             raise ValueError("conversion failed")
 
-    inner_system_converter = nexus_system._get_payload_converter(
-        inner_data_converter.payload_converter,
+    inner_system_converter = nexus_system._get_system_nexus_payload_converter(
+        inner_data_converter._get_internal_payload_converter(),
         RaisingFailureConverter(),
     )
 
@@ -832,20 +833,24 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
 
     captured_contexts: list[SerializationContext | None] = []
     system_payload_converter_wrap_count = 0
-    original_get_payload_converter = nexus_system._get_payload_converter
+    original_get_system_nexus_payload_converter = (
+        nexus_system._get_system_nexus_payload_converter
+    )
 
-    def capture_get_payload_converter(
-        user_payload_converter: temporalio.converter.PayloadConverter,
+    def capture_get_system_nexus_payload_converter(
+        internal_payload_converter: temporalio.converter.PayloadConverter,
         user_failure_converter: temporalio.converter.FailureConverter,
     ) -> temporalio.converter.PayloadConverter:
         nonlocal system_payload_converter_wrap_count
         system_payload_converter_wrap_count += 1
-        return original_get_payload_converter(
-            user_payload_converter, user_failure_converter
+        return original_get_system_nexus_payload_converter(
+            internal_payload_converter, user_failure_converter
         )
 
     monkeypatch.setattr(
-        nexus_system, "_get_payload_converter", capture_get_payload_converter
+        nexus_system,
+        "_get_system_nexus_payload_converter",
+        capture_get_system_nexus_payload_converter,
     )
     caller_config = env.client.config()
     caller_config["data_converter"] = dataclasses.replace(

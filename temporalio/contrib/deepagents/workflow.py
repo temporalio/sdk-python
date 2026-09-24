@@ -3,8 +3,9 @@
 Everything here runs *inside* the workflow. The dispatch helpers
 (:func:`call_model` / :func:`call_tool` / :func:`call_backend_op`) are the single
 choke point through which the in-workflow model / tool / backend stubs reach
-their activities; they also consult the continue-as-new result cache so work
-done before a ``continue_as_new`` is reused rather than repeated after it.
+their activities. Every dispatch runs its own Activity; only executions
+recorded before the ``deepagents.retire-result-cache`` patch consult the
+legacy continue-as-new result cache during replay.
 
 :func:`run_deep_agent` is the optional driver that adds continue-as-new
 state-carry around a native ``agent.ainvoke(...)`` — plain ``agent.ainvoke(...)``
@@ -24,6 +25,7 @@ from temporalio.exceptions import ApplicationError
 
 # Reserved key under which the CAN result cache rides inside a state snapshot.
 _CACHE_KEY = "__temporal_cache__"
+_INPUT_CARRIED_KEY = "__temporal_input_in_transcript__"
 
 # Checkpointer classes that keep their state in the workflow's own memory and are
 # therefore rehydrated for free by deterministic replay. Anything else does its
@@ -77,6 +79,34 @@ class DeepAgentsWorkflowError(ApplicationError):
 # ---------------------------------------------------------------------------
 
 
+def _legacy_lookup(kind: str, name: str, payload: Any) -> tuple[str | None, bool, Any]:
+    """Legacy-cache lookup: ``(key, hit, value)``; key is None on new executions."""
+    if not _legacy_result_cache():
+        return None, False, None
+    key = _serde.cache_key(kind, name, payload)
+    hit, value = _serde.cache_lookup(key)
+    return key, hit, value
+
+
+def _legacy_result_cache() -> bool:
+    """Whether this execution uses the legacy continue-as-new result cache.
+
+    New executions do not cache at all: repeated identical calls are
+    legitimate work (a re-issued tool call, a deliberate model resample, a
+    re-read after a write), and under the resume-from-transcript
+    continue-as-new semantics a continued run never re-executes prior
+    dispatches — so a carried cache entry could only ever serve a stale
+    result to a genuinely new call. Replay of a single run needs no cache:
+    history supplies recorded activity results.
+
+    Patch-gated because histories recorded under the legacy cache contain
+    dedup decisions (a repeated call answered with no activity scheduled);
+    replaying them without the cache would emit commands history does not
+    have.
+    """
+    return not workflow.patched("deepagents.retire-result-cache")
+
+
 async def call_model(
     activity_name: str,
     activity_input: _activity.ModelActivityInput,
@@ -84,13 +114,12 @@ async def call_model(
     summary: str,
     **opts: Any,
 ) -> _activity.ModelActivityOutput:
-    """Dispatch one model call, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key(
+    """Dispatch one model call as its own Activity."""
+    legacy_key, hit, cached = _legacy_lookup(
         "model",
         activity_input.model_name,
         [activity_input.messages, activity_input.tool_schemas],
     )
-    hit, cached = _serde.cache_lookup(key)
     if hit:
         return _activity.ModelActivityOutput(message=cached)
     output = await workflow.execute_activity(
@@ -100,7 +129,8 @@ async def call_model(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.message)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.message)
     return output
 
 
@@ -110,9 +140,10 @@ async def call_tool(
     summary: str,
     **opts: Any,
 ) -> _activity.ToolActivityOutput:
-    """Dispatch one tool call, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key("tool", activity_input.tool_name, activity_input.args)
-    hit, cached = _serde.cache_lookup(key)
+    """Dispatch one tool call as its own Activity."""
+    legacy_key, hit, cached = _legacy_lookup(
+        "tool", activity_input.tool_name, activity_input.args
+    )
     if hit:
         return _activity.ToolActivityOutput(message=cached)
     output = await workflow.execute_activity(
@@ -122,7 +153,8 @@ async def call_tool(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.message)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.message)
     return output
 
 
@@ -132,13 +164,12 @@ async def call_backend_op(
     summary: str,
     **opts: Any,
 ) -> _activity.BackendOpOutput:
-    """Dispatch one backend op, reusing a cached result across continue-as-new."""
-    key = _serde.cache_key(
+    """Dispatch one backend op as its own Activity."""
+    legacy_key, hit, cached = _legacy_lookup(
         f"backend:{activity_input.backend_ref}",
         activity_input.op,
         [activity_input.args, activity_input.kwargs],
     )
-    hit, cached = _serde.cache_lookup(key)
     if hit:
         return _activity.BackendOpOutput(result=cached)
     output = await workflow.execute_activity(
@@ -148,7 +179,8 @@ async def call_backend_op(
         summary=summary,
         **opts,
     )
-    _serde.cache_put(key, output.result)
+    if legacy_key is not None:
+        _serde.cache_put(legacy_key, output.result)
     return output
 
 
@@ -158,7 +190,18 @@ async def call_backend_op(
 
 
 def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
-    """Prepend a snapshot's carried messages onto the next turn's input."""
+    """Prepend a snapshot's carried messages onto the next turn's input.
+
+    The driver's own continue-as-new re-invocation avoids duplicating the
+    original prompt: a Mapping input travels without its "messages" key, and
+    a bare (non-Mapping) prompt travels as-is with a snapshot marker telling
+    this merge not to re-append it (the type must survive for the user's
+    ``@workflow.run`` signature). An externally supplied ``state_snapshot``
+    plus a fresh input still composes: carried history first, new input
+    after. Agents are expected to return the accumulated transcript in
+    ``result["messages"]`` (as deepagents/LangGraph reducers do) — the carry
+    only strips input messages when the transcript is non-empty.
+    """
     raw_prior: Any = snapshot.get("messages") or []
     prior = list(raw_prior)
     if not prior:
@@ -168,6 +211,12 @@ def _merge_snapshot(input: Any, snapshot: Mapping[str, Any]) -> Any:
         raw_next: Any = input.get("messages") or []
         merged["messages"] = [*prior, *list(raw_next)]
         return merged
+    if _INPUT_CARRIED_KEY in snapshot and snapshot[_INPUT_CARRIED_KEY] == input:
+        # Internal continue-as-new of a bare prompt: this exact input is
+        # already in the transcript; it rode along only to preserve its type.
+        # A DIFFERENT bare input (an externally harvested snapshot plus a
+        # fresh prompt) falls through and composes as usual.
+        return {"messages": prior}
     return {"messages": [*prior, *_as_message_list(input)]}
 
 
@@ -186,10 +235,9 @@ async def run_deep_agent(
 ) -> Any:
     """Drive ``agent.ainvoke(input)`` with continue-as-new state carry.
 
-    Once the completed turn leaves pending todos AND history has grown past the
-    limit, the turn's state (messages + the model/tool result cache) is
-    snapshotted and carried into a fresh run via ``workflow.continue_as_new``,
-    so long conversations do not accumulate unbounded history.
+    Once a completed turn leaves pending todos and history has grown past the
+    limit, its messages are carried into a fresh run via
+    ``workflow.continue_as_new``. Only legacy executions carry the result cache.
 
     By default (``continue_as_new_after=None``) the limit is the server's own
     recommendation — ``workflow.info().is_continue_as_new_suggested()`` — which
@@ -202,9 +250,20 @@ async def run_deep_agent(
     its signature is ``(input, state_snapshot=None)`` — because that is how the
     carried state is threaded into the next run.
     """
+    # The carry across continue-as-new derives from the ORIGINAL input:
+    # re-threading the merged input would hand a dict to str-typed run
+    # signatures and re-prepend carried messages on every later boundary.
+    original_input = input
     # Resume path: rehydrate the result cache and fold carried messages in.
     if state_snapshot is not None:
-        _serde.set_result_cache(dict(state_snapshot.get(_CACHE_KEY) or {}))
+        # Only legacy executions consult the carried cache; on new
+        # executions the inbound legacy entries are dead weight, and at the
+        # upgrade hop a repeated identical call re-executes (conservative
+        # direction) rather than being served a possibly-stale carried result.
+        if _legacy_result_cache():
+            _serde.set_result_cache(dict(state_snapshot.get(_CACHE_KEY) or {}))
+        else:
+            _serde.set_result_cache({})
         input = _merge_snapshot(input, state_snapshot)
     else:
         _serde.set_result_cache({})
@@ -230,14 +289,36 @@ async def run_deep_agent(
             workflow.info().get_current_history_length() >= continue_as_new_after
         )
     if should_continue and _has_pending_work(result):
-        snapshot = {
-            "messages": _extract_messages(result),
-            _CACHE_KEY: _serde.result_cache_snapshot() or {},
-        }
+        carried = _extract_messages(result)
+        if not carried:
+            # A turn may report pending todos with an empty/pruned transcript;
+            # the conversation the agent SAW must still cross the boundary.
+            if isinstance(input, Mapping):
+                carried = _extract_messages(input)
+            else:
+                carried = _as_message_list(input)
+        snapshot: dict[str, Any] = {"messages": carried}
+        if _legacy_result_cache():
+            snapshot[_CACHE_KEY] = _serde.result_cache_snapshot() or {}
         # ``continue_as_new`` threads positional args into the next run via
         # ``args=``; the enclosing ``@workflow.run`` receives them as
-        # ``(input, state_snapshot)``.
-        workflow.continue_as_new(args=[input, snapshot])
+        # ``(input, state_snapshot)``, so the carried input must keep the
+        # user's declared input TYPE (a dict cannot decode into a run method
+        # typed for a bare-string prompt). When the transcript already
+        # carries the conversation (including the original input messages),
+        # a Mapping input travels without its "messages" key, and a
+        # non-Mapping input travels as-is with a snapshot marker telling
+        # _merge_snapshot not to re-append it. An EMPTY transcript re-sends
+        # the input unchanged so the original prompt is never lost.
+        carry_input: Any = original_input
+        if carried:
+            if isinstance(original_input, Mapping):
+                carry_input = {
+                    k: v for k, v in original_input.items() if k != "messages"
+                }
+            else:
+                snapshot[_INPUT_CARRIED_KEY] = original_input
+        workflow.continue_as_new(args=[carry_input, snapshot])
 
     return result
 

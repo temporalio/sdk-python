@@ -20,20 +20,84 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
-- Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
-- New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows, dynamic `@node` workflows, and durable HITL.
+- **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
+  Workflow-level metadata that allows for improved visibility into a Workflow execution's history
+  by grouping logically related Events together based on user-defined or system-inferred criteria.
+  `workflow.create_event_group(...)` takes the Event Group's ID as its first and only required
+  argument; the user-provided ID is used verbatim and should not contain sensitive information.
+  The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
+
+- Added `workflow.Info.original_execution_run_id`, the run ID recorded on the workflow
+  execution started event. Unlike `run_id`, this value is preserved across workflow resets.
+
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
+
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 
 ### Changed
 
+### Deprecated
+
+### :boom: Breaking Changes
+
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
+### Fixed
+
+- Experimental Workflow Streams background publishing now retries transient
+  signal delivery failures without delaying payload conversion errors.
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
+- A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
+  workflow and activity user metadata are serialized with theirs. This covers the static summary
+  sent when starting an operation, and the summary and details read back from a description.
+
+### Security
+
+## [1.33.0] - 2026-09-14
+
+### Added
+
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `update_options` and `restore_original_options`.
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
+- Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
+- New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
+  and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
+  synchronous results, and failures. Asynchronous handler results and detached standalone handles
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
+
+### Changed
+
+- Standalone Activities are now generally available (GA). (Standalone Activities as Nexus operations
+  and Standalone Activities operator commands remain experimental. Operator commands are `pause`,
+  `unpause`, `updateOptions`, `restoreOriginal`.)
 - System Nexus Signal-with-Start Workflow operations now use the typed
   `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
   the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
 - System Nexus Signal-with-Start Workflow operations now invoke
   `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
   point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
-
-### Deprecated
+- The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
+  operation.
 
 ### :boom: Breaking Changes
 
@@ -52,8 +116,21 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- Experimental Workflow Streams background publishing now retries transient
-  signal delivery failures without delaying payload conversion errors.
+- `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
+  and supports its file download API, including video inputs and download
+  destinations.
+- `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
+  model, and backend-op calls: each dispatch runs its own Activity, and the
+  continue-as-new result cache is retired for new executions (a continued run
+  resumes from the carried transcript and never re-executes prior dispatches,
+  so a carried cache entry could only serve stale results). Patch-gated
+  (`deepagents.retire-result-cache`), so histories recorded before this change
+  replay unchanged; note that deferring the patch keeps the full legacy dedup
+  cache — including the stale-result behavior this entry describes — and that
+  a chain upgraded mid-continue-as-new re-executes rather than reuses a
+  repeated identical call (the conservative direction).
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
+
 - **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
   Previously each batch's duration was summed, over-reporting the time whenever storage operations
   ran concurrently.
@@ -72,8 +149,6 @@ to include examples, links to docs, or any other relevant information.
 - Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
   or callbacks to attach.
 - The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
-
-### Security
 
 ## [1.32.0] - 2026-08-24
 

@@ -9,6 +9,7 @@ from temporalio.workflow import ActivityCancellationType, VersioningIntent
 
 from ._temporal_mcp_client import TemporalMCPClient
 from ._temporal_model import TemporalModel
+from ._temporal_sandbox import TemporalSandbox
 
 _SNAPSHOT_DISABLED = (
     "TemporalAgent disables take_snapshot()/load_snapshot(). Temporal "
@@ -23,8 +24,9 @@ class TemporalAgent(Agent):
 
     ``model`` is the name of a factory registered in
     ``StrandsPlugin(models={...})``. The activity options apply to every model
-    invocation this agent makes. All other keyword arguments are forwarded to
-    Strands' ``Agent`` (``tools``, ``hooks``, ``system_prompt``,
+    invocation this agent makes. ``sandbox`` is a workflow-side
+    ``TemporalSandbox`` whose name selects a worker-side factory. All other
+    keyword arguments are forwarded to Strands' ``Agent`` (``tools``, ``hooks``, ``system_prompt``,
     ``structured_output_model``, ``messages``, etc.).
 
     Strands' ``retry_strategy`` is disabled; configure retries via
@@ -48,6 +50,7 @@ class TemporalAgent(Agent):
         priority: Priority = Priority.default,
         streaming_topic: str | None = None,
         streaming_batch_interval: timedelta = timedelta(milliseconds=100),
+        sandbox: TemporalSandbox | None = None,
         **agent_kwargs: Any,
     ) -> None:
         """Build a TemporalAgent from a registered model name and activity options."""
@@ -76,7 +79,7 @@ class TemporalAgent(Agent):
             streaming_topic=streaming_topic,
             streaming_batch_interval=streaming_batch_interval,
         )
-        super().__init__(model=temporal_model, **agent_kwargs)
+        super().__init__(model=temporal_model, sandbox=sandbox, **agent_kwargs)
 
         # Strands invokes ToolProvider.load_tools() once at construction on a
         # separate run_async thread that has no workflow runtime, so a
