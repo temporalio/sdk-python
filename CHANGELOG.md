@@ -52,6 +52,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
+  ending the subscription normally.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
