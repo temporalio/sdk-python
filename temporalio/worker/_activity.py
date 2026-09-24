@@ -351,7 +351,18 @@ class _ActivityWorker:
             result = await self._execute_activity(
                 start, running_activity, task_token, data_converter
             )
-            [payload] = await data_converter.encode([result])
+            try:
+                [payload] = await data_converter.encode([result])
+            except (
+                temporalio.exceptions.FailureError,
+                concurrent.futures.BrokenExecutor,
+            ):
+                raise
+            except Exception as err:
+                raise temporalio.exceptions.ApplicationError(
+                    f"Failed to encode return value of activity {start.activity_type}",
+                    type=type(err).__name__,
+                ) from err
             completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
             try:

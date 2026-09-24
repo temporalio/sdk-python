@@ -4808,6 +4808,178 @@ async def test_workflow_activity_outbound_conversion_failure(client: Client):
         assert "Intentional outbound converter failure" in str(err.value.cause)
 
 
+@activity.defn
+async def result_conversion_activity(encode: bool) -> Any:
+    return object() if encode else "not an int"
+
+
+@workflow.defn
+class ResultConversionChildWorkflow:
+    @workflow.run
+    async def run(self, encode: bool) -> Any:
+        return object() if encode else "not an int"
+
+
+@workflow.defn
+class ResultConversionWorkflow:
+    @workflow.run
+    async def run(self, source: str, encode: bool) -> None:
+        if source == "child_workflow":
+            await workflow.execute_child_workflow(
+                workflow="ResultConversionChildWorkflow",
+                arg=encode,
+                id=f"{workflow.info().workflow_id}-child",
+                result_type=int,
+            )
+        else:
+            execute_activity = (
+                workflow.execute_local_activity
+                if source == "local_activity"
+                else workflow.execute_activity
+            )
+            await execute_activity(
+                activity="result_conversion_activity",
+                arg=encode,
+                result_type=int,
+                start_to_close_timeout=timedelta(seconds=10),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+
+
+@pytest.mark.parametrize(
+    "source,target",
+    [
+        ("activity", "activity result_conversion_activity"),
+        ("local_activity", "activity result_conversion_activity"),
+        ("child_workflow", "child workflow ResultConversionChildWorkflow"),
+    ],
+)
+async def test_result_decoding_failure(
+    client: Client, source: str, target: str
+) -> None:
+    async with new_worker(
+        client,
+        ResultConversionWorkflow,
+        ResultConversionChildWorkflow,
+        activities=[result_conversion_activity],
+    ) as worker:
+        handle = await client.start_workflow(
+            workflow=ResultConversionWorkflow.run,
+            args=[source, False],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        try:
+            await assert_task_fail_eventually(handle)
+            history = await handle.fetch_history()
+            failure = next(
+                event.workflow_task_failed_event_attributes.failure
+                for event in history.events
+                if event.HasField("workflow_task_failed_event_attributes")
+            )
+            assert failure.message == f"Failed to decode return value of {target}"
+            assert failure.application_failure_info.type == "RuntimeError"
+            assert failure.cause.application_failure_info.type == "TypeError"
+            assert (
+                failure.cause.message
+                == "Expected value to be int|float, was <class 'str'>"
+            )
+        finally:
+            await handle.terminate()
+
+
+@pytest.mark.parametrize("source", ["activity", "local_activity", "child_workflow"])
+async def test_result_encoding_failure(client: Client, source: str) -> None:
+    async with new_worker(
+        client,
+        ResultConversionWorkflow,
+        ResultConversionChildWorkflow,
+        activities=[result_conversion_activity],
+    ) as worker:
+        handle = await client.start_workflow(
+            workflow=ResultConversionWorkflow.run,
+            args=[source, True],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        failure: Failure
+        if source == "child_workflow":
+            try:
+                child_handle = await assert_workflow_exists_eventually(
+                    client=client,
+                    workflow=ResultConversionChildWorkflow.run,
+                    workflow_id=f"{handle.id}-child",
+                )
+                await assert_task_fail_eventually(child_handle)
+                history = await child_handle.fetch_history()
+                failure = next(
+                    event.workflow_task_failed_event_attributes.failure
+                    for event in history.events
+                    if event.HasField("workflow_task_failed_event_attributes")
+                )
+                assert (
+                    failure.message
+                    == "Failed to encode return value of workflow ResultConversionChildWorkflow"
+                )
+            finally:
+                await handle.terminate()
+        else:
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            cause: BaseException | None = err.value.cause
+            if source == "activity":
+                assert isinstance(cause, ActivityError)
+                cause = cause.cause
+            assert isinstance(cause, ApplicationError)
+            assert cause.failure
+            failure = cause.failure
+            assert (
+                failure.message
+                == "Failed to encode return value of activity result_conversion_activity"
+            )
+            assert failure.application_failure_info.type == "TypeError"
+        assert failure.cause.application_failure_info.type == "TypeError"
+        assert failure.cause.message == "Object of type object is not JSON serializable"
+
+
+@pytest.mark.parametrize("failure_type", [TypeError, RuntimeError])
+async def test_result_encoding_failure_exception_types(
+    client: Client, failure_type: type[Exception]
+) -> None:
+    async with new_worker(
+        client,
+        ResultConversionChildWorkflow,
+        workflow_failure_exception_types=[failure_type],
+    ) as worker:
+        handle = await client.start_workflow(
+            workflow=ResultConversionChildWorkflow.run,
+            arg=True,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        if failure_type is TypeError:
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "TypeError"
+            assert (
+                err.value.cause.message
+                == "Object of type object is not JSON serializable"
+            )
+        else:
+            try:
+                await assert_task_fail_eventually(handle)
+                history = await handle.fetch_history()
+                failure = next(
+                    event.workflow_task_failed_event_attributes.failure
+                    for event in history.events
+                    if event.HasField("workflow_task_failed_event_attributes")
+                )
+                assert failure.application_failure_info.type == "TypeError"
+            finally:
+                await handle.terminate()
+
+
 @dataclass
 class ManualResultType:
     some_string: str
