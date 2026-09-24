@@ -21,7 +21,6 @@ from tests.contrib.langsmith.test_integration import (
     NexusService,
     TraceableActivityWorkflow,
     _make_client_and_collector,
-    _poll_query,
     nested_traceable_activity,
     traceable_activity,
 )
@@ -63,7 +62,7 @@ class TestPluginIntegration:
     ) -> None:
         """Plugin wired to a real Temporal worker produces the full trace hierarchy.
 
-        user_pipeline only wraps start_workflow, so poll/query/signal/update
+        user_pipeline only wraps start_workflow, so query/signal/update
         traces are naturally separate root traces.
         """
         if env.supports_time_skipping:
@@ -100,18 +99,16 @@ class TestPluginIntegration:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                assert await _poll_query(
-                    handle,
-                    ComprehensiveWorkflow.is_waiting_for_signal,
-                    expected=True,
-                ), "Workflow never reached signal wait point"
-                await handle.query(ComprehensiveWorkflow.my_query)
-                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
+                # Updates and the signal are handled at the next workflow task
+                # wherever the run is; the queries then hit the completed
+                # workflow, which has no workflow task in flight by definition.
                 await handle.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
+                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle.result()
+                assert await handle.query(ComprehensiveWorkflow.my_query)
 
         assert result == "comprehensive-done"
 
@@ -183,19 +180,6 @@ class TestPluginIntegration:
             "          inner_llm_call",
         ]
         assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
-
-        # poll_query trace (separate root, variable number of iterations)
-        poll_trace_trees = find_trace_trees(trace_trees, "poll_query")
-        assert len(poll_trace_trees) == 1
-        poll = poll_trace_trees[0]
-        assert poll.name == "poll_query"
-        poll_children = poll.children
-        for poll_child in poll_children:
-            assert poll_child.name == "QueryWorkflow:is_waiting_for_signal"
-            assert [child.name for child in poll_child.children] == [
-                "HandleQuery:is_waiting_for_signal"
-            ]
-            assert not poll_child.children[0].children
 
         # Each remaining operation is its own root trace
         query_trace_trees = find_trace_trees(trace_trees, "QueryWorkflow:my_query")

@@ -59,7 +59,9 @@ def _current_user_converters() -> _SystemNexusUserConverters:
 
 def _current_user_payload_converter() -> temporalio.converter.PayloadConverter:  # pyright: ignore[reportUnusedFunction]
     """Return the active user payload converter for system Nexus model conversion."""
-    return _current_user_converters().payload_converter
+    return _TemporalTransferTypePayloadConverter.unwrap(
+        _current_user_converters().payload_converter
+    )
 
 
 def _current_user_failure_converter() -> temporalio.converter.FailureConverter:  # pyright: ignore[reportUnusedFunction]
@@ -96,12 +98,12 @@ class _SystemNexusPayloadConverter(temporalio.converter.PayloadConverter):
 
     def __init__(
         self,
-        user_payload_converter: temporalio.converter.PayloadConverter,
+        internal_payload_converter: temporalio.converter.PayloadConverter,
         user_failure_converter: temporalio.converter.FailureConverter,
     ) -> None:
         """Create a payload converter for system Nexus outer envelopes."""
         self._user_converters = _SystemNexusUserConverters(
-            user_payload_converter, user_failure_converter
+            internal_payload_converter, user_failure_converter
         )
         self._outer_payload_converter = _TemporalTransferTypePayloadConverter.wrap(
             _SystemNexusOuterPayloadConverter()
@@ -168,12 +170,14 @@ async def maybe_visit_payload(
     return payload_converter.to_payload(value)
 
 
-def _get_payload_converter(  # pyright: ignore[reportUnusedFunction]
-    user_payload_converter: temporalio.converter.PayloadConverter,
+def _get_system_nexus_payload_converter(  # pyright: ignore[reportUnusedFunction]
+    internal_payload_converter: temporalio.converter.PayloadConverter,
     user_failure_converter: temporalio.converter.FailureConverter,
 ) -> temporalio.converter.PayloadConverter:
-    """Return the fixed payload converter for system Nexus outer envelopes."""
-    return _SystemNexusPayloadConverter(user_payload_converter, user_failure_converter)
+    """Return the system envelope converter given an internal, wrapped payload converter."""
+    return _SystemNexusPayloadConverter(
+        internal_payload_converter, user_failure_converter
+    )
 
 
 def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]
