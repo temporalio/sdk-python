@@ -9,8 +9,10 @@ from pathlib import Path
 from temporalio.api.cloud.cloudservice.v1 import (
     CreateNamespaceRequest,
     DeleteNamespaceRequest,
+    DeleteNexusEndpointRequest,
     GetAsyncOperationRequest,
     GetNamespaceRequest,
+    GetNexusEndpointsRequest,
 )
 from temporalio.api.cloud.namespace.v1 import MtlsAuthSpec, NamespaceSpec
 from temporalio.api.cloud.operation.v1 import AsyncOperation
@@ -51,8 +53,10 @@ async def wait_for_operation(
 
 async def create() -> None:
     client = await cloud_client()
-    namespace_name = "sdk-python-ci-{}-{}".format(
-        os.environ["GITHUB_RUN_ID"], os.environ["GITHUB_RUN_ATTEMPT"]
+    namespace_name = "sdk-python-ci-{}-{}{}".format(
+        os.environ["GITHUB_RUN_ID"],
+        os.environ["GITHUB_RUN_ATTEMPT"],
+        os.environ.get("TEMPORAL_CLOUD_NAMESPACE_SUFFIX", ""),
     )
     result = await client.cloud_service.create_namespace(
         CreateNamespaceRequest(
@@ -80,6 +84,27 @@ async def delete(namespace: str) -> None:
     existing = await client.cloud_service.get_namespace(
         GetNamespaceRequest(namespace=namespace)
     )
+    endpoints = []
+    page_token = ""
+    while True:
+        response = await client.cloud_service.get_nexus_endpoints(
+            GetNexusEndpointsRequest(
+                target_namespace_id=existing.namespace.namespace,
+                page_token=page_token,
+            )
+        )
+        endpoints.extend(response.endpoints)
+        if not response.next_page_token:
+            break
+        page_token = response.next_page_token
+    for endpoint in endpoints:
+        result = await client.cloud_service.delete_nexus_endpoint(
+            DeleteNexusEndpointRequest(
+                endpoint_id=endpoint.id,
+                resource_version=endpoint.resource_version,
+            )
+        )
+        await wait_for_operation(client, result.async_operation)
     result = await client.cloud_service.delete_namespace(
         DeleteNamespaceRequest(
             namespace=namespace,

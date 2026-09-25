@@ -22,10 +22,7 @@ from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
-
-# Cloud CI's namespace credentials cannot manage Nexus endpoints.
-# See https://github.com/temporalio/sdk-python/issues/1704.
-pytestmark = pytest.mark.requires_local_server
+from tests.nexus.conftest import NexusEndpoint
 
 
 @dataclass
@@ -138,12 +135,12 @@ async def test_workflow_run_operation(
     client: Client,
     env: WorkflowEnvironment,
     service_handler_cls: type[Any],
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     assert (service_defn := nexusrpc.get_service_definition(service_handler_cls))
     async with Worker(
         client,
@@ -164,14 +161,13 @@ async def test_workflow_run_operation(
 async def test_request_deadline_is_accessible_in_workflow_run_operation(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint: NexusEndpoint,
 ):
     """Test that request_deadline is accessible in WorkflowRunOperationContext."""
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    endpoint_name = make_nexus_endpoint_name(task_queue)
-    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    task_queue = nexus_endpoint.task_queue
     service_handler = RequestDeadlineHandler()
     async with Worker(
         env.client,
@@ -198,12 +194,12 @@ async def test_request_deadline_is_accessible_in_workflow_run_operation(
 async def test_workflow_run_operation_includes_token_in_callback(
     client: Client,
     env: WorkflowEnvironment,
+    nexus_endpoint: NexusEndpoint,
 ):
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
-    task_queue = str(uuid.uuid4())
-    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    task_queue = nexus_endpoint.task_queue
     async with Worker(
         client,
         task_queue=task_queue,
