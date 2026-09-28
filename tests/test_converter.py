@@ -351,6 +351,28 @@ if sys.version_info <= (3, 12, 3):
         baz: UUID | None = None
 
 
+@pytest.mark.parametrize(
+    "hint",
+    [frozenset, frozenset[int], typing_extensions.FrozenSet[int]],  # type:ignore[reportDeprecated]
+)
+@pytest.mark.parametrize("value", [frozenset(), frozenset({1, 2})])
+def test_json_frozenset_round_trip(hint: Any, value: frozenset[int]):
+    converter = JSONPlainPayloadConverter()
+    payload = converter.to_payload(value)
+    assert payload is not None
+    converted = converter.from_payload(payload, hint)
+    assert isinstance(converted, frozenset)
+    assert converted == value
+
+
+def test_json_nested_frozenset_round_trip():
+    converter = JSONPlainPayloadConverter()
+    value = {frozenset({1, 2}), frozenset({3})}
+    payload = converter.to_payload(value)
+    assert payload is not None
+    assert converter.from_payload(payload, set[frozenset[int]]) == value
+
+
 def test_json_type_hints():
     converter = JSONPlainPayloadConverter()
 
@@ -439,6 +461,7 @@ def test_json_type_hints():
     ok(deque[int], deque([5, 6]))
     ok(Sequence[int], [5, 6])
     fail(list[int], [1, 2, "3"])
+    fail(frozenset[int], [1, 2, "3"])
 
     # Dict-like
     ok(dict[str, MyDataClass], {"foo": MyDataClass("foo", 5, SerializableEnum.FOO)})
