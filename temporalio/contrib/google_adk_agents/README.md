@@ -56,7 +56,7 @@ Model calls are intercepted and executed as Temporal activities with configurabl
 - Priority levels
 
 #### 3. Sandbox Compatibility
-- Automatic passthrough for `google.adk`, `google.genai`, and `mcp` modules
+- Automatic passthrough for `google.adk`, `google.genai`, `mcp`, and `opentelemetry` modules
 - Works with both sandboxed and unsandboxed workflow runners
 
 #### 4. Advanced Serialization
