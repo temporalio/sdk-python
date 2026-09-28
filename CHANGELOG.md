@@ -40,6 +40,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
 ### Deprecated
 
 ### :boom: Breaking Changes
@@ -52,6 +56,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
