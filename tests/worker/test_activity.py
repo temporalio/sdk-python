@@ -30,7 +30,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import RawValue, RetryPolicy
-from temporalio.converter import DefaultPayloadConverter
+from temporalio.converter import DataConverter, DefaultPayloadConverter
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -1241,6 +1241,121 @@ async def test_sync_activity_process_executor_crash(
             await asyncio.wait_for(act_worker_task, 10)
         assert str(worker_err.value) == "Activity worker failed"
         assert isinstance(worker_err.value.__cause__, BrokenProcessPool)
+
+
+@dataclass
+class UnserializableResult:
+    pass
+
+
+def _converter_raising_on_result(
+    error: BaseException,
+) -> type[DefaultPayloadConverter]:
+    class RaiseOnResultConverter(DefaultPayloadConverter):
+        def to_payloads(
+            self, values: Sequence[Any]
+        ) -> list[temporalio.api.common.v1.Payload]:
+            if any(isinstance(value, UnserializableResult) for value in values):
+                raise error
+            return super().to_payloads(values)
+
+    return RaiseOnResultConverter
+
+
+def _client_failing_result_encoding(client: Client, error: BaseException) -> Client:
+    return Client(
+        client.service_client,
+        namespace=client.namespace,
+        data_converter=DataConverter(
+            payload_converter_class=_converter_raising_on_result(error)
+        ),
+    )
+
+
+async def test_result_encoding_failure_keeps_failure_type(
+    client: Client, worker: ExternalWorker
+):
+    """An encoder error the worker treats by type must not be re-labeled."""
+
+    @activity.defn
+    async def unserializable_result() -> UnserializableResult:
+        return UnserializableResult()
+
+    act_task_queue = str(uuid.uuid4())
+    act_client = _client_failing_result_encoding(
+        client, ApplicationError("converter failed", type="ConverterError")
+    )
+    async with Worker(
+        act_client, task_queue=act_task_queue, activities=[unserializable_result]
+    ):
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[
+                        KSAction(
+                            execute_activity=KSExecuteActivityAction(
+                                name="unserializable_result", task_queue=act_task_queue
+                            )
+                        )
+                    ]
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ActivityError)
+    cause = err.value.cause.cause
+    # An ApplicationError is a FailureError, so the encoder's own type and message
+    # have to survive. Re-labeling would bury the cause under the new message and
+    # report the failure as an unnamed "ApplicationError".
+    assert isinstance(cause, ApplicationError)
+    assert cause.type == "ConverterError"
+    assert cause.message == "converter failed"
+
+
+async def test_result_encoding_broken_executor_fails_worker(
+    client: Client, worker: ExternalWorker
+):
+    """A broken executor during encoding stays worker-fatal, as it is during run."""
+
+    @activity.defn
+    async def unserializable_result() -> UnserializableResult:
+        return UnserializableResult()
+
+    act_task_queue = str(uuid.uuid4())
+    act_client = _client_failing_result_encoding(
+        client, concurrent.futures.BrokenExecutor("pool is broken")
+    )
+    act_worker = Worker(
+        act_client, task_queue=act_task_queue, activities=[unserializable_result]
+    )
+    act_worker_task = asyncio.create_task(act_worker.run())
+    try:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                "kitchen_sink",
+                KSWorkflowParams(
+                    actions=[
+                        KSAction(
+                            execute_activity=KSExecuteActivityAction(
+                                name="unserializable_result", task_queue=act_task_queue
+                            )
+                        )
+                    ]
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert err.value.cause.cause.type == "BrokenExecutor"
+
+        with pytest.raises(RuntimeError) as worker_err:
+            await asyncio.wait_for(act_worker_task, 10)
+        assert str(worker_err.value) == "Activity worker failed"
+        assert isinstance(worker_err.value.__cause__, concurrent.futures.BrokenExecutor)
+    finally:
+        await act_worker.shutdown()
 
 
 class AsyncActivityWrapper:
