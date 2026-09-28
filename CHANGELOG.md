@@ -40,6 +40,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
 ### Deprecated
 
 ### :boom: Breaking Changes
@@ -55,8 +59,19 @@ to include examples, links to docs, or any other relevant information.
 - Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
   including nested frozen sets.
 
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
+- `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
+  graph workflows can load their context support during execution.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
