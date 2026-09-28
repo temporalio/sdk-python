@@ -744,7 +744,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     ``dict()`` methods, and all iterables.
 
     For decoding, this uses type hints to attempt to rebuild the type from the
-    type hint, including ``frozenset`` collections.
+    type hint.
     """
 
     _encoder: type[json.JSONEncoder] | None
