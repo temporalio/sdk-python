@@ -884,6 +884,9 @@ async def test_sync_response_includes_signal_backlinks() -> None:
         cancellation=_NexusTaskCancellation(),
         request_deadline=None,
         endpoint="endpoint",
+        data_converter=worker._data_converter_for_nexus_task(
+            "endpoint", "_BacklinkStashingService", "sync_op"
+        ),
     )
     assert response.HasField("sync_success")
     assert len(response.sync_success.links) == 1
@@ -898,6 +901,9 @@ async def test_async_response_includes_signal_backlinks() -> None:
         cancellation=_NexusTaskCancellation(),
         request_deadline=None,
         endpoint="endpoint",
+        data_converter=worker._data_converter_for_nexus_task(
+            "endpoint", "_BacklinkStashingService", "async_op"
+        ),
     )
     assert response.HasField("async_success")
     assert response.async_success.operation_token == "op-token"

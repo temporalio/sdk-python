@@ -1487,9 +1487,6 @@ class Client:
     ) -> ActivityHandle[ReturnType]:
         """Start an activity and return its handle.
 
-        .. warning::
-           This API is experimental.
-
         Args:
             activity: String name or callable activity function to execute.
             arg: Single argument to the activity.
@@ -1741,9 +1738,6 @@ class Client:
     ) -> ReturnType:
         """Start an activity, wait for it to complete, and return its result.
 
-        .. warning::
-           This API is experimental.
-
         This is a convenience method that combines :py:meth:`start_activity` and
         :py:meth:`ActivityHandle.result`.
 
@@ -1943,9 +1937,6 @@ class Client:
     ) -> ActivityHandle[Any]:
         """Start an activity from a callable class.
 
-        .. warning::
-           This API is experimental.
-
         See :py:meth:`start_activity` for parameter and return details.
         """
         return await self.start_activity(
@@ -2137,9 +2128,6 @@ class Client:
     ) -> Any:
         """Start an activity from a callable class and wait for completion.
 
-        .. warning::
-           This API is experimental.
-
         This is a shortcut for ``await`` :py:meth:`start_activity_class`.
         """
         return await self.execute_activity(
@@ -2285,9 +2273,6 @@ class Client:
         rpc_timeout: timedelta | None = None,
     ) -> ActivityHandle[Any]:
         """Start an activity from a method.
-
-        .. warning::
-           This API is experimental.
 
         See :py:meth:`start_activity` for parameter and return details.
         """
@@ -2435,9 +2420,6 @@ class Client:
     ) -> Any:
         """Start an activity from a method and wait for completion.
 
-        .. warning::
-           This API is experimental.
-
         This is a shortcut for ``await`` :py:meth:`start_activity_method`.
         """
         return await self.execute_activity(
@@ -2473,9 +2455,6 @@ class Client:
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionAsyncIterator:
         """List activities not started by a workflow.
-
-        .. warning::
-           This API is experimental.
 
         This does not make a request until the first iteration is attempted.
         Therefore any errors will not occur until then.
@@ -2516,9 +2495,6 @@ class Client:
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionCount:
         """Count activities not started by a workflow.
-
-        .. warning::
-           This API is experimental.
 
         Args:
             query: A Temporal visibility filter for activities.
@@ -2562,9 +2538,6 @@ class Client:
         """Get a handle to an existing activity, as the caller of that activity.
 
         The activity must not have been started by a workflow.
-
-        .. warning::
-           This API is experimental.
 
         To get a handle to an activity execution that you control for manual completion and
         heartbeating, see :py:meth:`Client.get_async_activity_handle`.

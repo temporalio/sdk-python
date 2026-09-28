@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Generator, Mapping
+from collections.abc import Awaitable, Callable, Generator, Mapping, Sequence
 from datetime import timedelta
 from enum import IntEnum
 from typing import Any, Generic, overload
@@ -15,6 +15,7 @@ import temporalio.nexus
 from temporalio.types import NexusServiceType
 
 from ._context import _Runtime
+from ._event_groups import EventGroup
 
 __all__ = [
     "NexusClient",
@@ -112,6 +113,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for string operation name
@@ -129,6 +131,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for workflow_run_operation methods
@@ -149,6 +152,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for sync_operation methods (async def)
@@ -169,6 +173,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for sync_operation methods (def)
@@ -189,6 +194,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for operation_handler
@@ -208,6 +214,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     # Overload for temporal_operation methods
@@ -233,6 +240,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
     @abstractmethod
@@ -248,6 +256,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> Any:
         """Start a Nexus operation and return its handle.
 
@@ -258,7 +267,14 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             schedule_to_close_timeout: Timeout for the entire operation attempt.
             schedule_to_start_timeout: Timeout for the operation to be started.
             start_to_close_timeout: Timeout for async operations to complete after starting.
+            cancellation_type: How the operation is treated when it is cancelled from
+                the workflow.
             headers: Headers to send with the Nexus HTTP request.
+            summary: A single-line fixed summary for this operation that may appear
+                in UI/CLI. This can be in single-line Temporal markdown format.
+            event_groups: Event Groups to associate this command with, in
+                addition to those active in the current scope. See
+                :py:func:`temporalio.workflow.create_event_group`.
 
         Returns:
             A handle to the Nexus operation. The result can be obtained as
@@ -283,6 +299,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for string operation name
@@ -300,6 +317,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for workflow_run_operation methods
@@ -320,6 +338,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for sync_operation methods (async def)
@@ -340,6 +359,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for sync_operation methods (def)
@@ -360,6 +380,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for operation_handler
@@ -380,6 +401,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     # Overload for temporal_operation methods
@@ -405,6 +427,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
     @abstractmethod
@@ -420,6 +443,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> Any:
         """Execute a Nexus operation and return its result.
 
@@ -430,7 +454,14 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             schedule_to_close_timeout: Timeout for the entire operation attempt.
             schedule_to_start_timeout: Timeout for the operation to be started.
             start_to_close_timeout: Timeout for async operations to complete after starting.
+            cancellation_type: How the operation is treated when it is cancelled from
+                the workflow.
             headers: Headers to send with the Nexus HTTP request.
+            summary: A single-line fixed summary for this operation that may appear
+                in UI/CLI. This can be in single-line Temporal markdown format.
+            event_groups: Event Groups to associate this command with, in
+                addition to those active in the current scope. See
+                :py:func:`temporalio.workflow.create_event_group`.
 
         Returns:
             The operation result.
@@ -477,6 +508,7 @@ class _NexusClient(NexusClient[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> Any:
         return await _Runtime.current().workflow_start_nexus_operation(
             endpoint=self.endpoint,
@@ -490,6 +522,7 @@ class _NexusClient(NexusClient[NexusServiceType]):
             cancellation_type=cancellation_type,
             headers=headers,
             summary=summary,
+            event_groups=event_groups,
         )
 
     async def execute_operation(
@@ -504,6 +537,7 @@ class _NexusClient(NexusClient[NexusServiceType]):
         cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
         headers: Mapping[str, str] | None = None,
         summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
     ) -> Any:
         handle = await self.start_operation(
             operation,
@@ -515,6 +549,7 @@ class _NexusClient(NexusClient[NexusServiceType]):
             cancellation_type=cancellation_type,
             headers=headers,
             summary=summary,
+            event_groups=event_groups,
         )
         return await handle
 

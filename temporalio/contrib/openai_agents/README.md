@@ -905,19 +905,18 @@ Choose the appropriate OTEL exporter for your monitoring system:
 # For OTLP (works with most OTEL collectors and monitoring systems)
 pip install opentelemetry-exporter-otlp
 
-# For Console output (development/debugging)
-pip install opentelemetry-exporter-console
-
 # Other exporters available for specific systems
 pip install opentelemetry-exporter-<your-system>
 ```
+
+`ConsoleSpanExporter` (development/debugging) ships with `opentelemetry-sdk`, so it needs no extra package.
 
 ### Example: Multiple Exporters
 
 ```python
 from temporalio.contrib.opentelemetry import create_tracer_provider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.exporter.console import ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry import trace
 
 exporters = [
@@ -934,8 +933,10 @@ exporters = [
     ConsoleSpanExporter(),
 ]
 
-# Set up global tracer provider with multiple exporters
-tracer_provider = create_tracer_provider(exporters=exporters)
+# Set up the global tracer provider with one span processor per exporter
+tracer_provider = create_tracer_provider()
+for exporter in exporters:
+    tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
 trace.set_tracer_provider(tracer_provider)
 
 plugin = OpenAIAgentsPlugin(use_otel_instrumentation=True)

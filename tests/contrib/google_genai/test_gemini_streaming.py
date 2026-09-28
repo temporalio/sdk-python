@@ -81,7 +81,6 @@ async def test_streaming_publishes_to_workflow_stream(client: Client):
             "say hi",
             id=wf_id,
             task_queue=worker.task_queue,
-            execution_timeout=timedelta(seconds=15),
         )
 
         stream = WorkflowStreamClient.create(new_client, wf_id)
@@ -116,7 +115,6 @@ async def test_streaming_without_workflow_stream_raises(client: Client):
                 "hi",
                 id=f"gemini-stream-nostream-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=10),
             )
 
     assert "WorkflowStream" in str(exc_info.value.cause)

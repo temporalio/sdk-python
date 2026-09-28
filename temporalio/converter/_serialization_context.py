@@ -28,6 +28,10 @@ class SerializationContext(ABC):
         context type is :py:class:`ActivitySerializationContext` and the workflow ID is that of the
         currently-executing workflow. ActivitySerializationContext is also set on data converter
         operations in the activity context.
+
+        When operating on a Nexus operation payload, the context type is
+        :py:class:`NexusSerializationContext` and identifies the Nexus endpoint, service, and
+        resolved operation name.
     """
 
     pass
@@ -92,6 +96,38 @@ class ActivitySerializationContext(SerializationContext):
 
     is_local: bool
     """Whether the activity is a local activity started from a workflow."""
+
+
+@dataclass(frozen=True)
+class NexusSerializationContext(SerializationContext):
+    """Serialization context for Nexus operation payloads.
+
+    Callers receive this context when encoding inputs and decoding results or failures. The context
+    is not propagated to a handler that completes an asynchronous operation. Handlers receive it
+    when decoding inputs, encoding synchronous results, and encoding failures produced while
+    handling a Nexus task.
+
+    A standalone operation handle retains the context used to start the operation and uses it to
+    decode the result, including when the start request returns an existing operation. A handle
+    created with :py:meth:`temporalio.client.Client.get_nexus_operation_handle` has no endpoint,
+    service, or operation information and therefore decodes without Nexus context.
+
+    A failure encoded by a handler is later decoded by a caller. Because some operation paths may
+    lack this context, contextual encodings must be self-describing and decoders must continue to
+    accept payloads encoded without context.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    endpoint: str
+    """Nexus endpoint name."""
+
+    service: str
+    """Nexus service name."""
+
+    operation: str
+    """Nexus operation name."""
 
 
 class WithSerializationContext(ABC):

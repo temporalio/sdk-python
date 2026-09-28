@@ -104,11 +104,7 @@ class WorkflowUpdateRPCTimeoutOrCancelledError(RPCTimeoutOrCancelledError):
 
 
 class ActivityFailureError(temporalio.exceptions.TemporalError):
-    """Error that occurs when an activity is unsuccessful.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Error that occurs when an activity is unsuccessful."""
 
     def __init__(self, *, cause: BaseException) -> None:
         """Create activity failure error."""

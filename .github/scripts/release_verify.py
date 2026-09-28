@@ -271,8 +271,6 @@ def _sdk_core_changelog_entries(
             "run",
             "--quiet",
             "-p",
-            "temporalio-sdk-core",
-            "--bin",
             "changelog-release-notes",
             "--",
             "--from",

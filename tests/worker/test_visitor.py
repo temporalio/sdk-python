@@ -235,8 +235,8 @@ async def test_system_nexus_envelope_is_detected_in_generic_payload_field():
         input=Payloads(payloads=[Payload(data=b"workflow-input")]),
     )
     data_converter = temporalio.converter.default()
-    payload_converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload_converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     )
     system_payload = payload_converter.to_payload(system_request)
@@ -280,8 +280,8 @@ async def test_system_nexus_envelope_without_payloads_is_visited():
         run_id="test-run-id"
     )
     data_converter = temporalio.converter.default()
-    payload_converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload_converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     )
     system_payload = payload_converter.to_payload(response)
@@ -307,8 +307,8 @@ async def test_system_nexus_envelope_without_payloads_is_visited():
 
 async def test_unknown_system_nexus_payload_raises_application_error():
     data_converter = temporalio.converter.default()
-    payload_converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter,
+    payload_converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
         data_converter.failure_converter,
     )
     system_payload = payload_converter.to_payload(
@@ -482,8 +482,9 @@ async def test_system_nexus_envelope_visit_is_bounded():
                 active_visits -= 1
 
     data_converter = temporalio.converter.default()
-    payload_converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter, data_converter.failure_converter
+    payload_converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
+        data_converter.failure_converter,
     )
     system_request = workflowservice_pb2.SignalWithStartWorkflowExecutionRequest(
         input=Payloads(payloads=[Payload(data=b"workflow-input")]),
