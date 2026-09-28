@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
   Workflow-level metadata that allows for improved visibility into a Workflow execution's history
   by grouping logically related Events together based on user-defined or system-inferred criteria.
@@ -40,13 +42,28 @@ to include examples, links to docs, or any other relevant information.
 
 - Schedule updates now pass the conflict token returned by the server and retry
   the describe-update loop when a concurrent update changes the schedule.
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
 
 ### Deprecated
 
 ### :boom: Breaking Changes
 
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
 ### Fixed
 
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
