@@ -60,6 +60,11 @@ to include examples, links to docs, or any other relevant information.
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
   a naive ISO string that the server rejects with `BadSearchAttributes`.
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
 - `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
   (e.g., adding `delete` / `adelete`).
 - `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
