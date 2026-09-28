@@ -744,7 +744,7 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
     ``dict()`` methods, and all iterables.
 
     For decoding, this uses type hints to attempt to rebuild the type from the
-    type hint.
+    type hint, including ``frozenset`` collections.
     """
 
     _encoder: type[json.JSONEncoder] | None
@@ -1086,11 +1086,13 @@ def value_to_type(
                     ret_list.append(value_to_type(arg_type, item, custom_converters))
                 except Exception as err:
                     raise TypeError(f"Failed converting {hint} index {i}") from err
-        # If tuple, set, or deque convert back to that type
+        # If tuple, set, frozenset, or deque convert back to that type
         if origin is tuple:
             return tuple(ret_list)
         elif origin is set:
             return set(ret_list)
+        elif origin is frozenset:
+            return frozenset(ret_list)
         elif origin is collections.deque:
             return collections.deque(ret_list)
         return ret_list

@@ -52,6 +52,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
