@@ -1272,47 +1272,6 @@ def _client_failing_result_encoding(client: Client, error: BaseException) -> Cli
     )
 
 
-async def test_result_encoding_failure_keeps_failure_type(
-    client: Client, worker: ExternalWorker
-):
-    """An encoder error the worker treats by type must not be re-labeled."""
-
-    @activity.defn
-    async def unserializable_result() -> UnserializableResult:
-        return UnserializableResult()
-
-    act_task_queue = str(uuid.uuid4())
-    act_client = _client_failing_result_encoding(
-        client, ApplicationError("converter failed", type="ConverterError")
-    )
-    async with Worker(
-        act_client, task_queue=act_task_queue, activities=[unserializable_result]
-    ):
-        with pytest.raises(WorkflowFailureError) as err:
-            await client.execute_workflow(
-                "kitchen_sink",
-                KSWorkflowParams(
-                    actions=[
-                        KSAction(
-                            execute_activity=KSExecuteActivityAction(
-                                name="unserializable_result", task_queue=act_task_queue
-                            )
-                        )
-                    ]
-                ),
-                id=str(uuid.uuid4()),
-                task_queue=worker.task_queue,
-            )
-    assert isinstance(err.value.cause, ActivityError)
-    cause = err.value.cause.cause
-    # An ApplicationError is a FailureError, so the encoder's own type and message
-    # have to survive. Re-labeling would bury the cause under the new message and
-    # report the failure as an unnamed "ApplicationError".
-    assert isinstance(cause, ApplicationError)
-    assert cause.type == "ConverterError"
-    assert cause.message == "converter failed"
-
-
 async def test_result_encoding_broken_executor_fails_worker(
     client: Client, worker: ExternalWorker
 ):

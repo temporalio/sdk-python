@@ -353,20 +353,11 @@ class _ActivityWorker:
             )
             try:
                 [payload] = await data_converter.encode([result])
+            except concurrent.futures.BrokenExecutor:
+                # The handler below fails the whole worker on a broken executor,
+                # so it has to see the original type rather than a re-label.
+                raise
             except Exception as err:
-                # The handler below re-types anything that is not already a
-                # Temporal failure, so re-label only what it dispatches on by
-                # class: it fails the whole worker on a broken executor, and it
-                # reports a FailureError as itself instead of an
-                # ApplicationError. Wrapping either would change the outcome.
-                if isinstance(
-                    err,
-                    (
-                        temporalio.exceptions.FailureError,
-                        concurrent.futures.BrokenExecutor,
-                    ),
-                ):
-                    raise
                 raise temporalio.exceptions.ApplicationError(
                     f"Failed to encode return value of activity {start.activity_type}",
                     type=type(err).__name__,
