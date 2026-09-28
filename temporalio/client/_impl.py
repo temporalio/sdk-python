@@ -1592,9 +1592,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             )
 
         # Set user metadata
-        metadata = await _encode_user_metadata(
-            self._client.data_converter, input.summary, None
-        )
+        metadata = await _encode_user_metadata(data_converter, input.summary, None)
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
 
@@ -1661,6 +1659,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     ) -> Any:
         """Poll for nexus operation result until it's available."""
         data_converter = self._client.data_converter
+        # These three are set together or not at all: a handle that started the operation has all
+        # of them, and a handle obtained by operation ID alone has none and defaults them to "".
+        # An empty endpoint therefore means "no operation to build a context from", not "an
+        # operation named the empty string".
         if input.endpoint and input.service and input.operation:
             data_converter = data_converter.with_context(
                 temporalio.converter.NexusSerializationContext(

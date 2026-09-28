@@ -256,6 +256,7 @@ async def test_workflow_info(client: Client, env: WorkflowEnvironment):
             json.dumps(dataclasses.asdict(retry_policy), default=str)
         )
         assert uuid.UUID(info["run_id"]).version == 7
+        assert info["original_execution_run_id"] == info["run_id"]
         assert info["run_timeout"] is None
         assert info["task_queue"] == worker.task_queue
         assert info["task_timeout"] == "0:00:10"
