@@ -62,6 +62,8 @@ to include examples, links to docs, or any other relevant information.
   deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
+- `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
+  graph workflows can load their context support during execution.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
