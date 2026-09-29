@@ -62,6 +62,8 @@ to include examples, links to docs, or any other relevant information.
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
   a naive ISO string that the server rejects with `BadSearchAttributes`.
+- `temporalio.contrib.deepagents` now preserves model binding options such as
+  `response_format` and `tool_choice` when tools are also bound.
 - Workflow handles returned when a start attaches to a running workflow now use
   the server-provided first execution run ID with Temporal Server 1.32.0 or
   later.
