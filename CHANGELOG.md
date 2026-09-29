@@ -61,6 +61,9 @@ to include examples, links to docs, or any other relevant information.
 - Workflow handles returned when a start attaches to a running workflow now use
   the server-provided first execution run ID with Temporal Server 1.32.0 or
   later.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
 - Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
   importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
   caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
