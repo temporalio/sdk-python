@@ -60,6 +60,9 @@ to include examples, links to docs, or any other relevant information.
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
   a naive ISO string that the server rejects with `BadSearchAttributes`.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
 - Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
   importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
   caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
