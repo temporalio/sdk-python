@@ -176,6 +176,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
+                first_execution_run_id = resp.first_execution_run_id or (
+                    resp.run_id if resp.started else None
+                )
             else:
                 resp = await self._client.workflow_service.start_workflow_execution(
                     req,
@@ -183,7 +186,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
-                first_execution_run_id = resp.run_id
+                first_execution_run_id = resp.first_execution_run_id or resp.run_id
                 eagerly_started = resp.HasField("eager_workflow_task")
         except RPCError as err:
             # If the status is ALREADY_EXISTS and the details can be extracted
@@ -192,7 +195,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                 if err.grpc_status.details[0].Unpack(details):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
-                        input.id, input.workflow, run_id=details.run_id
+                        input.id,
+                        input.workflow,
+                        run_id=details.run_id,
+                        first_run_id=details.first_execution_run_id or None,
                     )
             raise
         handle: WorkflowHandle[Any, Any] = WorkflowHandle(
@@ -1012,6 +1018,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                                     input.start_workflow_input.id,
                                     input.start_workflow_input.workflow,
                                     run_id=details.run_id,
+                                    first_run_id=(
+                                        details.first_execution_run_id or None
+                                    ),
                                 )
                         else:
                             err = RPCError(
