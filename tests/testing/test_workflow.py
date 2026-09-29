@@ -176,6 +176,51 @@ async def test_workflow_env_time_skipping_disabled():
                 assert monotonic() - start > 2.5
 
 
+@activity.defn
+async def echo(value: str) -> str:
+    return value
+
+
+@workflow.defn
+class TwoActivitiesWorkflow:
+    @workflow.run
+    async def run(self, value: str) -> str:
+        for _ in range(2):
+            value = await workflow.execute_activity(
+                echo, value, start_to_close_timeout=timedelta(seconds=15)
+            )
+        return value
+
+
+async def test_workflow_env_time_skipping_concurrent_result_waiters():
+    # The test server holds one time-skipping lock per in-flight task and counts
+    # one unlock per request, so concurrent result() waiters have to share one
+    # unlock. Otherwise the clock skips as soon as the first workflow completes
+    # and times out the task the other workflow still has in flight.
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with new_worker(
+            env.client, TwoActivitiesWorkflow, activities=[echo]
+        ) as worker:
+            handles = [
+                await env.client.start_workflow(
+                    TwoActivitiesWorkflow.run,
+                    value,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker.task_queue,
+                )
+                for value in ("first", "second")
+            ]
+            assert ["first", "second"] == await asyncio.gather(
+                *(handle.result() for handle in handles)
+            )
+        for handle in handles:
+            async for event in handle.fetch_history_events():
+                assert not event.HasField("workflow_task_timed_out_event_attributes")
+                assert not event.HasField(
+                    "workflow_execution_timed_out_event_attributes"
+                )
+
+
 @workflow.defn
 class AssertFailWorkflow:
     @workflow.run

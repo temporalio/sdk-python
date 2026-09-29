@@ -690,6 +690,7 @@ class _V1WorkflowEnvironment(_HasAServer):
         server: temporalio.bridge.testing.EphemeralServer,
     ) -> None:
         self._auto_time_skipping = True
+        self._time_skipping_waiters = 0
         super().__init__(
             _client_with_interceptors(
                 client,
@@ -803,22 +804,42 @@ class _V1WorkflowEnvironment(_HasAServer):
         if not self._auto_time_skipping:
             yield None
             return
-        await self._client.test_service.unlock_time_skipping(
-            temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
-        )
+        # The test server holds one time-skipping lock per in-flight task and
+        # counts one unlock per request, and it skips as soon as the count is
+        # zero. Concurrent waiters therefore share a single unlock; a second
+        # one would let the clock jump while another workflow still has a task
+        # in flight. The waiter is counted before the await so a second waiter
+        # cannot slip in and unlock again.
+        self._time_skipping_waiters += 1
+        if self._time_skipping_waiters == 1:
+            try:
+                await self._client.test_service.unlock_time_skipping(
+                    temporalio.api.testservice.v1.UnlockTimeSkippingRequest()
+                )
+            except BaseException:
+                self._time_skipping_waiters -= 1
+                raise
         try:
             yield None
-            await self._client.test_service.lock_time_skipping(
-                temporalio.api.testservice.v1.LockTimeSkippingRequest()
-            )
-        except:
+        except BaseException:
+            # Lock it back, swallowing error
             try:
-                await self._client.test_service.lock_time_skipping(
-                    temporalio.api.testservice.v1.LockTimeSkippingRequest()
-                )
-            except:
+                await self._lock_time_skipping_after_waiter()
+            except Exception:
                 logger.exception("Failed locking time skipping after error")
             raise
+        # Lock it back, throwing on error
+        await self._lock_time_skipping_after_waiter()
+
+    async def _lock_time_skipping_after_waiter(self) -> None:
+        # Only the last waiter locks. The count drops first so a failed lock
+        # call does not leave a phantom waiter behind.
+        self._time_skipping_waiters -= 1
+        if self._time_skipping_waiters:
+            return
+        await self._client.test_service.lock_time_skipping(
+            temporalio.api.testservice.v1.LockTimeSkippingRequest()
+        )
 
 
 class _V2WorkflowEnvironment(_HasAServer):

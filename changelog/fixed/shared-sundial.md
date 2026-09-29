@@ -1,0 +1,1 @@
+`WorkflowEnvironment.start_time_skipping()`: concurrent `WorkflowHandle.result()` waiters now share one time-skipping unlock, so the clock no longer jumps while another Workflow still has a task in flight.
