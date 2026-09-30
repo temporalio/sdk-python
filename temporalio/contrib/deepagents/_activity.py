@@ -242,10 +242,13 @@ class DeepAgentActivities:
 
     def _build_bound_model(self, input: ModelActivityInput) -> Any:
         model = self._model_provider(input.model_name)
-        if input.bind_kwargs:
-            model = model.bind(**input.bind_kwargs)
+        # Bind tools on the unbound model: bind() returns a RunnableBinding, and calling
+        # bind_tools() on that delegates to the unbound model, so the resulting binding would
+        # carry only the tools and drop every bind kwarg (e.g. response_format). See #1896.
         if input.tool_schemas:
             model = model.bind_tools(input.tool_schemas)
+        if input.bind_kwargs:
+            model = model.bind(**input.bind_kwargs)
         return model
 
     @activity.defn(name=INVOKE_MODEL)
