@@ -25,6 +25,9 @@ jobs:
         include:
           - os: ubuntu-latest
             runsOn: ubuntu-latest-16-cores
+            # Keep xdist parallelism at the standard runner level so the local
+            # test service is not overwhelmed by more concurrent workers.
+            pytestWorkerArg: "-n 4"
           - os: ubuntu-latest
             python: "3.14"
             docsTarget: true
@@ -64,14 +67,14 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
-      - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
+      - run: poe test ${{matrix.pytestExtraArgs}} ${{matrix.pytestWorkerArg}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 15
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        run: poe test ${{matrix.pytestExtraArgs}} ${{matrix.pytestWorkerArg}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
         timeout-minutes: 10
       - if: ${{ matrix.openaiTestTarget && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
-        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
+        run: poe test tests/contrib/openai_agents/test_openai.py ${{matrix.pytestExtraArgs}} ${{matrix.pytestWorkerArg}} -s  --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--openai.xml
         timeout-minutes: 10
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
