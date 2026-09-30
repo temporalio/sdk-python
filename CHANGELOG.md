@@ -56,6 +56,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.deepagents` no longer drops the bind kwargs a DeepAgents model was
+  configured with (such as the `response_format` of `ProviderStrategy` structured output) when
+  the same model also has tools bound
+  ([#1896](https://github.com/temporalio/sdk-python/issues/1896)).
 - Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
   including nested frozen sets.
 
