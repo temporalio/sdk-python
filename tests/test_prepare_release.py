@@ -89,6 +89,45 @@ def test_sdk_core_release_notes_embed_core_output(
     ]
 
 
+def test_sdk_core_release_notes_replace_squashed_commit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    release_verify = _release_verify_module()
+    (tmp_path / ".git").mkdir()
+    monkeypatch.setattr(
+        release_verify, "_previous_release_tag", lambda _version: "1.33.0"
+    )
+    monkeypatch.setattr(
+        release_verify,
+        "_gitlink",
+        lambda revision, _path: {
+            "1.33.0": "85b71d7ecd4f2bf677fa1cee17f3fbc1ab10f1b9",
+            "HEAD": "e163abd6dc19040064986a63c8b8cf4756ffd320",
+        }[revision],
+    )
+    calls: list[tuple[str, str]] = []
+
+    def generate_notes(
+        previous_commit: str, current_commit: str, _path: pathlib.Path
+    ) -> list[str]:
+        calls.append((previous_commit, current_commit))
+        return ["* Core feature."]
+
+    monkeypatch.setattr(release_verify, "_sdk_core_changelog_entries", generate_notes)
+
+    assert release_verify._sdk_core_release_notes("1.34.0", str(tmp_path)) == [
+        "### SDK Core",
+        "",
+        "* Core feature.",
+    ]
+    assert calls == [
+        (
+            "857248b25eefee15d6d5fe4574161e5e8287f94a",
+            "e163abd6dc19040064986a63c8b8cf4756ffd320",
+        )
+    ]
+
+
 def test_sdk_core_release_notes_preserves_generator_failure_output(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
