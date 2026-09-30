@@ -41,6 +41,7 @@ _fake_info = temporalio.workflow.Info(
     first_execution_run_id="sandbox-validate-first-run_id",
     headers={},
     namespace="sandbox-validate-namespace",
+    original_execution_run_id="sandbox-validate-original-execution-run_id",
     parent=None,
     root=None,
     raw_memo={},
@@ -79,7 +80,7 @@ class SandboxedWorkflowRunner(WorkflowRunner):
         # Just create with fake info which validates
         self.create_instance(
             WorkflowInstanceDetails(
-                payload_converter_factory=temporalio.converter.DataConverter.default._new_payload_converter,
+                payload_converter_factory=temporalio.converter.DataConverter.default._new_internal_payload_converter,
                 failure_converter_class=temporalio.converter.DataConverter.default.failure_converter_class,
                 interceptor_classes=[],
                 defn=defn,

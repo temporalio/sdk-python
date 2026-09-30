@@ -89,11 +89,19 @@ class DataConverter(WithSerializationContext):
     """Singleton default data converter."""
 
     def __post_init__(self) -> None:  # noqa: D105
-        object.__setattr__(self, "payload_converter", self._new_payload_converter())
+        object.__setattr__(self, "payload_converter", self.payload_converter_class())
         object.__setattr__(self, "failure_converter", self.failure_converter_class())
 
-    def _new_payload_converter(self) -> PayloadConverter:
+    def _get_internal_payload_converter(self) -> PayloadConverter:
+        """Return the configured converter with SDK transfer type hooks enabled."""
+        # Reuse the configured instance so its state and any applied serialization
+        # context are preserved. A new wrapper does not create a new user converter.
+        return _TemporalTransferTypePayloadConverter.wrap(self.payload_converter)
+
+    def _new_internal_payload_converter(self) -> PayloadConverter:
         """Create a payload converter instance with SDK transfer type hooks enabled."""
+        # Unlike _get_internal_payload_converter, instantiate a fresh user converter
+        # so workflow instances do not share mutable custom converter state.
         return _TemporalTransferTypePayloadConverter.wrap(
             self.payload_converter_class()
         )
@@ -113,7 +121,7 @@ class DataConverter(WithSerializationContext):
             same number as values given, but must be at least one and cannot be
             more than was given.
         """
-        payloads = self.payload_converter.to_payloads(values)
+        payloads = self._get_internal_payload_converter().to_payloads(values)
         payloads = await self._encode_payload_sequence(payloads)
         payloads = await self._external_store_payload_sequence(payloads)
         return payloads
@@ -135,7 +143,9 @@ class DataConverter(WithSerializationContext):
         """
         payloads = await self._external_retrieve_payload_sequence(payloads)
         payloads = await self._decode_payload_sequence(payloads)
-        return self.payload_converter.from_payloads(payloads, type_hints)
+        return self._get_internal_payload_converter().from_payloads(
+            payloads, type_hints
+        )
 
     async def encode_wrapper(
         self, values: Sequence[Any]
@@ -161,7 +171,9 @@ class DataConverter(WithSerializationContext):
         self, exception: BaseException, failure: temporalio.api.failure.v1.Failure
     ) -> None:
         """Convert and encode failure."""
-        self.failure_converter.to_failure(exception, self.payload_converter, failure)
+        self.failure_converter.to_failure(
+            exception, self._get_internal_payload_converter(), failure
+        )
         await _apply_to_failure_payloads(failure, self._transform_outbound_payloads)
 
     async def decode_failure(
@@ -169,7 +181,9 @@ class DataConverter(WithSerializationContext):
     ) -> BaseException:
         """Decode and convert failure."""
         await _apply_to_failure_payloads(failure, self._transform_inbound_payloads)
-        return self.failure_converter.from_failure(failure, self.payload_converter)
+        return self.failure_converter.from_failure(
+            failure, self._get_internal_payload_converter()
+        )
 
     def with_context(self, context: SerializationContext) -> Self:
         """Return an instance with context set on the component converters."""

@@ -27,7 +27,7 @@ from temporalio.api.failure.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n&temporal/api/callback/v1/message.proto\x12\x18temporal.api.callback.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/common.proto\x1a%temporal/api/failure/v1/message.proto"\x97\x03\n\x0c\x43\x61llbackInfo\x12\x32\n\x08\x63\x61llback\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Callback\x12\x35\n\x11registration_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x33\n\x05state\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.CallbackState\x12\x0f\n\x07\x61ttempt\x18\x04 \x01(\x05\x12>\n\x1alast_attempt_complete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x06 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0e\x62locked_reason\x18\x08 \x01(\tB\x93\x01\n\x1bio.temporal.api.callback.v1B\x0cMessageProtoP\x01Z\'go.temporal.io/api/callback/v1;callback\xaa\x02\x1aTemporalio.Api.Callback.V1\xea\x02\x1dTemporalio::Api::Callback::V1b\x06proto3'
+    b'\n&temporal/api/callback/v1/message.proto\x12\x18temporal.api.callback.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/common.proto\x1a%temporal/api/failure/v1/message.proto"\xab\x03\n\x0c\x43\x61llbackInfo\x12\x32\n\x08\x63\x61llback\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.Callback\x12\x35\n\x11registration_time\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x33\n\x05state\x18\x03 \x01(\x0e\x32$.temporal.api.enums.v1.CallbackState\x12\x0f\n\x07\x61ttempt\x18\x04 \x01(\x05\x12>\n\x1alast_attempt_complete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12>\n\x14last_attempt_failure\x18\x06 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12>\n\x1anext_attempt_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x16\n\x0e\x62locked_reason\x18\x08 \x01(\t\x12\x12\n\nrequest_id\x18\t \x01(\tB\x93\x01\n\x1bio.temporal.api.callback.v1B\x0cMessageProtoP\x01Z\'go.temporal.io/api/callback/v1;callback\xaa\x02\x1aTemporalio.Api.Callback.V1\xea\x02\x1dTemporalio::Api::Callback::V1b\x06proto3'
 )
 
 
@@ -47,5 +47,5 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\033io.temporal.api.callback.v1B\014MessageProtoP\001Z'go.temporal.io/api/callback/v1;callback\252\002\032Temporalio.Api.Callback.V1\352\002\035Temporalio::Api::Callback::V1"
     _CALLBACKINFO._serialized_start = 215
-    _CALLBACKINFO._serialized_end = 622
+    _CALLBACKINFO._serialized_end = 642
 # @@protoc_insertion_point(module_scope)

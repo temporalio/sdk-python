@@ -176,6 +176,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
+                first_execution_run_id = resp.first_execution_run_id or (
+                    resp.run_id if resp.started else None
+                )
             else:
                 resp = await self._client.workflow_service.start_workflow_execution(
                     req,
@@ -183,7 +186,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
-                first_execution_run_id = resp.run_id
+                first_execution_run_id = resp.first_execution_run_id or resp.run_id
                 eagerly_started = resp.HasField("eager_workflow_task")
         except RPCError as err:
             # If the status is ALREADY_EXISTS and the details can be extracted
@@ -192,7 +195,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                 if err.grpc_status.details[0].Unpack(details):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
-                        input.id, input.workflow, run_id=details.run_id
+                        input.id,
+                        input.workflow,
+                        run_id=details.run_id,
+                        first_run_id=details.first_execution_run_id or None,
                     )
             raise
         handle: WorkflowHandle[Any, Any] = WorkflowHandle(
@@ -1012,6 +1018,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                                     input.start_workflow_input.id,
                                     input.start_workflow_input.workflow,
                                     run_id=details.run_id,
+                                    first_run_id=(
+                                        details.first_execution_run_id or None
+                                    ),
                                 )
                         else:
                             err = RPCError(
@@ -1592,9 +1601,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             )
 
         # Set user metadata
-        metadata = await _encode_user_metadata(
-            self._client.data_converter, input.summary, None
-        )
+        metadata = await _encode_user_metadata(data_converter, input.summary, None)
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
 
@@ -1661,6 +1668,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     ) -> Any:
         """Poll for nexus operation result until it's available."""
         data_converter = self._client.data_converter
+        # These three are set together or not at all: a handle that started the operation has all
+        # of them, and a handle obtained by operation ID alone has none and defaults them to "".
+        # An empty endpoint therefore means "no operation to build a context from", not "an
+        # operation named the empty string".
         if input.endpoint and input.service and input.operation:
             data_converter = data_converter.with_context(
                 temporalio.converter.NexusSerializationContext(
