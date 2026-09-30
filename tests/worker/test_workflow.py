@@ -977,9 +977,11 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
-    # Core completes the task holding a local activity at 80% of this timeout
+    # Core completes the task holding a local activity at 80% of this timeout, and
+    # the cancel reaches the activity on the second such cycle (~8s), so the assert
+    # budget needs headroom beyond that on loaded runners
     task_timeout = timedelta(seconds=5)
-    assert_timeout = timedelta(seconds=10)
+    assert_timeout = timedelta(seconds=30)
     activity_inst = ActivityWaitCancelNotify()
 
     async def wait_cancel_complete() -> None:
