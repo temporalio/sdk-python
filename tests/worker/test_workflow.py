@@ -16,7 +16,8 @@ import time
 import typing
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Mapping, Sequence
+from collections.abc import Awaitable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
@@ -1152,22 +1153,15 @@ class OrphanedLocalActivityWorkflow:
         )
 
 
-async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
-    client: Client,
-):
-    started = asyncio.Event()
+@contextmanager
+def _orphan_local_activity_cancel() -> Iterator[None]:
+    """Make Core drop a running local activity's cancel on eviction.
+
+    Holds the activity poll that follows a local activity start until workflow
+    polling has shut down, so the cancel Core queues on eviction is never
+    delivered and the activity keeps running untracked.
+    """
     workflow_poll_shut_down = asyncio.Event()
-    details: list[temporalio.activity.ActivityCancellationDetails | None] = []
-
-    @activity.defn(name="wait_forever_local_activity")
-    async def wait_forever_local_activity() -> None:
-        started.set()
-        try:
-            await asyncio.sleep(1000)
-        except asyncio.CancelledError:
-            details.append(activity.cancellation_details())
-
-    # Hold the next poll until Core has evicted the run, so its queued cancel is never delivered
     bridge_worker = temporalio.bridge.worker.Worker
     orig_poll_activity = bridge_worker.poll_activity_task
     orig_poll_workflow = bridge_worker.poll_workflow_activation
@@ -1196,6 +1190,24 @@ async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
             bridge_worker, "poll_workflow_activation", poll_workflow_activation
         ),
     ):
+        yield
+
+
+async def test_worker_shutdown_cancels_local_activity_untracked_by_core(
+    client: Client,
+):
+    started = asyncio.Event()
+    details: list[temporalio.activity.ActivityCancellationDetails | None] = []
+
+    @activity.defn(name="wait_forever_local_activity")
+    async def wait_forever_local_activity() -> None:
+        started.set()
+        try:
+            await asyncio.sleep(1000)
+        except asyncio.CancelledError:
+            details.append(activity.cancellation_details())
+
+    with _orphan_local_activity_cancel():
         worker = new_worker(
             client,
             OrphanedLocalActivityWorkflow,
@@ -1272,6 +1284,57 @@ async def test_worker_shutdown_keeps_details_of_local_activity_ignoring_cancel(
         details
         == [temporalio.activity.ActivityCancellationDetails(cancel_requested=True)] * 2
     )
+
+
+class _SlowPayloadCodec(PayloadCodec):
+    """Yields while encoding, like a codec that calls a remote KMS."""
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        if payloads:
+            await asyncio.sleep(5)
+        return list(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return list(payloads)
+
+
+async def test_worker_shutdown_completes_while_untracked_activity_encodes_failure(
+    client: Client,
+):
+    # The shutdown cancel lands while the orphaned activity is still encoding its
+    # failure through a slow codec; shutdown must still complete
+    started = asyncio.Event()
+
+    @activity.defn(name="wait_forever_local_activity")
+    async def raise_on_shutdown_local_activity() -> None:
+        started.set()
+        await activity.wait_for_worker_shutdown()
+        # Details send the failure through the codec
+        raise ApplicationError("failing at shutdown", {"detail": "x"})
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default, payload_codec=_SlowPayloadCodec()
+    )
+    codec_client = Client(**config)
+    with _orphan_local_activity_cancel():
+        worker = new_worker(
+            codec_client,
+            OrphanedLocalActivityWorkflow,
+            activities=[raise_on_shutdown_local_activity],
+        )
+        run_task = asyncio.create_task(worker.run())
+        handle = await codec_client.start_workflow(
+            OrphanedLocalActivityWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=timedelta(seconds=3),
+        )
+        await started.wait()
+        # Terminating fails the workflow task heartbeat, which evicts the run
+        await handle.terminate()
+        await asyncio.wait_for(worker.shutdown(), 20)
+        await run_task
 
 
 @workflow.defn

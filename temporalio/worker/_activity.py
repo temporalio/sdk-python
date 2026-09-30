@@ -212,7 +212,16 @@ class _ActivityWorker:
                 activity.cancel(cancelled_by_request=True)
         running_tasks = [v.task for v in self._running_activities.values() if v.task]
         if running_tasks:
-            await asyncio.gather(*running_tasks, return_exceptions=False)
+            # A cancel above can land while an activity is still encoding its
+            # result, ending its task with CancelledError, so never let a task
+            # exception escape and stall shutdown
+            for result in await asyncio.gather(*running_tasks, return_exceptions=True):
+                if isinstance(result, BaseException) and not isinstance(
+                    result, asyncio.CancelledError
+                ):
+                    logger.warning(
+                        "Activity task raised during worker shutdown", exc_info=result
+                    )
 
     def _handle_cancel_activity_task(
         self,
