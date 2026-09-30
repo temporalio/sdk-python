@@ -28,6 +28,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30
