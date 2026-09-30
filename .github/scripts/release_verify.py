@@ -11,6 +11,12 @@ import re
 import subprocess
 from collections.abc import Sequence
 
+# The 1.33.0 gitlink points to the original PR commit, which was later
+# replaced by this squashed commit and is no longer reachable from SDK Core main.
+_SDK_CORE_COMMIT_REPLACEMENTS = {
+    "85b71d7ecd4f2bf677fa1cee17f3fbc1ab10f1b9": "857248b25eefee15d6d5fe4574161e5e8287f94a",
+}
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -288,6 +294,9 @@ def _sdk_core_changelog_entries(
 def _sdk_core_release_notes(version: str, path: str) -> list[str]:
     previous_tag = _previous_release_tag(version)
     previous_commit = _gitlink(previous_tag, path)
+    previous_commit = _SDK_CORE_COMMIT_REPLACEMENTS.get(
+        previous_commit, previous_commit
+    )
     current_commit = _gitlink("HEAD", path)
     if previous_commit == current_commit:
         return []
