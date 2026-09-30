@@ -28,6 +28,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30
@@ -70,10 +75,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- Encoding a datetime search attribute without a timezone now raises
-  `ValueError("Timezone must be present on all search attribute dates")` on
-  the typed path, matching the deprecated untyped encoder, instead of sending
-  a naive ISO string that the server rejects with `BadSearchAttributes`.
 - `temporalio.contrib.deepagents` now preserves model binding options such as
   `response_format` and `tool_choice` when tools are also bound.
 - Workflow handles returned when a start attaches to a running workflow now use
