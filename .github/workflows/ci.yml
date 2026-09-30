@@ -24,6 +24,8 @@ jobs:
         os: [ubuntu-latest, ubuntu-arm, macos-arm, windows-latest]
         include:
           - os: ubuntu-latest
+            runsOn: ubuntu-latest-16-cores
+          - os: ubuntu-latest
             python: "3.14"
             docsTarget: true
             openaiTestTarget: true
@@ -106,7 +108,7 @@ jobs:
   # FIPS binary and build the release wheel.
   fips-build:
     timeout-minutes: 45
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -190,7 +192,7 @@ jobs:
       matrix:
         include:
           - cibw-build: cp310-musllinux_x86_64
-            runsOn: ubuntu-latest
+            runsOn: ubuntu-latest-16-cores
           - cibw-build: cp310-musllinux_aarch64
             runsOn: ubuntu-24.04-arm64-2-core
     runs-on: ${{ matrix.runsOn }}
@@ -214,7 +216,7 @@ jobs:
 
   check-protos:
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -251,7 +253,7 @@ jobs:
 
   test-latest-deps:
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -292,7 +294,7 @@ jobs:
   cloud-test:
     if: ${{ github.actor != 'dependabot[bot]' && (github.event.pull_request.head.repo.full_name == '' || github.event.pull_request.head.repo.full_name == 'temporalio/sdk-python') }}
     timeout-minutes: 30
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-16-cores
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
