@@ -20,6 +20,20 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+### Fixed
+
+### Security
+
+## [1.34.0] - 2026-09-30
+
+### Added
+
 - Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
   ID when provided by the server.
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
@@ -45,8 +59,6 @@ to include examples, links to docs, or any other relevant information.
 - The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
   deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
   `langsmith<0.13` (was `<0.9`).
-
-### Deprecated
 
 ### :boom: Breaking Changes
 
@@ -93,8 +105,6 @@ to include examples, links to docs, or any other relevant information.
 - A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
   workflow and activity user metadata are serialized with theirs. This covers the static summary
   sent when starting an operation, and the summary and details read back from a description.
-
-### Security
 
 ## [1.33.0] - 2026-09-14
 

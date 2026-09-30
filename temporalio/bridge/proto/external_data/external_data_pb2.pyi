@@ -33,6 +33,7 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
     COMPLETE_TIME_FIELD_NUMBER: builtins.int
     BACKOFF_FIELD_NUMBER: builtins.int
     ORIGINAL_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
+    ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
     seq: builtins.int
     attempt: builtins.int
     """The number of attempts at execution before we recorded this result. Typically starts at 1,
@@ -57,6 +58,11 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
         """The time the LA was originally scheduled (wall clock time). This is used to track
         schedule-to-close timeouts when timer-based backoffs are used
         """
+    activation_index: builtins.int
+    """Position, within the workflow task, of the activation this resolution was delivered in.
+    Replay must deliver resolutions in the same activations because workflow code can branch on
+    which handles are ready. Absent in markers written by Core versions that predate this field.
+    """
     def __init__(
         self,
         *,
@@ -67,10 +73,15 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
         complete_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         backoff: google.protobuf.duration_pb2.Duration | None = ...,
         original_schedule_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        activation_index: builtins.int | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
+            "_activation_index",
+            b"_activation_index",
+            "activation_index",
+            b"activation_index",
             "backoff",
             b"backoff",
             "complete_time",
@@ -82,6 +93,10 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "_activation_index",
+            b"_activation_index",
+            "activation_index",
+            b"activation_index",
             "activity_id",
             b"activity_id",
             "activity_type",
@@ -98,6 +113,12 @@ class LocalActivityMarkerData(google.protobuf.message.Message):
             b"seq",
         ],
     ) -> None: ...
+    def WhichOneof(
+        self,
+        oneof_group: typing_extensions.Literal[
+            "_activation_index", b"_activation_index"
+        ],
+    ) -> typing_extensions.Literal["activation_index"] | None: ...
 
 global___LocalActivityMarkerData = LocalActivityMarkerData
 

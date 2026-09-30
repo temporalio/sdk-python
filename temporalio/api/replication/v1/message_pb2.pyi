@@ -8,6 +8,7 @@ import collections.abc
 import sys
 
 import google.protobuf.descriptor
+import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
@@ -25,14 +26,33 @@ class ClusterReplicationConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     CLUSTER_NAME_FIELD_NUMBER: builtins.int
+    REPLICATION_RAMP_DURATION_FIELD_NUMBER: builtins.int
     cluster_name: builtins.str
+    @property
+    def replication_ramp_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """Ramp duration when this cluster is added as passive by UpdateNamespace; unset or non-positive disables gradual connect.
+        This field is not persisted and is omitted from namespace responses.
+        """
     def __init__(
         self,
         *,
         cluster_name: builtins.str = ...,
+        replication_ramp_duration: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "replication_ramp_duration", b"replication_ramp_duration"
+        ],
+    ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["cluster_name", b"cluster_name"]
+        self,
+        field_name: typing_extensions.Literal[
+            "cluster_name",
+            b"cluster_name",
+            "replication_ramp_duration",
+            b"replication_ramp_duration",
+        ],
     ) -> None: ...
 
 global___ClusterReplicationConfig = ClusterReplicationConfig
