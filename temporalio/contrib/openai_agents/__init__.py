@@ -1,10 +1,10 @@
 """Compatibility imports for the standalone OpenAI Agents integration.
 
-New code should import :mod:`temporalio.openai_agents` directly.
+New code should import ``temporalio.openai_agents`` directly.
 
 .. deprecated::
     Install ``temporalio-openai-agents`` and import
-    :mod:`temporalio.openai_agents` instead.
+    ``temporalio.openai_agents`` instead.
 """
 
 import warnings
