@@ -19,6 +19,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
@@ -1182,6 +1183,7 @@ class ResolveSignalExternalWorkflow(google.protobuf.message.Message):
 
     SEQ_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding SignalExternalWorkflowExecution
     command
@@ -1191,18 +1193,25 @@ class ResolveSignalExternalWorkflow(google.protobuf.message.Message):
         """If populated, this signal either failed to be sent or was cancelled depending on failure
         type / info.
         """
+    cause: temporalio.api.enums.v1.failed_cause_pb2.SignalExternalWorkflowExecutionFailedCause.ValueType
+    """The server-reported cause when the signal failed. Unspecified when the signal succeeded or
+    was cancelled before being sent.
+    """
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        cause: temporalio.api.enums.v1.failed_cause_pb2.SignalExternalWorkflowExecutionFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"],
+        field_name: typing_extensions.Literal[
+            "cause", b"cause", "failure", b"failure", "seq", b"seq"
+        ],
     ) -> None: ...
 
 global___ResolveSignalExternalWorkflow = ResolveSignalExternalWorkflow
@@ -1212,27 +1221,31 @@ class ResolveRequestCancelExternalWorkflow(google.protobuf.message.Message):
 
     SEQ_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Sequence number as provided by lang in the corresponding
     RequestCancelExternalWorkflowExecution command
     """
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """If populated, this signal either failed to be sent or was cancelled depending on failure
-        type / info.
-        """
+        """If populated, the cancellation request failed."""
+    cause: temporalio.api.enums.v1.failed_cause_pb2.CancelExternalWorkflowExecutionFailedCause.ValueType
+    """The server-reported cause when the cancellation request failed."""
     def __init__(
         self,
         *,
         seq: builtins.int = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
+        cause: temporalio.api.enums.v1.failed_cause_pb2.CancelExternalWorkflowExecutionFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing_extensions.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal["failure", b"failure", "seq", b"seq"],
+        field_name: typing_extensions.Literal[
+            "cause", b"cause", "failure", b"failure", "seq", b"seq"
+        ],
     ) -> None: ...
 
 global___ResolveRequestCancelExternalWorkflow = ResolveRequestCancelExternalWorkflow

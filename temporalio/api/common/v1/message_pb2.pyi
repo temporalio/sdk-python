@@ -322,9 +322,7 @@ class WorkflowExecution(google.protobuf.message.Message):
 global___WorkflowExecution = WorkflowExecution
 
 class Execution(google.protobuf.message.Message):
-    """Identifies a specific execution within a namespace. This is used for standalone activities
-    executions in batch jobs currently.
-    """
+    """Identifies a specific execution within a namespace."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -676,6 +674,10 @@ class Callback(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     class Nexus(google.protobuf.message.Message):
+        """Nexus callbacks are used to delivery Nexus operation completions, as defined in the Nexus RPC spec:
+        https://github.com/nexus-rpc/api/blob/main/SPEC.md#callback-urls
+        """
+
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
         class HeaderEntry(google.protobuf.message.Message):
@@ -737,13 +739,81 @@ class Callback(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["data", b"data"]
         ) -> None: ...
 
+    class NexusHandler(google.protobuf.message.Message):
+        """NexusHandler callbacks are requests to invoke a specific shape of Nexus operation on a Temporal worker.
+        The specified Nexus operation must have the following:
+        - Input:  temporalio.api.notificationservice.v1.OnCompleteRequest
+        - Output: temporalio.api.notificationservice.v1.OnCompleteResponse
+
+        The targeted Nexus service must be registered within the same namespace as the source operation
+        the callback is attached to. (While Nexus allows for cross-namespace operations, NexusHandler callbacks
+        are strictly caller-side.)
+
+        NexusHandler callbacks are only supported for certain types of operations, e.g. standalone Nexus operations.
+        Attempting to attach a Worker callback for an unsupported operation will result in an INVALID_ARGUMENT
+        error from the server.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        TASK_QUEUE_NAME_FIELD_NUMBER: builtins.int
+        SERVICE_FIELD_NUMBER: builtins.int
+        OPERATION_FIELD_NUMBER: builtins.int
+        SOURCE_CONTEXT_FIELD_NUMBER: builtins.int
+        task_queue_name: builtins.str
+        """Nexus task queue the Temporal worker is listening on.
+
+        NOTE: This is not a temporalio.api.taskqueue.v1.TaskQueue to avoid a circular dependency.
+        """
+        service: builtins.str
+        """Target Nexus service, e.g. "HTTPAdapter"."""
+        operation: builtins.str
+        """Target operation, e.g. "DeliverAsWebhook"."""
+        @property
+        def source_context(self) -> global___Payload:
+            """Arbitrary user-supplied data from the source operation's callsite. (As applicable, not all operations
+            support attaching context data.)
+
+            There are restrictions on the maxium payload size a single callback can carry, as well as the
+            total sum of all source context payloads attached to an execution. See dynamic configuration:
+            "callback.nexusHandler.sourceContext.maxSize", "callback.nexusHandler.sourceContext.aggregateMaxSize".
+            """
+        def __init__(
+            self,
+            *,
+            task_queue_name: builtins.str = ...,
+            service: builtins.str = ...,
+            operation: builtins.str = ...,
+            source_context: global___Payload | None = ...,
+        ) -> None: ...
+        def HasField(
+            self,
+            field_name: typing_extensions.Literal["source_context", b"source_context"],
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "operation",
+                b"operation",
+                "service",
+                b"service",
+                "source_context",
+                b"source_context",
+                "task_queue_name",
+                b"task_queue_name",
+            ],
+        ) -> None: ...
+
     NEXUS_FIELD_NUMBER: builtins.int
     INTERNAL_FIELD_NUMBER: builtins.int
+    NEXUS_HANDLER_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     @property
     def nexus(self) -> global___Callback.Nexus: ...
     @property
     def internal(self) -> global___Callback.Internal: ...
+    @property
+    def nexus_handler(self) -> global___Callback.NexusHandler: ...
     @property
     def links(
         self,
@@ -758,12 +828,20 @@ class Callback(google.protobuf.message.Message):
         *,
         nexus: global___Callback.Nexus | None = ...,
         internal: global___Callback.Internal | None = ...,
+        nexus_handler: global___Callback.NexusHandler | None = ...,
         links: collections.abc.Iterable[global___Link] | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "internal", b"internal", "nexus", b"nexus", "variant", b"variant"
+            "internal",
+            b"internal",
+            "nexus",
+            b"nexus",
+            "nexus_handler",
+            b"nexus_handler",
+            "variant",
+            b"variant",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -775,13 +853,15 @@ class Callback(google.protobuf.message.Message):
             b"links",
             "nexus",
             b"nexus",
+            "nexus_handler",
+            b"nexus_handler",
             "variant",
             b"variant",
         ],
     ) -> None: ...
     def WhichOneof(
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["nexus", "internal"] | None: ...
+    ) -> typing_extensions.Literal["nexus", "internal", "nexus_handler"] | None: ...
 
 global___Callback = Callback
 
@@ -1011,11 +1091,63 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    class Callback(google.protobuf.message.Message):
+        """A link to a worker callback attached to an execution. An execution (e.g. standalone Nexus operation) can have
+        multiple callbacks attached, and will be differentiated by the request_id used when the callback is invoked.
+        """
+
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        NAMESPACE_FIELD_NUMBER: builtins.int
+        EXECUTION_FIELD_NUMBER: builtins.int
+        COMPONENT_PATH_FIELD_NUMBER: builtins.int
+        REQUEST_ID_FIELD_NUMBER: builtins.int
+        namespace: builtins.str
+        @property
+        def execution(self) -> global___Execution: ...
+        @property
+        def component_path(
+            self,
+        ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+            builtins.str
+        ]:
+            """In most cases, the Execution is sufficient to identify the callback's source. But the callback could have
+            been attached some child component of that execution. e.g. a workflow update. The component path describes
+            the unique component as applicable, typically ending with a unique ID. e.g. ["Update", $workflowUpdateId ]
+            """
+        request_id: builtins.str
+        """Server-generate request ID sent when the callback was dispatched."""
+        def __init__(
+            self,
+            *,
+            namespace: builtins.str = ...,
+            execution: global___Execution | None = ...,
+            component_path: collections.abc.Iterable[builtins.str] | None = ...,
+            request_id: builtins.str = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing_extensions.Literal["execution", b"execution"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing_extensions.Literal[
+                "component_path",
+                b"component_path",
+                "execution",
+                b"execution",
+                "namespace",
+                b"namespace",
+                "request_id",
+                b"request_id",
+            ],
+        ) -> None: ...
+
     WORKFLOW_EVENT_FIELD_NUMBER: builtins.int
     BATCH_JOB_FIELD_NUMBER: builtins.int
     ACTIVITY_FIELD_NUMBER: builtins.int
     NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     WORKFLOW_FIELD_NUMBER: builtins.int
+    CALLBACK_FIELD_NUMBER: builtins.int
     @property
     def workflow_event(self) -> global___Link.WorkflowEvent: ...
     @property
@@ -1026,6 +1158,8 @@ class Link(google.protobuf.message.Message):
     def nexus_operation(self) -> global___Link.NexusOperation: ...
     @property
     def workflow(self) -> global___Link.Workflow: ...
+    @property
+    def callback(self) -> global___Link.Callback: ...
     def __init__(
         self,
         *,
@@ -1034,6 +1168,7 @@ class Link(google.protobuf.message.Message):
         activity: global___Link.Activity | None = ...,
         nexus_operation: global___Link.NexusOperation | None = ...,
         workflow: global___Link.Workflow | None = ...,
+        callback: global___Link.Callback | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1042,6 +1177,8 @@ class Link(google.protobuf.message.Message):
             b"activity",
             "batch_job",
             b"batch_job",
+            "callback",
+            b"callback",
             "nexus_operation",
             b"nexus_operation",
             "variant",
@@ -1059,6 +1196,8 @@ class Link(google.protobuf.message.Message):
             b"activity",
             "batch_job",
             b"batch_job",
+            "callback",
+            b"callback",
             "nexus_operation",
             b"nexus_operation",
             "variant",
@@ -1073,7 +1212,12 @@ class Link(google.protobuf.message.Message):
         self, oneof_group: typing_extensions.Literal["variant", b"variant"]
     ) -> (
         typing_extensions.Literal[
-            "workflow_event", "batch_job", "activity", "nexus_operation", "workflow"
+            "workflow_event",
+            "batch_job",
+            "activity",
+            "nexus_operation",
+            "workflow",
+            "callback",
         ]
         | None
     ): ...

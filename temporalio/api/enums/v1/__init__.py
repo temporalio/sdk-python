@@ -25,6 +25,7 @@ from .deployment_pb2 import (
 )
 from .event_type_pb2 import EventType
 from .failed_cause_pb2 import (
+    ActivityTaskFailedCause,
     CancelExternalWorkflowExecutionFailedCause,
     ResourceExhaustedCause,
     ResourceExhaustedScope,
@@ -74,6 +75,7 @@ __all__ = [
     "ActivityExecutionStatus",
     "ActivityIdConflictPolicy",
     "ActivityIdReusePolicy",
+    "ActivityTaskFailedCause",
     "ApplicationErrorCategory",
     "ArchivalState",
     "BatchOperationState",
