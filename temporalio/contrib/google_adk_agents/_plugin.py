@@ -100,11 +100,12 @@ def _warn_if_global_otel_providers_not_replay_safe() -> None:
 
 
 def _deterministic_time_provider() -> float:
-    # Read-only contexts (query handlers, update validators) get wall-clock
-    # time: their results are never replayed, and workflow.time() would hand
-    # them the last activation's timestamp, which is stale by however long the
-    # workflow has been parked.
-    if workflow.in_workflow() and not workflow.unsafe.is_read_only():
+    # workflow.time() in every in-workflow context, read-only ones included: a
+    # dynamic workflow's ``dynamic_config`` runs read-only and is replayed, so
+    # a wall-clock value there would not be replay-safe. In a query handler
+    # the value is the current activation's timestamp rather than the wall
+    # clock, which is harmless because nothing a query computes is persisted.
+    if workflow.in_workflow():
         return workflow.time()
     return time.time()
 
@@ -117,11 +118,15 @@ def _workflow_adk_random() -> random.Random:
     # workflow instance, as the opentelemetry and langsmith integrations do)
     # rather than sharing workflow.random(), so how many values ADK consumes
     # never shifts the sequence user code sees. The read-only check must come
-    # first, so a query handler can never touch the cached stream: read-only
-    # contexts (query handlers, update validators) get a fresh unseeded
-    # generator instead, since their results are never replayed while a draw
-    # from the cached stream would advance it and diverge later activations
-    # from replay.
+    # first, so a query handler can never touch the cached stream: a draw
+    # there would advance it and diverge later activations from replay.
+    # Read-only code gets a fresh unseeded generator instead. Query handlers
+    # and update validators are never replayed; a dynamic workflow's
+    # ``dynamic_config`` is read-only and replayed, but it configures the
+    # workflow before any agent code runs, and workflow.random() raises in
+    # every read-only context anyway (which is what 1.34.0 did here). There
+    # is no deterministic alternative: new_random() registers a reseed
+    # callback, which read-only mode also forbids.
     if workflow.unsafe.is_read_only():
         return random.Random()
     inst = workflow.instance()
@@ -207,10 +212,10 @@ def setup_deterministic_runtime() -> None:
     instance), so ADK-generated ids and retry jitter are reproducible on
     replay without shifting the sequence user code sees from
     ``workflow.random()`` and ``workflow.uuid4()``. In read-only contexts
-    (query handlers, update validators) time comes from the wall clock and ids
-    and randoms come from a nondeterministic fallback stream that leaves the
-    private stream untouched, since read-only results are never replayed.
-    Outside a workflow in the same process (activities, client code) they fall
+    (query handlers, update validators) time is still ``workflow.time()``,
+    while ids and randoms come from a nondeterministic fallback stream that
+    leaves the private stream untouched, since read-only results are never
+    replayed. Outside a workflow in the same process (activities, client code) they fall
     back to ``time.time()``, ``uuid.uuid4()``, and an unseeded
     ``random.Random()``.
 

@@ -956,10 +956,12 @@ def uuid4(*, rng: Random | None = None) -> uuid.UUID:
     security purposes.
 
     Args:
-        rng: Generator to draw from instead of the workflow's shared one,
-            e.g. a private stream from :py:func:`new_random`. When provided,
-            no workflow state is read or advanced, so this form also works in
-            read-only contexts and outside a workflow.
+        rng: Generator to draw from instead of the workflow's own, e.g. a
+            private stream from :py:func:`new_random`. Only ``rng`` is
+            advanced and the workflow runtime is not accessed, so this form
+            also works outside a workflow and in read-only contexts, provided
+            ``rng`` is not a generator that workflow execution also draws
+            from (such as :py:func:`random`).
 
     Returns:
         A v4 UUID deterministically derived from the generator.

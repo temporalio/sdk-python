@@ -22,7 +22,7 @@ to include examples, links to docs, or any other relevant information.
 
 - `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
   UUID from a caller-supplied generator (e.g., a private stream from `workflow.new_random()`)
-  without reading or advancing any workflow state.
+  instead of the workflow's own random stream; only `rng` is advanced.
 
 ### Changed
 
@@ -39,8 +39,8 @@ to include examples, links to docs, or any other relevant information.
 ### Fixed
 
 - `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
-  update validators), returning wall-clock time and fresh entropy without touching the workflow's
-  random state.
+  update validators), returning the workflow's deterministic time and fresh entropy without
+  touching the workflow's random state.
 
 ### Security
 

@@ -591,8 +591,9 @@ async def test_child_workflow_config_parity_with_start_child_workflow():
 
 
 def test_uuid4_accepts_explicit_random() -> None:
-    # workflow.uuid4(rng=...) touches no workflow state, so it works
-    # outside a workflow and derives the same uuid from the same stream state.
+    # workflow.uuid4(rng=...) only advances the supplied generator and never
+    # touches the workflow runtime, so it works outside a workflow and is a
+    # pure function of the generator's state.
     import random
     import uuid
 
