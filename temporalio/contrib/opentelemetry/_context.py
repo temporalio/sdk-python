@@ -2,48 +2,50 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
 from contextvars import Token
-from dataclasses import dataclass
 
 import opentelemetry.context
 from opentelemetry.context import Context
 
 
-@dataclass(frozen=True)
-class AttachedContext:
-    """A context attached by :func:`attach_context`, with what its detach needs."""
+@contextmanager
+def attached_context(context: Context | None) -> Iterator[None]:
+    """Attach ``context`` for the block and detach it afterwards where possible.
 
-    context: Context
-    token: Token[Context]
-
-    def detach(self) -> bool:
-        """Detach the context where its token is valid; return whether it was.
-
-        The attach and the detach of one interceptor call can run on different
-        threads: workflow activations run on a thread pool while the asyncio
-        task keeps its ``contextvars.Context`` across them, so the token is
-        still valid there and the detach must happen. Generator finalization
-        and GC, on the other hand, can run a ``finally`` in a different
-        ``contextvars.Context``, where the token is invalid and
-        ``opentelemetry.context.detach`` logs "Failed to detach context".
-        Checking that the attached context is still current cannot tell those
-        apart, because OpenTelemetry's threading instrumentation (enabled by
-        strands, among others) propagates the same ``Context`` object into new
-        threads. Only ``contextvars`` knows which ``Context`` a token belongs
-        to, so this performs the reset that ``opentelemetry.context.detach``
-        performs and treats its ``ValueError`` for a foreign ``Context`` as
-        "nothing to detach here".
-        """
-        if self.context is not opentelemetry.context.get_current():
-            return False
-        try:
-            self.token.var.reset(self.token)
-        except ValueError:
-            # The token was created in a different contextvars.Context.
-            return False
-        return True
+    ``None`` attaches nothing. The block's ``finally`` can run in a different
+    ``contextvars.Context`` than the one that attached: a context manager
+    abandoned by an evicted workflow is finalized wherever garbage collection
+    happens to run. The token is not valid there, and
+    ``opentelemetry.context.detach`` would log "Failed to detach context" even
+    though there is nothing to detach. Checking that the attached context is
+    still current does not catch every such case, because OpenTelemetry's
+    threading instrumentation (enabled by strands, among others) propagates
+    the same ``Context`` object into new threads. The thread is no test
+    either: workflow activations move between pool threads while the asyncio
+    task keeps its ``contextvars.Context``, and those detaches must happen.
+    Only ``contextvars`` knows which ``Context`` a token belongs to, so
+    :func:`_detach` performs the reset ``detach`` performs and ignores the
+    ``ValueError`` raised for a token from another ``Context``.
+    """
+    if context is None:
+        yield
+        return
+    token = opentelemetry.context.attach(context)
+    try:
+        yield
+    finally:
+        _detach(context, token)
 
 
-def attach_context(context: Context) -> AttachedContext:
-    """Attach ``context`` and remember what a safe detach needs."""
-    return AttachedContext(context, opentelemetry.context.attach(context))
+def _detach(context: Context, token: Token[Context]) -> bool:
+    """Detach ``context`` if it is current and ``token`` is valid here."""
+    if context is not opentelemetry.context.get_current():
+        return False
+    try:
+        token.var.reset(token)
+    except ValueError:
+        # The token was created in a different contextvars.Context.
+        return False
+    return True

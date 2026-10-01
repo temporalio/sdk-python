@@ -36,7 +36,7 @@ import temporalio.exceptions
 import temporalio.nexus.system.workflow_service.models
 import temporalio.worker
 import temporalio.workflow
-from temporalio.contrib.opentelemetry._context import attach_context
+from temporalio.contrib.opentelemetry._context import attached_context
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
@@ -184,8 +184,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Context | None = None,
     ) -> Iterator[None]:
-        attached = attach_context(context) if context else None
-        try:
+        with attached_context(context):
             with self.tracer.start_as_current_span(
                 name,
                 attributes=attributes,
@@ -220,9 +219,6 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                             )
                         )
                     raise
-        finally:
-            if attached:
-                attached.detach()
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -557,8 +553,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # We need to put this interceptor on the context too
         context = self._set_on_context(context)
         # Run under context with new span
-        attached = attach_context(context)
-        try:
+        with attached_context(context):
             # This won't be created if there was no context header
             self._completed_span(
                 f"HandleQuery:{input.query}",
@@ -568,8 +563,6 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                 kind=opentelemetry.trace.SpanKind.SERVER,
             )
             return await super().handle_query(input)
-        finally:
-            attached.detach()
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
@@ -640,26 +633,23 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         success = False
         exception: Exception | None = None
         # Run under this context
-        attached = attach_context(context)
-
-        try:
-            yield None
-            success = True
-        except temporalio.exceptions.FailureError as err:
-            # We only record the failure errors since those are the only ones
-            # that lead to workflow completions
-            exception = err
-            raise
-        finally:
-            # Create a completed span before detaching context
-            if exception or (success and success_is_complete):
-                self._completed_span(
-                    f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
-                    exception=exception,
-                    kind=opentelemetry.trace.SpanKind.INTERNAL,
-                )
-
-            attached.detach()
+        with attached_context(context):
+            try:
+                yield None
+                success = True
+            except temporalio.exceptions.FailureError as err:
+                # We only record the failure errors since those are the only ones
+                # that lead to workflow completions
+                exception = err
+                raise
+            finally:
+                # Create a completed span before detaching context
+                if exception or (success and success_is_complete):
+                    self._completed_span(
+                        f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
+                        exception=exception,
+                        kind=opentelemetry.trace.SpanKind.INTERNAL,
+                    )
 
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]

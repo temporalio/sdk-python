@@ -33,8 +33,8 @@ from temporalio.contrib.opentelemetry import (
     TracingWorkflowInboundInterceptor,
     create_tracer_provider,
 )
+from temporalio.contrib.opentelemetry import _context as otel_context
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
-from temporalio.contrib.opentelemetry._context import AttachedContext
 from temporalio.contrib.opentelemetry._otel_interceptor import (
     _TracingWorkflowInboundInterceptor as _OtelTracingWorkflowInboundInterceptor,
 )
@@ -937,7 +937,7 @@ async def test_opentelemetry_context_restored_after_activity(
     detach_count = 0
     original_attach = context.attach
     original_detach = context.detach
-    original_attached_detach = AttachedContext.detach
+    original_context_detach = otel_context._detach
 
     def tracked_attach(ctx):  # type:ignore[reportMissingParameterType]
         nonlocal attach_count
@@ -951,16 +951,16 @@ async def test_opentelemetry_context_restored_after_activity(
 
     # Spans detach through context.detach; the interceptors reset their own
     # tokens directly, so count those detaches where they happen.
-    def tracked_attached_detach(self: AttachedContext) -> bool:
+    def tracked_context_detach(ctx: Any, token: Any) -> bool:
         nonlocal detach_count
-        detached = original_attached_detach(self)
+        detached = original_context_detach(ctx, token)
         if detached:
             detach_count += 1
         return detached
 
     context.attach = tracked_attach
     context.detach = tracked_detach
-    monkeypatch.setattr(AttachedContext, "detach", tracked_attached_detach)
+    monkeypatch.setattr(otel_context, "_detach", tracked_context_detach)
 
     try:
         task_queue = f"task_queue_{uuid.uuid4()}"
