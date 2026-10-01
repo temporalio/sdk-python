@@ -28,6 +28,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- A cancel that arrives while an activity's result or failure is still being encoded no longer
+  interrupts the reporting, so the completion is still sent. Previously the activity stayed open
+  on the server side and worker shutdown waited on it forever.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30

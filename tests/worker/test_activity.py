@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import dataclasses
 import logging
 import logging.handlers
 import os
@@ -30,7 +31,11 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import RawValue, RetryPolicy
-from temporalio.converter import DefaultPayloadConverter
+from temporalio.converter import (
+    DataConverter,
+    DefaultPayloadConverter,
+    PayloadCodec,
+)
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -1129,6 +1134,78 @@ async def test_activity_worker_shutdown_graceful(
     await activity_started.wait()
     await act_worker.shutdown()
     assert "Worker graceful shutdown" == await handle.result()
+
+
+class _SlowEncodeCodec(PayloadCodec):
+    """Yields while encoding, like a codec that calls a remote KMS."""
+
+    def __init__(self) -> None:
+        self.encoding_started = asyncio.Event()
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.encoding_started.set()
+        await asyncio.sleep(3)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
+async def test_activity_cancel_during_result_encode_still_completes(
+    client: Client, worker: ExternalWorker, caplog: pytest.LogCaptureFixture
+):
+    @activity.defn
+    async def fail_with_details() -> NoReturn:
+        # Details send the failure through the codec
+        raise ApplicationError("boom", {"detail": "x"})
+
+    codec = _SlowEncodeCodec()
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default, payload_codec=codec
+    )
+    act_task_queue = str(uuid.uuid4())
+    act_worker = Worker(
+        Client(**config), task_queue=act_task_queue, activities=[fail_with_details]
+    )
+    run_task = asyncio.create_task(act_worker.run())
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[
+                KSAction(
+                    execute_activity=KSExecuteActivityAction(
+                        name="fail_with_details",
+                        task_queue=act_task_queue,
+                        retry_max_attempts=1,
+                    )
+                )
+            ]
+        ),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    # Shut down while the failure is still being encoded. With no grace period
+    # the worker cancels the activity at once, which must not keep its outcome
+    # from being reported, or shutdown would wait on it forever.
+    await codec.encoding_started.wait()
+    with caplog.at_level(logging.DEBUG, logger="temporalio.worker._activity"):
+        await asyncio.wait_for(act_worker.shutdown(), 20)
+    await run_task
+    # The cancel must have reached the activity while it was still encoding,
+    # otherwise this test proves nothing
+    assert any(
+        rec.getMessage().startswith("Cancelling activity") for rec in caplog.records
+    )
+    with pytest.raises(WorkflowFailureError) as err:
+        await handle.result()
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, ApplicationError)
+    assert err.value.cause.cause.message == "boom"
 
 
 @activity.defn
