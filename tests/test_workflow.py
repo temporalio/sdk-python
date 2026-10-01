@@ -588,17 +588,3 @@ async def test_child_workflow_config_parity_with_start_child_workflow():
         await workflow.start_child_workflow(
             "workflow", **workflow.ChildWorkflowConfig()
         )
-
-
-def test_uuid4_accepts_explicit_random() -> None:
-    # workflow.uuid4(rng=...) only advances the supplied generator and never
-    # touches the workflow runtime, so it works outside a workflow and is a
-    # pure function of the generator's state.
-    import random
-    import uuid
-
-    seeded = random.Random(42)
-    expected = uuid.UUID(int=random.Random(42).getrandbits(128), version=4)
-    got = workflow.uuid4(rng=seeded)
-    assert got == expected
-    assert got.version == 4

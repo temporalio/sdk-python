@@ -137,9 +137,14 @@ def _workflow_adk_random() -> random.Random:
     return rng
 
 
+def _uuid4_from(rng: random.Random) -> uuid.UUID:
+    # Same construction as workflow.uuid4(), drawn from the given stream.
+    return uuid.UUID(bytes=rng.getrandbits(16 * 8).to_bytes(16, "big"), version=4)
+
+
 def _deterministic_id_provider() -> str:
     if workflow.in_workflow():
-        return str(workflow.uuid4(rng=_workflow_adk_random()))
+        return str(_uuid4_from(_workflow_adk_random()))
     return str(uuid.uuid4())
 
 
@@ -209,15 +214,15 @@ def setup_deterministic_runtime() -> None:
     context) as well as in the calling context. Inside a workflow, time comes
     from ``workflow.time()``, and ids and randoms come from a workflow-private
     deterministic stream (a ``workflow.new_random()`` cached on the workflow
-    instance), so ADK-generated ids and retry jitter are reproducible on
-    replay without shifting the sequence user code sees from
-    ``workflow.random()`` and ``workflow.uuid4()``. In read-only contexts
-    (query handlers, update validators) time is still ``workflow.time()``,
-    while ids and randoms come from a nondeterministic fallback stream that
-    leaves the private stream untouched, since read-only results are never
-    replayed. Outside a workflow in the same process (activities, client code) they fall
-    back to ``time.time()``, ``uuid.uuid4()``, and an unseeded
-    ``random.Random()``.
+    instance; ids are v4 UUIDs built from that stream), so ADK-generated ids
+    and retry jitter are reproducible on replay without shifting the sequence
+    user code sees from ``workflow.random()`` and ``workflow.uuid4()``. In
+    read-only contexts (query handlers, update validators) time is still
+    ``workflow.time()``, while ids and randoms come from a nondeterministic
+    fallback stream that leaves the private stream untouched, since read-only
+    results are never replayed. Outside a workflow in the same process
+    (activities, client code) they fall back to ``time.time()``,
+    ``uuid.uuid4()``, and an unseeded ``random.Random()``.
 
     Overrides through ADK's ``set_*_provider`` functions must be made after
     this runs (after the worker starts, or from workflow code); one made
