@@ -37,6 +37,8 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and
+  `seed_trace_id()`.
 
 ### Fixed
 
