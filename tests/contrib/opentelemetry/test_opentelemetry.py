@@ -1052,7 +1052,7 @@ async def test_opentelemetry_standalone_activity_tracing(
     assert start_activity_span.attributes["temporalActivityType"] == "tracing_activity"
 
 
-def test_opentelemetry_safe_detach():
+def _assert_context_detach_is_safe() -> None:
     class _fake_self:
         def _load_workflow_context_carrier(*_args):
             return None
@@ -1097,3 +1097,26 @@ def test_opentelemetry_safe_detach():
         assert capturer.find(otel_context_error) is None, (
             "Detach from context message should not be logged"
         )
+
+
+def test_opentelemetry_safe_detach():
+    _assert_context_detach_is_safe()
+
+
+def test_opentelemetry_safe_detach_with_threading_instrumentation():
+    # OpenTelemetry's threading instrumentation (strands turns it on when an
+    # Agent is created) propagates the current Context object into new
+    # threads, so a context-identity check alone would detach a token minted
+    # on another thread.
+    threading_instrumentation = pytest.importorskip(
+        "opentelemetry.instrumentation.threading"
+    )
+    instrumentor = threading_instrumentation.ThreadingInstrumentor()
+    already_instrumented = instrumentor.is_instrumented_by_opentelemetry
+    if not already_instrumented:
+        instrumentor.instrument()
+    try:
+        _assert_context_detach_is_safe()
+    finally:
+        if not already_instrumented:
+            instrumentor.uninstrument()
