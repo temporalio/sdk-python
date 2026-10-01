@@ -20,6 +20,44 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+### Changed
+
+- Payload converters exposed by data converters and workflow/activity accessors
+  retain transfer type conversion, so direct use behaves consistently with SDK
+  serialization.
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+- The OpenAI Agents integration has moved to the independently versioned
+  [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
+  package. The existing `temporalio[openai-agents]` extra now installs that
+  package, and the old public `temporalio.contrib.openai_agents` imports
+  remain available at runtime and retain their static type information.
+  New code should depend on `temporalio-openai-agents` directly and import
+  `temporalio.openai_agents`.
+
+### Fixed
+
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
+
+- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
+  log `Failed to detach context` when a context is torn down on a different thread while
+  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
+  context is now detached exactly when its token is still valid in the current
+  `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+### Security
+
+## [1.34.0] - 2026-09-30
+
+### Added
+
+- Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
+  ID when provided by the server.
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
   graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
@@ -44,8 +82,6 @@ to include examples, links to docs, or any other relevant information.
   deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
   `langsmith<0.13` (was `<0.9`).
 
-### Deprecated
-
 ### :boom: Breaking Changes
 
 - The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
@@ -55,6 +91,14 @@ to include examples, links to docs, or any other relevant information.
   across the upgrade; drain such workflows or use worker versioning.
 
 ### Fixed
+
+- `temporalio.contrib.deepagents` now preserves model binding options such as
+  `response_format` and `tool_choice` when tools are also bound.
+- Workflow handles returned when a start attaches to a running workflow now use
+  the server-provided first execution run ID with Temporal Server 1.32.0 or
+  later.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
 
 - Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
   importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
@@ -79,8 +123,6 @@ to include examples, links to docs, or any other relevant information.
 - A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
   workflow and activity user metadata are serialized with theirs. This covers the static summary
   sent when starting an operation, and the summary and details read back from a description.
-
-### Security
 
 ## [1.33.0] - 2026-09-14
 

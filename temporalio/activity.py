@@ -241,9 +241,13 @@ class _Context:
                 self.payload_converter_class_or_instance,
                 temporalio.converter.PayloadConverter,
             ):
-                self._payload_converter = self.payload_converter_class_or_instance
+                self._payload_converter = _TemporalTransferTypePayloadConverter.wrap(
+                    self.payload_converter_class_or_instance
+                )
             else:
-                self._payload_converter = self.payload_converter_class_or_instance()
+                self._payload_converter = _TemporalTransferTypePayloadConverter.wrap(
+                    self.payload_converter_class_or_instance()
+                )
         return self._payload_converter
 
     @property
@@ -458,9 +462,7 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     The returned converter has :py:class:`temporalio.converter.ActivitySerializationContext` set.
     This is often used for dynamic activities to convert payloads.
     """
-    return _TemporalTransferTypePayloadConverter.unwrap(
-        _Context.current().payload_converter
-    )
+    return _Context.current().payload_converter
 
 
 def metric_meter() -> temporalio.common.MetricMeter:
