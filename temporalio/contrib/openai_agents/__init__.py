@@ -1,13 +1,8 @@
 """Compatibility imports for the standalone OpenAI Agents integration.
 
-New code should import ``temporalio.openai_agents`` directly.
-
-.. deprecated::
-    Install ``temporalio-openai-agents`` and import
-    ``temporalio.openai_agents`` instead.
+Install ``temporalio-openai-agents`` and import ``temporalio.openai_agents``
+directly in new code.
 """
-
-import warnings
 
 from temporalio.openai_agents import (  # pyright: ignore[reportMissingImports]
     AgentsWorkflowError,
@@ -23,13 +18,6 @@ from temporalio.openai_agents import (  # pyright: ignore[reportMissingImports]
 )
 
 from . import testing, workflow
-
-warnings.warn(
-    "temporalio.contrib.openai_agents is deprecated; install "
-    "temporalio-openai-agents and import temporalio.openai_agents instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
 
 __all__ = [
     "AgentsWorkflowError",
