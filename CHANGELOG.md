@@ -31,6 +31,13 @@ to include examples, links to docs, or any other relevant information.
   instance) instead of `workflow.random()`. A workflow started under 1.34.0 that generated
   ADK ids or jitter (for example one waiting on a HITL response) may not replay
   deterministically across this upgrade; drain such workflows or use worker versioning.
+- The OpenAI Agents integration has moved to the independently versioned
+  [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
+  package. The existing `temporalio[openai-agents]` extra now installs that
+  package, and the old public `temporalio.contrib.openai_agents` imports
+  remain available at runtime and retain their static type information.
+  New code should depend on `temporalio-openai-agents` directly and import
+  `temporalio.openai_agents`.
 
 ### Fixed
 
