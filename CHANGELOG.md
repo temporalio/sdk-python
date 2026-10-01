@@ -22,6 +22,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- Payload converters exposed by data converters and workflow/activity accessors
+  retain transfer type conversion, so direct use behaves consistently with SDK
+  serialization.
+
 ### Deprecated
 
 ### :boom: Breaking Changes

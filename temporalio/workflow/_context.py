@@ -836,6 +836,7 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     """Get the payload converter for the current workflow.
 
     The returned converter has :py:class:`temporalio.converter.WorkflowSerializationContext` set.
+    It includes SDK transfer type conversion.
     This is often used for dynamic workflows/signals/queries to convert
     payloads.
     """
