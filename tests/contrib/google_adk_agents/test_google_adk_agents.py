@@ -1290,6 +1290,32 @@ def test_output_schema_type_sent_as_json_schema(schema: Any) -> None:
     assert serialized["config"]["response_schema"] == TypeAdapter(schema).json_schema()
 
 
+def test_output_schema_preserves_custom_model_json_schema() -> None:
+    class CustomCityWeather(CityWeather):
+        @classmethod
+        def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            """Include the cities supported by the weather model."""
+            schema = super().model_json_schema(*args, **kwargs)
+            schema["properties"]["city"]["enum"] = ["Paris", "London"]
+            return schema
+
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(CustomCityWeather)
+
+    converted = _with_serializable_response_schema(request)
+    converter = GoogleAdkPlugin()._configure_data_converter(None).payload_converter
+    payloads = converter.to_payloads([converted])
+    restored = converter.from_payloads(payloads, [LlmRequest])[0]
+    response_schema = types.Schema.model_validate(restored.config.response_schema)
+
+    assert request.config.response_schema is CustomCityWeather
+    assert response_schema.properties is not None
+    assert response_schema.properties["city"].enum == ["Paris", "London"]
+
+
 @pytest.mark.parametrize(
     ("schema", "expected_values"),
     [

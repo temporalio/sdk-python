@@ -7,7 +7,7 @@ from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
-from pydantic import TypeAdapter
+from pydantic import BaseModel, TypeAdapter
 
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -101,13 +101,17 @@ def _with_serializable_response_schema(llm_request: LlmRequest) -> LlmRequest:
     (for example a Pydantic model class), which the payload converter cannot
     serialize. google-genai and ADK's LiteLlm both turn such a type into its
     JSON schema before calling the model, so sending the JSON schema instead
-    is equivalent. Integer-valued enums are normalized to string enums to
-    match google-genai's enum handling.
+    is equivalent. Pydantic model classes use their ``model_json_schema``
+    method to preserve custom schema generation. Integer-valued enums are
+    normalized to string enums to match google-genai's enum handling.
     """
     schema = llm_request.config.response_schema
     if schema is None or isinstance(schema, (dict, types.Schema)):
         return llm_request
-    response_schema = TypeAdapter(schema).json_schema()
+    if isinstance(schema, type) and issubclass(schema, BaseModel):
+        response_schema = schema.model_json_schema()
+    else:
+        response_schema = TypeAdapter(schema).json_schema()
     if (
         isinstance(schema, type)
         and issubclass(schema, Enum)
