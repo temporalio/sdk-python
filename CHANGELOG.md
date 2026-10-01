@@ -36,6 +36,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Fixed Pydantic constraints being silently ignored inside or outside workflow
+  sandboxes by passing through `annotated_types` by default.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30
