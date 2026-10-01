@@ -50,6 +50,8 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
   context is now detached exactly when its token is still valid in the current
   `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Clarify activity and child workflow return-value conversion errors without hiding their original causes.
 ### Security
 
 ## [1.34.0] - 2026-09-30
@@ -109,7 +111,6 @@ to include examples, links to docs, or any other relevant information.
   (e.g., adding `delete` / `adelete`).
 - `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
   deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
-- Clarify activity and child workflow return-value conversion errors without hiding their original causes.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
 - `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
