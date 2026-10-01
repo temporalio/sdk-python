@@ -9759,7 +9759,6 @@ async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
             WorkflowWithFailingActivityAndCodec.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            run_timeout=timedelta(seconds=5),
         )
         assert result == "Handled encrypted failure successfully"
 
