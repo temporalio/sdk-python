@@ -20,8 +20,7 @@ This file contains assembled releases only.
 ### Fixed
 
 - A cancel that arrives while an activity's result or failure is still being encoded no longer
-  interrupts the reporting, so the completion is still sent. Previously the activity stayed open
-  on the server side and worker shutdown waited on it forever.
+  interrupts the reporting, so the completion is still sent.
 
 ### Security
 
