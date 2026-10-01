@@ -38,12 +38,13 @@ to include examples, links to docs, or any other relevant information.
   deterministically across this upgrade; drain such workflows or use worker versioning.
 ### Fixed
 
-- `GoogleAdkPlugin`'s deterministic providers now leave the workflow's random state untouched in
-  read-only contexts (query handlers, update validators), where they return wall-clock time and
-  fresh entropy instead of advancing a replayed stream; ADK's `reset_*_provider()` functions now
-  restore the deterministic providers rather than the standard-library ones; and installing the
-  providers is idempotent and thread-safe, warning when a provider override set before the worker
-  started is replaced.
+- `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
+  update validators), returning wall-clock time and fresh entropy without touching the workflow's
+  random state; in 1.34.0 an ADK id or random draw there failed the query with
+  `While in read-only function, action attempted: random`. ADK's `reset_*_provider()` functions
+  now restore the deterministic providers rather than the standard-library ones, and installing
+  the providers is idempotent and thread-safe, warning when it replaces a provider override set
+  before the worker started.
 ### Security
 
 ## [1.34.0] - 2026-09-30
