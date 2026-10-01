@@ -21,8 +21,9 @@ to include examples, links to docs, or any other relevant information.
 ### Added
 
 - `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
-  UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
+  UUID from a caller-supplied generator (e.g., a private stream from `workflow.new_random()`)
   without reading or advancing any workflow state.
+
 ### Changed
 
 ### Deprecated
@@ -31,20 +32,16 @@ to include examples, links to docs, or any other relevant information.
 
 - `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
   workflow-private deterministic stream (a `workflow.new_random()` cached on the workflow
-  instance) instead of `workflow.random()`, so ADK no longer shifts the sequences user code sees
-  from `workflow.random()` and `workflow.uuid4()`, and a `google-adk` upgrade that changes how
-  many ids ADK generates no longer affects them either. A workflow started under 1.34.0 that
-  generated ADK ids or jitter (for example one waiting on a HITL response) may not replay
+  instance) instead of `workflow.random()`. A workflow started under 1.34.0 that generated
+  ADK ids or jitter (for example one waiting on a HITL response) may not replay
   deterministically across this upgrade; drain such workflows or use worker versioning.
+
 ### Fixed
 
 - `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
   update validators), returning wall-clock time and fresh entropy without touching the workflow's
-  random state; in 1.34.0 an ADK id or random draw there failed the query with
-  `While in read-only function, action attempted: random`. ADK's `reset_*_provider()` functions
-  now restore the deterministic providers rather than the standard-library ones, and installing
-  the providers is idempotent and thread-safe, warning when it replaces a provider override set
-  before the worker started.
+  random state.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30
