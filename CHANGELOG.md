@@ -22,6 +22,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- Payload converters exposed by data converters and workflow/activity accessors
+  retain transfer type conversion, so direct use behaves consistently with SDK
+  serialization.
+
 ### Deprecated
 
 ### :boom: Breaking Changes
@@ -38,6 +42,19 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
+
+- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
+  log `Failed to detach context` when a context is torn down on a different thread while
+  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
+  context is now detached exactly when its token is still valid in the current
+  `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
 ### Security
 
 ## [1.34.0] - 2026-09-30
