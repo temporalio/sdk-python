@@ -931,6 +931,7 @@ async def test_opentelemetry_context_restored_after_activity(
     client_with_tracing: Client,
     activity: Callable[[], None],
     expect_failure: bool,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     attach_count = 0
     detach_count = 0
@@ -959,7 +960,7 @@ async def test_opentelemetry_context_restored_after_activity(
 
     context.attach = tracked_attach
     context.detach = tracked_detach
-    AttachedContext.detach = tracked_attached_detach
+    monkeypatch.setattr(AttachedContext, "detach", tracked_attached_detach)
 
     try:
         task_queue = f"task_queue_{uuid.uuid4()}"
@@ -990,7 +991,6 @@ async def test_opentelemetry_context_restored_after_activity(
     finally:
         context.attach = original_attach
         context.detach = original_detach
-        AttachedContext.detach = original_attached_detach
 
 
 @activity.defn
