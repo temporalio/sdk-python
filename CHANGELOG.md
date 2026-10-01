@@ -40,6 +40,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
