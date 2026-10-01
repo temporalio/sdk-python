@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from contextvars import Token
 from dataclasses import dataclass
 
@@ -16,29 +15,35 @@ class AttachedContext:
 
     context: Context
     token: Token[Context]
-    thread: threading.Thread
 
-    def detach(self) -> None:
-        """Detach the context only where the token is valid.
+    def detach(self) -> bool:
+        """Detach the context where its token is valid; return whether it was.
 
-        Generator finalization and GC can run a ``finally`` on a different
-        thread or ``contextvars.Context`` than the one that attached, where the
-        token is invalid and ``opentelemetry.context.detach`` logs "Failed to
-        detach context". Checking that the attached context is still current is
-        not enough on its own: OpenTelemetry's threading instrumentation
-        (enabled by strands, among others) propagates the same ``Context``
-        object into new threads. Requiring the attaching thread as well (the
-        ``Thread`` object, so a recycled thread id cannot match) closes that gap.
+        The attach and the detach of one interceptor call can run on different
+        threads: workflow activations run on a thread pool while the asyncio
+        task keeps its ``contextvars.Context`` across them, so the token is
+        still valid there and the detach must happen. Generator finalization
+        and GC, on the other hand, can run a ``finally`` in a different
+        ``contextvars.Context``, where the token is invalid and
+        ``opentelemetry.context.detach`` logs "Failed to detach context".
+        Checking that the attached context is still current cannot tell those
+        apart, because OpenTelemetry's threading instrumentation (enabled by
+        strands, among others) propagates the same ``Context`` object into new
+        threads. Only ``contextvars`` knows which ``Context`` a token belongs
+        to, so this performs the reset that ``opentelemetry.context.detach``
+        performs and treats its ``ValueError`` for a foreign ``Context`` as
+        "nothing to detach here".
         """
-        if (
-            threading.current_thread() is self.thread
-            and self.context is opentelemetry.context.get_current()
-        ):
-            opentelemetry.context.detach(self.token)
+        if self.context is not opentelemetry.context.get_current():
+            return False
+        try:
+            self.token.var.reset(self.token)
+        except ValueError:
+            # The token was created in a different contextvars.Context.
+            return False
+        return True
 
 
 def attach_context(context: Context) -> AttachedContext:
     """Attach ``context`` and remember what a safe detach needs."""
-    return AttachedContext(
-        context, opentelemetry.context.attach(context), threading.current_thread()
-    )
+    return AttachedContext(context, opentelemetry.context.attach(context))

@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import gc
 import logging
 import queue
 import threading
 import uuid
 from collections.abc import Callable, Generator, Iterable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, cast
+from typing import Any, ParamSpec, TypeVar, cast
 
 import nexusrpc
 import opentelemetry.context
+import opentelemetry.trace
 import pytest
 from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
@@ -26,10 +28,13 @@ from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.contrib.opentelemetry import (
+    OpenTelemetryInterceptor,
     TracingInterceptor,
     TracingWorkflowInboundInterceptor,
+    create_tracer_provider,
 )
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
+from temporalio.contrib.opentelemetry._context import AttachedContext
 from temporalio.contrib.opentelemetry._otel_interceptor import (
     _TracingWorkflowInboundInterceptor as _OtelTracingWorkflowInboundInterceptor,
 )
@@ -39,7 +44,14 @@ from temporalio.exceptions import (
     NexusOperationError,
 )
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import UnsandboxedWorkflowRunner, Worker
+from temporalio.worker import (
+    ExecuteWorkflowInput,
+    Interceptor,
+    UnsandboxedWorkflowRunner,
+    Worker,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+)
 from tests.helpers import LogCapturer
 from tests.helpers.nexus import make_nexus_endpoint_name
 
@@ -924,6 +936,7 @@ async def test_opentelemetry_context_restored_after_activity(
     detach_count = 0
     original_attach = context.attach
     original_detach = context.detach
+    original_attached_detach = AttachedContext.detach
 
     def tracked_attach(ctx):  # type:ignore[reportMissingParameterType]
         nonlocal attach_count
@@ -935,8 +948,18 @@ async def test_opentelemetry_context_restored_after_activity(
         detach_count += 1
         return original_detach(token)
 
+    # Spans detach through context.detach; the interceptors reset their own
+    # tokens directly, so count those detaches where they happen.
+    def tracked_attached_detach(self: AttachedContext) -> bool:
+        nonlocal detach_count
+        detached = original_attached_detach(self)
+        if detached:
+            detach_count += 1
+        return detached
+
     context.attach = tracked_attach
     context.detach = tracked_detach
+    AttachedContext.detach = tracked_attached_detach
 
     try:
         task_queue = f"task_queue_{uuid.uuid4()}"
@@ -967,6 +990,7 @@ async def test_opentelemetry_context_restored_after_activity(
     finally:
         context.attach = original_attach
         context.detach = original_detach
+        AttachedContext.detach = original_attached_detach
 
 
 @activity.defn
@@ -1055,7 +1079,7 @@ async def test_opentelemetry_standalone_activity_tracing(
     assert start_activity_span.attributes["temporalActivityType"] == "tracing_activity"
 
 
-def _v1_workflow_context() -> Any:
+def _v1_workflow_context(success_is_complete: bool = True) -> Any:
     class _fake_self:
         def _load_workflow_context_carrier(*_args):
             return None
@@ -1068,7 +1092,7 @@ def _v1_workflow_context() -> Any:
 
     return TracingWorkflowInboundInterceptor._top_level_workflow_context(
         _fake_self(),  # type: ignore
-        success_is_complete=True,
+        success_is_complete=success_is_complete,
     )
 
 
@@ -1146,3 +1170,135 @@ def test_opentelemetry_safe_detach(
     finally:
         if not already_instrumented:
             instrumentor.uninstrument()
+
+
+def _run_in_context_on_new_thread(
+    ctx: contextvars.Context, fn: Callable[[], Any]
+) -> Any:
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(ctx.run, fn).result(timeout=5)
+
+
+@pytest.mark.parametrize(
+    "make_context_manager",
+    [lambda: _v1_workflow_context(success_is_complete=False), _v2_workflow_context],
+    ids=["TracingInterceptor", "OpenTelemetryInterceptor"],
+)
+def test_opentelemetry_detach_after_thread_change(
+    make_context_manager: Callable[[], Any],
+):
+    # Workflow activations run on a thread pool, so the asyncio task that
+    # entered one of these context managers can leave it on another thread
+    # while keeping the same contextvars.Context. The token is valid there and
+    # the detach must restore the outer context.
+    task_context = contextvars.copy_context()
+    outer = opentelemetry.context.set_value("outer", True)
+    task_context.run(opentelemetry.context.attach, outer)
+    context_manager = make_context_manager()
+
+    _run_in_context_on_new_thread(task_context, context_manager.__enter__)
+    assert task_context.run(opentelemetry.context.get_current) is not outer
+    _run_in_context_on_new_thread(
+        task_context, lambda: context_manager.__exit__(None, None, None)
+    )
+    assert task_context.run(opentelemetry.context.get_current) is outer
+
+
+_P = ParamSpec("_P")
+_T = TypeVar("_T")
+
+
+class _AlternatingThreadExecutor(ThreadPoolExecutor):
+    """Runs each submission on a different thread than the one before it, the
+    way successive activations of a workflow can land on different pool
+    threads under load."""
+
+    def __init__(self) -> None:
+        super().__init__(max_workers=1)
+        self._pools = [ThreadPoolExecutor(max_workers=1) for _ in range(2)]
+        self._submissions = 0
+
+    def submit(
+        self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs
+    ) -> Future[_T]:
+        pool = self._pools[self._submissions % len(self._pools)]
+        self._submissions += 1
+        return pool.submit(fn, *args, **kwargs)
+
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None:
+        for pool in self._pools:
+            pool.shutdown(wait, cancel_futures=cancel_futures)
+        super().shutdown(wait, cancel_futures=cancel_futures)
+
+
+@workflow.defn
+class TimerWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Two activations: the start, and the timer firing.
+        await asyncio.sleep(0.01)
+
+
+@pytest.mark.parametrize(
+    "make_interceptor",
+    [lambda: TracingInterceptor(get_tracer(__name__)), OpenTelemetryInterceptor],
+    ids=["TracingInterceptor", "OpenTelemetryInterceptor"],
+)
+async def test_opentelemetry_context_restored_after_activation_thread_change(
+    client: Client,
+    make_interceptor: Callable[[], Interceptor],
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    # OpenTelemetryInterceptor insists on a replay-safe global provider.
+    opentelemetry.trace.set_tracer_provider(create_tracer_provider())
+    records: list[tuple[threading.Thread, threading.Thread, bool]] = []
+
+    class ContextRestoredWorkflowInboundInterceptor(WorkflowInboundInterceptor):
+        async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
+            entered_on = threading.current_thread()
+            before = opentelemetry.context.get_current()
+            result = await super().execute_workflow(input)
+            records.append(
+                (
+                    entered_on,
+                    threading.current_thread(),
+                    opentelemetry.context.get_current() is before,
+                )
+            )
+            return result
+
+    class ContextRestoredInterceptor(Interceptor):
+        def workflow_interceptor_class(
+            self, input: WorkflowInterceptorClassInput
+        ) -> type[WorkflowInboundInterceptor] | None:
+            return ContextRestoredWorkflowInboundInterceptor
+
+    executor = _AlternatingThreadExecutor()
+    try:
+        async with Worker(
+            client,
+            task_queue=f"task_queue_{uuid.uuid4()}",
+            workflows=[TimerWorkflow],
+            # The first interceptor is the outermost, so it sees whatever the
+            # tracing interceptor leaves attached.
+            interceptors=[ContextRestoredInterceptor(), make_interceptor()],
+            workflow_task_executor=executor,
+            workflow_runner=UnsandboxedWorkflowRunner(),
+        ) as worker:
+            await client.execute_workflow(
+                TimerWorkflow.run,
+                id=f"workflow_{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    finally:
+        executor.shutdown()
+
+    assert len(records) == 1
+    entered_on, left_on, context_restored = records[0]
+    assert entered_on is not left_on, (
+        "The workflow was expected to change threads between its activations"
+    )
+    assert context_restored, (
+        "The tracing interceptor must detach its context even though the "
+        "workflow left it on a different thread than it entered on"
+    )
