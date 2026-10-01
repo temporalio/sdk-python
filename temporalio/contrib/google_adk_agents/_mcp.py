@@ -333,9 +333,6 @@ def _handle_worker_failure(func: Callable) -> Callable:
     state, so we re-raise as an ``ApplicationError`` of type
     ``"DedicatedWorkerFailure"`` for the caller to handle.
 
-    Duplicated (rather than shared) from ``openai_agents._mcp`` on purpose:
-    these two contribs do not currently share internal code, and importing
-    across them would create an unwanted dependency.
     """
 
     @functools.wraps(func)

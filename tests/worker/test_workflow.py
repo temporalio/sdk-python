@@ -947,7 +947,7 @@ class CancelActivityWorkflow:
         if params.local:
             handle = workflow.start_local_activity_method(
                 ActivityWaitCancelNotify.wait_cancel,
-                schedule_to_close_timeout=timedelta(seconds=5),
+                schedule_to_close_timeout=timedelta(minutes=1),
                 cancellation_type=workflow.ActivityCancellationType[
                     params.cancellation_type
                 ],
@@ -956,7 +956,7 @@ class CancelActivityWorkflow:
             handle = workflow.start_activity_method(
                 ActivityWaitCancelNotify.wait_cancel,
                 schedule_to_close_timeout=timedelta(seconds=5),
-                heartbeat_timeout=timedelta(seconds=1),
+                heartbeat_timeout=timedelta(seconds=5),
                 cancellation_type=workflow.ActivityCancellationType[
                     params.cancellation_type
                 ],
@@ -977,14 +977,24 @@ class CancelActivityWorkflow:
 
 @pytest.mark.parametrize("local", [True, False])
 async def test_workflow_cancel_activity(client: Client, local: bool):
-    # Need short task timeout to timeout LA task and longer assert timeout
-    # so the task can timeout
-    task_timeout = timedelta(seconds=1)
-    assert_timeout = timedelta(seconds=10)
+    # Core completes the task holding a local activity at 80% of this timeout, and
+    # the cancel reaches the activity on the second such cycle (~8s), so the assert
+    # budget needs headroom beyond that on loaded runners
+    task_timeout = timedelta(seconds=5)
+    assert_timeout = timedelta(seconds=30)
     activity_inst = ActivityWaitCancelNotify()
 
+    async def wait_cancel_complete() -> None:
+        await asyncio.wait_for(
+            activity_inst.wait_cancel_complete.wait(), assert_timeout.total_seconds()
+        )
+        activity_inst.wait_cancel_complete.clear()
+
     async with new_worker(
-        client, CancelActivityWorkflow, activities=[activity_inst.wait_cancel]
+        client,
+        CancelActivityWorkflow,
+        activities=[activity_inst.wait_cancel],
+        max_heartbeat_throttle_interval=timedelta(milliseconds=300),
     ) as worker:
         # Try cancel - confirm error and activity was sent the cancel
         handle = await client.start_workflow(
@@ -1004,7 +1014,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await assert_eq_eventually(
             "Error: CancelledError", activity_result, timeout=assert_timeout
         )
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
         await handle.cancel()
 
         # Wait cancel - confirm no error due to graceful cancel handling
@@ -1023,7 +1033,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
             activity_result,
             timeout=assert_timeout,
         )
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
         await handle.cancel()
 
         # Abandon - confirm error and that activity stays running
@@ -1043,7 +1053,7 @@ async def test_workflow_cancel_activity(client: Client, local: bool):
         await asyncio.sleep(0.5)
         assert not activity_inst.wait_cancel_complete.is_set()
         await handle.cancel()
-        await activity_inst.wait_cancel_complete.wait()
+        await wait_cancel_complete()
 
 
 @workflow.defn
@@ -5215,10 +5225,19 @@ async def test_workflow_custom_metrics(client: Client, env: WorkflowEnvironment)
             },
             34,
         )
-        # Also check Temporal metric got its prefix
-        prom_matcher.assert_metric_exists(
-            "foo_workflow_completed", {"workflow_type": "CustomMetricsWorkflow"}, 1
-        )
+
+        # The Core completion metric can be recorded just after the workflow result
+        # reaches the client, so allow the Prometheus endpoint to catch up.
+        async def assert_workflow_completed_metric() -> None:
+            with urlopen(url=f"http://{prom_addr}/metrics") as f:
+                prom_lines = f.read().decode("utf-8").splitlines()
+            PromMetricMatcher(prom_lines).assert_metric_exists(
+                "foo_workflow_completed",
+                {"workflow_type": "CustomMetricsWorkflow"},
+                1,
+            )
+
+        await assert_eventually(assert_workflow_completed_metric)
 
 
 async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironment):
@@ -7072,6 +7091,19 @@ class IDConflictWorkflow:
         await workflow.wait_condition(lambda: False)
 
 
+@workflow.defn
+class IDConflictContinueAsNewWorkflow:
+    @workflow.run
+    async def run(self, continue_as_new: bool) -> None:
+        if continue_as_new:
+            workflow.continue_as_new(False)
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.signal
+    def attach(self) -> None:
+        pass
+
+
 async def test_workflow_id_conflict(client: Client):
     async with new_worker(client, IDConflictWorkflow) as worker:
         # Start a workflow
@@ -7128,6 +7160,50 @@ async def test_workflow_id_conflict(client: Client):
         assert new_handle.run_id != handle.run_id
         assert (await handle.describe()).status == WorkflowExecutionStatus.TERMINATED
         assert (await new_handle.describe()).status == WorkflowExecutionStatus.RUNNING
+
+
+@pytest.mark.parametrize("signal_with_start", [False, True])
+async def test_workflow_id_conflict_use_existing_first_execution_run_id(
+    client: Client, env: WorkflowEnvironment, signal_with_start: bool
+):
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Java test server does not return first execution run ID from start"
+        )
+    async with new_worker(client, IDConflictContinueAsNewWorkflow) as worker:
+        workflow_id = f"wf-{uuid.uuid4()}"
+        original_handle = await client.start_workflow(
+            IDConflictContinueAsNewWorkflow.run,
+            True,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+        first_execution_run_id = original_handle.first_execution_run_id
+        assert first_execution_run_id is not None
+
+        async def current_run_id() -> str:
+            return (await client.get_workflow_handle(workflow_id).describe()).run_id
+
+        async def assert_continued_as_new() -> None:
+            assert await current_run_id() != first_execution_run_id
+
+        await assert_eventually(assert_continued_as_new)
+        current_execution_run_id = await current_run_id()
+
+        attached_handle = await client.start_workflow(
+            IDConflictContinueAsNewWorkflow.run,
+            False,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
+            start_signal="attach" if signal_with_start else None,
+        )
+        assert attached_handle.result_run_id == current_execution_run_id
+        assert attached_handle.first_execution_run_id == first_execution_run_id
+
+        await attached_handle.cancel()
+        with pytest.raises(WorkflowFailureError):
+            await original_handle.result()
 
 
 @workflow.defn
@@ -9683,7 +9759,6 @@ async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
             WorkflowWithFailingActivityAndCodec.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
-            run_timeout=timedelta(seconds=5),
         )
         assert result == "Handled encrypted failure successfully"
 

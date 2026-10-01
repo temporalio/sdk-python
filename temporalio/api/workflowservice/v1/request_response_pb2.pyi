@@ -38,6 +38,7 @@ import temporalio.api.filter.v1.message_pb2
 import temporalio.api.history.v1.message_pb2
 import temporalio.api.namespace.v1.message_pb2
 import temporalio.api.nexus.v1.message_pb2
+import temporalio.api.nexusoperation.v1.message_pb2
 import temporalio.api.protocol.v1.message_pb2
 import temporalio.api.query.v1.message_pb2
 import temporalio.api.replication.v1.message_pb2
@@ -2695,6 +2696,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     WORKER_VERSION_FIELD_NUMBER: builtins.int
     DEPLOYMENT_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """The task token as received in `PollActivityTaskQueueResponse`"""
     @property
@@ -2726,6 +2728,8 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType
+    """Why did the task fail? When unset, the failure is treated as an unspecified activity failure."""
     def __init__(
         self,
         *,
@@ -2741,6 +2745,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
         deployment: temporalio.api.deployment.v1.message_pb2.Deployment | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2760,6 +2765,8 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "cause",
+            b"cause",
             "deployment",
             b"deployment",
             "deployment_options",
@@ -2821,6 +2828,7 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
     IDENTITY_FIELD_NUMBER: builtins.int
     LAST_HEARTBEAT_DETAILS_FIELD_NUMBER: builtins.int
     RESOURCE_ID_FIELD_NUMBER: builtins.int
+    CAUSE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Namespace of the workflow which scheduled this activity"""
     workflow_id: builtins.str
@@ -2841,6 +2849,10 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
         """Additional details to be stored as last activity heartbeat"""
     resource_id: builtins.str
     """Resource ID for routing. Contains "workflow:workflow_id" or "activity:activity_id" for standalone activities."""
+    cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType
+    """Why did the activity task fail? Optional; when unset the failure is treated as a normal
+    activity failure. See the type's doc for more.
+    """
     def __init__(
         self,
         *,
@@ -2853,6 +2865,7 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
         last_heartbeat_details: temporalio.api.common.v1.message_pb2.Payloads
         | None = ...,
         resource_id: builtins.str = ...,
+        cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2865,6 +2878,8 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "activity_id",
             b"activity_id",
+            "cause",
+            b"cause",
             "failure",
             b"failure",
             "identity",
@@ -12543,9 +12558,12 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     INPUT_FIELD_NUMBER: builtins.int
     ID_REUSE_POLICY_FIELD_NUMBER: builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: builtins.int
+    ON_CONFLICT_OPTIONS_FIELD_NUMBER: builtins.int
     SEARCH_ATTRIBUTES_FIELD_NUMBER: builtins.int
     NEXUS_HEADER_FIELD_NUMBER: builtins.int
     USER_METADATA_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
+    LINKS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request."""
@@ -12606,6 +12624,14 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     The default policy is NEXUS_OPERATION_ID_CONFLICT_POLICY_FAIL.
     """
     @property
+    def on_conflict_options(
+        self,
+    ) -> temporalio.api.nexusoperation.v1.message_pb2.OnConflictOptions:
+        """Defines actions to be done to the existing running standalone Nexus when the conflict policy
+        NEXUS_OPERATION_ID_CONFLICT_POLICY_USE_EXISTING is used. If not set or set to a empty object
+        (all options with default value), it will not modify the running operation.
+        """
+    @property
     def search_attributes(
         self,
     ) -> temporalio.api.common.v1.message_pb2.SearchAttributes:
@@ -12624,6 +12650,22 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """Metadata for use by user interfaces to display the fixed as-of-start summary and details of the operation."""
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Callback
+    ]:
+        """Completion callbacks to be invoked once the Nexus operation reaches a terminal state."""
+    @property
+    def links(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Link
+    ]:
+        """Links to be associated with the Nexus operation. Callbacks may also have associated links;
+        links already included with a callback should not be duplicated here.
+        """
     def __init__(
         self,
         *,
@@ -12640,10 +12682,18 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
         input: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         id_reuse_policy: temporalio.api.enums.v1.nexus_pb2.NexusOperationIdReusePolicy.ValueType = ...,
         id_conflict_policy: temporalio.api.enums.v1.nexus_pb2.NexusOperationIdConflictPolicy.ValueType = ...,
+        on_conflict_options: temporalio.api.nexusoperation.v1.message_pb2.OnConflictOptions
+        | None = ...,
         search_attributes: temporalio.api.common.v1.message_pb2.SearchAttributes
         | None = ...,
         nexus_header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         user_metadata: temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata
+        | None = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.common.v1.message_pb2.Callback
+        ]
+        | None = ...,
+        links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
     ) -> None: ...
     def HasField(
@@ -12651,6 +12701,8 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "input",
             b"input",
+            "on_conflict_options",
+            b"on_conflict_options",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
@@ -12666,6 +12718,8 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "completion_callbacks",
+            b"completion_callbacks",
             "endpoint",
             b"endpoint",
             "id_conflict_policy",
@@ -12676,10 +12730,14 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
             b"identity",
             "input",
             b"input",
+            "links",
+            b"links",
             "namespace",
             b"namespace",
             "nexus_header",
             b"nexus_header",
+            "on_conflict_options",
+            b"on_conflict_options",
             "operation",
             b"operation",
             "operation_id",
@@ -12791,6 +12849,7 @@ class DescribeNexusOperationExecutionResponse(google.protobuf.message.Message):
     RESULT_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     LONG_POLL_TOKEN_FIELD_NUMBER: builtins.int
+    COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run ID of the operation, useful when run_id was not specified in the request."""
     @property
@@ -12809,6 +12868,15 @@ class DescribeNexusOperationExecutionResponse(google.protobuf.message.Message):
         """The failure if the operation completed unsuccessfully."""
     long_poll_token: builtins.bytes
     """Token for follow-on long-poll requests. Absent only if the operation is complete."""
+    @property
+    def completion_callbacks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.nexusoperation.v1.message_pb2.CallbackInfo
+    ]:
+        """Completion callbacks to be invoked once the Nexus operation reaches a terminal state.
+        They will remain in the CALLBACK_STATE_STANDBY state until the Nexus operation is finished.
+        """
     def __init__(
         self,
         *,
@@ -12819,6 +12887,10 @@ class DescribeNexusOperationExecutionResponse(google.protobuf.message.Message):
         result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
         long_poll_token: builtins.bytes = ...,
+        completion_callbacks: collections.abc.Iterable[
+            temporalio.api.nexusoperation.v1.message_pb2.CallbackInfo
+        ]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -12838,6 +12910,8 @@ class DescribeNexusOperationExecutionResponse(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
+            "completion_callbacks",
+            b"completion_callbacks",
             "failure",
             b"failure",
             "info",
