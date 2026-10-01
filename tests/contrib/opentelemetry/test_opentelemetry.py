@@ -30,6 +30,9 @@ from temporalio.contrib.opentelemetry import (
     TracingWorkflowInboundInterceptor,
 )
 from temporalio.contrib.opentelemetry import workflow as otel_workflow
+from temporalio.contrib.opentelemetry._otel_interceptor import (
+    _TracingWorkflowInboundInterceptor as _OtelTracingWorkflowInboundInterceptor,
+)
 from temporalio.exceptions import (
     ApplicationError,
     ApplicationErrorCategory,
@@ -1052,7 +1055,7 @@ async def test_opentelemetry_standalone_activity_tracing(
     assert start_activity_span.attributes["temporalActivityType"] == "tracing_activity"
 
 
-def _assert_context_detach_is_safe() -> None:
+def _v1_workflow_context() -> Any:
     class _fake_self:
         def _load_workflow_context_carrier(*_args):
             return None
@@ -1063,11 +1066,25 @@ def _assert_context_detach_is_safe() -> None:
         def _completed_span(*args: Any, **_kwargs: Any):
             pass
 
-    # create a context manager and force enter to happen on this thread
-    context_manager = TracingWorkflowInboundInterceptor._top_level_workflow_context(
+    return TracingWorkflowInboundInterceptor._top_level_workflow_context(
         _fake_self(),  # type: ignore
         success_is_complete=True,
     )
+
+
+def _v2_workflow_context() -> Any:
+    class _fake_input:
+        headers: dict[str, Any] = {}
+
+    return _OtelTracingWorkflowInboundInterceptor._top_level_workflow_context(
+        object(),  # type: ignore
+        _fake_input(),  # type: ignore
+    )
+
+
+def _assert_context_detach_is_safe(make_context_manager: Callable[[], Any]) -> None:
+    # create a context manager and force enter to happen on this thread
+    context_manager = make_context_manager()
     context_manager.__enter__()
 
     # move reference to context manager into queue
@@ -1099,11 +1116,20 @@ def _assert_context_detach_is_safe() -> None:
         )
 
 
-def test_opentelemetry_safe_detach():
-    _assert_context_detach_is_safe()
-
-
-def test_opentelemetry_safe_detach_with_threading_instrumentation():
+@pytest.mark.parametrize(
+    "make_context_manager",
+    [_v1_workflow_context, _v2_workflow_context],
+    ids=["TracingInterceptor", "OpenTelemetryInterceptor"],
+)
+@pytest.mark.parametrize(
+    "threading_instrumented", [False, True], ids=["plain", "threading-instrumented"]
+)
+def test_opentelemetry_safe_detach(
+    make_context_manager: Callable[[], Any], threading_instrumented: bool
+):
+    if not threading_instrumented:
+        _assert_context_detach_is_safe(make_context_manager)
+        return
     # OpenTelemetry's threading instrumentation (strands turns it on when an
     # Agent is created) propagates the current Context object into new
     # threads, so a context-identity check alone would detach a token minted
@@ -1116,7 +1142,7 @@ def test_opentelemetry_safe_detach_with_threading_instrumentation():
     if not already_instrumented:
         instrumentor.instrument()
     try:
-        _assert_context_detach_is_safe()
+        _assert_context_detach_is_safe(make_context_manager)
     finally:
         if not already_instrumented:
             instrumentor.uninstrument()

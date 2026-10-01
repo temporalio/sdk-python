@@ -28,10 +28,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- `temporalio.contrib.opentelemetry`: the tracing interceptor no longer logs `Failed to detach
-  context` when a workflow context is torn down on a different thread while OpenTelemetry's
-  threading instrumentation (enabled by strands, among others) is active; the context is now
-  detached only on the thread that attached it.
+- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
+  log `Failed to detach context` when a context is torn down on a different thread while
+  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
+  context is now detached only on the thread that attached it.
 ### Security
 
 ## [1.34.0] - 2026-09-30

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
-import threading
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from contextvars import Token
 from dataclasses import dataclass
 from typing import (
     Any,
@@ -38,6 +36,7 @@ import temporalio.exceptions
 import temporalio.nexus.system.workflow_service.models
 import temporalio.worker
 import temporalio.workflow
+from temporalio.contrib.opentelemetry._context import attach_context
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
@@ -59,29 +58,6 @@ default_text_map_propagator = opentelemetry.propagators.composite.CompositePropa
 _CarrierDict: TypeAlias = dict[str, opentelemetry.propagators.textmap.CarrierValT]
 
 _ContextT = TypeVar("_ContextT", bound=nexusrpc.handler.OperationContext)
-
-
-def _attach_context(context: Context) -> tuple[Token[Context], int]:
-    """Attach ``context`` and remember the attaching thread for a safe detach."""
-    return opentelemetry.context.attach(context), threading.get_ident()
-
-
-def _detach_context(context: Context, token: Token[Context], thread_ident: int) -> None:
-    """Detach ``token`` only where it is valid.
-
-    Generator finalization and GC can run a ``finally`` on a different thread
-    or ``contextvars.Context`` than the one that attached, where the token is
-    invalid and ``detach`` logs "Failed to detach context". Comparing the
-    active context is not enough on its own: OpenTelemetry's threading
-    instrumentation (enabled by strands, among others) propagates the same
-    ``Context`` object into new threads, so the attaching thread is required
-    too.
-    """
-    if (
-        threading.get_ident() == thread_ident
-        and context is opentelemetry.context.get_current()
-    ):
-        opentelemetry.context.detach(token)
 
 
 class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interceptor):
@@ -208,7 +184,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Context | None = None,
     ) -> Iterator[None]:
-        attached = _attach_context(context) if context else None
+        attached = attach_context(context) if context else None
         try:
             with self.tracer.start_as_current_span(
                 name,
@@ -245,8 +221,8 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                         )
                     raise
         finally:
-            if attached and context:
-                _detach_context(context, *attached)
+            if attached:
+                attached.detach()
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -581,7 +557,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # We need to put this interceptor on the context too
         context = self._set_on_context(context)
         # Run under context with new span
-        attached = _attach_context(context)
+        attached = attach_context(context)
         try:
             # This won't be created if there was no context header
             self._completed_span(
@@ -593,7 +569,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             )
             return await super().handle_query(input)
         finally:
-            _detach_context(context, *attached)
+            attached.detach()
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
@@ -664,7 +640,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         success = False
         exception: Exception | None = None
         # Run under this context
-        attached = _attach_context(context)
+        attached = attach_context(context)
 
         try:
             yield None
@@ -683,7 +659,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                     kind=opentelemetry.trace.SpanKind.INTERNAL,
                 )
 
-            _detach_context(context, *attached)
+            attached.detach()
 
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]
