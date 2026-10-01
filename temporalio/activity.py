@@ -460,7 +460,6 @@ def payload_converter() -> temporalio.converter.PayloadConverter:
     """Get the payload converter for the current activity.
 
     The returned converter has :py:class:`temporalio.converter.ActivitySerializationContext` set.
-    It includes SDK transfer type conversion.
     This is often used for dynamic activities to convert payloads.
     """
     return _Context.current().payload_converter
