@@ -20,8 +20,9 @@ class NotificationValue:
 @pytest.mark.parametrize("success", [True, False])
 def test_notification_request_roundtrip(success: bool) -> None:
     data_converter = temporalio.converter.default()
-    converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter, data_converter.failure_converter
+    converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
+        data_converter.failure_converter,
     )
     result: models.OnCompleteRequestResult[NotificationValue] = (
         models.OnCompleteRequestResultSuccess(NotificationValue("result"))
@@ -54,8 +55,9 @@ def test_notification_request_roundtrip(success: bool) -> None:
 
 def test_notification_response_roundtrip() -> None:
     data_converter = temporalio.converter.default()
-    converter = nexus_system._get_payload_converter(
-        data_converter.payload_converter, data_converter.failure_converter
+    converter = nexus_system._get_system_nexus_payload_converter(
+        data_converter._get_internal_payload_converter(),
+        data_converter.failure_converter,
     )
     response = notifications.OnCompleteResponse()
     assert (
