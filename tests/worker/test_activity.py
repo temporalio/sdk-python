@@ -1136,17 +1136,18 @@ async def test_activity_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
-class _SlowEncodeCodec(PayloadCodec):
-    """Yields while encoding, like a codec that calls a remote KMS."""
+class _BlockingEncodeCodec(PayloadCodec):
+    """Blocks in encode until released, like a codec waiting on a remote KMS."""
 
     def __init__(self) -> None:
         self.encoding_started = asyncio.Event()
+        self.release = asyncio.Event()
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         self.encoding_started.set()
-        await asyncio.sleep(3)
+        await self.release.wait()
         return list(payloads)
 
     async def decode(
@@ -1163,7 +1164,7 @@ async def test_activity_cancel_during_result_encode_still_completes(
         # Details send the failure through the codec
         raise ApplicationError("boom", {"detail": "x"})
 
-    codec = _SlowEncodeCodec()
+    codec = _BlockingEncodeCodec()
     config = client.config()
     config["data_converter"] = dataclasses.replace(
         DataConverter.default, payload_codec=codec
@@ -1194,13 +1195,21 @@ async def test_activity_cancel_during_result_encode_still_completes(
     # from being reported, or shutdown would wait on it forever.
     await codec.encoding_started.wait()
     with caplog.at_level(logging.DEBUG, logger="temporalio.worker._activity"):
-        await asyncio.wait_for(act_worker.shutdown(), 20)
+        shutdown_task = asyncio.create_task(act_worker.shutdown())
+
+        # Only let encoding finish once the cancel has reached the activity,
+        # so it cannot complete first and let an unfixed worker pass
+        async def cancel_logged() -> None:
+            while not any(
+                rec.getMessage().startswith("Cancelling activity")
+                for rec in caplog.records
+            ):
+                await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(cancel_logged(), 20)
+        codec.release.set()
+        await asyncio.wait_for(shutdown_task, 20)
     await run_task
-    # The cancel must have reached the activity while it was still encoding,
-    # otherwise this test proves nothing
-    assert any(
-        rec.getMessage().startswith("Cancelling activity") for rec in caplog.records
-    )
     with pytest.raises(WorkflowFailureError) as err:
         await handle.result()
     assert isinstance(err.value.cause, ActivityError)
