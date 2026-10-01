@@ -30,7 +30,7 @@ to include examples, links to docs, or any other relevant information.
   [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
   package. The existing `temporalio[openai-agents]` extra now installs that
   package, and the old public `temporalio.contrib.openai_agents` imports
-  remain available.
+  remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
 
