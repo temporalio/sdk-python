@@ -44,8 +44,6 @@ to include examples, links to docs, or any other relevant information.
   Activity's failure message and expose its exception to after-tool hooks.
 - Reject unsupported `InterpreterPoolExecutor` activity executors when creating
   a worker instead of failing during activity execution.
-- Fixed Pydantic constraints being silently ignored inside or outside workflow
-  sandboxes by passing through `annotated_types` by default.
 
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
