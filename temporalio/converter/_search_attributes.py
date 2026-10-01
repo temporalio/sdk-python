@@ -61,6 +61,8 @@ def encode_typed_search_attribute_value(
         )
     # datetime needs to be in isoformat
     if isinstance(value, datetime):
+        if value.tzinfo is None:
+            raise ValueError("Timezone must be present on all search attribute dates")
         value = value.isoformat()
     # We'll do an extra sanity check for keyword list and check every value
     if isinstance(value, Sequence):
