@@ -239,6 +239,11 @@ _ = temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class UserMetadata:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     static_summary: typing.Any | None = None
     static_details: typing.Any | None = None
 

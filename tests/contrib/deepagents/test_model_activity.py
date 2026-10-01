@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 import uuid
+from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -29,9 +30,48 @@ with workflow.unsafe.imports_passed_through():
     from langchain_core.messages import HumanMessage
 
     from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalModel
-    from temporalio.contrib.deepagents.testing import mock_model_provider
+    from temporalio.contrib.deepagents._activity import (
+        DeepAgentActivities,
+        ModelActivityInput,
+    )
+    from temporalio.contrib.deepagents.testing import FakeModel, mock_model_provider
 
 INVOKE_MODEL = "deepagents.invoke_model"
+
+
+class _ToolBindingModel(FakeModel):
+    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> Any:
+        return self.bind(tools=tools, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "bind_kwargs",
+    [
+        {"response_format": {"type": "json_schema", "json_schema": {"name": "Answer"}}},
+        {"tool_choice": "any"},
+    ],
+)
+def test_model_binding_preserves_kwargs_with_tools(bind_kwargs: dict[str, Any]) -> None:
+    tool_schemas = [
+        {
+            "type": "function",
+            "function": {"name": "lookup", "parameters": {"type": "object"}},
+        }
+    ]
+    activities = DeepAgentActivities(
+        model_provider=lambda _: _ToolBindingModel(responses=["answer"])
+    )
+
+    bound = activities._build_bound_model(
+        ModelActivityInput(
+            model_name="fake:model",
+            messages=[],
+            tool_schemas=tool_schemas,
+            bind_kwargs=bind_kwargs,
+        )
+    )
+
+    assert bound.kwargs == {"tools": tool_schemas, **bind_kwargs}
 
 
 @workflow.defn

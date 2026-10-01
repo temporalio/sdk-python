@@ -1553,6 +1553,7 @@ class CallbackInfo(google.protobuf.message.Message):
     LAST_ATTEMPT_FAILURE_FIELD_NUMBER: builtins.int
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     BLOCKED_REASON_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     @property
     def callback(self) -> temporalio.api.common.v1.message_pb2.Callback:
         """Information on how this callback should be invoked (e.g. its URL and type)."""
@@ -1578,6 +1579,10 @@ class CallbackInfo(google.protobuf.message.Message):
         """The time when the next attempt is scheduled."""
     blocked_reason: builtins.str
     """If the state is BLOCKED, blocked reason provides additional information."""
+    request_id: builtins.str
+    """Server-generated request ID used as an idempotency token when invoking callbacks.
+    It has no relation to caller-side request_id sent in operations like StartWorkflowExecutionRequest.
+    """
     def __init__(
         self,
         *,
@@ -1593,6 +1598,7 @@ class CallbackInfo(google.protobuf.message.Message):
         next_attempt_schedule_time: google.protobuf.timestamp_pb2.Timestamp
         | None = ...,
         blocked_reason: builtins.str = ...,
+        request_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1628,6 +1634,8 @@ class CallbackInfo(google.protobuf.message.Message):
             b"next_attempt_schedule_time",
             "registration_time",
             b"registration_time",
+            "request_id",
+            b"request_id",
             "state",
             b"state",
             "trigger",
