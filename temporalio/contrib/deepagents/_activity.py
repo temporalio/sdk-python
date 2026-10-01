@@ -242,10 +242,10 @@ class DeepAgentActivities:
 
     def _build_bound_model(self, input: ModelActivityInput) -> Any:
         model = self._model_provider(input.model_name)
-        if input.bind_kwargs:
-            model = model.bind(**input.bind_kwargs)
         if input.tool_schemas:
             model = model.bind_tools(input.tool_schemas)
+        if input.bind_kwargs:
+            model = model.bind(**input.bind_kwargs)
         return model
 
     @activity.defn(name=INVOKE_MODEL)

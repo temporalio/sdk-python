@@ -27,6 +27,7 @@ worker-wide wiring, not per-workflow state.
 from __future__ import annotations
 
 import importlib
+import inspect
 import threading
 import uuid as _uuid
 import warnings
@@ -386,6 +387,7 @@ _ASYNC_TO_SYNC_OPS: dict[str, str] = {
     "adownload_files": "download_files",
     "aupload_files": "upload_files",
     "aexecute": "execute",
+    "adelete": "delete",
 }
 
 _original_backend_async_defaults: dict[str, Any] = {}
@@ -462,6 +464,7 @@ _BACKEND_OPS = (
     "download_files",
     "upload_files",
     "execute",
+    "delete",
     # Async twins (what FilesystemMiddleware actually calls).
     "als",
     "als_info",
@@ -475,7 +478,19 @@ _BACKEND_OPS = (
     "adownload_files",
     "aupload_files",
     "aexecute",
+    "adelete",
 )
+
+# Capability-gated ops. deepagents decides whether a backend has ``delete`` from
+# the CLASS (``type(backend).delete`` against the protocol default) and whether
+# it can ``execute`` from a nominal ``isinstance`` check against
+# ``SandboxBackendProtocol`` (an ABC subclass, not a structural Protocol).
+# Neither can be answered per instance, so the wrapper mirrors the inner
+# backend at class level; see :func:`_wrapper_class_for`. Some probes read the
+# method's SIGNATURE as well (``execute_accepts_timeout`` looks for a
+# ``timeout`` parameter on ``type(backend).execute``), so these dispatchers
+# also carry the inner method's signature; see :func:`_make_backend_op`.
+_OPTIONAL_OPS = frozenset({"delete", "adelete", "execute", "aexecute"})
 
 
 class TemporalBackend:
@@ -490,6 +505,25 @@ class TemporalBackend:
     Unknown attribute access is forwarded to the inner backend so backend
     metadata / configuration the agent reads (but that does no I/O) still works.
     """
+
+    def __new__(
+        cls,
+        inner: Any,
+        *,
+        activity_options: Mapping[str, Any] | None = None,
+    ) -> "TemporalBackend":
+        """Pick the wrapper class that mirrors ``inner``'s optional capabilities.
+
+        Applies to subclasses too: a user's ``class MyBackend(TemporalBackend)``
+        gets a mirrored subclass of ``MyBackend``, so ``isinstance`` and any
+        methods it defines are preserved.
+        """
+        target: type[TemporalBackend] = (
+            cls
+            if getattr(cls, "_temporal_mirror_of", None) is not None
+            else _wrapper_class_for(inner, cls)
+        )
+        return object.__new__(target)
 
     def __init__(
         self,
@@ -533,14 +567,113 @@ class TemporalBackend:
         return _serde.load_backend_result(output.result)
 
     def __getattr__(self, name: str) -> Any:
-        """Bound-method access for a known I/O op returns an activity dispatcher.
-
-        Everything else forwards to the inner backend unchanged.
-        """
-        if name in _BACKEND_OPS:
-
-            async def _op(*args: Any, **kwargs: Any) -> Any:
-                return await self._dispatch(name, *args, **kwargs)
-
-            return _op
+        """Forward anything that is not an I/O op to the inner backend unchanged."""
         return getattr(self._inner, name)
+
+
+def _make_backend_op(name: str, mirror: Any = None) -> Callable[..., Any]:
+    """Build the activity dispatcher for backend op ``name``.
+
+    ``mirror`` is the inner backend's own method for the op. When given, the
+    dispatcher advertises that method's signature (through ``__signature__``;
+    it still accepts and forwards any arguments). deepagents probes some
+    capabilities by signature: ``execute_accepts_timeout`` looks for a
+    ``timeout`` parameter on ``type(backend).execute`` and, unlike the
+    ``max_count`` probe, does not take ``**kwargs`` as a stand-in, so a bare
+    ``(*args, **kwargs)`` dispatcher made a wrapped ``LocalShellBackend``
+    refuse the per-command ``timeout`` its unwrapped self accepts. Carrying the
+    inner signature keeps every such probe answering exactly as it does for the
+    inner backend, including for a sandbox that does *not* accept ``timeout``
+    (deepagents then declines the call up front instead of the activity failing
+    on an unexpected keyword).
+    """
+
+    async def _op(self: TemporalBackend, *args: Any, **kwargs: Any) -> Any:
+        return await self._dispatch(name, *args, **kwargs)
+
+    _op.__name__ = _op.__qualname__ = name
+    if mirror is not None:
+        try:
+            signature = inspect.signature(mirror)
+        except (TypeError, ValueError):
+            pass
+        else:
+            setattr(_op, "__signature__", signature)
+    return _op
+
+
+# The I/O ops are real class-level methods, not ``__getattr__`` products, so
+# class-based capability checks in deepagents see them.
+for _op_name in _BACKEND_OPS:
+    if _op_name not in _OPTIONAL_OPS:
+        setattr(TemporalBackend, _op_name, _make_backend_op(_op_name))
+
+_wrapper_classes: dict[tuple[type, type, bool, bool], type[TemporalBackend]] = {}
+
+
+def _wrapper_class_for(
+    inner: Any, base: type[TemporalBackend]
+) -> type[TemporalBackend]:
+    """Return the subclass of ``base`` whose optional capabilities mirror ``inner``.
+
+    ``delete`` / ``adelete``: a delete-capable inner backend gets dispatchers
+    like every other op; any other inner backend keeps the protocol defaults,
+    so deepagents disables its delete tool exactly as it would for the
+    unwrapped backend. Execution: deepagents offers its shell tool only to a
+    nominal ``SandboxBackendProtocol`` instance, so when deepagents reports the
+    inner backend as execution-capable the mirror also derives from that class
+    (with ``execute`` / ``aexecute`` dispatchers and ``id`` forwarded); a wrapper
+    around a plain filesystem or store backend stays a non-sandbox class. The
+    dispatchers built here carry the inner methods' signatures, which deepagents
+    reads for finer probes such as ``execute_accepts_timeout``; see
+    :func:`_make_backend_op`. An op that ``base`` already defines (a user
+    subclass) is left alone. Without deepagents installed there is nothing to
+    mirror and ``base`` is used as-is.
+    """
+    try:
+        protocol = importlib.import_module("deepagents.backends.protocol")
+        filesystem = importlib.import_module("deepagents.middleware.filesystem")
+    except ImportError:
+        return base
+    inner_cls = type(inner)
+    default_delete = protocol.BackendProtocol.delete
+    has_delete = getattr(inner_cls, "delete", default_delete) is not default_delete
+    has_execute = bool(filesystem.supports_execution(inner))
+    # Keyed by the inner CLASS too, since the dispatchers carry its method
+    # signatures. ``has_execute`` stays in the key: for a ``CompositeBackend``
+    # deepagents answers it per instance, from the default backend.
+    key = (base, inner_cls, has_delete, has_execute)
+    cls = _wrapper_classes.get(key)
+    if cls is None:
+        namespace: dict[str, Any] = {
+            "__module__": base.__module__,
+            "__qualname__": base.__qualname__,
+            "__doc__": base.__doc__,
+            "_temporal_mirror_of": base,
+        }
+        for op in ("delete", "adelete"):
+            if hasattr(base, op):
+                continue
+            namespace[op] = (
+                _make_backend_op(op, mirror=getattr(inner_cls, op, None))
+                if has_delete
+                else getattr(protocol.BackendProtocol, op)
+            )
+        bases: tuple[type, ...] = (base,)
+        if has_execute:
+            sandbox_cls = protocol.SandboxBackendProtocol
+            if not issubclass(base, sandbox_cls):
+                bases = (base, sandbox_cls)
+            for op in ("execute", "aexecute"):
+                if not hasattr(base, op):
+                    namespace[op] = _make_backend_op(
+                        op, mirror=getattr(inner_cls, op, None)
+                    )
+            if not hasattr(base, "id"):
+                # The sandbox class defines ``id``; keep reading the inner
+                # backend's, which ``__getattr__`` would otherwise have served.
+                namespace["id"] = property(lambda self: self._inner.id)
+        # Workflow tasks run on a thread pool, so two runs can build the same
+        # key at once; the first class stored wins for both callers.
+        cls = _wrapper_classes.setdefault(key, type(base.__name__, bases, namespace))
+    return cls

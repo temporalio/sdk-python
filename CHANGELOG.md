@@ -20,7 +20,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
-- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
 ### Changed
 
 ### Deprecated
@@ -30,18 +29,88 @@ to include examples, links to docs, or any other relevant information.
 - The OpenAI Agents integration has moved to the independently versioned
   [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
   package. The existing `temporalio[openai-agents]` extra now installs that
-  package, and compatibility modules preserve the old public
-  `temporalio.contrib.openai_agents` imports. New code should depend on
-  `temporalio-openai-agents` directly and import `temporalio.openai_agents`.
+  package, and the old public `temporalio.contrib.openai_agents` imports
+  remain available at runtime and retain their static type information.
+  New code should depend on `temporalio-openai-agents` directly and import
+  `temporalio.openai_agents`.
 - `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and
   `seed_trace_id()`.
 
 ### Fixed
 
+### Security
+
+## [1.34.0] - 2026-09-30
+
+### Added
+
+- Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
+  ID when provided by the server.
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows, dynamic `@node` workflows, and durable HITL.
+- **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
+  Workflow-level metadata that allows for improved visibility into a Workflow execution's history
+  by grouping logically related Events together based on user-defined or system-inferred criteria.
+  `workflow.create_event_group(...)` takes the Event Group's ID as its first and only required
+  argument; the user-provided ID is used verbatim and should not contain sensitive information.
+  The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
+
+- Added `workflow.Info.original_execution_run_id`, the run ID recorded on the workflow
+  execution started event. Unlike `run_id`, this value is preserved across workflow resets.
+
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
+
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
+
+### Changed
+
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
+### :boom: Breaking Changes
+
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
+### Fixed
+
+- `temporalio.contrib.deepagents` now preserves model binding options such as
+  `response_format` and `tool_choice` when tools are also bound.
+- Workflow handles returned when a start attaches to a running workflow now use
+  the server-provided first execution run ID with Temporal Server 1.32.0 or
+  later.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
+- `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
+  graph workflows can load their context support during execution.
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
 - Current workflow and activity payload converter accessors now return the configured converter
   without SDK-internal transfer type conversion.
-
-### Security
+- A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
+  workflow and activity user metadata are serialized with theirs. This covers the static summary
+  sent when starting an operation, and the summary and details read back from a description.
 
 ## [1.33.0] - 2026-09-14
 

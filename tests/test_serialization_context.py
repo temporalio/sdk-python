@@ -1729,14 +1729,25 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
         self,
         markers: dict[NexusSerializationContext, bytes],
         context: SerializationContext | None = None,
+        allow_contextless_decode_of_marked_payload: bool = False,
     ):
         self.markers = markers
         self.context = context
+        # A handle obtained by operation ID decodes a payload that was encoded under
+        # a Nexus context without one. Every other caller must decode under the same context it
+        # encoded with, so that direction is an error unless a test opts out here.
+        self.allow_contextless_decode_of_marked_payload = (
+            allow_contextless_decode_of_marked_payload
+        )
 
     def with_context(
         self, context: SerializationContext
     ) -> NexusContextMarkerPayloadCodec:
-        return NexusContextMarkerPayloadCodec(self.markers, context)
+        return NexusContextMarkerPayloadCodec(
+            self.markers,
+            context,
+            self.allow_contextless_decode_of_marked_payload,
+        )
 
     def _marker(self) -> bytes | None:
         if not isinstance(self.context, NexusSerializationContext):
@@ -1767,6 +1778,12 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         marker = self._marker()
         if marker is None:
+            if not self.allow_contextless_decode_of_marked_payload:
+                for payload in payloads:
+                    assert self.MARKER_KEY not in payload.metadata, (
+                        f"payload encoded under a Nexus context was decoded under "
+                        f"{self.context!r}"
+                    )
             return list(payloads)
         decoded = []
         for payload in payloads:
@@ -1989,6 +2006,59 @@ async def test_workflow_nexus_payload_codec_receives_context(
 
 
 @pytest.mark.requires_local_server
+async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
+    env: WorkflowEnvironment,
+):
+    """A handle obtained by operation ID alone decodes its result without a Nexus context.
+
+    Such a handle never issued a start request, so it has no endpoint, service or operation to
+    build a context from. The result was still encoded by the handler under the operation's
+    context, so this is the one asymmetry the strict codec has to tolerate.
+    """
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = "standalone-nexus-detached-handle-task-queue"
+    endpoint_name = f"standalone-detached-nexus-endpoint-{uuid.uuid4()}"
+    context = NexusSerializationContext(
+        endpoint=endpoint_name,
+        service="NexusOperationTestServiceHandler",
+        operation="operation",
+    )
+    config = env.client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=NexusContextMarkerPayloadCodec(
+            {context: b"detached"},
+            allow_contextless_decode_of_marked_payload=True,
+        ),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[NexusOperationTestServiceHandler()],
+    ) as worker:
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
+        operation_id = str(uuid.uuid4())
+        started = await client.create_nexus_client(
+            service=NexusOperationTestServiceHandler,
+            endpoint=endpoint_name,
+        ).start_operation(
+            NexusOperationTestServiceHandler.operation,
+            "detached",
+            id=operation_id,
+            schedule_to_close_timeout=timedelta(seconds=10),
+        )
+        assert await started.result() == "detached"
+
+        # The fresh handle knows only the operation ID, so it decodes without a context.
+        detached = client.get_nexus_operation_handle(operation_id, result_type=str)
+        assert await detached.result() == "detached"
+
+
+@pytest.mark.requires_local_server
 async def test_standalone_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
@@ -2097,6 +2167,117 @@ async def test_workflow_nexus_failure_converter_has_context(
 
         assert ("to_failure", expected_context) in nexus_failure_context_traces
         assert ("from_failure", expected_context) in nexus_failure_context_traces
+
+
+class NexusContextRequiringPayloadCodec(PayloadCodec, WithSerializationContext):
+    """Marks payloads it encodes under a Nexus context and requires that mark back on decode.
+
+    Stands in for a codec keyed on the context, such as one deriving an encryption key from it:
+    such a codec cannot recover a payload whose two halves were converted under different
+    contexts. Raising in both directions catches a mismatch either way round. The leniency in
+    :py:class:`NexusContextMarkerPayloadCodec` deliberately tolerates such a mismatch, so it
+    cannot detect this.
+    """
+
+    MARKER_KEY = "nexus-context-required-marker"
+
+    def __init__(self, context: SerializationContext | None = None):
+        self.context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> NexusContextRequiringPayloadCodec:
+        return NexusContextRequiringPayloadCodec(context)
+
+    def _nexus_context(self) -> NexusSerializationContext | None:
+        return (
+            self.context
+            if isinstance(self.context, NexusSerializationContext)
+            else None
+        )
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        context = self._nexus_context()
+        if context is None:
+            return list(payloads)
+        encoded = []
+        for payload in payloads:
+            marked = temporalio.api.common.v1.Payload()
+            marked.CopyFrom(payload)
+            marked.metadata[self.MARKER_KEY] = b"1"
+            encoded.append(marked)
+        return encoded
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        context = self._nexus_context()
+        decoded = []
+        for payload in payloads:
+            marked = self.MARKER_KEY in payload.metadata
+            if context is None:
+                if marked:
+                    raise RuntimeError(
+                        "payload encoded under a Nexus context was decoded without one"
+                    )
+                decoded.append(payload)
+                continue
+            if not marked:
+                raise RuntimeError(
+                    f"payload encoded without a Nexus context was decoded under {context!r}"
+                )
+            stripped = temporalio.api.common.v1.Payload()
+            stripped.CopyFrom(payload)
+            del stripped.metadata[self.MARKER_KEY]
+            decoded.append(stripped)
+        return decoded
+
+
+@pytest.mark.requires_local_server
+async def test_standalone_nexus_describe_reads_metadata_with_context(
+    env: WorkflowEnvironment,
+):
+    """A description reads back the summary the start request attached.
+
+    A Nexus operation's user metadata is serialized with the operation's context, the same way
+    workflow and activity user metadata is serialized with theirs. Encoding and decoding it under
+    different contexts does not round-trip for a converter that varies by context.
+    """
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = "standalone-nexus-describe-metadata-task-queue"
+    endpoint_name = "standalone-describe-metadata-nexus-endpoint"
+    config = env.client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=NexusContextRequiringPayloadCodec(),
+    )
+    client = Client(**config)
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[NexusOperationTestServiceHandler()],
+    ) as worker:
+        await env.create_nexus_endpoint(endpoint_name, worker.task_queue)
+        nexus_client = client.create_nexus_client(
+            service=NexusOperationTestServiceHandler,
+            endpoint=endpoint_name,
+        )
+        operation_handle = await nexus_client.start_operation(
+            NexusOperationTestServiceHandler.operation,
+            "describe-metadata",
+            id=str(uuid.uuid4()),
+            schedule_to_close_timeout=timedelta(seconds=10),
+            summary="the-summary",
+        )
+        assert await operation_handle.result() == "describe-metadata"
+
+        description = await operation_handle.describe()
+        assert await description.static_summary() == "the-summary"
 
 
 @pytest.mark.requires_local_server
@@ -2303,3 +2484,86 @@ async def test_user_customization_of_default_payload_converter(
                 id=wf_id,
                 task_queue=task_queue,
             )
+
+
+class _ContextRecordingCodec(PayloadCodec, WithSerializationContext):
+    """Records the serialization context it is handed, so a test can assert which one was used."""
+
+    def __init__(
+        self,
+        seen: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ):
+        self.seen = seen
+        self.context = context
+
+    def with_context(self, context: SerializationContext) -> _ContextRecordingCodec:
+        return _ContextRecordingCodec(self.seen, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.seen.append(self.context)
+        return list(payloads)
+
+
+def _nexus_worker_with_recording_codec(seen: list[SerializationContext | None]):
+    """A _NexusWorker with just enough wired up to call _data_converter_for_nexus_task."""
+    from unittest import mock
+
+    from temporalio.worker._nexus import _NexusWorker
+
+    return _NexusWorker(
+        bridge_worker=lambda: mock.MagicMock(),
+        client=mock.MagicMock(namespace="ns"),
+        namespace="ns",
+        task_queue="tq",
+        service_handlers=[NexusOperationTestServiceHandler()],
+        data_converter=dataclasses.replace(
+            DataConverter.default, payload_codec=_ContextRecordingCodec(seen)
+        ),
+        interceptors=[],
+        metric_meter=mock.MagicMock(),
+        executor=None,
+    )
+
+
+async def _encode_through_codec(data_converter: DataConverter) -> None:
+    """Drive the converter's codec so it records the context it was scoped to."""
+    assert data_converter.payload_codec is not None
+    await data_converter.payload_codec.encode([])
+
+
+async def test_nexus_worker_task_without_endpoint_is_scoped_by_an_empty_endpoint():
+    """Servers before 1.30.0 do not report the endpoint a task was addressed to.
+
+    The task is still scoped by service and operation, with an empty endpoint. It will not agree
+    with the caller, which scoped by the real endpoint, but it is a Nexus context rather than an
+    absent one.
+    """
+    seen: list[SerializationContext | None] = []
+    worker = _nexus_worker_with_recording_codec(seen)
+
+    await _encode_through_codec(
+        worker._data_converter_for_nexus_task("", "Service", "operation")
+    )
+    assert seen == [
+        NexusSerializationContext(endpoint="", service="Service", operation="operation")
+    ]
+
+    other_seen: list[SerializationContext | None] = []
+    other = _nexus_worker_with_recording_codec(other_seen)
+    await _encode_through_codec(
+        other._data_converter_for_nexus_task("endpoint", "Service", "operation")
+    )
+    assert other_seen == [
+        NexusSerializationContext(
+            endpoint="endpoint", service="Service", operation="operation"
+        )
+    ]

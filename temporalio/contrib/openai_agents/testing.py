@@ -1,15 +1,6 @@
-"""Compatibility imports for OpenAI Agents testing helpers."""
+"""Compatibility imports for temporalio.openai_agents.testing."""
 
+from temporalio.openai_agents.testing import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
 from temporalio.openai_agents.testing import (  # pyright: ignore[reportMissingImports]
-    AgentEnvironment,
-    ResponseBuilders,
-    TestModel,
-    TestModelProvider,
+    __all__ as __all__,
 )
-
-__all__ = [
-    "AgentEnvironment",
-    "ResponseBuilders",
-    "TestModel",
-    "TestModelProvider",
-]

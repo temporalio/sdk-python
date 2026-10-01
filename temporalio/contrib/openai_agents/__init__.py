@@ -1,47 +1,12 @@
 """Compatibility imports for the standalone OpenAI Agents integration.
 
-New code should import :mod:`temporalio.openai_agents` directly.
+Install ``temporalio-openai-agents`` and import ``temporalio.openai_agents``
+directly in new code.
 
-.. deprecated::
-    Install ``temporalio-openai-agents`` and import
-    :mod:`temporalio.openai_agents` instead.
+Legacy ``testing`` and ``workflow`` modules forward the standalone public API.
 """
 
-import warnings
-
+from temporalio.openai_agents import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
 from temporalio.openai_agents import (  # pyright: ignore[reportMissingImports]
-    AgentsWorkflowError,
-    AllowAllWorkerEnvVars,
-    ModelActivityParameters,
-    OpenAIAgentsPlugin,
-    OpenAIPayloadConverter,
-    SandboxClientProvider,
-    StatefulMCPServerProvider,
-    StatelessMCPServerProvider,
-    TemporalWorkerEnvValue,
-    temporal_worker_env_ref,
+    __all__ as __all__,
 )
-
-from . import testing, workflow
-
-warnings.warn(
-    "temporalio.contrib.openai_agents is deprecated; install "
-    "temporalio-openai-agents and import temporalio.openai_agents instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-__all__ = [
-    "AgentsWorkflowError",
-    "AllowAllWorkerEnvVars",
-    "ModelActivityParameters",
-    "OpenAIAgentsPlugin",
-    "OpenAIPayloadConverter",
-    "SandboxClientProvider",
-    "StatelessMCPServerProvider",
-    "StatefulMCPServerProvider",
-    "TemporalWorkerEnvValue",
-    "temporal_worker_env_ref",
-    "testing",
-    "workflow",
-]
