@@ -386,13 +386,13 @@ instead (for example inside an activity or an MCP toolset factory).
 > generated interrupt/function-call ids, so those ids must regenerate
 > identically on replay. The plugin installs ADK's platform time/uuid/random
 > providers as process-wide defaults, so the ids ADK generates (including
-> default `RequestInput` interrupt ids) derive from `workflow.uuid4()` and
-> replay identically.
+> default `RequestInput` interrupt ids) derive from the workflow-private
+> deterministic stream and replay identically.
 
 ## Determinism Notes
 
 - The plugin patches ADK's `google.adk.platform` time, uuid, and random
-  providers to `workflow.now()`, `workflow.uuid4()`, and `workflow.random()`
+  providers to `workflow.time()` and a workflow-private deterministic stream
   inside workflows.
 - ADK node `timeout=`/`RetryConfig` map onto durable timers
   (`asyncio.wait_for`/`asyncio.sleep`). For activity-backed nodes, prefer
