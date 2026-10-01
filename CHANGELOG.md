@@ -41,6 +41,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
+
 - `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
   log `Failed to detach context` when a context is torn down on a different thread while
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
