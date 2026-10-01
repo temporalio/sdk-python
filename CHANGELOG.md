@@ -45,6 +45,9 @@ to include examples, links to docs, or any other relevant information.
   Custom Pydantic schema generation is preserved.
   Integer-valued output enums are normalized to strings to match Google GenAI.
 
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
