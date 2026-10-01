@@ -5,11 +5,13 @@ import concurrent.futures
 import multiprocessing
 import multiprocessing.context
 import os
+import sys
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
+from unittest.mock import Mock
 from urllib.request import urlopen
 
 import nexusrpc
@@ -75,6 +77,36 @@ def test_load_default_worker_binary_id():
     val1 = temporalio.worker._worker.load_default_build_id(memoize=False)
     val2 = temporalio.worker._worker.load_default_build_id(memoize=False)
     assert val1 == val2
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason="InterpreterPoolExecutor requires Python 3.14 or newer",
+)
+@pytest.mark.parametrize("subclass", [False, True])
+def test_activity_executor_rejects_interpreter_pool(subclass: bool):
+    if sys.version_info >= (3, 14):
+
+        class CustomInterpreterPoolExecutor(concurrent.futures.InterpreterPoolExecutor):
+            pass
+
+        executor_class = concurrent.futures.InterpreterPoolExecutor
+        if subclass:
+            executor_class = CustomInterpreterPoolExecutor
+
+        client = Mock(spec=Client)
+        client.config.return_value = {"plugins": []}
+        with executor_class(max_workers=1) as executor:
+            with pytest.raises(
+                ValueError,
+                match="InterpreterPoolExecutor is not supported as an activity_executor",
+            ):
+                Worker(
+                    client,
+                    task_queue="test-interpreter-pool",
+                    activities=[never_run_activity],
+                    activity_executor=executor,
+                )
 
 
 @activity.defn
