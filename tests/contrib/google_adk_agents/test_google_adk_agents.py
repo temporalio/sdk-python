@@ -22,6 +22,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from datetime import timedelta
+from enum import Enum, IntEnum
 from typing import Any
 
 import pytest
@@ -1179,6 +1180,26 @@ class CityWeather(BaseModel):
     temperature_c: float
 
 
+class NumericChoice(IntEnum):
+    FIRST = 10
+    SECOND = 20
+
+
+class IntegerChoice(Enum):
+    FIRST = 1
+    SECOND = 2
+
+
+class MixedChoice(Enum):
+    FIRST = 1
+    SECOND = "other"
+
+
+class StringChoice(str, Enum):
+    FIRST = "first"
+    SECOND = "second"
+
+
 class OutputSchemaModel(TestModel):
     def responses(self) -> list[LlmResponse]:
         return [
@@ -1250,7 +1271,7 @@ async def test_agent_with_output_schema(client: Client):
     assert result == {"city": "Paris", "temperature_c": 17.5}
 
 
-@pytest.mark.parametrize("schema", [CityWeather, list[CityWeather]])
+@pytest.mark.parametrize("schema", [CityWeather, list[CityWeather], StringChoice])
 def test_output_schema_type_sent_as_json_schema(schema: Any) -> None:
     request = LlmRequest(
         model="gemini-2.0-flash",
@@ -1267,6 +1288,34 @@ def test_output_schema_type_sent_as_json_schema(schema: Any) -> None:
     payloads = converter.payload_converter.to_payloads([converted])
     serialized = json.loads(payloads[0].data)
     assert serialized["config"]["response_schema"] == TypeAdapter(schema).json_schema()
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected_values"),
+    [
+        (NumericChoice, ["10", "20"]),
+        (IntegerChoice, ["1", "2"]),
+        (MixedChoice, ["1", "other"]),
+    ],
+)
+def test_output_schema_integer_enum_is_serializable(
+    schema: type[Enum], expected_values: list[str]
+) -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(schema)
+
+    converted = _with_serializable_response_schema(request)
+
+    assert request.config.response_schema is schema
+    converter = GoogleAdkPlugin()._configure_data_converter(None).payload_converter
+    payloads = converter.to_payloads([converted])
+    restored = converter.from_payloads(payloads, [LlmRequest])[0]
+    response_schema = types.Schema.model_validate(restored.config.response_schema)
+    assert response_schema.type == types.Type.STRING
+    assert response_schema.enum == expected_values
 
 
 def test_json_output_schema_left_unchanged() -> None:

@@ -69,6 +69,7 @@ to include examples, links to docs, or any other relevant information.
   the workflow sandbox.
 - `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
   when calling the model. The schema type is now sent to the model activity as its JSON schema.
+  Integer-valued output enums are normalized to strings to match Google GenAI.
 - `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
   graph workflows can load their context support during execution.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.

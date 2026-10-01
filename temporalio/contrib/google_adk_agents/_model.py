@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import Enum
 
 from google.adk.models import BaseLlm, LLMRegistry
 from google.adk.models.llm_request import LlmRequest
@@ -100,14 +101,23 @@ def _with_serializable_response_schema(llm_request: LlmRequest) -> LlmRequest:
     (for example a Pydantic model class), which the payload converter cannot
     serialize. google-genai and ADK's LiteLlm both turn such a type into its
     JSON schema before calling the model, so sending the JSON schema instead
-    is equivalent.
+    is equivalent. Integer-valued enums are normalized to string enums to
+    match google-genai's enum handling.
     """
     schema = llm_request.config.response_schema
     if schema is None or isinstance(schema, (dict, types.Schema)):
         return llm_request
+    response_schema = TypeAdapter(schema).json_schema()
+    if (
+        isinstance(schema, type)
+        and issubclass(schema, Enum)
+        and any(isinstance(member.value, int) for member in schema)
+    ):
+        response_schema["type"] = "string"
+        response_schema["enum"] = [str(member.value) for member in schema]
     request = llm_request.model_copy()
     request.config = llm_request.config.model_copy(
-        update={"response_schema": TypeAdapter(schema).json_schema()}
+        update={"response_schema": response_schema}
     )
     return request
 
