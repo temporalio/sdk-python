@@ -257,7 +257,7 @@ class GoogleAdkPlugin(SimplePlugin):
     This plugin configures:
 
     - Pydantic Payload Converter (required for ADK objects).
-    - Sandbox Passthrough for google.adk and google.genai modules.
+    - Sandbox Passthrough for google.adk, google.genai, and OpenTelemetry modules.
     - ADK's time, id, and random providers, so ADK-generated ids and retry
       jitter come from the workflow's deterministic clock and a
       workflow-private deterministic random stream
@@ -301,6 +301,8 @@ class GoogleAdkPlugin(SimplePlugin):
                         "google.adk",
                         "google.genai",
                         "mcp",
+                        # ADK imports OpenTelemetry context lazily for graph workflows.
+                        "opentelemetry",
                         # ADK probes these optional model SDKs lazily on each LLM turn.
                         "anthropic",
                         "litellm",

@@ -23,6 +23,35 @@ to include examples, links to docs, or any other relevant information.
 - `workflow.uuid4()` now accepts an optional keyword-only `rng` argument to derive the
   UUID from a caller-supplied generator (e.g. a private stream from `workflow.new_random()`)
   without reading or advancing any workflow state.
+### Changed
+
+### Deprecated
+
+### :boom: Breaking Changes
+
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
+  workflow-private deterministic stream (a `workflow.new_random()` cached on the workflow
+  instance) instead of `workflow.random()`, so ADK no longer shifts the sequences user code sees
+  from `workflow.random()` and `workflow.uuid4()`, and a `google-adk` upgrade that changes how
+  many ids ADK generates no longer affects them either. A workflow started under 1.34.0 that
+  generated ADK ids or jitter (for example one waiting on a HITL response) may not replay
+  deterministically across this upgrade; drain such workflows or use worker versioning.
+### Fixed
+
+- `GoogleAdkPlugin`'s deterministic providers now leave the workflow's random state untouched in
+  read-only contexts (query handlers, update validators), where they return wall-clock time and
+  fresh entropy instead of advancing a replayed stream; ADK's `reset_*_provider()` functions now
+  restore the deterministic providers rather than the standard-library ones; and installing the
+  providers is idempotent and thread-safe, warning when a provider override set before the worker
+  started is replaced.
+### Security
+
+## [1.34.0] - 2026-09-30
+
+### Added
+
+- Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
+  ID when provided by the server.
 - **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
   graph workflows, dynamic `@node` workflows, and durable HITL.
 - **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
@@ -43,19 +72,41 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
-### Deprecated
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
 
 ### :boom: Breaking Changes
 
-- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`; 2.8.0 is the
-  first release with the `google.adk.platform._random` seam the plugin now installs a provider for.
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
 
 ### Fixed
 
-- `GoogleAdkPlugin` now applies its deterministic time, id, and random providers inside
-  workflow tasks.
+- `temporalio.contrib.deepagents` now preserves model binding options such as
+  `response_format` and `tool_choice` when tools are also bound.
+- Workflow handles returned when a start attaches to a running workflow now use
+  the server-provided first execution run ID with Temporal Server 1.32.0 or
+  later.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
 - `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
   the workflow sandbox.
+- `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
+  graph workflows can load their context support during execution.
 - `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
 - `DataConverter.payload_converter` and current workflow and activity payload converter accessors
   now return the configured converter without SDK-internal transfer type conversion.
@@ -66,8 +117,6 @@ to include examples, links to docs, or any other relevant information.
 - A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
   workflow and activity user metadata are serialized with theirs. This covers the static summary
   sent when starting an operation, and the summary and details read back from a description.
-
-### Security
 
 ## [1.33.0] - 2026-09-14
 
