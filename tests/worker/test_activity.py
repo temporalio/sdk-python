@@ -1691,7 +1691,6 @@ class DynActivityValue:
 @activity.defn(dynamic=True)
 def sync_dyn_activity(args: Sequence[RawValue]) -> DynActivityValue:
     assert len(args) == 2
-    assert isinstance(activity.payload_converter(), DefaultPayloadConverter)
     arg1 = activity.payload_converter().from_payload(args[0].payload, DynActivityValue)
     assert isinstance(arg1, DynActivityValue)
     arg2 = activity.payload_converter().from_payload(args[1].payload, DynActivityValue)

@@ -612,13 +612,6 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
             return payload_converter
         return _TemporalTransferTypePayloadConverter(payload_converter)
 
-    @staticmethod
-    def unwrap(payload_converter: PayloadConverter) -> PayloadConverter:
-        """Remove this wrapper from a payload converter, if present."""
-        if isinstance(payload_converter, _TemporalTransferTypePayloadConverter):
-            return payload_converter._inner_payload_converter
-        return payload_converter
-
     def to_payloads(
         self, values: Sequence[Any]
     ) -> list[temporalio.api.common.v1.Payload]:
@@ -1086,11 +1079,13 @@ def value_to_type(
                     ret_list.append(value_to_type(arg_type, item, custom_converters))
                 except Exception as err:
                     raise TypeError(f"Failed converting {hint} index {i}") from err
-        # If tuple, set, or deque convert back to that type
+        # If tuple, set, frozenset, or deque convert back to that type
         if origin is tuple:
             return tuple(ret_list)
         elif origin is set:
             return set(ret_list)
+        elif origin is frozenset:
+            return frozenset(ret_list)
         elif origin is collections.deque:
             return collections.deque(ret_list)
         return ret_list

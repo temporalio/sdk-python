@@ -60,9 +60,6 @@ import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
-from temporalio.converter._payload_converter import (
-    _TemporalTransferTypePayloadConverter,
-)
 from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
     _start_system_nexus_operation,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
@@ -1065,11 +1062,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     )
                 )
                 if serialization_context is not None:
-                    payload_converter = (
-                        temporalio.nexus.system._get_system_nexus_payload_converter(
-                            self._payload_converter_with_context(serialization_context),
-                            self._failure_converter_with_context(serialization_context),
-                        )
+                    payload_converter = temporalio.nexus.system._get_payload_converter(
+                        self._payload_converter_with_context(serialization_context),
+                        self._failure_converter_with_context(serialization_context),
                     )
             [output] = self._convert_payloads(
                 [result.completed],
@@ -1511,9 +1506,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         return use_patch
 
     def workflow_payload_converter(self) -> temporalio.converter.PayloadConverter:
-        return _TemporalTransferTypePayloadConverter.unwrap(
-            self._workflow_context_payload_converter
-        )
+        return self._workflow_context_payload_converter
 
     def workflow_random(self) -> random.Random:
         self._assert_not_read_only("random")
@@ -2260,20 +2253,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input.operation_name,
                 input.input,
             )
-            internal_payload_converter = self._workflow_context_payload_converter
+            user_payload_converter = self._workflow_context_payload_converter
             user_failure_converter = self._workflow_context_failure_converter
             if serialization_context is not None:
-                internal_payload_converter = self._payload_converter_with_context(
+                user_payload_converter = self._payload_converter_with_context(
                     serialization_context
                 )
                 user_failure_converter = self._failure_converter_with_context(
                     serialization_context
                 )
-            payload_converter = (
-                temporalio.nexus.system._get_system_nexus_payload_converter(
-                    internal_payload_converter,
-                    user_failure_converter,
-                )
+            payload_converter = temporalio.nexus.system._get_payload_converter(
+                user_payload_converter,
+                user_failure_converter,
             )
             failure_converter = user_failure_converter
         else:
