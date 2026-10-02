@@ -560,6 +560,43 @@ def test_json_frozenset_round_trip(hint: Any, value: frozenset[int]):
     assert converted == value
 
 
+@dataclass
+class DataClassWithNonInitFields:
+    foo: str
+    computed: str = dataclasses.field(init=False)
+    counter: int = dataclasses.field(init=False, default=0)
+
+    def __post_init__(self) -> None:
+        self.computed = self.foo.upper()
+
+
+@dataclass(frozen=True)
+class FrozenDataClassWithNonInitField:
+    foo: str
+    counter: int = dataclasses.field(init=False, default=0)
+
+
+def test_json_dataclass_non_init_fields_round_trip():
+    converter = JSONPlainPayloadConverter()
+
+    value = DataClassWithNonInitFields("foo")
+    value.counter = 3
+    payload = converter.to_payload(value)
+    assert payload
+    converted = converter.from_payload(payload, DataClassWithNonInitFields)
+    assert converted == value
+    assert converted.computed == "FOO"
+    assert converted.counter == 3
+
+    frozen_value = FrozenDataClassWithNonInitField("foo")
+    object.__setattr__(frozen_value, "counter", 3)
+    payload = converter.to_payload(frozen_value)
+    assert payload
+    frozen_converted = converter.from_payload(payload, FrozenDataClassWithNonInitField)
+    assert frozen_converted == frozen_value
+    assert frozen_converted.counter == 3
+
+
 def test_json_nested_frozenset_round_trip():
     converter = JSONPlainPayloadConverter()
     value = {frozenset({1, 2}), frozenset({3})}

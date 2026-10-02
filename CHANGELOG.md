@@ -59,6 +59,10 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
   context is now detached exactly when its token is still valid in the current
   `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Decoding a dataclass with `field(init=False)` fields no longer raises `TypeError` for an
+  unexpected keyword argument. Those fields are left out of the constructor call and their
+  serialized values are restored afterwards, including on frozen dataclasses.
 ### Security
 
 ## [1.34.0] - 2026-09-30
