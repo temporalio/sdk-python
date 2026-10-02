@@ -151,9 +151,6 @@ class WorkflowIDConflictPolicy(IntEnum):
 class ActivityIDReusePolicy(IntEnum):
     """How already-closed activity IDs are handled on start.
 
-    .. warning::
-       This API is experimental.
-
     See :py:class:`temporalio.api.enums.v1.ActivityIdReusePolicy`.
     """
 
@@ -173,9 +170,6 @@ class ActivityIDReusePolicy(IntEnum):
 
 class ActivityIDConflictPolicy(IntEnum):
     """How already-running activity IDs are handled on start.
-
-    .. warning::
-       This API is experimental.
 
     See :py:class:`temporalio.api.enums.v1.ActivityIdConflictPolicy`.
     """

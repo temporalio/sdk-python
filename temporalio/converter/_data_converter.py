@@ -73,7 +73,9 @@ class DataConverter(WithSerializationContext):
     """Class to instantiate for failure conversion."""
 
     payload_converter: PayloadConverter = dataclasses.field(init=False)
-    """Payload converter created from the :py:attr:`payload_converter_class`."""
+    """Payload converter created from :py:attr:`payload_converter_class` and wrapped
+    with SDK transfer type conversion, including when called directly.
+    """
 
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""

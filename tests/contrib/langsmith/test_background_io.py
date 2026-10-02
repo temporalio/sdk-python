@@ -235,7 +235,9 @@ class TestExecutorBackedPostPatch:
         tree.patch()
 
         executor.shutdown(wait=True)
-        mock_run.patch.assert_called_once()
+        # No argument means "LangSmith's default": forwarded as None, never
+        # resolved to a bool here (0.11 reads LANGSMITH_EXCLUDE_INPUTS_ON_PATCH).
+        mock_run.patch.assert_called_once_with(exclude_inputs=None)
 
     @patch(_PATCH_IN_WORKFLOW, return_value=False)
     def test_post_delegates_directly_outside_workflow(self, _mock_in_wf: Any) -> None:
@@ -258,6 +260,19 @@ class TestExecutorBackedPostPatch:
         tree.patch(exclude_inputs=True)
 
         mock_run.patch.assert_called_once_with(exclude_inputs=True)
+
+    @patch(_PATCH_IN_WORKFLOW, return_value=False)
+    def test_patch_forwards_langsmith_default_outside_workflow(
+        self, _mock_in_wf: Any
+    ) -> None:
+        """No argument is forwarded as None so LangSmith's own default applies."""
+        executor = _make_executor()
+        mock_run = _make_mock_run()
+        tree = _ReplaySafeRunTree(mock_run, executor=executor)
+
+        tree.patch()
+
+        mock_run.patch.assert_called_once_with(exclude_inputs=None)
 
     @patch(_PATCH_IS_REPLAYING, return_value=False)
     @patch(_PATCH_IN_WORKFLOW, return_value=True)

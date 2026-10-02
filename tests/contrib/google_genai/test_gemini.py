@@ -743,6 +743,16 @@ class FileDownloadWorkflow:
 
 
 @workflow.defn
+class FileDownloadToPathWorkflow:
+    """Workflow that downloads a file to a path on the activity worker."""
+
+    @workflow.run
+    async def run(self, file_name: str, destination: str) -> None:
+        client = TemporalAsyncClient()
+        await client.files.download(file=file_name, destination=destination)
+
+
+@workflow.defn
 class FileSearchStoreUploadWorkflow:
     """Workflow that uploads to a file search store."""
 
@@ -1240,6 +1250,24 @@ async def test_file_download(client: Client):
     assert len(api_tracker.file_download_requests) == 1
     assert api_tracker.file_download_requests[0].file == "files/some-file"
     assert result == b"fake file content"
+
+
+async def test_file_download_to_path(client: Client):
+    """Download destinations are passed to the activity worker."""
+    new_client, api_tracker = apply_plugin(client, [])
+
+    async with new_worker(new_client, FileDownloadToPathWorkflow) as worker:
+        await new_client.execute_workflow(
+            FileDownloadToPathWorkflow.run,
+            args=["files/some-file", "/tmp/downloaded-file"],
+            id=f"gemini-file-download-to-path-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+    assert len(api_tracker.file_download_requests) == 1
+    request = api_tracker.file_download_requests[0]
+    assert request.file == "files/some-file"
+    assert request.destination == "/tmp/downloaded-file"
 
 
 # ===========================================================================

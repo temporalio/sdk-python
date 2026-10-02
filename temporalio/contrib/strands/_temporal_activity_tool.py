@@ -9,7 +9,7 @@ from strands.types._events import ToolInterruptEvent, ToolResultEvent
 from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, ToolUse
 
 from temporalio import activity, workflow
-from temporalio.exceptions import ActivityError, ApplicationError
+from temporalio.exceptions import ActivityError, ApplicationError, FailureError
 
 from ._failure_converter import STRANDS_INTERRUPT_TYPE
 
@@ -76,7 +76,8 @@ class TemporalActivityTool(AgentTool):
             ):
                 yield ToolInterruptEvent(tool_use, [Interrupt(**cause.details[0])])
                 return
-            raise
+            yield _activity_error_event(tool_use["toolUseId"], e)
+            return
         yield ToolResultEvent(
             ToolResult(
                 toolUseId=tool_use["toolUseId"],
@@ -84,6 +85,23 @@ class TemporalActivityTool(AgentTool):
                 content=[{"text": _to_text(result)}],
             )
         )
+
+
+def _activity_error_event(tool_use_id: str, error: ActivityError) -> ToolResultEvent:
+    # ActivityError reports a generic message; its cause holds the activity's failure.
+    cause = error.__cause__
+    exception = cause if isinstance(cause, Exception) else error
+    message = (
+        exception.message if isinstance(exception, FailureError) else str(exception)
+    )
+    return ToolResultEvent(
+        ToolResult(
+            toolUseId=tool_use_id,
+            status="error",
+            content=[{"text": message}],
+        ),
+        exception=exception,
+    )
 
 
 def _to_text(result: Any) -> str:

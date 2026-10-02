@@ -16,6 +16,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Generic,
+    TypeVar,
 )
 
 from typing_extensions import Self
@@ -48,8 +49,11 @@ from ._interceptor import (
     DescribeActivityInput,
     FailAsyncActivityInput,
     HeartbeatAsyncActivityInput,
+    PauseActivityInput,
     ReportCancellationAsyncActivityInput,
     TerminateActivityInput,
+    UnpauseActivityInput,
+    UpdateActivityOptionsInput,
 )
 
 if TYPE_CHECKING:
@@ -61,9 +65,6 @@ class ActivityExecutionAsyncIterator:
     """Asynchronous iterator for activity execution values.
 
     You should typically use ``async for`` on this iterator and not call any of its methods.
-
-    .. warning::
-       This API is experimental.
     """
 
     def __init__(
@@ -164,11 +165,7 @@ class ActivityExecutionAsyncIterator:
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecution:
-    """Info for an activity execution not started by a workflow, from list response.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Info for an activity execution not started by a workflow, from list response."""
 
     activity_id: str
     """Activity ID."""
@@ -261,11 +258,7 @@ class ActivityExecution:
 
 @dataclass(frozen=True, eq=False, kw_only=True)
 class ActivityExecutionDescription(ActivityExecution):
-    """Detailed information about an activity execution not started by a workflow.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Detailed information about an activity execution not started by a workflow."""
 
     attempt: int
     """Current attempt number."""
@@ -559,9 +552,6 @@ class ActivityExecutionDescription(ActivityExecution):
 class ActivityExecutionStatus(IntEnum):
     """Status of an activity execution.
 
-    .. warning::
-       This API is experimental.
-
     See :py:class:`temporalio.api.enums.v1.ActivityExecutionStatus`.
     """
 
@@ -586,13 +576,13 @@ class ActivityExecutionStatus(IntEnum):
     TIMED_OUT = int(
         temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_TIMED_OUT
     )
+    PAUSED = int(
+        temporalio.api.enums.v1.ActivityExecutionStatus.ACTIVITY_EXECUTION_STATUS_PAUSED
+    )
 
 
 class PendingActivityState(IntEnum):
     """Detailed state of an activity execution that is in ACTIVITY_EXECUTION_STATUS_RUNNING.
-
-    .. warning::
-       This API is experimental.
 
     See :py:class:`temporalio.api.enums.v1.PendingActivityState`.
     """
@@ -617,13 +607,165 @@ class PendingActivityState(IntEnum):
     )
 
 
+ActivityOptionValueType = TypeVar("ActivityOptionValueType")
+
+
 @dataclass(frozen=True)
-class ActivityExecutionCount:
-    """Representation of a count from a count activities call.
+class ActivityOptionsKey(Generic[ActivityOptionValueType]):
+    """Typed key for one updatable activity option.
+
+    Use the keys on :py:class:`ActivityOptionsKeys` rather than constructing
+    these directly.
 
     .. warning::
        This API is experimental.
     """
+
+    name: str
+    """Field-mask path this key updates."""
+
+    def value_set(
+        self, value: ActivityOptionValueType
+    ) -> ActivityOptionsUpdate[ActivityOptionValueType]:
+        """Create an update that sets this option to the given value."""
+        return ActivityOptionsUpdate(self, value)
+
+    def value_unset(self) -> ActivityOptionsUpdate[ActivityOptionValueType]:
+        """Create an update that clears this option server-side."""
+        return ActivityOptionsUpdate(self, None)
+
+
+@dataclass(frozen=True)
+class ActivityOptionsUpdate(Generic[ActivityOptionValueType]):
+    """A single change to an activity's options.
+
+    An option not represented by any update in the call is left untouched; an
+    update carrying None clears the option.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    key: ActivityOptionsKey[ActivityOptionValueType]
+    """Option being changed."""
+
+    value: ActivityOptionValueType | None
+    """Value being set, or None to clear the option."""
+
+
+class ActivityOptionsKeys:
+    """The activity options that :py:meth:`ActivityHandle.update_options` can change.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    task_queue: ActivityOptionsKey[str] = ActivityOptionsKey("task_queue.name")
+    schedule_to_close_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "schedule_to_close_timeout"
+    )
+    schedule_to_start_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "schedule_to_start_timeout"
+    )
+    start_to_close_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "start_to_close_timeout"
+    )
+    heartbeat_timeout: ActivityOptionsKey[timedelta] = ActivityOptionsKey(
+        "heartbeat_timeout"
+    )
+    start_delay: ActivityOptionsKey[timedelta] = ActivityOptionsKey("start_delay")
+    retry_policy: ActivityOptionsKey[temporalio.common.RetryPolicy] = (
+        ActivityOptionsKey("retry_policy")
+    )
+    priority: ActivityOptionsKey[temporalio.common.Priority] = ActivityOptionsKey(
+        "priority"
+    )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionOptions:
+    """An activity's options as resolved by the server.
+
+    Returned by :py:meth:`ActivityHandle.update_options` and
+    :py:meth:`ActivityHandle.restore_original_options`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    task_queue: str | None
+    """Task queue the activity is scheduled on."""
+
+    schedule_to_close_timeout: timedelta | None
+    """Total time the caller is willing to wait, including retries."""
+
+    schedule_to_start_timeout: timedelta | None
+    """Maximum time the activity may wait to be picked up by a worker."""
+
+    start_to_close_timeout: timedelta | None
+    """Maximum time for a single attempt."""
+
+    heartbeat_timeout: timedelta | None
+    """Maximum allowed time between heartbeats."""
+
+    start_delay: timedelta | None
+    """Delay before the first attempt is made available for dispatch."""
+
+    retry_policy: temporalio.common.RetryPolicy | None
+    """Retry policy in effect for the activity."""
+
+    priority: temporalio.common.Priority | None
+    """Priority of the activity."""
+
+    @staticmethod
+    def _from_proto(
+        options: temporalio.api.activity.v1.ActivityOptions,
+    ) -> ActivityExecutionOptions:
+        return ActivityExecutionOptions(
+            task_queue=options.task_queue.name
+            if options.HasField("task_queue")
+            else None,
+            schedule_to_close_timeout=(
+                options.schedule_to_close_timeout.ToTimedelta()
+                if options.HasField("schedule_to_close_timeout")
+                else None
+            ),
+            schedule_to_start_timeout=(
+                options.schedule_to_start_timeout.ToTimedelta()
+                if options.HasField("schedule_to_start_timeout")
+                else None
+            ),
+            start_to_close_timeout=(
+                options.start_to_close_timeout.ToTimedelta()
+                if options.HasField("start_to_close_timeout")
+                else None
+            ),
+            heartbeat_timeout=(
+                options.heartbeat_timeout.ToTimedelta()
+                if options.HasField("heartbeat_timeout")
+                else None
+            ),
+            start_delay=(
+                options.start_delay.ToTimedelta()
+                if options.HasField("start_delay")
+                else None
+            ),
+            retry_policy=(
+                temporalio.common.RetryPolicy.from_proto(options.retry_policy)
+                if options.HasField("retry_policy")
+                else None
+            ),
+            priority=(
+                temporalio.common.Priority._from_proto(options.priority)
+                if options.HasField("priority")
+                else None
+            ),
+        )
+
+
+@dataclass(frozen=True)
+class ActivityExecutionCount:
+    """Representation of a count from a count activities call."""
 
     count: int
     """Total count matching the filter, if any."""
@@ -646,11 +788,7 @@ class ActivityExecutionCount:
 
 @dataclass(frozen=True)
 class ActivityExecutionCountAggregationGroup:
-    """A single aggregation group from a count activities call.
-
-    .. warning::
-       This API is experimental.
-    """
+    """A single aggregation group from a count activities call."""
 
     count: int
     """Count for this group."""
@@ -822,11 +960,7 @@ class AsyncActivityHandle(WithSerializationContext):
 
 
 class ActivityHandle(Generic[ReturnType]):
-    """Handle representing an activity execution not started by a workflow.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Handle representing an activity execution not started by a workflow."""
 
     def __init__(
         self,
@@ -876,9 +1010,6 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> ReturnType:
         """Wait for result of the activity.
-
-        .. warning::
-           This API is experimental.
 
         The result may already be known if this method has been called before,
         in which case no network call is made. Otherwise the result will be
@@ -970,9 +1101,6 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Request cancellation of the activity.
 
-        .. warning::
-           This API is experimental.
-
         Requesting cancellation of an activity does not automatically transition the activity to
         canceled status. If the activity is heartbeating, a :py:class:`exceptions.CancelledError`
         exception will be raised when receiving the heartbeat response; if the activity allows this
@@ -1003,9 +1131,6 @@ class ActivityHandle(Generic[ReturnType]):
     ) -> None:
         """Terminate the activity execution immediately.
 
-        .. warning::
-           This API is experimental.
-
         Termination does not reach the worker and the activity code cannot react to it.
         A terminated activity may have a running attempt and will be requested to be
         canceled by the server when it heartbeats.
@@ -1025,6 +1150,154 @@ class ActivityHandle(Generic[ReturnType]):
             )
         )
 
+    async def pause(
+        self,
+        *,
+        reason: str | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Pause the activity.
+
+        A paused activity is not scheduled or retried until it is unpaused via
+        :py:meth:`unpause`.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            reason: Reason for pausing. Recorded and available via describe.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.pause_activity(
+            PauseActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def unpause(
+        self,
+        *,
+        reason: str | None = None,
+        jitter: timedelta | None = None,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> None:
+        """Unpause the activity, allowing it to be scheduled or retried again.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            reason: Reason for unpausing. Recorded on the server.
+            jitter: If set, the activity starts at a random time within this
+                duration rather than immediately.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+        """
+        await self._client._impl.unpause_activity(
+            UnpauseActivityInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                reason=reason,
+                jitter=jitter,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def update_options(
+        self,
+        updates: Sequence[ActivityOptionsUpdate[Any]],
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionOptions:
+        """Update the activity's options.
+
+        Only the options named by ``updates`` are changed; anything not named is
+        left as-is. An update created with
+        :py:meth:`ActivityOptionsKey.value_unset` clears that option.
+
+        Each option may be named at most once; naming the same option twice
+        raises :py:class:`ValueError`.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            updates: Options to change, built from :py:class:`ActivityOptionsKeys`.
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            The activity options as resolved by the server after the update.
+
+        Raises:
+            ValueError: If ``updates`` is empty or names the same option twice.
+        """
+        if not updates:
+            raise ValueError(
+                "update_options requires at least one update; use "
+                "restore_original_options() to revert options"
+            )
+        seen: set[str] = set()
+        for update in updates:
+            name = update.key.name
+            if name in seen:
+                raise ValueError(
+                    f"update_options received more than one update for {name}"
+                )
+            seen.add(name)
+        return await self._client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                updates=updates,
+                restore_original=False,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
+    async def restore_original_options(
+        self,
+        *,
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> ActivityExecutionOptions:
+        """Restore the activity's options to the ones it was created with.
+
+        This is a separate call rather than an option on
+        :py:meth:`update_options` because the server rejects a request that
+        combines the restore flag with any other option.
+
+        .. warning::
+           This API is experimental.
+
+        Args:
+            rpc_metadata: Headers used on the RPC call.
+            rpc_timeout: Optional RPC deadline to set for the RPC call.
+
+        Returns:
+            The activity options as resolved by the server after the restore.
+        """
+        return await self._client._impl.update_activity_options(
+            UpdateActivityOptionsInput(
+                activity_id=self._id,
+                activity_run_id=self._run_id,
+                updates=[],
+                restore_original=True,
+                rpc_metadata=rpc_metadata,
+                rpc_timeout=rpc_timeout,
+            )
+        )
+
     async def describe(
         self,
         *,
@@ -1036,9 +1309,6 @@ class ActivityHandle(Generic[ReturnType]):
         rpc_timeout: timedelta | None = None,
     ) -> ActivityExecutionDescription:
         """Describe the activity execution.
-
-        .. warning::
-           This API is experimental.
 
         Args:
             include_input: Include activity input in the response if available.

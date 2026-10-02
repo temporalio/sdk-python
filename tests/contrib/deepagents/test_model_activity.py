@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import sys
 import uuid
+from collections.abc import Sequence
 from datetime import timedelta
+from typing import Any
 
 import pytest
 
@@ -28,9 +30,48 @@ with workflow.unsafe.imports_passed_through():
     from langchain_core.messages import HumanMessage
 
     from temporalio.contrib.deepagents import DeepAgentsPlugin, TemporalModel
-    from temporalio.contrib.deepagents.testing import mock_model_provider
+    from temporalio.contrib.deepagents._activity import (
+        DeepAgentActivities,
+        ModelActivityInput,
+    )
+    from temporalio.contrib.deepagents.testing import FakeModel, mock_model_provider
 
 INVOKE_MODEL = "deepagents.invoke_model"
+
+
+class _ToolBindingModel(FakeModel):
+    def bind_tools(self, tools: Sequence[Any], **kwargs: Any) -> Any:
+        return self.bind(tools=tools, **kwargs)
+
+
+@pytest.mark.parametrize(
+    "bind_kwargs",
+    [
+        {"response_format": {"type": "json_schema", "json_schema": {"name": "Answer"}}},
+        {"tool_choice": "any"},
+    ],
+)
+def test_model_binding_preserves_kwargs_with_tools(bind_kwargs: dict[str, Any]) -> None:
+    tool_schemas = [
+        {
+            "type": "function",
+            "function": {"name": "lookup", "parameters": {"type": "object"}},
+        }
+    ]
+    activities = DeepAgentActivities(
+        model_provider=lambda _: _ToolBindingModel(responses=["answer"])
+    )
+
+    bound = activities._build_bound_model(
+        ModelActivityInput(
+            model_name="fake:model",
+            messages=[],
+            tool_schemas=tool_schemas,
+            bind_kwargs=bind_kwargs,
+        )
+    )
+
+    assert bound.kwargs == {"tools": tool_schemas, **bind_kwargs}
 
 
 @workflow.defn
@@ -101,3 +142,62 @@ async def test_temporal_model_explicit(env: WorkflowEnvironment) -> None:
     assert out == "Bonjour."
     counts = await count_scheduled_activities(handle)
     assert counts[INVOKE_MODEL] == 1, counts
+
+
+class _ResampleAgent:
+    """ainvoke-shaped driver: the SAME prompt sent twice through a
+    TemporalModel — deliberate resampling — under run_deep_agent so the
+    continue-as-new result cache is active."""
+
+    def __init__(self) -> None:
+        self.model = TemporalModel(model="fake:model")
+
+    async def ainvoke(self, _input: Any) -> dict:
+        first = await self.model.ainvoke([HumanMessage(content="same prompt")])
+        second = await self.model.ainvoke([HumanMessage(content="same prompt")])
+        return {
+            "messages": [f"{first.content}|{second.content}"],
+            "todos": [],
+        }
+
+
+@workflow.defn
+class ResampleWorkflow:
+    @workflow.run
+    async def run(self, input: dict, state_snapshot: dict | None = None) -> str:
+        from temporalio.contrib.deepagents import run_deep_agent
+
+        result = await run_deep_agent(
+            _ResampleAgent(), input, state_snapshot=state_snapshot
+        )
+        return str(result["messages"][-1])
+
+
+@pytest.mark.asyncio
+async def test_repeated_identical_model_call_resamples(
+    env: WorkflowEnvironment,
+) -> None:
+    """Two identical live model calls each run their own Activity and can
+    return different responses (deliberate resampling) — under the active
+    CAN cache, the old input-only key served the FIRST response twice."""
+    plugin = DeepAgentsPlugin(
+        model_provider=mock_model_provider(["first answer", "second answer"]),
+    )
+    async with Worker(
+        env.client,
+        task_queue="da-model-resample",
+        workflows=[ResampleWorkflow],
+        plugins=[plugin],
+        max_cached_workflows=0,
+    ):
+        handle = await env.client.start_workflow(
+            ResampleWorkflow.run,
+            {"messages": []},
+            id=f"da-model-resample-{uuid.uuid4()}",
+            task_queue="da-model-resample",
+        )
+        out = await handle.result()
+
+    assert out == "first answer|second answer", out
+    counts = await count_scheduled_activities(handle)
+    assert counts["deepagents.invoke_model"] == 2, counts
