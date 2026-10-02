@@ -899,7 +899,10 @@ def new_random(name: str | None = None) -> Random:
     """
 
     def seed_for(workflow_seed: int) -> int | str:
-        return workflow_seed if name is None else f"{workflow_seed}:{name}"
+        if name is None:
+            # Unchanged: the same integer seed as :py:func:`random`.
+            return workflow_seed
+        return f"{workflow_seed}:{name}"
 
     auto_random = Random(seed_for(random_seed()))
 
