@@ -37,11 +37,20 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
 
 ### Fixed
 
 - `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
   ending the subscription normally.
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
+  when calling the model. The schema type is now sent to the model activity as its JSON schema.
+  Custom Pydantic schema generation is preserved.
+  Integer-valued output enums are normalized to strings to match Google GenAI.
+
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
