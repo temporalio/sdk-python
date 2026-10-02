@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import argparse
 import ast
-import dataclasses
-import difflib
 import pathlib
 import re
 import subprocess
+import sys
 from collections.abc import Sequence
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
+from scripts.changelog import run_tool
 
 try:
     import tomllib
@@ -122,239 +124,31 @@ def _git(args: Sequence[str], *, cwd: pathlib.Path | None = None) -> str:
     ).strip()
 
 
-def _version_tuple(version: str) -> tuple[int, ...] | None:
-    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)+)(?:[a-zA-Z0-9_.+-]+)?", version)
-    if not match:
-        return None
-    return tuple(int(part) for part in match.group(1).split("."))
-
-
-def _previous_release_tag(version: str) -> str:
-    current = _version_tuple(version)
-    if current is None:
-        raise RuntimeError(f"Cannot determine previous release for {version!r}")
-
-    candidates: list[tuple[int, ...]] = []
-    for tag in _git(["tag"]).splitlines():
-        tag_version = _version_tuple(tag)
-        if tag_version is not None and tag_version < current:
-            candidates.append(tag_version)
-    if not candidates:
-        raise RuntimeError(f"Could not find a previous release tag before {version!r}")
-    return ".".join(str(part) for part in max(candidates))
-
-
-def _gitlink(rev: str, path: str) -> str:
-    output = _git(["ls-tree", rev, path])
-    parts = output.split()
-    if len(parts) < 3 or parts[0] != "160000":
-        raise RuntimeError(f"Could not find submodule gitlink {path!r} at {rev!r}")
-    return parts[2]
-
-
-def _clean_commit_subject(subject: str) -> str:
-    subject = subject.encode("ascii", "ignore").decode("ascii")
-    subject = re.sub(r"\s+", " ", subject).strip()
-    subject = re.sub(r"^:[a-z0-9_+-]+:\s*", "", subject)
-    return subject.replace(" : ", ": ")
-
-
-def _link_sdk_core_prs(subject: str) -> str:
-    return re.sub(
-        r"\(#([0-9]+)\)",
-        r"([#\1](https://github.com/temporalio/sdk-rust/pull/\1))",
-        subject,
-    )
-
-
-def _changelog_entries(text: str) -> dict[str, list[list[str]]]:
-    entries: dict[str, list[list[str]]] = {}
-    header: str | None = None
-    entry: list[str] | None = None
-
-    for line in text.splitlines():
-        if line.startswith("### "):
-            if entry is not None:
-                entries.setdefault(header or "Other", []).append(entry)
-                entry = None
-            header = line.removeprefix("### ").strip()
-        elif line.startswith(("* ", "- ")):
-            if entry is not None:
-                entries.setdefault(header or "Other", []).append(entry)
-            entry = [line]
-        elif entry is not None:
-            if line.strip():
-                entry.append(line)
-            else:
-                entries.setdefault(header or "Other", []).append(entry)
-                entry = None
-
-    if entry is not None:
-        entries.setdefault(header or "Other", []).append(entry)
-    return entries
-
-
-@dataclasses.dataclass
-class _ChangelogEntry:
-    lines: list[str]
-    introduced_header: str | None = None
-
-
-def _updated_changelog_entries(
-    previous_entries: dict[str, list[_ChangelogEntry]],
-    current_entries: dict[str, list[list[str]]],
-) -> dict[str, list[_ChangelogEntry]]:
-    current = [
-        (header, entry)
-        for header, header_entries in current_entries.items()
-        for entry in header_entries
-    ]
-    previous = [
-        entry
-        for category_entries in previous_entries.values()
-        for entry in category_entries
-    ]
-    exact_matches: dict[tuple[str, ...], list[_ChangelogEntry]] = {}
-    for entry in previous:
-        exact_matches.setdefault(tuple(entry.lines), []).append(entry)
-
-    matches: dict[int, _ChangelogEntry] = {}
-    matched_previous: set[int] = set()
-    for current_index, (_, entry) in enumerate(current):
-        exact = exact_matches.get(tuple(entry))
-        if exact:
-            previous_entry = exact.pop(0)
-            matches[current_index] = previous_entry
-            matched_previous.add(id(previous_entry))
-
-    candidates: list[tuple[float, int, _ChangelogEntry]] = []
-    for current_index, (_, current_entry) in enumerate(current):
-        if current_index in matches:
-            continue
-        for previous_entry in previous:
-            if id(previous_entry) in matched_previous:
-                continue
-            similarity = difflib.SequenceMatcher(
-                a="\n".join(previous_entry.lines),
-                b="\n".join(current_entry),
-                autojunk=False,
-            ).ratio()
-            if similarity >= 0.6:
-                candidates.append((similarity, current_index, previous_entry))
-    for _, current_index, previous_entry in sorted(
-        candidates, key=lambda candidate: candidate[0], reverse=True
-    ):
-        if current_index not in matches and id(previous_entry) not in matched_previous:
-            matches[current_index] = previous_entry
-            matched_previous.add(id(previous_entry))
-
-    updated: dict[str, list[_ChangelogEntry]] = {}
-    for current_index, (header, entry) in enumerate(current):
-        previous_entry = matches.get(current_index)
-        updated.setdefault(header, []).append(
-            _ChangelogEntry(
-                entry,
-                previous_entry.introduced_header if previous_entry else header,
-            )
-        )
-    return updated
-
-
-def _sdk_core_changelog_entries(
-    previous_commit: str,
-    current_commit: str,
-    path: pathlib.Path,
-) -> list[str]:
-    output = subprocess.check_output(
-        [
-            "cargo",
-            "run",
-            "--quiet",
-            "-p",
-            "changelog-release-notes",
-            "--",
-            "--from",
-            previous_commit,
-            "--to",
-            current_commit,
-        ],
-        cwd=path,
-        encoding="utf-8",
-        stderr=subprocess.STDOUT,
-    ).strip()
-    return output.splitlines() if output else []
-
-
 def _sdk_core_release_notes(version: str, path: str) -> list[str]:
-    previous_tag = _previous_release_tag(version)
-    previous_commit = _gitlink(previous_tag, path)
-    current_commit = _gitlink("HEAD", path)
-    if previous_commit == current_commit:
-        return []
-
-    submodule_path = pathlib.Path(path)
-    if not (submodule_path / ".git").exists():
-        raise RuntimeError(
-            f"Submodule {path!r} is not initialized; checkout with submodules"
-        )
-
-    try:
-        notes = _sdk_core_changelog_entries(
-            previous_commit,
-            current_commit,
-            submodule_path,
-        )
-    except subprocess.CalledProcessError:
-        _git(["fetch", "--quiet", "origin", "main"], cwd=submodule_path)
-        try:
-            notes = _sdk_core_changelog_entries(
-                previous_commit,
-                current_commit,
-                submodule_path,
-            )
-        except subprocess.CalledProcessError as error:
-            output = error.output.strip() if error.output else str(error)
-            raise RuntimeError(
-                "SDK Core changelog-release-notes failed after fetching origin/main:\n"
-                f"{output}"
-            ) from error
-    if not notes:
-        return []
-
-    return ["### SDK Core", "", *notes]
+    notes = run_tool(
+        pathlib.Path.cwd(),
+        [
+            "core-notes",
+            "--version",
+            version,
+            "--submodule",
+            path,
+        ],
+    ).strip("\n")
+    return ["### SDK Core", "", *notes.splitlines()] if notes else []
 
 
 def changelog_notes(args: argparse.Namespace) -> None:
-    changelog_path = pathlib.Path(args.changelog)
-    lines = changelog_path.read_text(encoding="utf-8").splitlines()
-    heading = re.compile(r"^## \[(?P<version>[^\]]+)\](?:\s+-\s+.*)?\s*$")
-
-    start = None
-    for index, line in enumerate(lines):
-        match = heading.match(line)
-        if match and match.group("version") == args.version:
-            start = index + 1
-            break
-
-    if start is None:
-        raise RuntimeError(
-            f"Could not find changelog section for version {args.version!r}"
-        )
-
-    end = len(lines)
-    for index in range(start, len(lines)):
-        if lines[index].startswith("## "):
-            end = index
-            break
-
-    section_lines = lines[start:end]
-    while section_lines and not section_lines[0].strip():
-        section_lines.pop(0)
-    while section_lines and not section_lines[-1].strip():
-        section_lines.pop()
-
-    if not section_lines:
-        raise RuntimeError(f"Changelog section for {args.version!r} is empty")
+    section_lines = run_tool(
+        pathlib.Path.cwd(),
+        [
+            "notes",
+            "--version",
+            args.version,
+            "--changelog",
+            args.changelog,
+        ],
+    ).splitlines()
 
     note_lines = ["## Notable Changes", "", *section_lines]
     sdk_core_notes = _sdk_core_release_notes(args.version, args.sdk_core_path)
