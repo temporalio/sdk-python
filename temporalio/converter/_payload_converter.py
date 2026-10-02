@@ -992,6 +992,7 @@ def value_to_type(
         fields = dataclasses.fields(hint)
         field_hints = get_type_hints(hint)
         field_values = {}
+        non_init_field_values = {}
         for field in fields:
             field_value = value.get(field.name, dataclasses.MISSING)
             # We do not check whether field is required here. Rather, we let the
@@ -999,17 +1000,27 @@ def value_to_type(
             # missing
             if field_value is not dataclasses.MISSING:
                 try:
-                    field_values[field.name] = value_to_type(
+                    converted = value_to_type(
                         field_hints[field.name], field_value, custom_converters
                     )
                 except Exception as err:
                     raise TypeError(
                         f"Failed converting field {field.name} on dataclass {hint}"
                     ) from err
+                if field.init:
+                    field_values[field.name] = converted
+                else:
+                    non_init_field_values[field.name] = converted
         # Simply instantiate the dataclass. This will fail as expected when
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
-        return hint(**field_values)
+        obj = hint(**field_values)
+        # Fields with init=False can't be passed to __init__, but they are
+        # serialized, so restore them afterwards. object.__setattr__ is used
+        # because the dataclass may be frozen.
+        for name, field_value in non_init_field_values.items():
+            object.__setattr__(obj, name, field_value)
+        return obj
 
     # Pydantic model instance
     # Pydantic users should use Pydantic v2 with
