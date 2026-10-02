@@ -31,8 +31,8 @@ to include examples, links to docs, or any other relevant information.
 ### :boom: Breaking Changes
 
 - `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
-  workflow-private deterministic stream (a `workflow.new_random()` cached on the workflow
-  instance) instead of `workflow.random()`. A workflow started under 1.34.0 that generated
+  workflow-private deterministic stream (a `workflow.new_random()` per run) instead of
+  `workflow.random()`. A workflow started under 1.34.0 that generated
   ADK ids or jitter (for example one waiting on a HITL response) may not replay
   deterministically across this upgrade; drain such workflows or use worker versioning.
 - The OpenAI Agents integration has moved to the independently versioned
@@ -42,12 +42,17 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
 
 ### Fixed
 
 - `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
   update validators), returning the workflow's deterministic time and fresh entropy without
   touching the workflow's random state.
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
+  when calling the model. The schema type is now sent to the model activity as its JSON schema.
+  Custom Pydantic schema generation is preserved.
+  Integer-valued output enums are normalized to strings to match Google GenAI.
 
 - `temporalio.contrib.strands` activity and MCP tools now give the model the
   Activity's failure message and expose its exception to after-tool hooks.
