@@ -41,6 +41,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Fixed Pydantic constraints being silently ignored inside or outside workflow
+  sandboxes by passing through `annotated_types` by default.
+
 - `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
   when calling the model. The schema type is now sent to the model activity as its JSON schema.
   Custom Pydantic schema generation is preserved.
