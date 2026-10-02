@@ -5,6 +5,7 @@ import re
 import urllib.parse
 from dataclasses import dataclass
 from enum import Enum
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -35,39 +36,34 @@ class _LinkPath:
     """The URL path shape for one link type.
 
     Every link path is /namespaces/{namespace}/{keyword}/{id}/{run_id} with an optional trailing
-    segment, so a link type is fully described by which keyword names it, what follows the run ID,
-    and which proto field holds the ID.
+    segment, so a link type is fully described by which keyword names it and what follows the
+    run ID.
     """
 
     keyword: str
     tail: str | None
-    id_field: str
     # A standalone Nexus operation need not have a run ID, so its path may carry an empty segment
     # there. The other link types always address a specific run.
     run_id_required: bool = True
 
+    @cached_property
+    def regex(self) -> re.Pattern[str]:
+        """The pattern matching a URL path of this shape."""
+        run_id = "[^/]+" if self.run_id_required else "[^/]*"
+        tail = f"/{self.tail}" if self.tail else ""
+        return re.compile(
+            rf"^/namespaces/(?P<namespace>[^/]+)/{self.keyword}"
+            rf"/(?P<id>[^/]+)/(?P<run_id>{run_id}){tail}$"
+        )
+
 
 _LINK_PATHS: dict[_LinkType, _LinkPath] = {
-    _LinkType.WORKFLOW_EVENT: _LinkPath("workflows", "history", "workflow_id"),
-    _LinkType.WORKFLOW: _LinkPath("workflows", None, "workflow_id"),
+    _LinkType.WORKFLOW_EVENT: _LinkPath("workflows", "history"),
+    _LinkType.WORKFLOW: _LinkPath("workflows", None),
     _LinkType.NEXUS_OPERATION: _LinkPath(
-        "nexus-operations", "details", "operation_id", run_id_required=False
+        "nexus-operations", "details", run_id_required=False
     ),
-    _LinkType.ACTIVITY: _LinkPath("activities", "details", "activity_id"),
-}
-
-
-def _link_path_regex(path: _LinkPath) -> re.Pattern[str]:
-    run_id = "[^/]+" if path.run_id_required else "[^/]*"
-    tail = f"/{path.tail}" if path.tail else ""
-    return re.compile(
-        rf"^/namespaces/(?P<namespace>[^/]+)/{path.keyword}"
-        rf"/(?P<id>[^/]+)/(?P<run_id>{run_id}){tail}$"
-    )
-
-
-_LINK_PATH_REGEXES: dict[_LinkType, re.Pattern[str]] = {
-    link_type: _link_path_regex(path) for link_type, path in _LINK_PATHS.items()
+    _LinkType.ACTIVITY: _LinkPath("activities", "details"),
 }
 
 
@@ -277,10 +273,16 @@ def _temporal_nexus_url(path: str, *, query_params: str | None = "") -> str:
     return f"temporal://{urllib.parse.urlunparse(('', '', path, '', query_params or '', ''))}"
 
 
-def _parse_link_url(
-    link: nexusrpc.Link, link_type: _LinkType
-) -> tuple[str, str, str, dict[str, list[str]]] | None:
-    """Return (namespace, id, run_id, query params), or None if the URL is not a link of this type.
+@dataclass(frozen=True)
+class _ParsedLinkUrl:
+    namespace: str
+    id: str
+    run_id: str
+    query_params: dict[str, list[str]]
+
+
+def _parse_link_url(link: nexusrpc.Link, link_type: _LinkType) -> _ParsedLinkUrl | None:
+    """Return the parts of a link URL, or None if the URL is not a link of this type.
 
     The path is matched exactly, so the workflow and workflow-event shapes -- which differ only by
     the trailing /history -- cannot be mistaken for one another.
@@ -291,18 +293,18 @@ def _parse_link_url(
             f"Invalid Nexus link: {link}. Expected scheme {_URL_SCHEME!r}, got {url.scheme!r}"
         )
         return None
-    regex = _LINK_PATH_REGEXES[link_type]
+    regex = _LINK_PATHS[link_type].regex
     match = regex.match(url.path)
     if not match:
         logger.warning(
             f"Invalid Nexus link: {link}. Expected path to match {regex.pattern}"
         )
         return None
-    return (
-        urllib.parse.unquote(match.group("namespace")),
-        urllib.parse.unquote(match.group("id")),
-        urllib.parse.unquote(match.group("run_id")),
-        urllib.parse.parse_qs(url.query),
+    return _ParsedLinkUrl(
+        namespace=urllib.parse.unquote(match.group("namespace")),
+        id=urllib.parse.unquote(match.group("id")),
+        run_id=urllib.parse.unquote(match.group("run_id")),
+        query_params=urllib.parse.parse_qs(url.query),
     )
 
 
@@ -329,7 +331,7 @@ def nexus_link_to_workflow_event_link(
     parsed = _parse_link_url(link, _LinkType.WORKFLOW_EVENT)
     if parsed is None:
         return None
-    namespace, workflow_id, run_id, query_params = parsed
+    query_params = parsed.query_params
     try:
         request_id_ref = None
         event_ref = None
@@ -350,9 +352,9 @@ def nexus_link_to_workflow_event_link(
         return None
 
     workflow_event_link = temporalio.api.common.v1.Link.WorkflowEvent(
-        namespace=namespace,
-        workflow_id=workflow_id,
-        run_id=run_id,
+        namespace=parsed.namespace,
+        workflow_id=parsed.id,
+        run_id=parsed.run_id,
         event_ref=event_ref,
         request_id_ref=request_id_ref,
     )
@@ -366,17 +368,18 @@ def nexus_link_to_workflow_link(
     parsed = _parse_link_url(link, _LinkType.WORKFLOW)
     if parsed is None:
         return None
-    namespace, workflow_id, run_id, query_params = parsed
     try:
-        reason = _optional_single_query_param(query_params, LINK_REASON_PARAM_NAME)
+        reason = _optional_single_query_param(
+            parsed.query_params, LINK_REASON_PARAM_NAME
+        )
     except ValueError as err:
         logger.warning(f"Invalid Nexus link: {link}. {err}")
         return None
 
     workflow_link = temporalio.api.common.v1.Link.Workflow(
-        namespace=namespace,
-        workflow_id=workflow_id,
-        run_id=run_id,
+        namespace=parsed.namespace,
+        workflow_id=parsed.id,
+        run_id=parsed.run_id,
         reason=reason,
     )
     return temporalio.api.common.v1.Link(workflow=workflow_link)
@@ -393,12 +396,11 @@ def nexus_link_to_nexus_operation_link(
     parsed = _parse_link_url(nexus_link, _LinkType.NEXUS_OPERATION)
     if parsed is None:
         return None
-    namespace, operation_id, run_id, _ = parsed
     return temporalio.api.common.v1.Link(
         nexus_operation=temporalio.api.common.v1.Link.NexusOperation(
-            namespace=namespace,
-            operation_id=operation_id,
-            run_id=run_id,
+            namespace=parsed.namespace,
+            operation_id=parsed.id,
+            run_id=parsed.run_id,
         )
     )
 
@@ -410,12 +412,11 @@ def nexus_link_to_activity_link(
     parsed = _parse_link_url(nexus_link, _LinkType.ACTIVITY)
     if parsed is None:
         return None
-    namespace, activity_id, run_id, _ = parsed
     return temporalio.api.common.v1.Link(
         activity=temporalio.api.common.v1.Link.Activity(
-            namespace=namespace,
-            activity_id=activity_id,
-            run_id=run_id,
+            namespace=parsed.namespace,
+            activity_id=parsed.id,
+            run_id=parsed.run_id,
         )
     )
 
