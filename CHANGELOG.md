@@ -41,6 +41,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
+  ending the subscription normally.
 - `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
   when calling the model. The schema type is now sent to the model activity as its JSON schema.
   Custom Pydantic schema generation is preserved.
