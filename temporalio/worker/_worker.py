@@ -35,10 +35,7 @@ from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._tuning import WorkerTuner
-from ._workflow import (
-    _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
-    _WorkflowWorker,
-)
+from ._workflow import _WorkflowWorker
 from ._workflow_instance import (
     PatchActivationInput,
     UnsandboxedWorkflowRunner,
@@ -146,7 +143,6 @@ class Worker:
         activity_task_poller_behavior: PollerBehavior | None = None,
         nexus_task_poller_behavior: PollerBehavior | None = None,
         disable_payload_error_limit: bool = False,
-        max_workflow_task_external_storage_concurrency: int = _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -339,13 +335,6 @@ class Worker:
                 and cause a task failure if the size limit is exceeded. The default is False.
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
-            max_workflow_task_external_storage_concurrency: Maximum number of
-                external storage payload operations (store/retrieve) that may run
-                concurrently within a single workflow task activation.
-                Defaults to 3. Adjust this value based on your workload's needs.
-                Please report any issues you encounter with this setting or if you
-                feel the default should be changed.
-                WARNING: This setting is experimental.
 
         """
         config = WorkerConfig(
@@ -394,7 +383,6 @@ class Worker:
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
-            max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
         )
 
         plugins_from_client = cast(
@@ -454,14 +442,6 @@ class Worker:
         ):
             raise ValueError(
                 "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
-            )
-        max_workflow_task_external_storage_concurrency = config.get(
-            "max_workflow_task_external_storage_concurrency",
-            _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
-        )
-        if max_workflow_task_external_storage_concurrency < 1:
-            raise ValueError(
-                "max_workflow_task_external_storage_concurrency must be positive"
             )
         if config.get("max_eager_activity_reservations_per_workflow_task", 3) < 1:
             raise ValueError(
@@ -577,7 +557,6 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
-                max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
             )
 
         tuner = config.get("tuner")
@@ -1061,7 +1040,6 @@ class WorkerConfig(TypedDict, total=False):
     activity_task_poller_behavior: PollerBehavior | None
     nexus_task_poller_behavior: PollerBehavior | None
     disable_payload_error_limit: bool
-    max_workflow_task_external_storage_concurrency: int
 
 
 def _poller_behavior_to_bridge(
