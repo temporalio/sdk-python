@@ -170,8 +170,7 @@ def prepare_release_files(
     *,
     skip_lock: bool = False,
 ) -> tuple[str, ...]:
-    """Apply a validated release plan and consume fragments after refreshing the lock."""
-    plan = prepare_changelog(repo_root, version, release_date)
+    """Update Python versions and lockfile before preparing the shared changelog."""
     pyproject_path = repo_root / "pyproject.toml"
     service_path = repo_root / "temporalio/service.py"
     pyproject_text = (
@@ -182,15 +181,20 @@ def prepare_release_files(
         replace_service_version(service_path.read_text(encoding="utf-8"), version)
         + "\n"
     )
-    (repo_root / "CHANGELOG.md").write_text(plan.changelog, encoding="utf-8")
     pyproject_path.write_text(pyproject_text, encoding="utf-8")
     service_path.write_text(service_text, encoding="utf-8")
     if not skip_lock:
         subprocess.run(["uv", "lock"], cwd=repo_root, check=True)
-    ensure_only_release_changes(repo_root, plan.consumed_paths)
-    for path in plan.consumed_paths:
-        (repo_root / path).unlink()
-    return plan.consumed_paths
+    ensure_only_release_changes(repo_root)
+    prepare_changelog(repo_root, version, release_date)
+    result = subprocess.run(
+        ["git", "ls-files", "--deleted", "-z", "--", "changelog"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return tuple(path for path in result.stdout.split("\0") if path)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
