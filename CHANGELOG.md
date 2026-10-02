@@ -38,6 +38,8 @@ to include examples, links to docs, or any other relevant information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
 - **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+- `SchedulePolicy.catchup_window` now defaults to `None`. An unspecified window will use the server
+  configured default.
 
 ### Fixed
 
@@ -438,3 +440,4 @@ to include examples, links to docs, or any other relevant information.
   dedicated-loop pattern used with gevent/gunicorn and synchronous services).
   Note this does not make a `Client` fully thread- or loop-agnostic; reusing one
   long-lived loop is still the recommended pattern.
+
