@@ -37,16 +37,19 @@ python scripts/prepare_release.py 1.35.0 --date 2026-10-02
 ```
 
 Run preparation from a clean worktree. The script creates a release branch from
-`origin/main`, asks the shared tool for a release plan, bumps Python versions,
-refreshes `uv.lock`, and commits the assembled changelog and consumed fragment
-deletions. It pushes the branch and opens a PR with the `skip-changelog` label.
+`origin/main`, bumps Python versions and refreshes `uv.lock`, then tells the
+shared tool to write the dated changelog and consume its fragments. It commits
+the resulting version, lockfile, changelog, and fragment-deletion changes. It pushes the branch and opens a PR with the `skip-changelog` label.
 Review the assembled notes before merging the release PR.
 
 Assembly creates a dated section at the top of the changelog, groups notes in the
 category order above, and sorts filenames within each category. Empty categories
 are omitted. Fragment bodies and older releases are preserved. Empty releases and
 duplicate versions are rejected. Fragments are retained if validation or lockfile
-refresh fails; inspect any partial version/changelog changes before retrying.
+refresh fails. A changelog validation failure leaves the version and lockfile
+updates in the local worktree; inspect or restore those changes before retrying.
+File-system errors can leave partial changelog preparation as well; preparation
+stops without committing so those changes can be inspected.
 
 Fragments merged after preparation remain pending for the next release. To
 include them in the current release, update the release PR and regenerate its
@@ -60,4 +63,6 @@ cargo run --manifest-path temporalio/bridge/sdk-core/crates/changelog-release-no
   --bin changelog-tool -- check --repo "$PWD"
 ```
 
-See that crate's README for the reusable CLI and JSON release-plan interface.
+See that crate's README for the reusable CLI. SDK-specific version and lockfile
+updates happen before its `prepare` command; no hook or release-plan exchange is
+required.

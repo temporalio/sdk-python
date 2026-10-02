@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import datetime
 import importlib.util
-import json
 import pathlib
 import subprocess
 import sys
@@ -13,7 +12,6 @@ import pytest
 
 import scripts.changelog
 import scripts.prepare_release
-from scripts.changelog import ReleasePlan, prepare_changelog
 from scripts.prepare_release import (
     commit_release_changes,
     create_release_branch,
@@ -96,27 +94,6 @@ def test_shared_tool_preserves_failure_diagnostics(
         scripts.changelog.run_tool(tmp_path, ["check"])
 
 
-@pytest.mark.parametrize(
-    "paths",
-    [
-        ["/etc/notes.md"],
-        ["changelog/fixed/../../service.py"],
-        ["changelog/unknown/note.md"],
-        ["changelog/fixed/note.md"] * 2,
-    ],
-)
-def test_invalid_consumed_paths_rejected(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, paths: list[str]
-) -> None:
-    monkeypatch.setattr(
-        scripts.changelog,
-        "run_tool",
-        lambda *_args: json.dumps({"changelog": "notes", "consumed_paths": paths}),
-    )
-    with pytest.raises(RuntimeError):
-        prepare_changelog(tmp_path, "1.35.0", datetime.date(2026, 10, 2))
-
-
 @pytest.fixture
 def release_repo(tmp_path: pathlib.Path) -> pathlib.Path:
     for name, text in {
@@ -148,25 +125,27 @@ def release_repo(tmp_path: pathlib.Path) -> pathlib.Path:
     return tmp_path
 
 
-def mock_plan(monkeypatch: pytest.MonkeyPatch) -> ReleasePlan:
-    plan = ReleasePlan(
-        "# Changelog\n\n## [1.35.0] - 2026-10-02\n\n### Fixed\n\n- A fix.\n",
-        ("changelog/fixed/giggling-teapot.md",),
-    )
-    monkeypatch.setattr(
-        scripts.prepare_release, "prepare_changelog", lambda *_args: plan
-    )
-    return plan
+def mock_preparation(monkeypatch: pytest.MonkeyPatch) -> str:
+    changelog = "# Changelog\n\n## [1.35.0] - 2026-10-02\n\n### Fixed\n\n- A fix.\n"
+
+    def prepare(repo: pathlib.Path, version: str, _date: datetime.date) -> None:
+        assert version in (repo / "pyproject.toml").read_text()
+        assert version in (repo / "temporalio/service.py").read_text()
+        (repo / "CHANGELOG.md").write_text(changelog)
+        (repo / "changelog/fixed/giggling-teapot.md").unlink()
+
+    monkeypatch.setattr(scripts.prepare_release, "prepare_changelog", prepare)
+    return changelog
 
 
-def test_release_consumes_and_commits_only_planned_fragments(
+def test_release_commits_consumed_fragments(
     monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
 ) -> None:
-    plan = mock_plan(monkeypatch)
+    changelog = mock_preparation(monkeypatch)
     consumed = prepare_release_files(
         release_repo, "1.35.0", datetime.date(2026, 10, 2), skip_lock=True
     )
-    assert consumed == plan.consumed_paths
+    assert consumed == ("changelog/fixed/giggling-teapot.md",)
     assert not (release_repo / consumed[0]).exists()
     ensure_only_release_changes(release_repo, consumed)
     subprocess.run(["git", "config", "user.name", "Test"], cwd=release_repo, check=True)
@@ -182,14 +161,14 @@ def test_release_consumes_and_commits_only_planned_fragments(
         text=True,
     ).splitlines()
     assert deleted == list(consumed)
-    assert (release_repo / "CHANGELOG.md").read_text() == plan.changelog
+    assert (release_repo / "CHANGELOG.md").read_text() == changelog
     assert "1.35.0" in (release_repo / "temporalio/service.py").read_text()
 
 
 def test_lock_failure_retains_fragments(
     monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
 ) -> None:
-    mock_plan(monkeypatch)
+    mock_preparation(monkeypatch)
 
     def fail(*_args: object, **_kwargs: object) -> None:
         raise subprocess.CalledProcessError(1, ["uv", "lock"])
@@ -203,7 +182,7 @@ def test_lock_failure_retains_fragments(
 def test_invalid_version_files_do_not_write_notes_or_consume_fragments(
     monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
 ) -> None:
-    mock_plan(monkeypatch)
+    mock_preparation(monkeypatch)
     original = (release_repo / "CHANGELOG.md").read_text()
     (release_repo / "temporalio/service.py").write_text("missing version\n")
     with pytest.raises(RuntimeError, match="service version"):
@@ -217,7 +196,7 @@ def test_invalid_version_files_do_not_write_notes_or_consume_fragments(
 def test_unexpected_changes_rejected_before_consuming(
     monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
 ) -> None:
-    mock_plan(monkeypatch)
+    mock_preparation(monkeypatch)
     (release_repo / "changelog/fixed/late-llama.md").write_text("- Late change.\n")
     with pytest.raises(RuntimeError, match="unexpected files"):
         prepare_release_files(
@@ -225,6 +204,44 @@ def test_unexpected_changes_rejected_before_consuming(
         )
     assert (release_repo / "changelog/fixed/giggling-teapot.md").exists()
     assert (release_repo / "changelog/fixed/late-llama.md").exists()
+
+
+def test_lock_update_precedes_changelog_preparation(
+    monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
+) -> None:
+    calls: list[str] = []
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if command == ["uv", "lock"]:
+            calls.append("lock")
+        return subprocess.CompletedProcess(command, 0, "")
+
+    def prepare(*_args: object) -> None:
+        assert calls == ["lock"]
+        calls.append("changelog")
+
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(scripts.prepare_release, "prepare_changelog", prepare)
+    prepare_release_files(release_repo, "1.35.0", datetime.date(2026, 10, 2))
+    assert calls == ["lock", "changelog"]
+
+
+def test_changelog_rejection_retains_notes_and_version_updates(
+    monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
+) -> None:
+    original = (release_repo / "CHANGELOG.md").read_text()
+
+    def reject(*_args: object) -> None:
+        raise RuntimeError("invalid fragment")
+
+    monkeypatch.setattr(scripts.prepare_release, "prepare_changelog", reject)
+    with pytest.raises(RuntimeError, match="invalid fragment"):
+        prepare_release_files(
+            release_repo, "1.35.0", datetime.date(2026, 10, 2), skip_lock=True
+        )
+    assert (release_repo / "CHANGELOG.md").read_text() == original
+    assert (release_repo / "changelog/fixed/giggling-teapot.md").exists()
+    assert "1.35.0" in (release_repo / "pyproject.toml").read_text()
 
 
 def test_replace_versions() -> None:
