@@ -1151,7 +1151,7 @@ class TestExternalStorageConcurrency:
             ExternalStorageConcurrency(max_driver_operations=-1),
         ],
     )
-    def test_rejects_limits_below_one(self, concurrency):
+    def test_rejects_limits_below_one(self, concurrency: ExternalStorageConcurrency):
         with pytest.raises(ValueError, match="must be a positive integer"):
             ExternalStorage(drivers=[InMemoryTestDriver()], concurrency=concurrency)
 
@@ -1228,7 +1228,9 @@ class TestExternalStorageConcurrency:
         gate.release()
         await asyncio.gather(first, second)
 
-    async def test_warns_when_driver_takes_no_permit(self, caplog):
+    async def test_warns_when_driver_takes_no_permit(
+        self, caplog: pytest.LogCaptureFixture
+    ):
         storage = ExternalStorage(
             drivers=[InMemoryTestDriver()], payload_size_threshold=0
         )
@@ -1238,7 +1240,9 @@ class TestExternalStorageConcurrency:
             "without using context.limiter" in r.message for r in caplog.records
         ), caplog.records
 
-    async def test_no_warning_when_driver_takes_a_permit(self, caplog):
+    async def test_no_warning_when_driver_takes_a_permit(
+        self, caplog: pytest.LogCaptureFixture
+    ):
         gate = _Gate()
         gate.release()
         storage = ExternalStorage(
