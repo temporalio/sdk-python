@@ -1365,6 +1365,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def workflow_is_read_only(self) -> bool:
         return self._read_only
 
+    def workflow_in_query_or_validator(self) -> bool:
+        return self._in_query_or_validator
+
     def workflow_memo(self) -> Mapping[str, Any]:
         if self._untyped_converted_memo is None:
             self._untyped_converted_memo = {
