@@ -12,7 +12,6 @@ import random
 import time
 import uuid
 import warnings
-from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
@@ -24,7 +23,6 @@ from google.adk.platform import uuid as adk_uuid
 
 from temporalio import workflow
 from temporalio.client import Client
-from temporalio.common import RawValue
 from temporalio.contrib.google_adk_agents import GoogleAdkPlugin, _plugin
 from temporalio.worker import (
     Replayer,
@@ -33,7 +31,6 @@ from temporalio.worker import (
     WorkflowRunner,
 )
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
-from tests.helpers import assert_task_fail_eventually
 
 
 @dataclass
@@ -541,41 +538,3 @@ async def test_ids_in_init_and_in_slotted_workflow(
     assert uuid.UUID(run_id).version == 4
     assert init_id != run_id
     assert uuid.UUID(slotted_id).version == 4
-
-
-@workflow.defn(dynamic=True)
-class IdInDynamicConfigWorkflow:
-    @workflow.dynamic_config
-    def dynamic_config(self) -> workflow.DynamicWorkflowConfig:
-        # Read-only like a query, but replayed: an ADK draw here must fail
-        # rather than produce a value that differs on replay.
-        adk_uuid.new_uuid()
-        return workflow.DynamicWorkflowConfig()
-
-    @workflow.run
-    async def run(self, _args: Sequence[RawValue]) -> None:
-        raise RuntimeError("Should never run")
-
-
-async def test_dynamic_config_cannot_draw_adk_randomness(client: Client) -> None:
-    reset_adk_providers_to_shipped_state()
-    new_config = client.config()
-    new_config["plugins"] = [GoogleAdkPlugin()]
-    client = Client(**new_config)
-
-    task_queue = f"adk-platform-providers-{uuid.uuid4()}"
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[IdInDynamicConfigWorkflow],
-    ):
-        handle = await client.start_workflow(
-            "adk-dynamic-config-workflow",
-            id=f"adk-platform-providers-{uuid.uuid4()}",
-            task_queue=task_queue,
-        )
-        await assert_task_fail_eventually(
-            handle,
-            message_contains="While in read-only function, action attempted: ADK random",
-        )
-        await handle.terminate()

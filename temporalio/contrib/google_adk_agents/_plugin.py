@@ -126,20 +126,13 @@ def _workflow_adk_random() -> random.Random:
     # sharing workflow.random(): ADK's draw count never shifts the sequence user
     # code sees, and the name keeps the two from coinciding (an unnamed stream
     # starts out identical to workflow.random(), so the Nth ADK id would equal
-    # the Nth workflow.uuid4()). Read-only code must not touch that
-    # stream: a draw there would advance it and diverge later activations
-    # from replay. Query handlers and update validators are never replayed, so
-    # they get a fresh unseeded generator instead. Every other read-only
-    # context (a dynamic workflow's ``dynamic_config``, a patch activation
-    # callback) is replayed, so drawing there is an error, as it is for
-    # workflow.random(), rather than a value that differs on replay.
+    # the Nth workflow.uuid4()). Read-only code (query handlers, update
+    # validators) must not touch that stream, since a draw there would advance
+    # it and diverge later activations from replay; as in the opentelemetry id
+    # generator, it gets a fresh unseeded generator instead.
+    if workflow.unsafe.is_read_only():
+        return random.Random()
     runtime = workflow._Runtime.current()
-    if runtime.workflow_is_read_only():
-        if runtime.workflow_in_query_or_validator():
-            return random.Random()
-        raise workflow.ReadOnlyContextError(
-            "While in read-only function, action attempted: ADK random"
-        )
     with _adk_randoms_lock:
         rng = _adk_randoms.get(runtime)
         if rng is None:
@@ -227,14 +220,12 @@ def setup_deterministic_runtime() -> None:
     deterministic stream (a ``workflow.new_random()`` per run; ids are v4
     UUIDs built from that stream), so ADK-generated ids and retry jitter are
     reproducible on replay without shifting the sequence user code sees from
-    ``workflow.random()`` and ``workflow.uuid4()``. In query handlers and
-    update validators time is still ``workflow.time()``, while ids and randoms
-    come from fresh entropy that leaves the private stream untouched, since
-    those are never replayed. Other read-only code, such as a dynamic
-    workflow's ``dynamic_config``, is replayed, so drawing an id or random
-    there raises :py:class:`temporalio.workflow.ReadOnlyContextError`, as
-    ``workflow.random()`` does. Outside a workflow in the same process
-    (activities, client code) they fall back to ``time.time()``,
+    ``workflow.random()`` and ``workflow.uuid4()``. In read-only contexts
+    (query handlers, update validators) time is still ``workflow.time()``,
+    while ids and randoms come from fresh entropy that leaves the private
+    stream untouched, since read-only results are never replayed. Outside a
+    workflow in the same process (activities, client code) they fall back to
+    ``time.time()``,
     ``uuid.uuid4()``, and an unseeded ``random.Random()``.
 
     Overrides through ADK's ``set_*_provider`` functions must be made after

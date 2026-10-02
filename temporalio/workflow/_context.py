@@ -366,9 +366,6 @@ class _Runtime(ABC):
     def workflow_is_read_only(self) -> bool: ...
 
     @abstractmethod
-    def workflow_in_query_or_validator(self) -> bool: ...
-
-    @abstractmethod
     def workflow_memo(self) -> Mapping[str, Any]: ...
 
     @abstractmethod
