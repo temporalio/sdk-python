@@ -37,6 +37,7 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
 
 ### Fixed
 
