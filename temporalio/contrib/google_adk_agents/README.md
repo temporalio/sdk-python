@@ -38,13 +38,14 @@ ADK provides: (from the [ADK overview](https://google.github.io/adk-docs/#learn-
 ### OpenTelemetry Integration
 - Automatic instrumentation for ADK components when exporters are provided
 - Tracing integration that works within Temporal's execution context
-- Support for custom span exporters
 
 ### Key Features
 
 #### 1. Deterministic Runtime
-- Replaces `time.time()` with `workflow.now()` when in workflow context
-- Replaces `uuid.uuid4()` with `workflow.uuid4()` for deterministic IDs
+- Installs ADK's `google.adk.platform` time, uuid, and random providers as process-wide defaults, so they apply inside workflow tasks (which run on worker threads with an empty `contextvars` context)
+- Inside a workflow, time comes from `workflow.time()` and ids and randoms come from a workflow-private deterministic stream (a `workflow.new_random()` cached per run), so ADK-generated session, event, invocation, and function-call ids and retry jitter are reproducible on replay without shifting the sequences user code sees from `workflow.random()` and `workflow.uuid4()`. In read-only contexts (query handlers, update validators) time is still `workflow.time()` and ids and randoms come from fresh entropy that leaves the private stream untouched
+- Outside a workflow in the same process (activities, client code) they fall back to the standard library
+- Overrides through ADK's `set_*_provider` functions must be made after the Worker starts or from workflow code; one made earlier is replaced (with a warning) when the plugin installs its providers, and `reset_*_provider` restores the deterministic providers rather than the standard-library ones
 - Automatic setup when using `GoogleAdkPlugin`
 
 #### 2. Activity-Based Model Execution
@@ -385,13 +386,13 @@ instead (for example inside an activity or an MCP toolset factory).
 > generated interrupt/function-call ids, so those ids must regenerate
 > identically on replay. The plugin installs ADK's platform time/uuid/random
 > providers as process-wide defaults, so the ids ADK generates (including
-> default `RequestInput` interrupt ids) derive from `workflow.uuid4()` and
-> replay identically.
+> default `RequestInput` interrupt ids) derive from the workflow-private
+> deterministic stream and replay identically.
 
 ## Determinism Notes
 
 - The plugin patches ADK's `google.adk.platform` time, uuid, and random
-  providers to `workflow.now()`, `workflow.uuid4()`, and `workflow.random()`
+  providers to `workflow.time()` and a workflow-private deterministic stream
   inside workflows.
 - ADK node `timeout=`/`RetryConfig` map onto durable timers
   (`asyncio.wait_for`/`asyncio.sleep`). For activity-backed nodes, prefer
