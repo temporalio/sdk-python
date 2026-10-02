@@ -20,6 +20,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- **Experimental**: New external storage concurrency controls. `ExternalStorage.concurrency` sets
+  `max_driver_operations` (across all drivers on that instance) and `max_operations_per_message`
+  (for one message). Drivers must use `context.limiter` for store and retrieve operations.
+
 ### Changed
 
 - Payload converters exposed by data converters and workflow/activity accessors
@@ -38,6 +42,8 @@ to include examples, links to docs, or any other relevant information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
 - **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+- **Experimental**: Removed the `max_workflow_task_external_storage_concurrency` `Worker` argument.
+  Use `ExternalStorage.concurrency`.
 
 ### Fixed
 

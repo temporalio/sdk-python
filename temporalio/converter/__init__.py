@@ -6,9 +6,11 @@ from temporalio.converter._data_converter import (
 )
 from temporalio.converter._extstore import (
     ExternalStorage,
+    ExternalStorageConcurrency,
     StorageDriver,
     StorageDriverActivityInfo,
     StorageDriverClaim,
+    StorageDriverLimiter,
     StorageDriverRetrieveContext,
     StorageDriverSelectContext,
     StorageDriverStoreContext,
@@ -59,10 +61,12 @@ from temporalio.converter._serialization_context import (
 __all__ = [
     "ActivitySerializationContext",
     "ExternalStorage",
+    "ExternalStorageConcurrency",
     "StorageDriver",
     "StorageDriverActivityInfo",
     "StorageDriverClaim",
     "StorageDriverRetrieveContext",
+    "StorageDriverLimiter",
     "StorageDriverSelectContext",
     "StorageDriverStoreContext",
     "StorageDriverWorkflowInfo",
