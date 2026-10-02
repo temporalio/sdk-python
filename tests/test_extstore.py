@@ -11,6 +11,7 @@ from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.converter import (
     DataConverter,
     ExternalStorage,
+    ExternalStorageConcurrency,
     JSONPlainPayloadConverter,
     PayloadCodec,
     StorageDriver,
@@ -24,6 +25,7 @@ from temporalio.converter._extstore import (
     _REFERENCE_ENCODING,
     StorageOperationMetrics,
     _StorageReference,
+    message_scope,
 )
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
@@ -870,3 +872,190 @@ def test_storage_metrics_duration_merges_adjacent_and_nested_batches() -> None:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+async def _settle() -> None:
+    """Let queued semaphore waiters reach their final state."""
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+
+def _payload() -> Payload:
+    return Payload(metadata={"encoding": b"binary/plain"}, data=b"x" * 8)
+
+
+class _Gate:
+    """Blocks every operation until released, recording peak concurrency."""
+
+    def __init__(self) -> None:
+        self._opened = asyncio.Event()
+        self._in_flight = 0
+        self.peak = 0
+
+    def release(self) -> None:
+        self._opened.set()
+
+    async def hold(self) -> None:
+        self._in_flight += 1
+        self.peak = max(self.peak, self._in_flight)
+        await self._opened.wait()
+        self._in_flight -= 1
+
+
+class _PermittingDriver(StorageDriver):
+    """Takes a permit around every request, so peak concurrency is observable."""
+
+    def __init__(self, gate: _Gate) -> None:
+        self._gate = gate
+
+    def name(self) -> str:
+        return "permitting"
+
+    async def store(
+        self, context: StorageDriverStoreContext, payloads: Sequence[Payload]
+    ) -> list[StorageDriverClaim]:
+        async def one(payload: Payload) -> StorageDriverClaim:
+            async with context.limiter.permit(payload):
+                await self._gate.hold()
+                return StorageDriverClaim(claim_data={"id": "x"})
+
+        return list(await asyncio.gather(*[one(p) for p in payloads]))
+
+    async def retrieve(
+        self,
+        context: StorageDriverRetrieveContext,
+        claims: Sequence[StorageDriverClaim],
+    ) -> list[Payload]:
+        async def one(claim: StorageDriverClaim) -> Payload:
+            async with context.limiter.permit(claim):
+                await self._gate.hold()
+                return _payload()
+
+        return list(await asyncio.gather(*[one(c) for c in claims]))
+
+
+class TestExternalStorageConcurrency:
+    """The two concurrency limits and the limiter handed to drivers."""
+
+    def test_defaults(self):
+        storage = ExternalStorage(drivers=[InMemoryTestDriver()])
+        assert storage.concurrency == ExternalStorageConcurrency(
+            max_driver_operations=64, max_operations_per_message=8
+        )
+
+    def test_explicit_values_kept(self):
+        storage = ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=5, max_operations_per_message=2
+            ),
+        )
+        assert storage.concurrency.max_driver_operations == 5
+        assert storage.concurrency.max_operations_per_message == 2
+
+    @pytest.mark.parametrize(
+        "concurrency",
+        [
+            ExternalStorageConcurrency(max_driver_operations=0),
+            ExternalStorageConcurrency(max_operations_per_message=0),
+            ExternalStorageConcurrency(max_driver_operations=-1),
+        ],
+    )
+    def test_rejects_limits_below_one(self, concurrency):
+        with pytest.raises(ValueError, match="must be a positive integer"):
+            ExternalStorage(drivers=[InMemoryTestDriver()], concurrency=concurrency)
+
+    async def test_max_operations_per_message_bounds_operations(self):
+        """One message may not exceed its own budget, however many sites it has."""
+        gate = _Gate()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)],
+            payload_size_threshold=0,
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=100, max_operations_per_message=3
+            ),
+        )
+
+        with message_scope(storage):
+            sites = [
+                asyncio.create_task(
+                    storage._store_payload_sequence([_payload(), _payload()])
+                )
+                for _ in range(4)
+            ]
+            await _settle()
+            assert gate.peak == 3
+            gate.release()
+            await asyncio.gather(*sites)
+        assert gate.peak == 3
+
+    async def test_each_message_gets_its_own_budget(self):
+        gate = _Gate()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)],
+            payload_size_threshold=0,
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=100, max_operations_per_message=2
+            ),
+        )
+
+        async def one_message() -> None:
+            with message_scope(storage):
+                await storage._store_payload_sequence(
+                    [_payload(), _payload(), _payload()]
+                )
+
+        first = asyncio.create_task(one_message())
+        second = asyncio.create_task(one_message())
+        await _settle()
+        assert gate.peak == 4  # two messages at 2 each, not 2 shared
+
+        gate.release()
+        await asyncio.gather(first, second)
+
+    async def test_max_driver_operations_shared_across_messages(self):
+        """The instance-wide budget spans every message using the instance."""
+        gate = _Gate()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)],
+            payload_size_threshold=0,
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=3, max_operations_per_message=10
+            ),
+        )
+
+        async def one_message() -> None:
+            with message_scope(storage):
+                await storage._store_payload_sequence(
+                    [_payload(), _payload(), _payload()]
+                )
+
+        first = asyncio.create_task(one_message())
+        second = asyncio.create_task(one_message())
+        await _settle()
+        assert gate.peak == 3
+
+        gate.release()
+        await asyncio.gather(first, second)
+
+    async def test_warns_when_driver_takes_no_permit(self, caplog):
+        storage = ExternalStorage(
+            drivers=[InMemoryTestDriver()], payload_size_threshold=0
+        )
+        with caplog.at_level("WARNING", logger="temporalio.converter"):
+            await storage._store_payload_sequence([_payload(), _payload()])
+        assert any(
+            "without using context.limiter" in r.message for r in caplog.records
+        ), caplog.records
+
+    async def test_no_warning_when_driver_takes_a_permit(self, caplog):
+        gate = _Gate()
+        gate.release()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)], payload_size_threshold=0
+        )
+        with caplog.at_level("WARNING", logger="temporalio.converter"):
+            await storage._store_payload_sequence([_payload(), _payload()])
+        assert not [
+            r for r in caplog.records if "without using context.limiter" in r.message
+        ]

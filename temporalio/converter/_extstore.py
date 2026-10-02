@@ -9,10 +9,20 @@ import contextlib
 import contextvars
 import dataclasses
 import time
+import weakref
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Coroutine, Generator, Mapping, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Callable,
+    Coroutine,
+    Generator,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from datetime import timedelta
+from logging import getLogger
 from typing import Any, ClassVar, TypeVar
 
 from typing_extensions import Self
@@ -23,6 +33,8 @@ from temporalio.converter._payload_converter import (
     JSONPlainPayloadConverter,
     JSONProtoPayloadConverter,
 )
+
+logger = getLogger("temporalio.converter")
 
 _T = TypeVar("_T")
 
@@ -164,6 +176,41 @@ class StorageDriverActivityInfo:
     """The activity type name, if available."""
 
 
+class StorageDriverLimiter(ABC):
+    """Limits the concurrent external storage operations a driver performs.
+
+    Drivers must wrap each operation in :meth:`permit`. Operations performed
+    outside a permit are not limited. Do not take a permit inside another
+    permit.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    @abstractmethod
+    def permit(
+        self, item: Payload | StorageDriverClaim
+    ) -> contextlib.AbstractAsyncContextManager[None]:
+        """Runs the block once a permit is available.
+
+        ``item`` is the payload being stored or the claim being retrieved.
+        """
+        ...
+
+
+class _PassthroughLimiter(StorageDriverLimiter):
+    """A limiter that never blocks."""
+
+    @contextlib.asynccontextmanager
+    async def permit(  # type: ignore[override]
+        self, item: Payload | StorageDriverClaim
+    ) -> AsyncIterator[None]:
+        yield
+
+
+_PASSTHROUGH_LIMITER = _PassthroughLimiter()
+
+
 @dataclass(frozen=True)
 class StorageDriverStoreContext:
     """Context passed to :meth:`StorageDriver.store` calls.
@@ -180,6 +227,9 @@ class StorageDriverStoreContext:
     being signaled), this is that target's identity.  When no explicit target
     exists the current execution context (workflow or activity) is used as the
     target instead."""
+
+    limiter: StorageDriverLimiter = _PASSTHROUGH_LIMITER
+    """Wrap each store operation in :meth:`StorageDriverLimiter.permit`."""
 
 
 @dataclass(frozen=True)
@@ -207,6 +257,9 @@ class StorageDriverRetrieveContext:
     .. warning::
         This API is experimental.
     """
+
+    limiter: StorageDriverLimiter = _PASSTHROUGH_LIMITER
+    """Wrap each retrieve operation in :meth:`StorageDriverLimiter.permit`."""
 
 
 class StorageDriver(ABC):
@@ -281,6 +334,68 @@ class _StorageReference:
 
 
 @dataclass(frozen=True)
+class ExternalStorageConcurrency:
+    """Configures concurrency limits for external storage operations.
+
+    .. warning::
+        This API is experimental.
+    """
+
+    max_driver_operations: int = 64
+    """The maximum number of concurrent external storage operations that drivers
+    can execute for a single :class:`ExternalStorage`. All drivers on that
+    instance share this limit. Defaults to 64.
+    """
+
+    max_operations_per_message: int = 8
+    """The maximum number of concurrent external storage operations that drivers
+    can execute for a single message (a message is input or output such as a
+    workflow activation, completion, or client request). This prevents one
+    message from monopolizing resources. Defaults to 8.
+    """
+
+
+class _SemaphoreLimiter(StorageDriverLimiter):
+    """Applies the storage limits to a single driver call."""
+
+    def __init__(
+        self,
+        per_message_semaphore: asyncio.Semaphore,
+        per_instance_semaphore: asyncio.Semaphore,
+    ) -> None:
+        self._per_message_semaphore = per_message_semaphore
+        self._per_instance_semaphore = per_instance_semaphore
+        self.permit_taken = False
+
+    @contextlib.asynccontextmanager
+    async def permit(  # type: ignore[override]
+        self, item: Payload | StorageDriverClaim
+    ) -> AsyncIterator[None]:
+        self.permit_taken = True
+        async with self._per_message_semaphore:
+            async with self._per_instance_semaphore:
+                yield
+
+
+_current_per_message_semaphore: contextvars.ContextVar[asyncio.Semaphore | None] = (
+    contextvars.ContextVar("_temporal_extstore_message_semaphore", default=None)
+)
+"""The limit for the message being processed."""
+
+
+@contextlib.contextmanager
+def message_scope(storage: ExternalStorage) -> Generator[None, Any, None]:
+    """Gives everything in this block one shared per-message limit."""
+    token = _current_per_message_semaphore.set(
+        asyncio.Semaphore(storage.concurrency.max_operations_per_message)
+    )
+    try:
+        yield
+    finally:
+        _current_per_message_semaphore.reset(token)
+
+
+@dataclass(frozen=True)
 class ExternalStorage:
     """Configuration for external storage behavior.
 
@@ -314,6 +429,9 @@ class ExternalStorage:
     Defaults to 256 KiB. Must be greater than or equal to zero.
     """
 
+    concurrency: ExternalStorageConcurrency = ExternalStorageConcurrency()
+    """Concurrency limits for external storage operations."""
+
     _driver_map: dict[str, StorageDriver] = dataclasses.field(
         init=False, repr=False, compare=False
     )
@@ -336,6 +454,11 @@ class ExternalStorage:
         compare=False,
     )
     """Selector context derived from :attr:`_store_context`."""
+
+    _per_instance_semaphores: MutableMapping[
+        asyncio.AbstractEventLoop, asyncio.Semaphore
+    ] = dataclasses.field(init=False, repr=False, compare=False)
+    """The limit shared by every message using this ExternalStorage."""
 
     _claim_converter: ClassVar[JSONProtoPayloadConverter] = JSONProtoPayloadConverter()
     _legacy_claim_converter: ClassVar[JSONPlainPayloadConverter] = (
@@ -371,7 +494,51 @@ class ExternalStorage:
                     "Each driver must have a unique name."
                 )
             driver_map[name] = driver
+        for name, value in (
+            ("max_driver_operations", self.concurrency.max_driver_operations),
+            (
+                "max_operations_per_message",
+                self.concurrency.max_operations_per_message,
+            ),
+        ):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+                raise ValueError(
+                    f"ExternalStorage.concurrency.{name} must be a positive integer, got {value!r}."
+                )
         object.__setattr__(self, "_driver_map", driver_map)
+        object.__setattr__(
+            self, "_per_instance_semaphores", weakref.WeakKeyDictionary()
+        )
+
+    def _make_limiter(self) -> _SemaphoreLimiter:
+        """Builds the limiter for one driver call."""
+        loop = asyncio.get_running_loop()
+        per_instance_semaphore = self._per_instance_semaphores.get(loop)
+        if per_instance_semaphore is None:
+            per_instance_semaphore = asyncio.Semaphore(
+                self.concurrency.max_driver_operations
+            )
+            self._per_instance_semaphores[loop] = per_instance_semaphore
+        per_message_semaphore = _current_per_message_semaphore.get()
+        if per_message_semaphore is None:
+            per_message_semaphore = asyncio.Semaphore(
+                self.concurrency.max_operations_per_message
+            )
+        return _SemaphoreLimiter(per_message_semaphore, per_instance_semaphore)
+
+    @staticmethod
+    def _warn_if_limiter_unused(
+        limiter: _SemaphoreLimiter, driver: StorageDriver, operation: str
+    ) -> None:
+        """Warns when a driver did not use the limiter."""
+        if limiter.permit_taken:
+            return
+        logger.warning(
+            "Storage driver '%s' performed a %s without using context.limiter. "
+            "Its operations are not limited.",
+            driver.name(),
+            operation,
+        )
 
     def _select_driver(
         self, context: StorageDriverSelectContext, payload: Payload
@@ -415,7 +582,11 @@ class ExternalStorage:
         if driver is None:
             return payload
 
-        claims = await driver.store(self._store_context, [payload])
+        limiter = self._make_limiter()
+        claims = await driver.store(
+            dataclasses.replace(self._store_context, limiter=limiter), [payload]
+        )
+        self._warn_if_limiter_unused(limiter, driver, "store")
 
         self._validate_claim_length(claims, expected=1, driver=driver)
 
@@ -467,12 +638,20 @@ class ExternalStorage:
 
         driver_group_list = list(driver_groups.items())
 
+        store_limiters = [self._make_limiter() for _ in driver_group_list]
         all_claims = await _gather_cancel_on_error(
             [
-                driver.store(self._store_context, [p for _, p in indexed_payloads])
-                for driver, indexed_payloads in driver_group_list
+                driver.store(
+                    dataclasses.replace(self._store_context, limiter=limiter),
+                    [p for _, p in indexed_payloads],
+                )
+                for (driver, indexed_payloads), limiter in zip(
+                    driver_group_list, store_limiters
+                )
             ]
         )
+        for (driver, _), limiter in zip(driver_group_list, store_limiters):
+            self._warn_if_limiter_unused(limiter, driver, "store")
 
         external_count = 0
         external_size = 0
@@ -534,10 +713,12 @@ class ExternalStorage:
 
         start_time = time.monotonic()
         driver = self._get_driver_by_name(ref.driver_name)
-        context = StorageDriverRetrieveContext()
+        limiter = self._make_limiter()
+        context = StorageDriverRetrieveContext(limiter=limiter)
         claim = StorageDriverClaim(claim_data=dict(ref.claim_data))
 
         stored_payloads = await driver.retrieve(context, [claim])
+        self._warn_if_limiter_unused(limiter, driver, "retrieve")
 
         self._validate_payload_length(stored_payloads, expected=1, driver=driver)
 
@@ -577,17 +758,24 @@ class ExternalStorage:
         if not driver_claims:
             return results
 
-        context = StorageDriverRetrieveContext()
         stored_by_index: dict[int, Payload] = {}
 
         driver_claim_list = list(driver_claims.items())
 
+        retrieve_limiters = [self._make_limiter() for _ in driver_claim_list]
         all_stored = await _gather_cancel_on_error(
             [
-                driver.retrieve(context, [claim for _, claim in indexed_claims])
-                for driver, indexed_claims in driver_claim_list
+                driver.retrieve(
+                    StorageDriverRetrieveContext(limiter=limiter),
+                    [claim for _, claim in indexed_claims],
+                )
+                for (driver, indexed_claims), limiter in zip(
+                    driver_claim_list, retrieve_limiters
+                )
             ]
         )
+        for (driver, _), limiter in zip(driver_claim_list, retrieve_limiters):
+            self._warn_if_limiter_unused(limiter, driver, "retrieve")
 
         external_count = 0
         external_size = 0
