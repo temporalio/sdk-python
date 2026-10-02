@@ -16,7 +16,6 @@ async def test_activity_env_async():
     waiting = asyncio.Event()
 
     async def do_stuff(param: str) -> str:
-        assert activity.payload_converter() is env.payload_converter
         activity.heartbeat(f"param: {param}")
 
         # Ensure it works across create_task
@@ -58,7 +57,6 @@ def test_activity_env_sync():
     properly_cancelled = False
 
     def do_stuff(param: str) -> None:
-        assert activity.payload_converter() is env.payload_converter
         activity.heartbeat(f"param: {param}")
 
         # Ensure it works across thread

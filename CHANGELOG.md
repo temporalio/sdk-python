@@ -22,6 +22,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Changed
 
+- Payload converters exposed by data converters and workflow/activity accessors
+  retain transfer type conversion, so direct use behaves consistently with SDK
+  serialization.
+
 ### Deprecated
 
 ### :boom: Breaking Changes
@@ -33,12 +37,31 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
 
 ### Fixed
 
 - Fixed Pydantic constraints being silently ignored inside or outside workflow
   sandboxes by passing through `annotated_types` by default.
 
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
+  when calling the model. The schema type is now sent to the model activity as its JSON schema.
+  Custom Pydantic schema generation is preserved.
+  Integer-valued output enums are normalized to strings to match Google GenAI.
+
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+
+- Encoding a datetime search attribute without a timezone now raises
+  `ValueError("Timezone must be present on all search attribute dates")` on
+  the typed path, matching the deprecated untyped encoder, instead of sending
+  a naive ISO string that the server rejects with `BadSearchAttributes`.
+
+- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
+  log `Failed to detach context` when a context is torn down on a different thread while
+  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
+  context is now detached exactly when its token is still valid in the current
+  `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
 ### Security
 
 ## [1.34.0] - 2026-09-30
