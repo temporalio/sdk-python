@@ -122,9 +122,11 @@ _adk_randoms_lock = threading.Lock()
 
 
 def _workflow_adk_random() -> random.Random:
-    # ADK draws from a private stream (a workflow.new_random() per run) rather
-    # than sharing workflow.random(), so how many values ADK consumes never
-    # shifts the sequence user code sees. Read-only code must not touch that
+    # ADK draws from a private, named workflow.new_random() stream rather than
+    # sharing workflow.random(): ADK's draw count never shifts the sequence user
+    # code sees, and the name keeps the two from coinciding (an unnamed stream
+    # starts out identical to workflow.random(), so the Nth ADK id would equal
+    # the Nth workflow.uuid4()). Read-only code must not touch that
     # stream: a draw there would advance it and diverge later activations
     # from replay. Query handlers and update validators are never replayed, so
     # they get a fresh unseeded generator instead. Every other read-only
@@ -141,7 +143,7 @@ def _workflow_adk_random() -> random.Random:
     with _adk_randoms_lock:
         rng = _adk_randoms.get(runtime)
         if rng is None:
-            rng = workflow.new_random()
+            rng = workflow.new_random("temporalio.contrib.google_adk_agents")
             _adk_randoms[runtime] = rng
     return rng
 

@@ -44,6 +44,7 @@ class PlatformProviderReadings:
     expected_id: str
     random_is_private_cached_stream: bool
     workflow_stream_unperturbed: bool
+    distinct_from_user_stream: bool
 
 
 # Appended to by PlatformProviderWorkflow when it runs on an unsandboxed
@@ -77,11 +78,11 @@ def reset_adk_providers_to_shipped_state() -> None:
 class PlatformProviderWorkflow:
     @workflow.run
     async def run(self) -> PlatformProviderReadings:
-        # ADK ids and randoms come from a private stream created via
-        # workflow.new_random() on first use, so a mirror stream made the
-        # same way reproduces the id from the same 128 bits.
+        # ADK ids and randoms come from a private named stream created via
+        # workflow.new_random() on first use, so a mirror made the same way
+        # reproduces the id from the same 128 bits.
         adk_id = adk_uuid.new_uuid()
-        mirror = workflow.new_random()
+        mirror = workflow.new_random("temporalio.contrib.google_adk_agents")
         expected_id = str(uuid.UUID(int=mirror.getrandbits(128), version=4))
         adk_rng = adk_random.get_random()
         # The private stream and workflow.random() start from the same seed,
@@ -97,6 +98,10 @@ class PlatformProviderWorkflow:
                 adk_rng is not workflow.random() and adk_random.get_random() is adk_rng
             ),
             workflow_stream_unperturbed=workflow.random().random() == probe.random(),
+            # An unnamed stream starts out as workflow.random() does, so its first
+            # 128 bits are what workflow.uuid4() would mint first for user code.
+            distinct_from_user_stream=adk_id
+            != str(uuid.UUID(int=workflow.new_random().getrandbits(128), version=4)),
         )
         unsandboxed_readings.append(readings)
         return readings
@@ -146,6 +151,7 @@ async def test_providers_apply_inside_workflow_tasks(
     assert readings.adk_id == readings.expected_id
     assert readings.random_is_private_cached_stream
     assert readings.workflow_stream_unperturbed
+    assert readings.distinct_from_user_stream
 
     # The values derive from history, so a replay reproduces them exactly.
     # Replay unsandboxed so the workflow can hand its readings back.

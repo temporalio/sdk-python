@@ -20,6 +20,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- `workflow.new_random()` accepts an optional `name` that is mixed into the seed, so differently
+  named generators, and `workflow.random()`, produce different sequences.
+
 ### Changed
 
 - Payload converters exposed by data converters and workflow/activity accessors
