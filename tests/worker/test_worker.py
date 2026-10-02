@@ -87,7 +87,7 @@ def test_load_default_worker_binary_id():
 def test_activity_executor_rejects_interpreter_pool(subclass: bool):
     if sys.version_info >= (3, 14):
 
-        class CustomInterpreterPoolExecutor(concurrent.futures.InterpreterPoolExecutor):
+        class CustomInterpreterPoolExecutor(concurrent.futures.InterpreterPoolExecutor):  # pyright: ignore[reportUnreachable]
             pass
 
         executor_class = concurrent.futures.InterpreterPoolExecutor

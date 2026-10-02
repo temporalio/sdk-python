@@ -421,7 +421,7 @@ class Worker:
         if sys.version_info >= (3, 14) and isinstance(
             config.get("activity_executor"), concurrent.futures.InterpreterPoolExecutor
         ):
-            raise ValueError(
+            raise ValueError(  # pyright: ignore[reportUnreachable]
                 "InterpreterPoolExecutor is not supported as an activity_executor. "
                 "Use ThreadPoolExecutor or ProcessPoolExecutor instead."
             )
