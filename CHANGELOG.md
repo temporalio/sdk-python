@@ -41,6 +41,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- A cancel that arrives while an activity's result or failure is still being encoded no longer
+  interrupts the reporting, so the completion is still sent.
+
 - `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
   when calling the model. The schema type is now sent to the model activity as its JSON schema.
   Custom Pydantic schema generation is preserved.
