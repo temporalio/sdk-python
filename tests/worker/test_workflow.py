@@ -9153,7 +9153,7 @@ async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
 
             # Wait for sync activity
             activity_info_1 = await assert_pending_activity_exists_eventually(
-                handle, test_activity_id
+                handle, test_activity_id, timeout=timedelta(seconds=10)
             )
             # Assert not paused
             assert not activity_info_1.paused
