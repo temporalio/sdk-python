@@ -59,6 +59,8 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
   context is now detached exactly when its token is still valid in the current
   `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Clarify activity and child workflow return-value conversion errors without hiding their original causes.
 ### Security
 
 ## [1.34.0] - 2026-09-30
