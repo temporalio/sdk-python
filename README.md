@@ -328,7 +328,7 @@ The default data converter supports converting multiple types including:
   * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
   * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
   * Iterables including ones JSON dump may not support by default, e.g. `set`
-  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
+  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates, including enums that mix in `int` or `str`
   * [UUID](https://docs.python.org/3/library/uuid.html)
   * `datetime.datetime`
 
