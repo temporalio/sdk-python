@@ -59,6 +59,10 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
   context is now detached exactly when its token is still valid in the current
   `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Decode enums that mix in `str` or `int` (for example `class Color(str, Enum)`) to the enum
+  instead of a list of characters or an error, and decode `dict` keys typed as an `int` enum.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30
