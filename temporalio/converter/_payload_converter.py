@@ -729,6 +729,16 @@ class JSONTypeConverter(ABC):
         raise NotImplementedError
 
 
+class _JSONNewTypeKeyConverter(JSONTypeConverter):
+    """Restore numeric NewType keys from JSON object key strings."""
+
+    def to_typed_value(self, hint: type, value: Any) -> Any:
+        """See base class."""
+        if isinstance(value, str) and (hint is int or hint is float):
+            return hint(value)
+        return self.Unhandled
+
+
 class JSONPlainPayloadConverter(EncodingPayloadConverter):
     """Converter for 'json/plain' payloads supporting common Python values.
 
@@ -937,6 +947,14 @@ def value_to_type(
             and not isinstance(type_args[1], TypeVar)
             else None
         )
+        key_converters = custom_converters
+        key_supertype = key_type
+        while supertype := getattr(key_supertype, "__supertype__", None):
+            key_supertype = supertype
+        if key_supertype is not key_type and (
+            key_supertype is int or key_supertype is float
+        ):
+            key_converters = [*custom_converters, _JSONNewTypeKeyConverter()]
         # Convert each key/value
         for key, value in value.items():
             this_value_type = value_type
@@ -960,7 +978,7 @@ def value_to_type(
                             key = {"null": None}[key]
 
                     if not isinstance(key_type, type) or not isinstance(key, key_type):
-                        key = value_to_type(key_type, key, custom_converters)
+                        key = value_to_type(key_type, key, key_converters)
                 except Exception as err:
                     raise TypeError(
                         f"Failed converting key {repr(key)} to type {key_type} in mapping {hint}"

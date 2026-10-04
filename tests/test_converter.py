@@ -101,6 +101,9 @@ class DatetimeClass:
 
 
 MyNewTypeStr = NewType("MyNewTypeStr", str)
+MyNewTypeInt = NewType("MyNewTypeInt", int)
+MyNestedNewTypeInt = NewType("MyNestedNewTypeInt", MyNewTypeInt)
+MyNewTypeFloat = NewType("MyNewTypeFloat", float)
 
 
 @dataclass
@@ -566,6 +569,92 @@ def test_json_nested_frozenset_round_trip():
     payload = converter.to_payload(value)
     assert payload is not None
     assert converter.from_payload(payload, set[frozenset[int]]) == value
+
+
+@pytest.mark.parametrize(
+    ("hint", "value"),
+    [
+        (
+            dict[MyNewTypeInt, str],
+            {-7: "negative", 0: "zero", 7: "positive", 2**65: "large"},
+        ),
+        (dict[MyNestedNewTypeInt, str], {-7: "negative", 7: "positive"}),
+        (dict[MyNewTypeFloat, str], {-1.5: "negative", 0.0: "zero", 1.5: "positive"}),
+        (dict[MyNewTypeInt, str], {}),
+        (
+            list[dict[MyNewTypeInt, MyDataClass]],
+            [{7: MyDataClass("foo", 5, SerializableEnum.FOO)}],
+        ),
+    ],
+)
+def test_json_newtype_numeric_keys_round_trip(hint: Any, value: Any):
+    converter = JSONPlainPayloadConverter()
+    payload = converter.to_payload(value)
+    assert payload is not None
+    assert converter.from_payload(payload, hint) == value
+
+
+@pytest.mark.parametrize(
+    ("hint", "key"),
+    [
+        (dict[MyNewTypeInt, str], "not-a-number"),
+        (dict[MyNewTypeInt, str], "1.5"),
+        (dict[MyNestedNewTypeInt, str], ""),
+        (dict[MyNewTypeFloat, str], "not-a-number"),
+    ],
+)
+def test_json_newtype_numeric_keys_reject_invalid_strings(hint: Any, key: str):
+    converter = JSONPlainPayloadConverter()
+    payload = converter.to_payload({key: "value"})
+    assert payload is not None
+    with pytest.raises(TypeError, match="Failed converting key"):
+        converter.from_payload(payload, hint)
+
+
+@pytest.mark.parametrize(
+    "hint", [dict[MyNewTypeInt, int], dict[MyNewTypeFloat, MyNewTypeInt]]
+)
+def test_json_newtype_numeric_keys_do_not_coerce_values(hint: Any):
+    converter = JSONPlainPayloadConverter()
+    payload = converter.to_payload({7: "8"})
+    assert payload is not None
+    with pytest.raises(TypeError, match="Failed converting value for key"):
+        converter.from_payload(payload, hint)
+
+
+@pytest.mark.parametrize("handled_hint", [MyNestedNewTypeInt, MyNewTypeInt, int])
+def test_json_newtype_numeric_keys_custom_converter(handled_hint: Any):
+    class KeyConverter(JSONTypeConverter):
+        def to_typed_value(self, hint: type, value: Any) -> Any:
+            if hint is handled_hint:
+                assert value == "7"
+                return 8
+            return self.Unhandled
+
+    converter = JSONPlainPayloadConverter(custom_type_converters=[KeyConverter()])
+    payload = converter.to_payload({7: "value"})
+    assert payload is not None
+    assert converter.from_payload(payload, dict[MyNestedNewTypeInt, str]) == {
+        8: "value"
+    }
+
+
+def test_json_newtype_numeric_keys_unhandled_custom_converter():
+    calls = []
+
+    class KeyConverter(JSONTypeConverter):
+        def to_typed_value(self, hint: type, value: Any) -> Any:
+            if hint in (MyNestedNewTypeInt, MyNewTypeInt, int):
+                calls.append((hint, value))
+            return self.Unhandled
+
+    converter = JSONPlainPayloadConverter(custom_type_converters=[KeyConverter()])
+    payload = converter.to_payload({7: "value"})
+    assert payload is not None
+    assert converter.from_payload(payload, dict[MyNestedNewTypeInt, str]) == {
+        7: "value"
+    }
+    assert calls == [(MyNestedNewTypeInt, "7"), (MyNewTypeInt, "7"), (int, "7")]
 
 
 def test_json_type_hints():
