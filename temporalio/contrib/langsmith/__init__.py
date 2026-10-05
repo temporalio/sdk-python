@@ -1,18 +1,10 @@
-"""LangSmith integration for Temporal SDK.
+"""Compatibility imports for the standalone LangSmith integration.
 
-.. warning::
-    This package is experimental and may change in future versions.
-    Use with caution in production environments.
-
-This package provides LangSmith tracing integration for Temporal workflows,
-activities, and other operations. It includes automatic run creation and
-context propagation for distributed tracing in LangSmith.
+Install ``temporalio-langsmith`` and import ``temporalio.langsmith``
+directly in new code.
 """
 
-from temporalio.contrib.langsmith._interceptor import LangSmithInterceptor
-from temporalio.contrib.langsmith._plugin import LangSmithPlugin
-
-__all__ = [
-    "LangSmithInterceptor",
-    "LangSmithPlugin",
-]
+from temporalio.langsmith import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
+from temporalio.langsmith import (  # pyright: ignore[reportMissingImports]
+    __all__ as __all__,
+)

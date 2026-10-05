@@ -1,34 +1,12 @@
-"""Temporal Integration for ADK.
+"""Compatibility imports for the standalone Google ADK integration.
 
-This module provides the necessary components to run ADK Agents within Temporal Workflows.
+Install ``temporalio-google-adk`` and import ``temporalio.google_adk``
+directly in new code.
+
+Legacy ``workflow`` module forwards the standalone public API.
 """
 
-from temporalio.contrib.google_adk_agents._hitl import (
-    HitlRequest,
-    hitl_confirmation_response,
-    hitl_input_response,
-    pending_hitl_requests,
+from temporalio.google_adk import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
+from temporalio.google_adk import (  # pyright: ignore[reportMissingImports]
+    __all__ as __all__,
 )
-from temporalio.contrib.google_adk_agents._mcp import (
-    TemporalMcpToolSet,
-    TemporalMcpToolSetProvider,
-    TemporalStatefulMcpToolSet,
-    TemporalStatefulMcpToolSetProvider,
-)
-from temporalio.contrib.google_adk_agents._model import TemporalModel
-from temporalio.contrib.google_adk_agents._plugin import (
-    GoogleAdkPlugin,
-)
-
-__all__ = [
-    "GoogleAdkPlugin",
-    "HitlRequest",
-    "TemporalMcpToolSet",
-    "TemporalMcpToolSetProvider",
-    "TemporalStatefulMcpToolSet",
-    "TemporalStatefulMcpToolSetProvider",
-    "TemporalModel",
-    "hitl_confirmation_response",
-    "hitl_input_response",
-    "pending_hitl_requests",
-]

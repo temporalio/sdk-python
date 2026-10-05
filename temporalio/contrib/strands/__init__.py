@@ -1,26 +1,12 @@
-"""Temporal integration for the Strands Agents SDK."""
+"""Compatibility imports for the standalone Strands Agents integration.
 
-from . import workflow
-from ._plugin import StrandsPlugin
-from ._sandbox_activity import (
-    SandboxStreamEvent,
-    SandboxWorkflowChain,
-    SandboxWorkflowContext,
+Install ``temporalio-strands-agents`` and import ``temporalio.strands_agents``
+directly in new code.
+
+Legacy ``workflow`` module forwards the standalone public API.
+"""
+
+from temporalio.strands_agents import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
+from temporalio.strands_agents import (  # pyright: ignore[reportMissingImports]
+    __all__ as __all__,
 )
-from ._temporal_agent import TemporalAgent
-from ._temporal_mcp_client import TemporalMCPClient
-from ._temporal_sandbox import TemporalSandbox
-from ._worker_env_ref import AllowAllWorkerEnvVars, temporal_worker_env_ref
-
-__all__ = [
-    "AllowAllWorkerEnvVars",
-    "SandboxStreamEvent",
-    "StrandsPlugin",
-    "SandboxWorkflowChain",
-    "SandboxWorkflowContext",
-    "TemporalAgent",
-    "TemporalMCPClient",
-    "TemporalSandbox",
-    "temporal_worker_env_ref",
-    "workflow",
-]

@@ -33,6 +33,17 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- The Deep Agents, Google ADK, Google GenAI, LangGraph, LangSmith, and Strands Agents
+  integrations have moved to independently versioned packages in
+  [`temporalio/ai-integrations`](https://github.com/temporalio/ai-integrations).
+  The existing `deepagents`, `google-adk`, `google-genai`, `langgraph`, `langsmith`,
+  and `strands-agents` extras now install the corresponding standalone packages,
+  and the old public `temporalio.contrib` imports forward their APIs.
+  New code should depend on `temporalio-deepagents`, `temporalio-google-adk`,
+  `temporalio-google-genai`, `temporalio-langgraph`, `temporalio-langsmith`, or
+  `temporalio-strands-agents` directly and import `temporalio.deepagents`,
+  `temporalio.google_adk`, `temporalio.google_genai`, `temporalio.langgraph`,
+  `temporalio.langsmith`, or `temporalio.strands_agents`, respectively.
 - `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
   workflow-private deterministic stream (a `workflow.new_random()` per run) instead of
   `workflow.random()`. A workflow started under 1.34.0 that generated
