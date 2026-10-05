@@ -53,6 +53,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Experimental Workflow Streams background publishing now retries transient
+  signal delivery failures without delaying payload conversion errors.
 - Fixed Pydantic constraints being silently ignored inside or outside workflow
   sandboxes by passing through `annotated_types` by default.
 
