@@ -830,6 +830,17 @@ def test_history_from_json():
     )
 
 
+def test_schedule_policy_proto() -> None:
+    default_policy = SchedulePolicy()
+    assert default_policy.catchup_window is None
+    assert not default_policy._to_proto().HasField("catchup_window")
+    assert SchedulePolicy._from_proto(default_policy._to_proto()).catchup_window is None
+
+    zero_policy = SchedulePolicy(catchup_window=timedelta())
+    assert zero_policy._to_proto().HasField("catchup_window")
+    assert zero_policy._to_proto().catchup_window.ToTimedelta() == timedelta()
+
+
 @pytest.mark.requires_local_server
 async def test_schedule_basics(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
@@ -988,6 +999,7 @@ async def test_schedule_basics(
     new_schedule.action.args = await DataConverter.default.encode(
         new_schedule.action.args
     )
+    new_schedule.policy.catchup_window = desc.schedule.policy.catchup_window
     assert desc.schedule == new_schedule
 
     # Attempt to create duplicate
