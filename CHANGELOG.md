@@ -20,6 +20,8 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Worker now warns when an activity method is registered from the class
+  instead of from an instance (i.e. its first parameter is an unbound `self`).
 - `workflow.new_random()` accepts an optional `name` that is mixed into the seed, so differently
   named generators, and `workflow.random()`, produce different sequences.
 
