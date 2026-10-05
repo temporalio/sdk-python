@@ -440,4 +440,3 @@ to include examples, links to docs, or any other relevant information.
   dedicated-loop pattern used with gevent/gunicorn and synchronous services).
   Note this does not make a `Client` fully thread- or loop-agnostic; reusing one
   long-lived loop is still the recommended pattern.
-
