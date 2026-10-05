@@ -135,6 +135,7 @@ class _Instance(WorkflowInstance):
         # not support importing __main__.
         if module_name == "__main__":
             module_name = "__temporal_main__"
+        self.importer.workflow_module_name = module_name
         try:
             # Import user code
             self._run_code(
