@@ -2,9 +2,9 @@
 
 For each PR with user-facing changes, add a Markdown file in each applicable
 category folder. Write high-level release notes describing what users can observe.
-Keep entries concise, ideally one or two sentences. Put each entry on a single
-line without manual wrapping. A fragment may contain multiple entries; blank
-lines are ignored.
+Keep entries concise, ideally one or two sentences. Write each entry entirely on
+one line: release tooling turns each nonempty line into a separate list item.
+A fragment may contain multiple entries; blank lines are ignored.
 Use fun, whimsical, unique lowercase kebab-case filenames, such as
 `fixed/giggling-teapot.md` or `added/dancing-marshmallow.md`. PR numbers are optional.
 

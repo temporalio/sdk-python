@@ -78,9 +78,9 @@ For release artifacts, use `uv build`. Documentation can be generated with
   for each applicable category. Use fun, whimsical, unique lowercase kebab-case
   filenames, such as `giggling-teapot.md`. The folder supplies the category;
   write only the release-note body, without a leading list marker (`-`). Keep
-  entries concise, ideally one or two sentences. Put each entry on a single line
-  without manual wrapping; a fragment may contain multiple entries. Release
-  tooling adds a list marker to each nonempty line. See `changelog/README.md` for
+  entries concise, ideally one or two sentences. Write each entry entirely on
+  one line: release tooling turns each nonempty line into a separate list item.
+  A fragment may contain multiple entries. See `changelog/README.md` for
   the convention.
   `CHANGELOG.md` contains completed releases and is assembled by release tooling.
 * Keep commit messages short and in the imperative mood.

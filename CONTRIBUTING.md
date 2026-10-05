@@ -65,9 +65,9 @@ Good pull requests are focused and easy to review:
   `changelog/<category>/` folder. Choose fun, whimsical, unique lowercase
   kebab-case filenames, such as `giggling-teapot.md`. Include only the release-note
   body without a leading list marker; the folder supplies its category. Keep
-  entries concise, ideally one or two sentences, with each entry on a single line
-  without manual wrapping. A fragment may contain multiple entries; release
-  tooling adds a list marker to each nonempty line. See [the fragment guide](changelog/README.md).
+  entries concise, ideally one or two sentences. Write each entry entirely on
+  one line: release tooling turns each nonempty line into a separate list item.
+  A fragment may contain multiple entries. See [the fragment guide](changelog/README.md).
   Release tooling assembles `CHANGELOG.md` from these fragments.
 * Describe what changed, why it changed, and what validation you ran.
 
