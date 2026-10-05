@@ -59,6 +59,8 @@ to include examples, links to docs, or any other relevant information.
 
 - `temporalio.contrib.strands` activity and MCP tools now give the model the
   Activity's failure message and expose its exception to after-tool hooks.
+- Reject unsupported `InterpreterPoolExecutor` activity executors when creating
+  a worker instead of failing during activity execution.
 
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
