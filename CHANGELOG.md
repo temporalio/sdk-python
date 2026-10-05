@@ -7,44 +7,6 @@ This file contains assembled releases only.
 
 # Changelog
 
-## [Unreleased]
-
-### Added
-
-### Changed
-
-- Payload converters exposed by data converters and workflow/activity accessors
-  retain transfer type conversion, so direct use behaves consistently with SDK
-  serialization.
-
-### Deprecated
-
-### :boom: Breaking Changes
-
-- The OpenAI Agents integration has moved to the independently versioned
-  [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
-  package. The existing `temporalio[openai-agents]` extra now installs that
-  package, and the old public `temporalio.contrib.openai_agents` imports
-  remain available at runtime and retain their static type information.
-  New code should depend on `temporalio-openai-agents` directly and import
-  `temporalio.openai_agents`.
-
-### Fixed
-
-- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of
-  ending the subscription normally.
-- Encoding a datetime search attribute without a timezone now raises
-  `ValueError("Timezone must be present on all search attribute dates")` on
-  the typed path, matching the deprecated untyped encoder, instead of sending
-  a naive ISO string that the server rejects with `BadSearchAttributes`.
-
-- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
-  log `Failed to detach context` when a context is torn down on a different thread while
-  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
-  context is now detached exactly when its token is still valid in the current
-  `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
-### Security
-
 ## [1.34.0] - 2026-09-30
 
 ### Added
