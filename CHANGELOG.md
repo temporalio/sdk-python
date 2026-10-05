@@ -49,6 +49,9 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Fixed Pydantic constraints being silently ignored inside or outside workflow
+  sandboxes by passing through `annotated_types` by default.
+
 - `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
   update validators), returning the workflow's deterministic time and fresh entropy without
   touching the workflow's random state.

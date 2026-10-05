@@ -515,6 +515,8 @@ SandboxRestrictions.passthrough_modules_with_temporal = (
         "pydantic",
         # Same for its compiled core, which Pydantic-based libraries import lazily
         "pydantic_core",
+        # Pydantic caches constraint classes by identity across sandboxes.
+        "annotated_types",
     }
 )
 
