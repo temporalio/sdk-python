@@ -406,8 +406,9 @@ async def test_tool_confirmation_activity_as_tool(client: Client, confirmed: boo
     # max_cached_workflows=0 forces a full history replay on every workflow
     # task, proving the confirmation resume is replay-safe: the recorded human
     # response references the confirmation function-call id, which must
-    # regenerate identically on replay (it derives from workflow.uuid4() via
-    # the platform uuid seam the plugin installs).
+    # regenerate identically on replay (it derives from the workflow's
+    # deterministic random stream via the platform uuid seam the plugin
+    # installs).
     async with _worker(client):
         LLMRegistry.register(ConfirmationModel)
         handle = await client.start_workflow(

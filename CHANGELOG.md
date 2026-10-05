@@ -20,6 +20,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### Added
 
+- Worker now warns when an activity method is registered from the class
+  instead of from an instance (i.e. its first parameter is an unbound `self`).
+- `workflow.new_random()` accepts an optional `name` that is mixed into the seed, so differently
+  named generators, and `workflow.random()`, produce different sequences.
+
 ### Changed
 
 - Payload converters exposed by data converters and workflow/activity accessors
@@ -30,6 +35,11 @@ to include examples, links to docs, or any other relevant information.
 
 ### :boom: Breaking Changes
 
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
+  workflow-private deterministic stream (a `workflow.new_random()` per run) instead of
+  `workflow.random()`. A workflow started under 1.34.0 that generated
+  ADK ids or jitter (for example one waiting on a HITL response) may not replay
+  deterministically across this upgrade; drain such workflows or use worker versioning.
 - The OpenAI Agents integration has moved to the independently versioned
   [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
   package. The existing `temporalio[openai-agents]` extra now installs that
@@ -37,11 +47,30 @@ to include examples, links to docs, or any other relevant information.
   remain available at runtime and retain their static type information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+- `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and
+  `seed_trace_id()`.
 
 ### Fixed
 
 - Experimental Workflow Streams background publishing now retries transient
   signal delivery failures without delaying payload conversion errors.
+- Fixed Pydantic constraints being silently ignored inside or outside workflow
+  sandboxes by passing through `annotated_types` by default.
+
+- `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
+  update validators), returning the workflow's deterministic time and fresh entropy without
+  touching the workflow's random state.
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
+  when calling the model. The schema type is now sent to the model activity as its JSON schema.
+  Custom Pydantic schema generation is preserved.
+  Integer-valued output enums are normalized to strings to match Google GenAI.
+
+- `temporalio.contrib.strands` activity and MCP tools now give the model the
+  Activity's failure message and expose its exception to after-tool hooks.
+- Reject unsupported `InterpreterPoolExecutor` activity executors when creating
+  a worker instead of failing during activity execution.
+
 - Encoding a datetime search attribute without a timezone now raises
   `ValueError("Timezone must be present on all search attribute dates")` on
   the typed path, matching the deprecated untyped encoder, instead of sending
@@ -52,6 +81,10 @@ to include examples, links to docs, or any other relevant information.
   OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
   context is now detached exactly when its token is still valid in the current
   `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Decode enums that mix in `str` or `int` (for example `class Color(str, Enum)`) to the enum
+  instead of a list of characters or an error, and decode `dict` keys typed as an `int` enum.
+
 ### Security
 
 ## [1.34.0] - 2026-09-30

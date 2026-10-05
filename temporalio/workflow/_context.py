@@ -879,21 +879,32 @@ def register_random_seed_callback(callback: Callable[[int], None]) -> None:
     return _Runtime.current().workflow_register_random_seed_callback(callback)
 
 
-def new_random() -> Random:
+def new_random(name: str | None = None) -> Random:
     """Create a Random instance that automatically reseeds when the workflow seed changes.
 
     This creates a new Random instance that is initially seeded with the current
     workflow seed, and automatically registers a callback to reseed itself
     whenever the workflow receives a new seed from core.
 
+    Args:
+        name: Mixed into the seed when given, so differently named instances,
+            and :py:func:`random`, produce different sequences. Without it the
+            instance starts out identical to :py:func:`random`.
+
     Returns:
         A Random instance that stays synchronized with the workflow's randomness.
     """
-    current_seed = random_seed()
-    auto_random = Random(current_seed)
+
+    def seed_for(workflow_seed: int) -> int | str:
+        if name is None:
+            # Unchanged: the same integer seed as :py:func:`random`.
+            return workflow_seed
+        return f"{workflow_seed}:{name}"
+
+    auto_random = Random(seed_for(random_seed()))
 
     def reseed_callback(new_seed: int) -> None:
-        auto_random.seed(new_seed)
+        auto_random.seed(seed_for(new_seed))
 
     register_random_seed_callback(reseed_callback)
     return auto_random
