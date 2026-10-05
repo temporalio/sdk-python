@@ -292,3 +292,7 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
+
+[tool.uv.sources]
+# TODO: Remove once a nexus-rpc release records the service of each operation
+nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python", rev = "e1d70abbb9378a8398fd472bd466c5dfa9f1aca7" }

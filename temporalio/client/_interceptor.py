@@ -18,6 +18,7 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
+import temporalio.nexus
 from temporalio.converter import DataConverter
 
 if TYPE_CHECKING:
@@ -605,6 +606,7 @@ class StartNexusOperationInput:
     headers: Mapping[str, str]
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
+    completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = ()
 
 
 @dataclass
