@@ -585,7 +585,7 @@ class WorkflowStreamClient:
                 self._polled_run_id = handle.workflow_run_id
                 result: PollResult = await handle.result()
             except asyncio.CancelledError:
-                return
+                raise
             except WorkflowUpdateFailedError as e:
                 cause_type = getattr(e.cause, "type", None)
                 if cause_type == TRUNCATED_OFFSET_ERROR_TYPE:
@@ -611,7 +611,9 @@ class WorkflowStreamClient:
                         continue
                     return
                 raise
-            except WorkflowUpdateRPCTimeoutOrCancelledError:
+            except WorkflowUpdateRPCTimeoutOrCancelledError as e:
+                if isinstance(e.__cause__, asyncio.CancelledError):
+                    raise e.__cause__
                 if await self._follow_continue_as_new():
                     continue
                 return
