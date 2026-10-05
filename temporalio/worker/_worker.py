@@ -172,7 +172,8 @@ class Worker:
             activity_executor: Concurrent executor to use for non-async
                 activities. This is required if any activities are non-async.
                 :py:class:`concurrent.futures.ThreadPoolExecutor` is
-                recommended. If this is a
+                recommended. ``concurrent.futures.InterpreterPoolExecutor``
+                is not supported. If this is a
                 :py:class:`concurrent.futures.ProcessPoolExecutor`, all
                 non-async activities must be picklable. ``max_workers`` on the
                 executor should at least be ``max_concurrent_activities`` or a
@@ -417,6 +418,13 @@ class Worker:
         Client is safe to take separately since it can't be modified by worker plugins.
         """
         self._config = config
+        if sys.version_info >= (3, 14) and isinstance(
+            config.get("activity_executor"), concurrent.futures.InterpreterPoolExecutor
+        ):
+            raise ValueError(  # pyright: ignore[reportUnreachable]
+                "InterpreterPoolExecutor is not supported as an activity_executor. "
+                "Use ThreadPoolExecutor or ProcessPoolExecutor instead."
+            )
         if not (
             config.get("activities")
             or config.get("nexus_service_handlers")

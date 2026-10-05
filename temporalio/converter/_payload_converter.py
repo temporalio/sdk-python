@@ -15,7 +15,7 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime
-from enum import IntEnum
+from enum import Enum
 from itertools import zip_longest
 from types import UnionType
 from typing import (
@@ -42,9 +42,6 @@ import temporalio.types
 if sys.version_info < (3, 11):
     # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
     from dateutil import parser  # type: ignore
-# StrEnum is available in 3.11+
-if sys.version_info >= (3, 11):
-    from enum import StrEnum  # type: ignore[reportUnreachable]
 
 from temporalio.converter._serialization_context import (
     SerializationContext,
@@ -954,6 +951,13 @@ def value_to_type(
                     if isinstance(key, str):
                         if key_type is int or key_type is float:
                             key = key_type(key)
+                        elif (
+                            inspect.isclass(key_type)
+                            and issubclass(key_type, Enum)
+                            and issubclass(key_type, int)
+                        ):
+                            # JSON serializes int enum keys as their number
+                            key = int(key)
                         elif key_type is bool:
                             key = {"true": True, "false": False}[key]
                         elif key_type is type(None):
@@ -1027,22 +1031,21 @@ def value_to_type(
             )
         return getattr(hint, "parse_obj")(value)
 
-    # IntEnum
-    if inspect.isclass(hint) and issubclass(hint, IntEnum):
+    # IntEnum, or any enum that mixes in int
+    if inspect.isclass(hint) and issubclass(hint, Enum) and issubclass(hint, int):
         if not isinstance(value, int):
             raise TypeError(
                 f"Cannot convert to enum {hint}, value not an integer, value is {type(value)}"
             )
         return hint(value)
 
-    # StrEnum, available in 3.11+
-    if sys.version_info >= (3, 11):
-        if inspect.isclass(hint) and issubclass(hint, StrEnum):  # type:ignore[reportUnreachable]
-            if not isinstance(value, str):
-                raise TypeError(
-                    f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
-                )
-            return hint(value)
+    # StrEnum, or any enum that mixes in str
+    if inspect.isclass(hint) and issubclass(hint, Enum) and issubclass(hint, str):
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Cannot convert to enum {hint}, value not a string, value is {type(value)}"
+            )
+        return hint(value)
 
     # UUID
     if inspect.isclass(hint) and issubclass(hint, uuid.UUID):
