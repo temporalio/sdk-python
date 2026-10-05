@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import cast
 
 import pytest
 
@@ -20,8 +19,8 @@ class NotificationValue:
 @pytest.mark.parametrize("success", [True, False])
 def test_notification_request_roundtrip(success: bool) -> None:
     data_converter = temporalio.converter.default()
-    converter = nexus_system._get_system_nexus_payload_converter(
-        data_converter._get_internal_payload_converter(),
+    converter = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
         data_converter.failure_converter,
     )
     result: models.OnCompleteRequestResult[NotificationValue] = (
@@ -33,12 +32,9 @@ def test_notification_request_roundtrip(success: bool) -> None:
         result=result, source_context=NotificationValue("context")
     )
     payload = converter.to_payload(request)
-    decoded = cast(
+    decoded = converter.from_payload(
+        payload,
         notifications.OnCompleteRequest[NotificationValue, NotificationValue],
-        converter.from_payload(
-            payload,
-            notifications.OnCompleteRequest[NotificationValue, NotificationValue],
-        ),
     )
     assert decoded.source_context == request.source_context
     assert isinstance(decoded.source_context, NotificationValue)
@@ -55,8 +51,8 @@ def test_notification_request_roundtrip(success: bool) -> None:
 
 def test_notification_response_roundtrip() -> None:
     data_converter = temporalio.converter.default()
-    converter = nexus_system._get_system_nexus_payload_converter(
-        data_converter._get_internal_payload_converter(),
+    converter = nexus_system._get_payload_converter(
+        data_converter.payload_converter,
         data_converter.failure_converter,
     )
     response = notifications.OnCompleteResponse()
