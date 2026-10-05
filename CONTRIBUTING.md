@@ -62,7 +62,8 @@ Good pull requests are focused and easy to review:
 * Include tests for behavior changes.
 * Update public API documentation or doc comments when public behavior changes.
 * For user-facing changes, add a Markdown fragment in each applicable
-  `changelog/<category>/` folder. Choose fun, whimsical, unique lowercase
+  `changelog/<category>/` folder. Use `stabilized/` for features that are no longer
+  experimental. Choose fun, whimsical, unique lowercase
   kebab-case filenames, such as `giggling-teapot.md`. Include only the release-note
   body without a leading list marker; the folder supplies its category. Keep
   entries concise, ideally one or two sentences. Write each entry entirely on

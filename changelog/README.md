@@ -11,6 +11,7 @@ Use fun, whimsical, unique lowercase kebab-case filenames, such as
 | Folder | Changes |
 | --- | --- |
 | `added/` | New features |
+| `stabilized/` | Features that are no longer experimental |
 | `changed/` | Changes in existing functionality |
 | `deprecated/` | Soon-to-be-removed features |
 | `breaking-changes/` | Removed or backwards-incompatible features |

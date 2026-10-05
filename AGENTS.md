@@ -75,7 +75,8 @@ For release artifacts, use `uv build`. Documentation can be generated with
 * Include tests for behavior changes.
 * Update public API documentation or doc comments for public behavior changes.
 * For user-facing changes, add a Markdown fragment under `changelog/<category>/`
-  for each applicable category. Use fun, whimsical, unique lowercase kebab-case
+  for each applicable category. Use `stabilized/` for features that are no longer
+  experimental. Use fun, whimsical, unique lowercase kebab-case
   filenames, such as `giggling-teapot.md`. The folder supplies the category;
   write only the release-note body, without a leading list marker (`-`). Keep
   entries concise, ideally one or two sentences. Write each entry entirely on
