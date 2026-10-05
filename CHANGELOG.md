@@ -48,6 +48,8 @@ to include examples, links to docs, or any other relevant information.
   New code should depend on `temporalio-openai-agents` directly and import
   `temporalio.openai_agents`.
 - **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+- `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and
+  `seed_trace_id()`.
 
 ### Fixed
 
