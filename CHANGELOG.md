@@ -7,23 +7,6 @@ This file contains assembled releases only.
 
 # Changelog
 
-## [Unreleased]
-
-### Added
-
-### Changed
-
-### Deprecated
-
-### :boom: Breaking Changes
-
-### Fixed
-
-- A cancel that arrives while an activity's result or failure is still being encoded no longer
-  interrupts the reporting, so the completion is still sent.
-
-### Security
-
 ## [1.34.0] - 2026-09-30
 
 ### Added
