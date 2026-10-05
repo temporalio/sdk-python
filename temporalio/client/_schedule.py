@@ -958,7 +958,7 @@ class SchedulePolicy:
 
     catchup_window: timedelta | None = None
     """After a Temporal server is unavailable, amount of time in the past to
-    execute missed actions. If None, the server configured default is used."""
+    execute missed actions. If None, the server configured default is used (currently one year)."""
 
     pause_on_failure: bool = False
     """Whether to pause the schedule if an action fails or times out.
