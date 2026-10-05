@@ -77,7 +77,9 @@ For release artifacts, use `uv build`. Documentation can be generated with
 * For user-facing changes, add a Markdown fragment under `changelog/<category>/`
   for each applicable category. Use fun, whimsical, unique lowercase kebab-case
   filenames, such as `giggling-teapot.md`. The folder supplies the category;
-  write only the release-note body. See `changelog/README.md` for the convention.
+  write only the release-note body, without a leading list marker (`-`). Keep
+  entries concise, ideally one or two sentences. Release tooling adds the list
+  marker. See `changelog/README.md` for the convention.
   `CHANGELOG.md` contains completed releases and is assembled by release tooling.
 * Keep commit messages short and in the imperative mood.
 * Provide a clear PR description outlining what changed, why it changed, and

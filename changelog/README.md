@@ -2,6 +2,7 @@
 
 For each PR with user-facing changes, add a Markdown file in each applicable
 category folder. Write high-level release notes describing what users can observe.
+Keep entries concise, ideally one or two sentences.
 Use fun, whimsical, unique lowercase kebab-case filenames, such as
 `fixed/giggling-teapot.md` or `added/dancing-marshmallow.md`. PR numbers are optional.
 
@@ -16,11 +17,12 @@ Use fun, whimsical, unique lowercase kebab-case filenames, such as
 
 Create a category folder when first needed. Place files directly inside it;
 use one fragment per category for your PR. The folder supplies the category, so
-the file contains only the entry, without a category or version heading:
+the file contains only the entry, without a category or version heading or a
+leading list marker (`-`). Release tooling adds the list marker:
 
 ```markdown
-- Reject unsupported activity executors when creating a worker, instead of
-  failing during activity execution.
+Reject unsupported activity executors when creating a worker, instead of
+failing during activity execution.
 ```
 
 Bodies can include paragraphs, examples, and documentation links. Do not edit
@@ -44,7 +46,8 @@ Review the assembled notes before merging the release PR.
 
 Assembly creates a dated section at the top of the changelog, groups notes in the
 category order above, and sorts filenames within each category. Empty categories
-are omitted. Fragment bodies and older releases are preserved. Empty releases and
+are omitted. Each fragment becomes one list item, with continuation lines indented
+to keep paragraphs and examples inside it. Older releases are preserved. Empty releases and
 duplicate versions are rejected. Fragments are retained if validation or lockfile
 refresh fails. A changelog validation failure leaves the version and lockfile
 updates in the local worktree; inspect or restore those changes before retrying.

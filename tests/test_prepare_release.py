@@ -101,7 +101,7 @@ def release_repo(tmp_path: pathlib.Path) -> pathlib.Path:
         "pyproject.toml": 'version = "1.34.0"\n',
         "temporalio/service.py": '__version__ = "1.34.0"\n',
         "uv.lock": "lock\n",
-        "changelog/fixed/giggling-teapot.md": "- A fix.\n",
+        "changelog/fixed/giggling-teapot.md": "A fix.\n",
     }.items():
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,7 +197,7 @@ def test_unexpected_changes_rejected_before_consuming(
     monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
 ) -> None:
     mock_preparation(monkeypatch)
-    (release_repo / "changelog/fixed/late-llama.md").write_text("- Late change.\n")
+    (release_repo / "changelog/fixed/late-llama.md").write_text("Late change.\n")
     with pytest.raises(RuntimeError, match="unexpected files"):
         prepare_release_files(
             release_repo, "1.35.0", datetime.date(2026, 10, 2), skip_lock=True

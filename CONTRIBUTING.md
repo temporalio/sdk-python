@@ -64,7 +64,8 @@ Good pull requests are focused and easy to review:
 * For user-facing changes, add a Markdown fragment in each applicable
   `changelog/<category>/` folder. Choose fun, whimsical, unique lowercase
   kebab-case filenames, such as `giggling-teapot.md`. Include only the release-note
-  body; the folder supplies its category. See [the fragment guide](changelog/README.md).
+  body without a leading list marker; the folder supplies its category. Keep
+  entries concise, ideally one or two sentences. See [the fragment guide](changelog/README.md).
   Release tooling assembles `CHANGELOG.md` from these fragments.
 * Describe what changed, why it changed, and what validation you ran.
 
