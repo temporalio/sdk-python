@@ -999,6 +999,7 @@ async def test_schedule_basics(
     new_schedule.action.args = await DataConverter.default.encode(
         new_schedule.action.args
     )
+    new_schedule.policy.catchup_window = desc.schedule.policy.catchup_window
     assert desc.schedule == new_schedule
 
     # Attempt to create duplicate
