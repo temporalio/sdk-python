@@ -102,7 +102,7 @@ class WeatherAgent:
             app_name="test_app",
         )
 
-        # 3. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        # 3. Create Session (uses runtime.new_uuid() -> the plugin's private stream)
         logger.info("Create session.")
         session = await runner.session_service.create_session(
             app_name="test_app", user_id="test"
@@ -421,7 +421,7 @@ class McpAgent:
         # 1. Define Agent using Temporal Helpers
         agent = mcp_agent(model_name)
 
-        # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        # 2. Create Session (uses runtime.new_uuid() -> the plugin's private stream)
         session_service = InMemorySessionService()
         logger.info("Create session.")
         session = await session_service.create_session(
