@@ -279,8 +279,9 @@ class JitteredRetryGraphWorkflow:
     """A retried node with default-style jitter must replay deterministically.
 
     Retry jitter feeds asyncio.sleep, i.e. a durable timer; unless the delay is
-    drawn from workflow.random() (via ADK's platform random seam), replays
-    compute a different timer duration and diverge.
+    drawn from the workflow's deterministic random stream (the plugin's
+    provider behind ADK's platform random seam), replays compute a different
+    timer duration and diverge.
     """
 
     @workflow.run
@@ -504,7 +505,7 @@ async def test_graph_node_retry_jitter_replay_safe(client: Client):
         assert result == "ok-after-2"
         history = await handle.fetch_history()
     # The jittered retry delay is a durable timer; replay must recompute the
-    # exact same duration from workflow.random().
+    # exact same duration from the plugin's deterministic random provider.
     await Replayer(
         workflows=[JitteredRetryGraphWorkflow], plugins=[GoogleAdkPlugin()]
     ).replay_workflow(history)
