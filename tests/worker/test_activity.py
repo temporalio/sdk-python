@@ -31,11 +31,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import RawValue, RetryPolicy
-from temporalio.converter import (
-    DataConverter,
-    DefaultPayloadConverter,
-    PayloadCodec,
-)
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
