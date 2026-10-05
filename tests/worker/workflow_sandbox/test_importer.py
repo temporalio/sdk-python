@@ -1,7 +1,9 @@
 import dataclasses
 import importlib
 import importlib.machinery
+import subprocess
 import sys
+import textwrap
 import types
 from typing import Any
 
@@ -21,6 +23,71 @@ from temporalio.worker.workflow_sandbox._restrictions import (
 )
 
 from .testmodules import restrictions
+
+
+@pytest.mark.parametrize("first", ["host", "sandbox"])
+def test_workflow_sandbox_importer_pydantic_constraints(first: str):
+    pytest.importorskip("pydantic", minversion="2")
+    # Pydantic caches constraint classes process-wide, so each creation order
+    # needs a fresh process to catch constraints being ignored on either side.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent(
+                """
+                import sys
+                from pydantic import BaseModel, Field, ValidationError, conint
+                from temporalio.worker.workflow_sandbox._importer import Importer
+                from temporalio.worker.workflow_sandbox._restrictions import (
+                    RestrictionContext, SandboxRestrictions,
+                )
+
+                def on_host():
+                    class Host(BaseModel):
+                        field: int = Field(ge=0)
+                        constrained: conint(ge=0)
+                    return Host
+
+                def in_sandbox():
+                    with Importer(
+                        SandboxRestrictions.default, RestrictionContext()
+                    ).applied():
+                        from typing import Annotated
+                        import annotated_types
+
+                        class Sandboxed(BaseModel):
+                            value: Annotated[int, annotated_types.Ge(1)]
+                    return Sandboxed
+
+                if sys.argv[1] == "host":
+                    host, sandboxed = on_host(), in_sandbox()
+                else:
+                    sandboxed, host = in_sandbox(), on_host()
+
+                assert sandboxed(value=1).value == 1
+                assert host(field=0, constrained=0).field == 0
+                for model, values, field in (
+                    (sandboxed, {"value": 0}, "value"),
+                    (host, {"field": -1, "constrained": 0}, "field"),
+                    (host, {"field": 0, "constrained": -1}, "constrained"),
+                ):
+                    try:
+                        model(**values)
+                    except ValidationError as err:
+                        assert err.errors()[0]["loc"] == (field,)
+                        assert err.errors()[0]["type"] == "greater_than_equal"
+                    else:
+                        raise AssertionError(f"Constraint ignored for {field}")
+                """
+            ),
+            first,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_workflow_sandbox_importer_invalid_module():

@@ -4,7 +4,9 @@ from strands.types._events import ToolResultEvent
 from strands.types.tools import AgentTool, ToolGenerator, ToolResult, ToolSpec, ToolUse
 
 from temporalio import workflow
+from temporalio.exceptions import ActivityError
 
+from ._temporal_activity_tool import _activity_error_event
 from ._temporal_mcp_client import _CallToolArgs, _MCPToolInfo
 
 
@@ -53,13 +55,17 @@ class TemporalMCPTool(AgentTool):
         **kwargs: Any,
     ) -> ToolGenerator:
         """Execute the tool by dispatching to the per-server call-tool activity."""
-        result: ToolResult = await workflow.execute_activity(
-            f"{self._server}-call-tool",
-            _CallToolArgs(
-                tool_name=self._info.name,
-                arguments=tool_use["input"],
-                tool_use_id=tool_use["toolUseId"],
-            ),
-            **self._options,
-        )
+        try:
+            result: ToolResult = await workflow.execute_activity(
+                f"{self._server}-call-tool",
+                _CallToolArgs(
+                    tool_name=self._info.name,
+                    arguments=tool_use["input"],
+                    tool_use_id=tool_use["toolUseId"],
+                ),
+                **self._options,
+            )
+        except ActivityError as error:
+            yield _activity_error_event(tool_use["toolUseId"], error)
+            return
         yield ToolResultEvent(result)

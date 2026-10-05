@@ -95,6 +95,17 @@ class _ActivityWorker:
                     f"Activity named {defn.name} is a class instead of an instance"
                 )
 
+            # A plain function whose first parameter is "self" is almost always
+            # a method referenced from the class instead of from an instance
+            if inspect.isfunction(activity):
+                params = list(inspect.signature(activity).parameters)
+                if params and params[0] == "self":
+                    warnings.warn(
+                        f"Activity named {defn.name} has a first parameter named self "
+                        "but is not bound to an instance, did you mean to register it "
+                        "from an instance of the class?"
+                    )
+
             # Some extra requirements for sync functions
             if not defn.is_async:
                 if not activity_executor:

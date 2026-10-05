@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any, cast
 
 import nexusrpc
 import pytest
@@ -24,6 +25,7 @@ from temporalio.client import (
     NexusOperationFailureError,
     WorkflowExecutionStatus,
     WorkflowFailureError,
+    WorkflowUpdateStage,
 )
 from temporalio.common import (
     NexusOperationExecutionStatus,
@@ -116,6 +118,7 @@ class TestService:
     sync_result: Operation[Input, str]
     custom_cancel: Operation[str, None]
     update_op: Operation[Input, str]
+    bad_update_stage_op: Operation[Input, str]
     query_op: Operation[str, bool]
     echo_activity: Operation[Input, str]
     error_activity: Operation[Input, None]
@@ -134,6 +137,7 @@ class TestServiceHandler:
         self.started_custom_cancel_workflow = asyncio.Event()
         self.started_custom_cancel_activity = asyncio.Event()
         self.custom_cancel_activity_called = asyncio.Event()
+        self.bad_update_stage_error: ValueError | None = None
 
     @nexus.temporal_operation
     async def echo(
@@ -290,8 +294,29 @@ class TestServiceHandler:
             input.value,
             UpdatableWorkflow.do_update,
             input.update_value,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
             update_id=input.update_id,
         )
+
+    @nexus.temporal_operation
+    async def bad_update_stage_op(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: Input,
+    ) -> nexus.TemporalOperationResult[str]:
+        try:
+            return await client.start_workflow_update(
+                input.value,
+                UpdatableWorkflow.do_update,
+                input.update_value,
+                # cast to bypass type checker
+                wait_for_stage=cast(Any, WorkflowUpdateStage.COMPLETED),
+                update_id=input.update_id,
+            )
+        except ValueError as err:
+            self.bad_update_stage_error = err
+            return nexus.TemporalOperationResult.sync(str(err))
 
     @nexus.temporal_operation
     async def query_op(
@@ -747,6 +772,41 @@ async def test_temporal_operation_update_workflow_delayed(
         ]
         assert expected_forward_link in caller_links
         assert expected_backward_link in handler_links
+
+
+async def test_start_workflow_update_rejects_non_accepted_wait_for_stage(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Update workflow tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    service_handler = TestServiceHandler()
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        workflows=[UpdatableWorkflow, BadUpdateStageCaller],
+    ):
+        update_workflow_id = f"updatable-workflow-{uuid.uuid4()}"
+        await client.start_workflow(
+            UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
+        )
+        result = await client.execute_workflow(
+            BadUpdateStageCaller.run,
+            Input(
+                value=update_workflow_id,
+                task_queue=task_queue,
+                update_value="Created",
+            ),
+            task_queue=task_queue,
+            id=f"bad-update-stage-caller-{uuid.uuid4()}",
+        )
+
+    assert isinstance(service_handler.bad_update_stage_error, ValueError)
+    assert result == str(service_handler.bad_update_stage_error)
+    assert result == "Only ACCEPTED wait stage is supported"
 
 
 async def test_temporal_operation_cancel_rejects_unknown_tokens():
@@ -1647,6 +1707,19 @@ class UpdateWorkflowCaller:
                     "unexpected empty operation token on an async operation"
                 )
         return await op_handle
+
+
+@workflow.defn
+class BadUpdateStageCaller:
+    """Caller workflow for an update op that requests an unsupported update stage."""
+
+    @workflow.run
+    async def run(self, input: Input) -> str:
+        client = workflow.create_nexus_client(
+            service=TestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        return await client.execute_operation(TestService.bad_update_stage_op, input)
 
 
 @workflow.defn
