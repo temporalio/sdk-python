@@ -81,6 +81,31 @@ def test_published_notes_keep_python_and_core_sections(
     )
 
 
+@pytest.mark.parametrize("core_notes", ["", "#### Fixed\n\n- Core fix.\n"])
+def test_empty_python_release_notes_allow_core_only_releases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, core_notes: str
+) -> None:
+    release_verify = _release_verify_module()
+
+    def run_tool(_root: pathlib.Path, args: list[str]) -> str:
+        return "" if args[0] == "notes" else core_notes
+
+    monkeypatch.setattr(release_verify, "run_tool", run_tool)
+    output = tmp_path / "notes.md"
+    release_verify.changelog_notes(
+        argparse.Namespace(
+            version="1.35.0",
+            changelog="CHANGELOG.md",
+            sdk_core_path="core",
+            output=str(output),
+        )
+    )
+    expected = "## Notable Changes\n\n"
+    if core_notes:
+        expected += "\n### SDK Core\n\n" + core_notes
+    assert output.read_text() == expected
+
+
 def test_shared_tool_preserves_failure_diagnostics(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:

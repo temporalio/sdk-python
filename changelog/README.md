@@ -50,8 +50,9 @@ Review the assembled notes before merging the release PR.
 Assembly creates a dated section at the top of the changelog, groups notes in the
 category order above, and sorts filenames within each category. Empty categories
 are omitted. Each nonempty line becomes one list item, in the order it appears
-in the fragment. Older releases are preserved. Empty releases and
-duplicate versions are rejected. Fragments are retained if validation or lockfile
+in the fragment. Breaking changes use `### :boom: Breaking Changes`. Older releases
+are preserved. Empty releases are allowed; duplicate versions are rejected.
+Fragments are retained if validation or lockfile
 refresh fails. A changelog validation failure leaves the version and lockfile
 updates in the local worktree; inspect or restore those changes before retrying.
 File-system errors can leave partial changelog preparation as well; preparation

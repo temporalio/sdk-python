@@ -50,7 +50,5 @@ def prepare_changelog(
             version,
             "--date",
             release_date.isoformat(),
-            "--breaking-heading",
-            ":boom: Breaking Changes",
         ],
     )
