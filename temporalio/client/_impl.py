@@ -1580,6 +1580,11 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 "temporalio.api.enums.v1.NexusOperationIdConflictPolicy.ValueType",
                 int(input.id_conflict_policy),
             ),
+            # Callback source contexts use the started operation's serialization
+            # context, like the rest of the request.
+            completion_callbacks=[
+                await cb._to_proto(data_converter) for cb in input.completion_callbacks
+            ],
         )
 
         if input.schedule_to_close_timeout is not None:
