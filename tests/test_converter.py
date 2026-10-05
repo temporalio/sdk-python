@@ -82,6 +82,14 @@ class SerializableEnum(IntEnum):
     FOO = 1
 
 
+class SerializableMixinStrEnum(str, Enum):
+    FOO = "foo"
+
+
+class SerializableMixinIntEnum(int, Enum):
+    FOO = 1
+
+
 if sys.version_info >= (3, 11):
 
     class SerializableStrEnum(StrEnum):  # type:ignore[reportUnreachable]
@@ -693,6 +701,18 @@ def test_json_type_hints():
     # IntEnum
     ok(SerializableEnum, SerializableEnum.FOO)
     ok(list[SerializableEnum], [SerializableEnum.FOO, SerializableEnum.FOO])
+    ok(dict[SerializableEnum, str], {SerializableEnum.FOO: "foo"})
+
+    # Enums that mix in int or str
+    ok(SerializableMixinIntEnum, SerializableMixinIntEnum.FOO)
+    ok(dict[SerializableMixinIntEnum, str], {SerializableMixinIntEnum.FOO: "foo"})
+    ok(SerializableMixinStrEnum, SerializableMixinStrEnum.FOO)
+    ok(
+        list[SerializableMixinStrEnum],
+        [SerializableMixinStrEnum.FOO, SerializableMixinStrEnum.FOO],
+    )
+    ok(dict[SerializableMixinStrEnum, int], {SerializableMixinStrEnum.FOO: 1})
+    fail(SerializableMixinStrEnum, 5)
 
     # UUID
     ok(UUID, uuid4())
