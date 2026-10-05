@@ -6,6 +6,7 @@ import google.protobuf.duration_pb2
 
 import temporalio.api.common.v1.message_pb2 as common_pb2
 import temporalio.api.enums.v1.workflow_pb2 as workflow_enums_pb2
+import temporalio.api.failure.v1.message_pb2 as failure_pb2
 import temporalio.api.taskqueue.v1.message_pb2 as taskqueue_pb2
 import temporalio.api.workflow.v1
 import temporalio.common
@@ -142,14 +143,35 @@ def _payload_to_value(payload: common_pb2.Payload) -> object:
 
 def payload_from_proto(
     proto: common_pb2.Payload,
+    type_hint: typing.Any = None,
 ) -> object:
-    return _payload_to_value(proto)
+    return temporalio.nexus.system._current_user_payload_converter().from_payloads(
+        [proto], [type_hint] if type_hint is not None else None
+    )[0]
 
 
 def payload_to_proto(
     payload: object,
 ) -> common_pb2.Payload:
     return _value_to_payload(payload)
+
+
+def failure_from_proto(
+    proto: failure_pb2.Failure,
+) -> BaseException:
+    return temporalio.nexus.system._current_user_failure_converter().from_failure(
+        proto, temporalio.nexus.system._current_user_payload_converter()
+    )
+
+
+def failure_to_proto(
+    failure: BaseException,
+) -> failure_pb2.Failure:
+    proto = failure_pb2.Failure()
+    temporalio.nexus.system._current_user_failure_converter().to_failure(
+        failure, temporalio.nexus.system._current_user_payload_converter(), proto
+    )
+    return proto
 
 
 def memo_from_proto(
