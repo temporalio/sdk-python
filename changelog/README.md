@@ -32,6 +32,29 @@ Entries can include inline Markdown and documentation links. Do not edit
 `CHANGELOG.md` for pending changes: it contains completed releases only. Maintainers
 can apply `skip-changelog` to PRs that need no release note.
 
+## Updating SDK Core
+
+Initialize the checked-in submodule, then use its shared update command:
+
+```bash
+git submodule update --init
+poe update-core
+```
+
+This fetches and updates Core to `origin/main`, importing user-facing entries from
+`crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
+`poe update-core --revision <ref>` to select a particular locally available revision instead.
+Each affected category gets a fragment with an automatically generated whimsical
+filename. Core entries join the language entries in the same categories, without
+a Core prefix. Wrapped Core prose becomes one line per entry; unsupported block
+Markdown must be rewritten before importing.
+
+Start with a clean Core checkout. Backward and divergent updates are rejected.
+Repeated updates import only the range since the previous checkout; an unchanged
+pin creates no fragments. Review and commit the updated pin and generated fragments
+together. The command does not stage or commit changes, refresh the bridge lockfile,
+or resolve bridge compatibility issues.
+
 ## Preparing a release
 
 Release tooling requires Rust/Cargo and the checked-in sdk-rust submodule:
@@ -46,6 +69,12 @@ Run preparation from a clean worktree. The script creates a release branch from
 shared tool to write the dated changelog and consume its fragments. It commits
 the resulting version, lockfile, changelog, and fragment-deletion changes. It pushes the branch and opens a PR with the `skip-changelog` label.
 Review the assembled notes before merging the release PR.
+
+Preparation consumes both language and imported Core fragments. Publishing calls
+the shared `release-notes` command to read that completed release and append Core
+commit links under `### SDK Core Commits`. Core changelog entries are not collected
+again during publishing. Both publishing jobs check out the pinned Core tool;
+the commit range comes from the previous release tag and the current release's pin.
 
 Assembly creates a dated section at the top of the changelog, groups notes in the
 category order above, and sorts filenames within each category. Empty categories

@@ -75,6 +75,11 @@ Good pull requests are focused and easy to review:
 Run the relevant local checks when practical. CI must pass before a pull request can
 be merged.
 
+When updating the Core submodule, use `poe update-core`, documented in
+[the fragment guide](changelog/README.md#updating-sdk-core). Review and
+commit the new pin and generated fragments together. Refresh the bridge lockfile
+and check compatibility as needed.
+
 ## Things to Avoid
 
 Avoid changes that make review harder without improving the contribution:

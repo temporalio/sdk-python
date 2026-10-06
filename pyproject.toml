@@ -154,6 +154,7 @@ lint-types = [
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest -n auto --dist=worksteal"
+update-core = { cmd = "cargo run --quiet --manifest-path temporalio/bridge/sdk-core/crates/changelog-release-notes/Cargo.toml --bin changelog-tool -- update-core --repo . --submodule temporalio/bridge/sdk-core", help = "Update Core and import its changelog fragments" }
 
 
 [tool.pytest.ini_options]
