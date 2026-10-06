@@ -55,6 +55,9 @@ pin creates no fragments. Review and commit the updated pin and generated fragme
 together. The command does not stage or commit changes, refresh the bridge lockfile,
 or resolve bridge compatibility issues.
 
+If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
+regenerated bindings in the update PR. Refresh the bridge lockfile when needed.
+
 ## Preparing a release
 
 Release tooling requires Rust/Cargo and the checked-in sdk-rust submodule:

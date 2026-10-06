@@ -79,6 +79,8 @@ When updating the Core submodule, use `poe update-core`, documented in
 [the fragment guide](changelog/README.md#updating-sdk-core). Review and
 commit the new pin and generated fragments together. Refresh the bridge lockfile
 and check compatibility as needed.
+If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
+regenerated bindings in the same PR.
 
 ## Things to Avoid
 

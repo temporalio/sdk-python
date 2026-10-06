@@ -128,5 +128,7 @@ Reviewers will look for:
   changelog entries into category fragments. Review and commit the new Core pin
   and generated fragments together; do not update the pin and defer its notes
   until release time. Refresh the bridge lockfile and check compatibility as needed.
+  If Core protobuf definitions changed, run `poe gen-protos-docker` and commit the
+  regenerated bindings with the pin update.
 * `__pycache__`, `build`, `dist`, and Rust `target` outputs are generated
   artifacts and should not be reviewed as source changes.
