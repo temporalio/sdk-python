@@ -73,7 +73,7 @@ def test_shared_notes_failure_preserves_existing_output(
 ) -> None:
     release_verify = _release_verify_module()
 
-    def run_tool(_root: pathlib.Path, args: list[str]) -> str:
+    def run_tool(_root: pathlib.Path, _args: list[str]) -> str:
         raise RuntimeError("Missing release section")
 
     monkeypatch.setattr(release_verify, "run_tool", run_tool)
