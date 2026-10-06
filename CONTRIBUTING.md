@@ -95,11 +95,15 @@ Markdown must be rewritten before importing.
 Start with a clean Core checkout. Backward and divergent updates are rejected.
 Repeated updates import only the range since the previous checkout; an unchanged
 pin creates no fragments. Review and commit the updated pin and generated fragments
-together. The command does not stage or commit changes, refresh the bridge lockfile,
-or resolve bridge compatibility issues.
+together with the bridge manifest and lockfile. Python copies Core path dependency
+versions from the updated checkout into `temporalio/bridge/Cargo.toml` and runs
+`cargo fetch` to refresh `Cargo.lock`, preserving existing valid registry pins.
+The command does not stage or commit changes or resolve Rust API
+compatibility issues. If dependency refresh fails, inspect the updated pin,
+fragments, and manifest before retrying.
 
 If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
-regenerated bindings in the update PR. Refresh the bridge lockfile when needed.
+regenerated bindings in the update PR.
 
 ## Things to Avoid
 

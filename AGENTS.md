@@ -127,7 +127,8 @@ Reviewers will look for:
   `CONTRIBUTING.md` under "Updating SDK Core". It updates the submodule and imports
   Core's user-facing changelog entries into category fragments. Review and commit the new Core pin
   and generated fragments together; do not update the pin and defer its notes
-  until release time. Refresh the bridge lockfile and check compatibility as needed.
+  until release time. The Python task copies Core path dependency versions from the new checkout
+  and refreshes the bridge lockfile; review both and check Rust API compatibility as needed.
   If Core protobuf definitions changed, run `poe gen-protos-docker` and commit the
   regenerated bindings with the pin update.
 * `__pycache__`, `build`, `dist`, and Rust `target` outputs are generated
