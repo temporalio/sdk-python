@@ -23,9 +23,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import abc
+
 import google.protobuf.empty_pb2
 import grpc
+
 import temporalio.api.testservice.v1.request_response_pb2
 
 class TestServiceStub:
@@ -179,4 +182,6 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
         This time might not be equal to {@link System#currentTimeMillis()} due to time skipping.
         """
 
-def add_TestServiceServicer_to_server(servicer: TestServiceServicer, server: grpc.Server) -> None: ...
+def add_TestServiceServicer_to_server(
+    servicer: TestServiceServicer, server: grpc.Server
+) -> None: ...

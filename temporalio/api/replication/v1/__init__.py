@@ -1,6 +1,8 @@
-from .message_pb2 import ClusterReplicationConfig
-from .message_pb2 import NamespaceReplicationConfig
-from .message_pb2 import FailoverStatus
+from .message_pb2 import (
+    ClusterReplicationConfig,
+    FailoverStatus,
+    NamespaceReplicationConfig,
+)
 
 __all__ = [
     "ClusterReplicationConfig",

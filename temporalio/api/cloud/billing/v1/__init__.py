@@ -1,5 +1,4 @@
-from .message_pb2 import BillingReportSpec
-from .message_pb2 import BillingReport
+from .message_pb2 import BillingReport, BillingReportSpec
 
 __all__ = [
     "BillingReport",

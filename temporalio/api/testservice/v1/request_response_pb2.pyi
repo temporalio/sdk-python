@@ -23,12 +23,14 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+
 import builtins
+import sys
+
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
-import sys
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -84,8 +86,12 @@ class SleepUntilRequest(google.protobuf.message.Message):
         *,
         timestamp: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+    ) -> None: ...
 
 global___SleepUntilRequest = SleepUntilRequest
 
@@ -100,8 +106,12 @@ class SleepRequest(google.protobuf.message.Message):
         *,
         duration: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["duration", b"duration"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["duration", b"duration"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["duration", b"duration"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["duration", b"duration"]
+    ) -> None: ...
 
 global___SleepRequest = SleepRequest
 
@@ -125,7 +135,11 @@ class GetCurrentTimeResponse(google.protobuf.message.Message):
         *,
         time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing_extensions.Literal["time", b"time"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing_extensions.Literal["time", b"time"]) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["time", b"time"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["time", b"time"]
+    ) -> None: ...
 
 global___GetCurrentTimeResponse = GetCurrentTimeResponse

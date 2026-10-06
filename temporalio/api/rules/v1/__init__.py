@@ -1,6 +1,4 @@
-from .message_pb2 import WorkflowRuleAction
-from .message_pb2 import WorkflowRuleSpec
-from .message_pb2 import WorkflowRule
+from .message_pb2 import WorkflowRule, WorkflowRuleAction, WorkflowRuleSpec
 
 __all__ = [
     "WorkflowRule",

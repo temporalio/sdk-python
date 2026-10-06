@@ -1,7 +1,4 @@
-from .message_pb2 import S3Spec
-from .message_pb2 import GCSSpec
-from .message_pb2 import KinesisSpec
-from .message_pb2 import PubSubSpec
+from .message_pb2 import GCSSpec, KinesisSpec, PubSubSpec, S3Spec
 
 __all__ = [
     "GCSSpec",

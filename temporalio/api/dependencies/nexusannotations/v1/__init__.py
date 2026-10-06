@@ -1,5 +1,4 @@
-from .options_pb2 import OperationOptions
-from .options_pb2 import ServiceOptions
+from .options_pb2 import OperationOptions, ServiceOptions
 
 __all__ = [
     "OperationOptions",

@@ -1,5 +1,4 @@
-from .external_data_pb2 import LocalActivityMarkerData
-from .external_data_pb2 import PatchedMarkerData
+from .external_data_pb2 import LocalActivityMarkerData, PatchedMarkerData
 
 __all__ = [
     "LocalActivityMarkerData",

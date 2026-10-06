@@ -1,8 +1,10 @@
-from .activity_task_pb2 import ActivityCancelReason
-from .activity_task_pb2 import ActivityTask
-from .activity_task_pb2 import Start
-from .activity_task_pb2 import Cancel
-from .activity_task_pb2 import ActivityCancellationDetails
+from .activity_task_pb2 import (
+    ActivityCancellationDetails,
+    ActivityCancelReason,
+    ActivityTask,
+    Cancel,
+    Start,
+)
 
 __all__ = [
     "ActivityCancelReason",
