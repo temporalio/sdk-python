@@ -118,7 +118,11 @@ class _Instance(WorkflowInstance):
     ) -> None:
         self.instance_details = instance_details
         self.runner_class = runner_class
-        self.importer = Importer(restrictions, RestrictionContext())
+        self.importer = Importer(
+            restrictions,
+            RestrictionContext(),
+            workflow_module_name=self._workflow_module_name(),
+        )
 
         self._current_thread_id: int | None = None
 
@@ -128,14 +132,17 @@ class _Instance(WorkflowInstance):
         }
         self._create_instance()
 
-    def _create_instance(self) -> None:
+    def _workflow_module_name(self) -> str:
         module_name = self.instance_details.defn.cls.__module__
         # If the module name is __main__ then we change to __temporal_main__ so
         # we don't trigger top-level execution that happens in __main__. We do
         # not support importing __main__.
         if module_name == "__main__":
             module_name = "__temporal_main__"
-        self.importer.workflow_module_name = module_name
+        return module_name
+
+    def _create_instance(self) -> None:
+        module_name = self._workflow_module_name()
         try:
             # Import user code
             self._run_code(

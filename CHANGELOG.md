@@ -51,9 +51,6 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
-- Exempt the workflow's defining module from unintentional passthrough warnings
-  and errors while continuing to reload it in the sandbox.
-
 - Fixed Pydantic constraints being silently ignored inside or outside workflow
   sandboxes by passing through `annotated_types` by default.
 
