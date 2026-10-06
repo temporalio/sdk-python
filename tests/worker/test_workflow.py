@@ -9024,7 +9024,6 @@ class ActivityHeartbeatWorkflow:
                 True,
                 activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=2),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         )
@@ -9034,7 +9033,6 @@ class ActivityHeartbeatWorkflow:
                 True,
                 activity_id=f"{activity_id}-2",
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=2),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
         )
@@ -9053,6 +9051,8 @@ async def test_activity_pause_cancellation_details(
             workflows=[ActivityHeartbeatWorkflow],
             activities=[heartbeat_activity, sync_heartbeat_activity],
             activity_executor=executor,
+            max_heartbeat_throttle_interval=timedelta(milliseconds=300),
+            default_heartbeat_throttle_interval=timedelta(milliseconds=300),
         ) as worker:
             test_activity_id = f"heartbeat-activity-{uuid.uuid4()}"
 
@@ -9105,7 +9105,6 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
                 False,
                 activity_id=activity_id,
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
         )
@@ -9115,7 +9114,6 @@ class ActivityHeartbeatPauseUnpauseWorkflow:
                 False,
                 activity_id=f"{activity_id}-2",
                 start_to_close_timeout=timedelta(seconds=10),
-                heartbeat_timeout=timedelta(seconds=1),
                 retry_policy=RetryPolicy(maximum_attempts=2),
             )
         )
@@ -9213,7 +9211,6 @@ class ExternalActivityWorkflow:
             external_activity_heartbeat,
             activity_id=activity_id,
             start_to_close_timeout=timedelta(seconds=10),
-            heartbeat_timeout=timedelta(seconds=1),
             retry_policy=RetryPolicy(maximum_attempts=2),
         )
 
@@ -9253,12 +9250,11 @@ async def test_external_activity_cancellation_details(
         # Pause activity then assert it is paused
         await pause_and_assert(client, wf_handle, activity_info.activity_id)
 
-        try:
+        with pytest.raises(AsyncActivityCancelledError) as err:
             await external_activity_handle.heartbeat()
-        except AsyncActivityCancelledError as err:
-            assert err.details == temporalio.activity.ActivityCancellationDetails(
-                paused=True
-            )
+        assert err.value.details == temporalio.activity.ActivityCancellationDetails(
+            paused=True
+        )
 
 
 @activity.defn
