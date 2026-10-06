@@ -35,35 +35,25 @@ def _release_verify_module() -> ModuleType:
     return module
 
 
-def test_sdk_core_release_notes_embed_shared_output(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    release_verify = _release_verify_module()
-    monkeypatch.setattr(
-        release_verify, "run_tool", lambda *_args: "#### Commits\n\n- Core commit\n"
-    )
-    assert release_verify._sdk_core_release_notes("1.35.0", "core") == [
-        "### SDK Core",
-        "",
-        "#### Commits",
-        "",
-        "- Core commit",
-    ]
-    monkeypatch.setattr(release_verify, "run_tool", lambda *_args: "")
-    assert release_verify._sdk_core_release_notes("1.35.0", "core") == []
-
-
-def test_published_notes_keep_python_and_core_sections(
+def test_published_notes_use_shared_file_output(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     release_verify = _release_verify_module()
 
     def run_tool(_root: pathlib.Path, args: list[str]) -> str:
-        return (
-            "### Fixed\n\n- Python fix.\n"
-            if args[0] == "notes"
-            else "#### Fixed\n\n- Core fix.\n"
-        )
+        assert args == [
+            "release-notes",
+            "--version",
+            "1.35.0",
+            "--changelog",
+            "CHANGELOG.md",
+            "--submodule",
+            "core",
+            "--output",
+            str(output),
+        ]
+        output.write_text("Shared release notes.\n")
+        return ""
 
     monkeypatch.setattr(release_verify, "run_tool", run_tool)
     output = tmp_path / "notes.md"
@@ -75,35 +65,30 @@ def test_published_notes_keep_python_and_core_sections(
             output=str(output),
         )
     )
-    assert (
-        output.read_text()
-        == "## Notable Changes\n\n### Fixed\n\n- Python fix.\n\n### SDK Core\n\n#### Fixed\n\n- Core fix.\n"
-    )
+    assert output.read_text() == "Shared release notes.\n"
 
 
-@pytest.mark.parametrize("core_notes", ["", "#### Fixed\n\n- Core fix.\n"])
-def test_empty_python_release_notes_allow_core_only_releases(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, core_notes: str
+def test_shared_notes_failure_preserves_existing_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:
     release_verify = _release_verify_module()
 
-    def run_tool(_root: pathlib.Path, args: list[str]) -> str:
-        return "" if args[0] == "notes" else core_notes
+    def run_tool(_root: pathlib.Path, _args: list[str]) -> str:
+        raise RuntimeError("Missing release section")
 
     monkeypatch.setattr(release_verify, "run_tool", run_tool)
     output = tmp_path / "notes.md"
-    release_verify.changelog_notes(
-        argparse.Namespace(
-            version="1.35.0",
-            changelog="CHANGELOG.md",
-            sdk_core_path="core",
-            output=str(output),
+    output.write_text("Existing notes.\n")
+    with pytest.raises(RuntimeError, match="Missing release section"):
+        release_verify.changelog_notes(
+            argparse.Namespace(
+                version="1.35.0",
+                changelog="CHANGELOG.md",
+                sdk_core_path="core",
+                output=str(output),
+            )
         )
-    )
-    expected = "## Notable Changes\n\n"
-    if core_notes:
-        expected += "\n### SDK Core\n\n" + core_notes
-    assert output.read_text() == expected
+    assert output.read_text() == "Existing notes.\n"
 
 
 def test_shared_tool_preserves_failure_diagnostics(
