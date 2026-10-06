@@ -4496,7 +4496,7 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
         self.timer_task.cancel()
 
 
-async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v1(
     env: WorkflowEnvironment,
 ):
     # This test only works when we support time skipping
@@ -4542,6 +4542,47 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task(
             # This used to not complete because a signal cancelling the timer was
             # not respected by the timer fire
             await result_task
+
+
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v2(
+    env: WorkflowEnvironment,
+):
+    # V2 port of the test above. Uses the fixture env's V2 TS instead of
+    # spawning its own V1 TS server. Instead of worker-off buffering (not
+    # possible with V2 FF, which needs a worker to make progress), buffers
+    # the cancel signal server-side first, then fast-forwards past the timer
+    # deadline. The resulting workflow task contains both the signal-received
+    # event and the timer-fired event, delivered in the same task.
+    if not env.supports_time_skipping_v2:
+        pytest.skip("Requires V2 time skipping")
+
+    async with new_worker(
+        env.client,
+        CancelSignalAndTimerFiredInSameTaskWorkflow,
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await env.client.start_workflow(
+            CancelSignalAndTimerFiredInSameTaskWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # Give the workflow a moment to process its initial task and start
+        # awaiting the timer.
+        await asyncio.sleep(0.5)
+        # Buffer the cancel signal server-side. It will be delivered on the
+        # next workflow task, which the fast-forward below triggers.
+        await handle.signal(
+            CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer
+        )
+        # Fast-forward past the timer deadline. The timer-fired event lands
+        # in the same workflow task as the pre-buffered signal; the signal
+        # handler cancels the timer_task first, so the timer-fired event is
+        # a no-op and the workflow exits via `except asyncio.CancelledError`.
+        # If the ordering had been reversed (timer-fire delivered in its own
+        # task before the signal), the workflow would reach `assert False`
+        # and `handle.result()` would raise.
+        await env.fast_forward(handle, timedelta(hours=2))
+        await handle.result()
 
 
 @workflow.defn
