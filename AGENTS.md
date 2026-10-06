@@ -124,8 +124,8 @@ Reviewers will look for:
   `README.md` before changing them.
 * The Rust bridge uses SDK Core from `temporalio/bridge/sdk-core`.
 * Update Core with `poe update-core`, which invokes the shared command documented in
-  `changelog/README.md`. It updates the submodule and imports Core's user-facing
-  changelog entries into category fragments. Review and commit the new Core pin
+  `CONTRIBUTING.md` under "Updating SDK Core". It updates the submodule and imports
+  Core's user-facing changelog entries into category fragments. Review and commit the new Core pin
   and generated fragments together; do not update the pin and defer its notes
   until release time. Refresh the bridge lockfile and check compatibility as needed.
   If Core protobuf definitions changed, run `poe gen-protos-docker` and commit the

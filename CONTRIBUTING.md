@@ -75,12 +75,31 @@ Good pull requests are focused and easy to review:
 Run the relevant local checks when practical. CI must pass before a pull request can
 be merged.
 
-When updating the Core submodule, use `poe update-core`, documented in
-[the fragment guide](changelog/README.md#updating-sdk-core). Review and
-commit the new pin and generated fragments together. Refresh the bridge lockfile
-and check compatibility as needed.
+## Updating SDK Core
+
+Initialize the checked-in submodule, then use the shared update command:
+
+```bash
+git submodule update --init
+poe update-core
+```
+
+This fetches and updates Core to `origin/main`, importing user-facing entries from
+`crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
+`poe update-core --revision <ref>` to select a particular locally available revision.
+Each affected category gets a fragment with an automatically generated whimsical
+filename. Core entries join the language entries in the same categories, without
+a Core prefix. Wrapped Core prose becomes one line per entry; unsupported block
+Markdown must be rewritten before importing.
+
+Start with a clean Core checkout. Backward and divergent updates are rejected.
+Repeated updates import only the range since the previous checkout; an unchanged
+pin creates no fragments. Review and commit the updated pin and generated fragments
+together. The command does not stage or commit changes, refresh the bridge lockfile,
+or resolve bridge compatibility issues.
+
 If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
-regenerated bindings in the same PR.
+regenerated bindings in the update PR. Refresh the bridge lockfile when needed.
 
 ## Things to Avoid
 

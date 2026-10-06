@@ -32,31 +32,9 @@ Entries can include inline Markdown and documentation links. Do not edit
 `CHANGELOG.md` for pending changes: it contains completed releases only. Maintainers
 can apply `skip-changelog` to PRs that need no release note.
 
-## Updating SDK Core
-
-Initialize the checked-in submodule, then use its shared update command:
-
-```bash
-git submodule update --init
-poe update-core
-```
-
-This fetches and updates Core to `origin/main`, importing user-facing entries from
-`crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
-`poe update-core --revision <ref>` to select a particular locally available revision instead.
-Each affected category gets a fragment with an automatically generated whimsical
-filename. Core entries join the language entries in the same categories, without
-a Core prefix. Wrapped Core prose becomes one line per entry; unsupported block
-Markdown must be rewritten before importing.
-
-Start with a clean Core checkout. Backward and divergent updates are rejected.
-Repeated updates import only the range since the previous checkout; an unchanged
-pin creates no fragments. Review and commit the updated pin and generated fragments
-together. The command does not stage or commit changes, refresh the bridge lockfile,
-or resolve bridge compatibility issues.
-
-If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
-regenerated bindings in the update PR. Refresh the bridge lockfile when needed.
+`poe update-core` imports Core changelog entries into category fragments when
+updating the submodule. See [Updating SDK Core](../CONTRIBUTING.md#updating-sdk-core)
+for contributor instructions.
 
 ## Preparing a release
 
