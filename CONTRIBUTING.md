@@ -88,8 +88,8 @@ This fetches and updates Core to `origin/main`, importing user-facing entries fr
 `crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
 `poe update-core --revision <ref>` to select a particular locally available revision.
 Each affected category gets a fragment with an automatically generated whimsical
-filename. Core entries join the language entries in the same categories, without
-a Core prefix. Wrapped Core prose becomes one line per entry; unsupported block
+filename. Core entries join the language entries in the same categories with a
+`Core: ` prefix. Wrapped Core prose becomes one line per entry; unsupported block
 Markdown must be rewritten before importing.
 
 Start with a clean Core checkout. Backward and divergent updates are rejected.
