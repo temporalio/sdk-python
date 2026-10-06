@@ -306,16 +306,18 @@ class _Visitor(VisitorFunctions):
 
 
 @contextlib.contextmanager
-def _external_storage_message_scope(
+def _external_storage_message(
     data_converter: temporalio.converter.DataConverter,
-) -> Iterator[None]:
-    """Gives every payload in this message one shared per-message limit."""
+) -> Iterator[temporalio.converter._extstore.StorageOperationMetrics]:
+    """Scopes one message's external storage limit and metrics."""
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
     storage = data_converter.external_storage
     if storage is None:
-        yield
+        with metrics.track():
+            yield metrics
         return
-    with temporalio.converter._extstore.message_scope(storage):
-        yield
+    with metrics.track(), temporalio.converter._extstore.message_scope(storage):
+        yield metrics
 
 
 async def decode_activation(
@@ -328,8 +330,7 @@ async def decode_activation(
     Returns:
         Metrics from any external storage retrieval operations that occurred.
     """
-    metrics = temporalio.converter._extstore.StorageOperationMetrics()
-    with metrics.track(), _external_storage_message_scope(data_converter):
+    with _external_storage_message(data_converter) as metrics:
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not decode_headers,
@@ -364,8 +365,7 @@ async def encode_completion(
         completion,
     )
 
-    metrics = temporalio.converter._extstore.StorageOperationMetrics()
-    with metrics.track(), _external_storage_message_scope(data_converter):
+    with _external_storage_message(data_converter) as metrics:
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not encode_headers,

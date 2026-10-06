@@ -34,7 +34,7 @@ from temporalio.converter._payload_converter import (
     JSONProtoPayloadConverter,
 )
 
-logger = getLogger("temporalio.converter")
+logger = getLogger(__name__)
 
 _T = TypeVar("_T")
 
@@ -191,9 +191,10 @@ class StorageDriverLimiter(ABC):
     def permit(
         self, item: Payload | StorageDriverClaim
     ) -> contextlib.AbstractAsyncContextManager[None]:
-        """Runs the block once a permit is available.
+        """Holds a permit for the duration of the ``async with`` block.
 
-        ``item`` is the payload being stored or the claim being retrieved.
+        Waits for a permit to be available before entering, and releases it on
+        exit. ``item`` is the payload being stored or the claim being retrieved.
         """
         ...
 
