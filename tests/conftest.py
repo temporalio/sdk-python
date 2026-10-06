@@ -200,6 +200,8 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "--dynamic-config-value",
         'system.system.refreshNexusEndpointsMinWait="0s"',
         "--dynamic-config-value",
+        "frontend.WorkflowTimeSkippingEnabled=true",
+        "--dynamic-config-value",
         "history.enableSignalWithStartFromWorkflow=true",
         "--dynamic-config-value",
         "history.enableUpdateCallbacks=true",
