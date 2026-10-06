@@ -8,6 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from tests.helpers.trace import TraceNode
+
 
 @pytest.fixture(autouse=True)
 def _clear_langsmith_env_cache() -> Any:  # pyright: ignore[reportUnusedFunction]
@@ -92,13 +94,8 @@ class InMemoryRunCollector:
         self._by_id.clear()
 
 
-def dump_traces(collector: InMemoryRunCollector) -> list[list[str]]:
-    """Reconstruct parent-child hierarchy grouped by root trace.
-
-    Returns a list of traces, where each trace is a list of indented
-    strings (same format as dump_runs). Each trace starts from a
-    different root run.
-    """
+def build_trace_trees(collector: InMemoryRunCollector) -> list[TraceNode]:
+    """Build trace trees from the collector's run parent relationships."""
     runs = collector.runs
     children: dict[str | None, list[_RunRecord]] = {}
     for r in runs:
@@ -113,30 +110,18 @@ def dump_traces(collector: InMemoryRunCollector) -> list[list[str]]:
                 f"which is not in the collected runs — dangling parent reference"
             )
 
-    traces: list[list[str]] = []
-    for root in children.get(None, []):
-        trace: list[str] = []
+    def build_tree(run: _RunRecord) -> TraceNode:
+        return TraceNode(
+            run.name,
+            [build_tree(child) for child in children.get(run.id, [])],
+        )
 
-        def _walk(parent_id: str | None, depth: int) -> None:
-            for child in children.get(parent_id, []):
-                trace.append("  " * depth + child.name)
-                _walk(child.id, depth + 1)
-
-        trace.append(root.name)
-        _walk(root.id, 1)
-        traces.append(trace)
-
-    return traces
+    return [build_tree(root) for root in children.get(None, [])]
 
 
-def dump_runs(collector: InMemoryRunCollector) -> list[str]:
-    """Flat list of all runs across all traces."""
-    return [run for trace in dump_traces(collector) for run in trace]
-
-
-def find_traces(traces: list[list[str]], root_name: str) -> list[list[str]]:
-    """Filter traces by exact root name match."""
-    return [t for t in traces if t[0] == root_name]
+def find_trace_trees(traces: list[TraceNode], root_name: str) -> list[TraceNode]:
+    """Filter trace trees by exact root run name."""
+    return [trace for trace in traces if trace.name == root_name]
 
 
 def make_mock_ls_client(collector: InMemoryRunCollector) -> MagicMock:

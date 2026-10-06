@@ -1,7 +1,9 @@
-from .common_pb2 import VersioningIntent
-from .common_pb2 import NamespacedWorkflowExecution
-from .common_pb2 import WorkerDeploymentVersion
-from .common_pb2 import ExternalStorageMetrics
+from .common_pb2 import (
+    ExternalStorageMetrics,
+    NamespacedWorkflowExecution,
+    VersioningIntent,
+    WorkerDeploymentVersion,
+)
 
 __all__ = [
     "ExternalStorageMetrics",

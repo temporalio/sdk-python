@@ -198,10 +198,12 @@ class GeminiApiCaller:
         @activity.defn
         async def gemini_files_download(
             req: _GeminiDownloadFileRequest,
-        ) -> bytes:
+        ) -> bytes | None:
             """Download a file using the real genai.Client on the worker."""
             return await self._client.aio.files.download(
-                file=req.file, config=req.config
+                file=req.file,
+                destination=req.destination,
+                config=req.config,
             )
 
         @activity.defn

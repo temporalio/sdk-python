@@ -65,7 +65,7 @@ class InterruptWorkflow:
 
 
 async def test_interrupt(client: Client):
-    task_queue = "test_interrupt"
+    task_queue = f"test_interrupt-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(

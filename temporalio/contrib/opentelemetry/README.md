@@ -1,6 +1,29 @@
 # OpenTelemetry Integration for Temporal Python SDK
 
-This package provides OpenTelemetry tracing integration for Temporal workflows, activities, and other operations. It includes automatic span creation and propagation for distributed tracing across your Temporal applications.
+This package provides OpenTelemetry tracing and metrics integration for Temporal workflows, activities, and other operations. It includes automatic span creation and propagation for distributed tracing, and a `MetricsExporter` for exporting Temporal SDK/Core metrics through the standard OpenTelemetry metrics API, across your Temporal applications.
+
+## Metrics
+
+`MetricsExporter` drains a `temporalio.runtime.MetricBuffer` into an OpenTelemetry `MeterProvider`, so Temporal's own SDK/Core metrics (and any custom metrics recorded via `activity.metric_meter()`/`workflow.metric_meter()`) can be exported through the standard OpenTelemetry metrics pipeline (views, resources, any OTel-compatible backend) instead of only through `PrometheusConfig`/`OpenTelemetryConfig`.
+
+```python
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
+from temporalio.contrib.opentelemetry import MetricsExporter
+from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
+
+buffer = MetricBuffer(10_000)
+runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+meter_provider = MeterProvider(
+    metric_readers=[PeriodicExportingMetricReader(ConsoleMetricExporter())]
+)
+
+async with MetricsExporter(buffer, meter_provider):
+    client = await Client.connect("localhost:7233", runtime=runtime)
+    ...
+```
+
+**Note:** the `Runtime` must be constructed with the buffer attached *before* `MetricsExporter` is started, and the exporter must keep running (it polls on a fixed interval) for as long as metrics should be exported.
 
 ## Overview
 
@@ -235,6 +258,66 @@ with tracer.start_as_current_span("my-operation") as span:
         "request.id": "req-123"
     })
 ```
+
+## Replay-Safe Metrics
+
+For Temporal SDK metrics inside workflows, use `temporalio.workflow.metric_meter()`,
+which is already replay-safe. However, third-party libraries (e.g. Google ADK) may
+record OpenTelemetry metrics through the process-global meter provider from code
+that runs inside workflows. Workflow code re-executes on every replay (cache
+eviction, worker restart, redeploy), so a plain global meter provider re-records
+those metrics on each replay, inflating counts.
+
+`ReplaySafeMeterProvider` wraps your meter provider so synchronous instrument
+recordings made from workflow code are dropped while the workflow is replaying
+history events, mirroring what `create_tracer_provider()` does for spans:
+
+```python
+import opentelemetry.metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from temporalio.contrib.opentelemetry import ReplaySafeMeterProvider
+
+# set_meter_provider only takes effect once per process, so this wrapper must
+# be the first and only global meter provider set, installed before any
+# library records metrics.
+opentelemetry.metrics.set_meter_provider(
+    ReplaySafeMeterProvider(MeterProvider(metric_readers=[my_reader]))
+)
+```
+
+Recordings are first-execution-only, matching `workflow.metric_meter()`: a
+retried workflow task re-executes live and can record again. Queries and
+update validators are live, once-per-request operations even when they run
+while the workflow is replaying, so their recordings are kept. Observable
+(asynchronous) instruments and recordings made outside workflows pass through
+untouched.
+
+## Replay-Safe Log Events
+
+Libraries may also emit OpenTelemetry log records through the process-global
+logger provider from workflow code (e.g. Google ADK's `gen_ai.*` events),
+which duplicate on every replay the same way. `ReplaySafeLoggerProvider`
+wraps your logger provider so records emitted from workflow code are dropped
+while the workflow is replaying history events:
+
+```python
+import opentelemetry._logs
+from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+from temporalio.contrib.opentelemetry import ReplaySafeLoggerProvider
+
+# set_logger_provider only takes effect once per process, so this wrapper
+# must be the first and only global logger provider set, installed before
+# any library emits log records.
+logger_provider = LoggerProvider()
+logger_provider.add_log_record_processor(BatchLogRecordProcessor(my_log_exporter))
+opentelemetry._logs.set_logger_provider(ReplaySafeLoggerProvider(logger_provider))
+```
+
+Emissions are first-execution-only: a retried workflow task re-executes live
+and can emit again. Queries and update validators are live, once-per-request
+operations even when they run while the workflow is replaying, so their
+emissions are kept. Emissions outside workflows pass through untouched.
 
 ## Best Practices
 

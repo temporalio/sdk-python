@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import dataclasses
 import logging
 import logging.handlers
 import os
@@ -30,6 +31,7 @@ from temporalio.client import (
     WorkflowHandle,
 )
 from temporalio.common import RawValue, RetryPolicy
+from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import (
     ActivityError,
     ApplicationError,
@@ -382,8 +384,13 @@ async def test_activity_cancel_catch(
             while True:
                 await asyncio.sleep(0.3)
                 activity.heartbeat()
-        except asyncio.CancelledError:
-            return "Got cancelled error, cancelled? " + str(activity.is_cancelled())
+        except asyncio.CancelledError as err:
+            return (
+                "Got cancelled error, cancelled? "
+                + str(activity.is_cancelled())
+                + ", reason: "
+                + str(err)
+            )
 
     result = await _execute_workflow_with_activity(
         client,
@@ -394,7 +401,10 @@ async def test_activity_cancel_catch(
         heartbeat_timeout_ms=2000,
         shared_state_manager=shared_state_manager,
     )
-    assert result.result == "Got cancelled error, cancelled? True"
+    assert (
+        result.result
+        == "Got cancelled error, cancelled? True, reason: Activity cancelled"
+    )
 
 
 async def test_activity_cancel_throw(
@@ -1122,6 +1132,87 @@ async def test_activity_worker_shutdown_graceful(
     assert "Worker graceful shutdown" == await handle.result()
 
 
+class _BlockingEncodeCodec(PayloadCodec):
+    """Blocks in encode until released, like a codec waiting on a remote KMS."""
+
+    def __init__(self) -> None:
+        self.encoding_started = asyncio.Event()
+        self.release = asyncio.Event()
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        self.encoding_started.set()
+        await self.release.wait()
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
+async def test_activity_cancel_during_result_encode_still_completes(
+    client: Client, worker: ExternalWorker, caplog: pytest.LogCaptureFixture
+):
+    @activity.defn
+    async def fail_with_details() -> NoReturn:
+        # Details send the failure through the codec
+        raise ApplicationError("boom", {"detail": "x"})
+
+    codec = _BlockingEncodeCodec()
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default, payload_codec=codec
+    )
+    act_task_queue = str(uuid.uuid4())
+    act_worker = Worker(
+        Client(**config), task_queue=act_task_queue, activities=[fail_with_details]
+    )
+    run_task = asyncio.create_task(act_worker.run())
+    handle = await client.start_workflow(
+        "kitchen_sink",
+        KSWorkflowParams(
+            actions=[
+                KSAction(
+                    execute_activity=KSExecuteActivityAction(
+                        name="fail_with_details",
+                        task_queue=act_task_queue,
+                        retry_max_attempts=1,
+                    )
+                )
+            ]
+        ),
+        id=str(uuid.uuid4()),
+        task_queue=worker.task_queue,
+    )
+    # Shut down while the failure is still being encoded. With no grace period
+    # the worker cancels the activity at once, which must not keep its outcome
+    # from being reported, or shutdown would wait on it forever.
+    await codec.encoding_started.wait()
+    with caplog.at_level(logging.DEBUG, logger="temporalio.worker._activity"):
+        shutdown_task = asyncio.create_task(act_worker.shutdown())
+
+        # Only let encoding finish once the cancel has reached the activity,
+        # so it cannot complete first and let an unfixed worker pass
+        async def cancel_logged() -> None:
+            while not any(
+                rec.getMessage().startswith("Cancelling activity")
+                for rec in caplog.records
+            ):
+                await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(cancel_logged(), 20)
+        codec.release.set()
+        await asyncio.wait_for(shutdown_task, 20)
+    await run_task
+    with pytest.raises(WorkflowFailureError) as err:
+        await handle.result()
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, ApplicationError)
+    assert err.value.cause.cause.message == "boom"
+
+
 @activity.defn
 def picklable_wait_on_event() -> str:
     activity.wait_for_worker_shutdown_sync(20)
@@ -1470,7 +1561,7 @@ async def test_sync_activity_cancel_after_return_does_not_kill_thread_pool_worke
     env: WorkflowEnvironment,
     shared_state_manager: SharedStateManager,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test requires real worker-side timeout cancellation delivery")
 
     def alive_thread_count(executor: ThreadPoolExecutor) -> int:

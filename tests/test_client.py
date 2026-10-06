@@ -141,6 +141,7 @@ async def test_start_id_reuse(
         )
         await handle.result()
     assert err.value.run_id == handle.result_run_id
+    assert err.value.first_run_id == handle.first_execution_run_id
 
     # Run again allowing duplicate (the default)
     handle = await client.start_workflow(
@@ -556,7 +557,7 @@ async def test_interceptor(client: Client, worker: ExternalWorker):
     assert interceptor.traces[4][1].id == handle.id
 
 
-async def test_lazy_client(client: Client, env: WorkflowEnvironment):
+async def test_lazy_client(env: WorkflowEnvironment):
     # TODO(cretz): Fix
     if env.supports_time_skipping_v1:
         pytest.skip(
@@ -564,23 +565,17 @@ async def test_lazy_client(client: Client, env: WorkflowEnvironment):
         )
     # Create another client that is lazy. This test just makes sure the
     # functionality continues to work.
-    lazy_client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
-        lazy=True,
-    )
+    lazy_client = await env.connect_client(lazy=True)
     assert not lazy_client.service_client.worker_service_client._bridge_client
     await lazy_client.workflow_service.get_system_info(GetSystemInfoRequest())
     assert lazy_client.service_client.worker_service_client._bridge_client
 
 
-async def test_client_connected_skips_connect_lock(client: Client):
+async def test_client_connected_skips_connect_lock(env: WorkflowEnvironment):
     # Once connected, RPCs must not touch the lazy-connect lock. Acquiring it
     # per-RPC put an event-loop-bound primitive on the hot path, pinning a
     # connected client to the loop it connected on.
-    other = await Client.connect(
-        client.service_client.config.target_host, namespace=client.namespace
-    )
+    other = await env.connect_client()
     svc = other.service_client.worker_service_client
     assert svc._bridge_client
 
@@ -599,18 +594,13 @@ async def test_client_connected_skips_connect_lock(client: Client):
     assert counting.acquire_count == 0
 
 
-def test_client_reuse_across_event_loops(client: Client):
+def test_client_reuse_across_event_loops(env: WorkflowEnvironment):
     # A connected client must not be pinned to the loop (or thread) it
     # connected on. This mirrors the long-lived-loop reuse pattern used by
     # gevent/gunicorn and synchronous services.
-    target_host = client.service_client.config.target_host
-    namespace = client.namespace
-
     connect_loop = asyncio.new_event_loop()
     try:
-        reused_client = connect_loop.run_until_complete(
-            Client.connect(target_host, namespace=namespace)
-        )
+        reused_client = connect_loop.run_until_complete(env.connect_client())
     finally:
         connect_loop.close()
 
@@ -668,21 +658,24 @@ async def test_list_workflows_and_fetch_history(
             )
             expected_id_and_input.append((workflow_id, f'"user{i}"'))
 
-    # List them and get their history
-    actual_id_and_input = sorted(
-        [
-            (
-                hist.workflow_id,
-                hist.events[0]
-                .workflow_execution_started_event_attributes.input.payloads[0]
-                .data.decode(),
-            )
-            async for hist in client.list_workflows(
-                f"WorkflowId = '{workflow_id}'"
-            ).map_histories()
-        ]
-    )
-    assert actual_id_and_input == expected_id_and_input
+    # Visibility is eventually consistent, so wait for all runs before fetching
+    # their histories.
+    async def list_id_and_input() -> list[tuple[str, str]]:
+        return sorted(
+            [
+                (
+                    hist.workflow_id,
+                    hist.events[0]
+                    .workflow_execution_started_event_attributes.input.payloads[0]
+                    .data.decode(),
+                )
+                async for hist in client.list_workflows(
+                    f"WorkflowId = '{workflow_id}'"
+                ).map_histories()
+            ]
+        )
+
+    await assert_eq_eventually(expected_id_and_input, list_id_and_input)
 
     # Verify listing can limit results
     limited = [
@@ -837,6 +830,18 @@ def test_history_from_json():
     )
 
 
+def test_schedule_policy_proto() -> None:
+    default_policy = SchedulePolicy()
+    assert default_policy.catchup_window is None
+    assert not default_policy._to_proto().HasField("catchup_window")
+    assert SchedulePolicy._from_proto(default_policy._to_proto()).catchup_window is None
+
+    zero_policy = SchedulePolicy(catchup_window=timedelta())
+    assert zero_policy._to_proto().HasField("catchup_window")
+    assert zero_policy._to_proto().catchup_window.ToTimedelta() == timedelta()
+
+
+@pytest.mark.requires_local_server
 async def test_schedule_basics(
     client: Client, worker: ExternalWorker, env: WorkflowEnvironment
 ):
@@ -844,8 +849,6 @@ async def test_schedule_basics(
         pytest.skip("Java test server doesn't support schedules")
     elif os.getenv("TEMPORAL_TEST_PROTO3"):
         pytest.skip("Older proto library cannot compare repeated fields")
-    await assert_no_schedules(client)
-
     # Create a schedule with a lot of stuff
     schedule = Schedule(
         action=ScheduleActionStartWorkflow(
@@ -996,6 +999,7 @@ async def test_schedule_basics(
     new_schedule.action.args = await DataConverter.default.encode(
         new_schedule.action.args
     )
+    new_schedule.policy.catchup_window = desc.schedule.policy.catchup_window
     assert desc.schedule == new_schedule
 
     # Attempt to create duplicate
@@ -1083,10 +1087,9 @@ async def test_schedule_basics(
     assert list_descs[0].id in [f"{handle.id}-3", f"{handle.id}-4"]
     assert list_descs[1].id in [f"{handle.id}-3", f"{handle.id}-4"]
 
-    # Delete all of the schedules
-    for id in await list_ids():
+    # Delete the schedules created by this test.
+    for id in expected_ids:
         await client.get_schedule_handle(id).delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_calendar_spec_defaults(
@@ -1094,8 +1097,6 @@ async def test_schedule_calendar_spec_defaults(
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
         Schedule(
@@ -1124,7 +1125,6 @@ async def test_schedule_calendar_spec_defaults(
             assert time == desc.info.next_action_times[i - 1] + timedelta(days=1)
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_trigger_immediately(
@@ -1132,8 +1132,6 @@ async def test_schedule_trigger_immediately(
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Create paused schedule that triggers immediately
     handle = await client.create_schedule(
         f"schedule-{uuid.uuid4()}",
@@ -1154,8 +1152,14 @@ async def test_schedule_trigger_immediately(
 
     # Confirm workflow result
     desc = await handle.describe()
-    assert desc.info.num_actions == 1
-    action_exec = (await handle.describe()).info.recent_actions[0].action
+
+    async def update_desc_get_action_count() -> int:
+        nonlocal desc
+        desc = await handle.describe()
+        return desc.info.num_actions
+
+    await assert_eq_eventually(1, update_desc_get_action_count)
+    action_exec = desc.info.recent_actions[0].action
     assert isinstance(action_exec, ScheduleActionExecutionStartWorkflow)
     assert (
         "some result"
@@ -1165,7 +1169,6 @@ async def test_schedule_trigger_immediately(
     )
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 async def test_schedule_backfill(
@@ -1173,8 +1176,6 @@ async def test_schedule_backfill(
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     begin = datetime(year=2020, month=1, day=20, hour=5)
 
     # Create paused schedule that runs every minute and has two backfills
@@ -1225,7 +1226,6 @@ async def test_schedule_backfill(
         )
     finally:
         await handle.delete()
-        await assert_no_schedules(client)
 
 
 async def test_schedule_create_limited_actions_validation(
@@ -1251,13 +1251,12 @@ async def test_schedule_create_limited_actions_validation(
     assert "are remaining actions set" in str(err.value)
 
 
+@pytest.mark.requires_local_server
 async def test_schedule_workflow_search_attribute_update(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Put search attribute on server
     text_attr_key = SearchAttributeKey.for_text("python-test-schedule-text")
     untyped_keyword_key = SearchAttributeKey.for_keyword("python-test-schedule-keyword")
@@ -1350,7 +1349,6 @@ async def test_schedule_workflow_search_attribute_update(
     assert desc.typed_search_attributes[text_attr_key] == "some-schedule-attr1"
 
     await handle.delete()
-    await assert_no_schedules(client)
 
 
 @pytest.mark.parametrize(
@@ -1362,13 +1360,12 @@ async def test_schedule_workflow_search_attribute_update(
         "partial-new-values-overwrites-and-drops",
     ],
 )
+@pytest.mark.requires_local_server
 async def test_schedule_search_attribute_update(
     client: Client, env: WorkflowEnvironment, test_case: str
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    await assert_no_schedules(client)
-
     # Put search attributes on server
     key_1 = SearchAttributeKey.for_text("python-test-schedule-sa-update-key-1")
     key_2 = SearchAttributeKey.for_keyword("python-test-schedule-sa-update-key-2")
@@ -1486,15 +1483,6 @@ async def test_schedule_search_attribute_update(
         raise ValueError(f"Invalid test case: {test_case}")
 
     await handle.delete()
-    await assert_no_schedules(client)
-
-
-async def assert_no_schedules(client: Client) -> None:
-    # Listing appears eventually consistent
-    async def schedule_count() -> int:
-        return len([d async for d in await client.list_schedules()])
-
-    await assert_eq_eventually(0, schedule_count)
 
 
 async def test_build_id_interactions(client: Client, env: WorkflowEnvironment):
@@ -1556,6 +1544,9 @@ class LastCompletionResultWorkflow:
             return "My First Result"
 
 
+# Cloud does not reliably provide a prior completion result to manually
+# triggered schedule actions.
+@pytest.mark.requires_local_server
 async def test_schedule_last_completion_result(
     client: Client, env: WorkflowEnvironment
 ):
@@ -1590,12 +1581,14 @@ async def test_schedule_last_completion_result(
                 result = await workflow_handle.result()
                 return length, result
 
-        assert await get_schedule_result() == (1, "My First Result")
+        expected_first_result: tuple[int, str | None] = (1, "My First Result")
+        await assert_eq_eventually(expected_first_result, get_schedule_result)
         await handle.trigger()
-        assert await get_schedule_result() == (
+        expected_second_result: tuple[int, str | None] = (
             2,
             "From last completion: My First Result",
         )
+        await assert_eq_eventually(expected_second_result, get_schedule_result)
 
         await handle.delete()
 

@@ -33,8 +33,10 @@ import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
 import temporalio.exceptions
+import temporalio.nexus.system.workflow_service.models
 import temporalio.worker
 import temporalio.workflow
+from temporalio.contrib.opentelemetry._context import attached_context
 from temporalio.exceptions import ApplicationError, ApplicationErrorCategory
 
 # OpenTelemetry dynamically, lazily chooses its context implementation at
@@ -182,8 +184,7 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
         kind: opentelemetry.trace.SpanKind,
         context: Context | None = None,
     ) -> Iterator[None]:
-        token = opentelemetry.context.attach(context) if context else None
-        try:
+        with attached_context(context):
             with self.tracer.start_as_current_span(
                 name,
                 attributes=attributes,
@@ -218,9 +219,6 @@ class TracingInterceptor(temporalio.client.Interceptor, temporalio.worker.Interc
                             )
                         )
                     raise
-        finally:
-            if token and context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
 
     def _completed_workflow_span(
         self, params: _CompletedWorkflowSpanParams
@@ -433,6 +431,10 @@ class _InputWithStringHeaders(Protocol):
     headers: Mapping[str, str] | None
 
 
+class _InputWithModelHeaders(Protocol):
+    headers: Mapping[str, Any] | None
+
+
 class _InputWithOperationContext(Generic[_ContextT], Protocol):
     ctx: _ContextT
 
@@ -551,8 +553,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         # We need to put this interceptor on the context too
         context = self._set_on_context(context)
         # Run under context with new span
-        token = opentelemetry.context.attach(context)
-        try:
+        with attached_context(context):
             # This won't be created if there was no context header
             self._completed_span(
                 f"HandleQuery:{input.query}",
@@ -562,13 +563,6 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                 kind=opentelemetry.trace.SpanKind.SERVER,
             )
             return await super().handle_query(input)
-        finally:
-            # In some exceptional cases this finally is executed with a
-            # different contextvars.Context than the one the token was created
-            # on. As such we do a best effort detach to avoid using a mismatched
-            # token.
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
 
     def handle_update_validator(
         self, input: temporalio.worker.HandleUpdateInput
@@ -639,31 +633,23 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         success = False
         exception: Exception | None = None
         # Run under this context
-        token = opentelemetry.context.attach(context)
-
-        try:
-            yield None
-            success = True
-        except temporalio.exceptions.FailureError as err:
-            # We only record the failure errors since those are the only ones
-            # that lead to workflow completions
-            exception = err
-            raise
-        finally:
-            # Create a completed span before detaching context
-            if exception or (success and success_is_complete):
-                self._completed_span(
-                    f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
-                    exception=exception,
-                    kind=opentelemetry.trace.SpanKind.INTERNAL,
-                )
-
-            # In some exceptional cases this finally is executed with a
-            # different contextvars.Context than the one the token was created
-            # on. As such we do a best effort detach to avoid using a mismatched
-            # token.
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
+        with attached_context(context):
+            try:
+                yield None
+                success = True
+            except temporalio.exceptions.FailureError as err:
+                # We only record the failure errors since those are the only ones
+                # that lead to workflow completions
+                exception = err
+                raise
+            finally:
+                # Create a completed span before detaching context
+                if exception or (success and success_is_complete):
+                    self._completed_span(
+                        f"CompleteWorkflow:{temporalio.workflow.info().workflow_type}",
+                        exception=exception,
+                        kind=opentelemetry.trace.SpanKind.INTERNAL,
+                    )
 
     def _context_to_headers(
         self, headers: Mapping[str, temporalio.api.common.v1.Payload]
@@ -684,6 +670,18 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             }
         return headers
 
+    def _context_carrier_to_model_headers(
+        self,
+        carrier: _CarrierDict,
+        headers: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any]:
+        if carrier:
+            return {
+                **(headers or {}),
+                self.header_key: carrier,
+            }
+        return headers or {}
+
     def _completed_span(
         self,
         span_name: str,
@@ -691,6 +689,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
         link_context_carrier: _CarrierDict | None = None,
         add_to_outbound: _InputWithHeaders | None = None,
         add_to_outbound_str: _InputWithStringHeaders | None = None,
+        add_to_outbound_model: _InputWithModelHeaders | None = None,
         new_span_even_on_replay: bool = False,
         additional_attributes: opentelemetry.util.types.Attributes = None,
         exception: Exception | None = None,
@@ -740,6 +739,11 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             if add_to_outbound_str:
                 add_to_outbound_str.headers = _carrier_to_nexus_headers(
                     updated_context_carrier, add_to_outbound_str.headers
+                )
+
+            if add_to_outbound_model:
+                add_to_outbound_model.headers = self._context_carrier_to_model_headers(
+                    updated_context_carrier, add_to_outbound_model.headers
                 )
 
     def _set_on_context(
@@ -829,6 +833,19 @@ class _TracingWorkflowOutboundInterceptor(
         )
 
         return await super().start_nexus_operation(input)
+
+    async def start_signal_with_start_workflow(
+        self,
+        request: temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowRequest,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowResponse
+    ]:
+        self.root._completed_span(
+            "SignalWithStartWorkflow",
+            kind=opentelemetry.trace.SpanKind.CLIENT,
+            add_to_outbound_model=request,
+        )
+        return await super().start_signal_with_start_workflow(request)
 
 
 def _carrier_to_nexus_headers(

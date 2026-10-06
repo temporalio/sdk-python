@@ -2,9 +2,11 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
+from unittest import mock
 
 import pytest
 
+import temporalio.api.workflowservice.v1
 from temporalio import activity, workflow
 from temporalio.client import (
     ActivityExecutionCount,
@@ -24,6 +26,7 @@ from temporalio.client import (
     StartActivityInput,
     TerminateActivityInput,
 )
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
@@ -34,6 +37,16 @@ from tests.helpers import assert_eq_eventually, assert_eventually
 @activity.defn
 async def increment(input: int) -> int:
     return input + 1
+
+
+# Activity for testing describe, stores last failure and heartbeat details
+@activity.defn
+async def heartbeat_fail_increment(x: int) -> int:
+    if activity.info().heartbeat_details:
+        return x + 1
+    else:
+        activity.heartbeat("heartbeat details")
+        raise ApplicationError("first attempt failed")
 
 
 # Activity classes for testing start_activity_class / execute_activity_class
@@ -73,77 +86,146 @@ class ActivityHolder:
     async def async_no_param(self) -> str:
         return "async-method-result"
 
-    @activity.defn
-    def sync_increment(self, x: int) -> int:
-        return x + 1
+
+async def test_start_activity_generates_request_id() -> None:
+    start_activity_execution = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.StartActivityExecutionResponse(
+            run_id="activity-run-id"
+        )
+    )
+    service_client = mock.MagicMock()
+    service_client.config.identity = "test-identity"
+    service_client.workflow_service.start_activity_execution = start_activity_execution
+    client = Client(service_client)
+
+    for activity_id in ("activity-id-1", "activity-id-2"):
+        await client.start_activity(
+            increment,
+            1,
+            id=activity_id,
+            task_queue="task-queue",
+            start_to_close_timeout=timedelta(seconds=1),
+        )
+
+    requests = [call.args[0] for call in start_activity_execution.call_args_list]
+    assert all(uuid.UUID(request.request_id).version == 4 for request in requests)
+    assert requests[0].request_id != requests[1].request_id
 
 
 class TestDescribe:
     @pytest.fixture
-    async def activity_handle(self, client: Client, env: WorkflowEnvironment):
+    def task_queue(self):
+        return str(uuid.uuid4())
+
+    async def make_activity_handle(
+        self, client: Client, task_queue: str, max_attempts: int = 2
+    ):
+        id = str(uuid.uuid4())
+        return await client.start_activity(
+            heartbeat_fail_increment,
+            args=(1,),
+            id=id,
+            task_queue=task_queue,
+            schedule_to_close_timeout=timedelta(minutes=1),
+            retry_policy=RetryPolicy(maximum_attempts=max_attempts),
+        )
+
+    @pytest.fixture
+    async def activity_handle(
+        self, client: Client, env: WorkflowEnvironment, task_queue: str
+    ):
         if env.supports_time_skipping_v1:
             pytest.skip(
                 "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
             )
-
-        id = str(uuid.uuid4())
-        task_queue = str(uuid.uuid4())
-        yield await client.start_activity(
-            increment,
-            args=(42,),
-            id=id,
-            task_queue=task_queue,
-            schedule_to_close_timeout=timedelta(hours=1),
-        )
+        return await self.make_activity_handle(client, task_queue)
 
     async def test_describe(self, client: Client, activity_handle: ActivityHandle):
         desc = await activity_handle.describe()
         # From ActivityExecution (base class)
         assert desc.activity_id == activity_handle.id
         assert desc.activity_run_id == activity_handle.run_id
-        assert desc.activity_type == "increment"
+        assert desc.activity_type == "heartbeat_fail_increment"
         assert desc.close_time is None  # not closed yet
         assert desc.execution_duration is None  # not closed yet
         assert desc.namespace == client.namespace
         assert desc.raw_info is not None
-        assert desc.scheduled_time is not None
+        assert desc.schedule_time is not None
         assert len(desc.typed_search_attributes) == 0
-        assert desc.state_transition_count is not None
         assert desc.status == ActivityExecutionStatus.RUNNING
         assert desc.task_queue
         # From ActivityExecutionDescription
         assert desc.attempt == 1
         assert desc.canceled_reason is None
         assert desc.current_retry_interval is None
-        assert desc.eager_execution_requested is False
         assert desc.expiration_time is not None
-        assert len(desc.raw_heartbeat_details) == 0
         assert desc.run_state == PendingActivityState.SCHEDULED
         assert desc.last_attempt_complete_time is None
-        assert desc.last_failure is None
         assert desc.last_heartbeat_time is None
         assert desc.last_started_time is None
-        assert desc.last_worker_identity == ""
-        assert desc.long_poll_token is not None
+        assert desc.last_worker_identity is None
         assert desc.next_attempt_schedule_time is None
-        assert desc.paused is False
         assert desc.retry_policy is not None
 
-    async def test_describe_long_poll(self, activity_handle: ActivityHandle):
-        desc1 = await activity_handle.describe()
-        assert desc1.long_poll_token
-        desc2_task = asyncio.create_task(
-            activity_handle.describe(long_poll_token=desc1.long_poll_token)
-        )
-        # Worker poll causes a transition to Started which notifies the waiting long-poll.
+    async def test_describe_payloads(
+        self, client: Client, activity_handle: ActivityHandle, task_queue: str
+    ):
         async with Worker(
-            activity_handle._client,
-            task_queue=desc1.task_queue,
-            activities=[increment],
+            client,
+            task_queue=task_queue,
+            activities=[heartbeat_fail_increment],
         ):
-            desc2 = await desc2_task
-            assert desc2.state_transition_count and desc1.state_transition_count
-            assert desc2.state_transition_count > desc1.state_transition_count
+            assert await activity_handle.result() == 2
+
+            desc_default = await activity_handle.describe()
+            assert not desc_default.has_input()
+            assert not desc_default.has_result()
+            assert not desc_default.has_outcome_failure()
+            assert not desc_default.has_heartbeat_details()
+            assert not desc_default.has_last_failure()
+            assert await desc_default.input([int]) is None
+            assert await desc_default.result(int) is None
+            assert await desc_default.outcome_failure() is None
+            assert await desc_default.heartbeat_details([str]) is None
+            assert await desc_default.last_failure() is None
+
+            desc_payloads = await activity_handle.describe(
+                include_input=True,
+                include_outcome=True,
+                include_heartbeat_details=True,
+                include_last_failure=True,
+            )
+            assert desc_payloads.has_input()
+            assert desc_payloads.has_result()
+            assert not desc_payloads.has_outcome_failure()
+            assert desc_payloads.has_heartbeat_details()
+            assert desc_payloads.has_last_failure()
+            assert await desc_payloads.input([int]) == [1]
+            assert await desc_payloads.result(int) == 2
+            assert await desc_payloads.outcome_failure() is None
+            assert await desc_payloads.heartbeat_details([str]) == ["heartbeat details"]
+            assert isinstance(await desc_payloads.last_failure(), ApplicationError)
+
+            failed_activity_handle = await self.make_activity_handle(
+                client, task_queue, max_attempts=1
+            )
+            with pytest.raises(ActivityFailureError) as err:
+                await failed_activity_handle.result()
+            assert isinstance(err.value.cause, ApplicationError)
+
+            desc_failure = await failed_activity_handle.describe(
+                include_outcome=True, include_last_failure=True
+            )
+            assert not desc_failure.has_input()
+            assert not desc_failure.has_result()
+            assert desc_failure.has_outcome_failure()
+            assert not desc_failure.has_heartbeat_details()
+            assert desc_failure.has_last_failure()
+            assert await desc_failure.input([int]) is None
+            assert await desc_failure.result(int) is None
+            assert isinstance(await desc_failure.outcome_failure(), ApplicationError)
+            assert await desc_failure.heartbeat_details([str]) is None
+            assert isinstance(await desc_failure.last_failure(), ApplicationError)
 
 
 class ActivityTracingInterceptor(Interceptor):
@@ -202,6 +284,8 @@ class ActivityTracingOutboundInterceptor(OutboundInterceptor):
         return await super().count_activities(input)
 
 
+# Cloud namespaces created by CI do not have the activity start-delay dynamic config.
+@pytest.mark.requires_local_server
 async def test_start_activity_calls_interceptor(
     client: Client, env: WorkflowEnvironment
 ):
@@ -461,6 +545,8 @@ async def test_get_result(client: Client, env: WorkflowEnvironment):
         assert await result_via_execute_activity == 2
 
 
+# Cloud namespaces created by CI do not have the activity start-delay dynamic config.
+@pytest.mark.requires_local_server
 async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping_v1:
         pytest.skip(
@@ -489,7 +575,7 @@ async def test_start_activity_start_delay(client: Client, env: WorkflowEnvironme
         desc = await activity_handle.describe()
         assert desc.last_started_time is not None
         assert (
-            desc.last_started_time - desc.scheduled_time
+            desc.last_started_time - desc.schedule_time
         ).total_seconds() >= start_delay.total_seconds() - 0.5
 
 
@@ -564,9 +650,6 @@ async def test_list_activities(client: Client, env: WorkflowEnvironment):
         assert execution.activity_type == "increment"
         assert execution.task_queue == task_queue
         assert execution.status == ActivityExecutionStatus.RUNNING
-        assert (
-            execution.state_transition_count is None
-        )  # Not set until activity completes
 
     await assert_eventually(check_executions)
 
@@ -669,7 +752,7 @@ async def test_manual_completion(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
 
     async with Worker(
@@ -711,7 +794,7 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
 
     async with Worker(
@@ -734,8 +817,13 @@ async def test_manual_cancellation(client: Client, env: WorkflowEnvironment):
         # report_cancellation fails if activity is not in CANCELLATION_REQUESTED state
         with pytest.raises(RPCError) as err:
             await async_activity_handle.report_cancellation("Test cancellation")
-        assert err.value.status == RPCStatusCode.FAILED_PRECONDITION
-        assert "invalid transition from Started" in str(err.value)
+        assert err.value.status in {
+            RPCStatusCode.FAILED_PRECONDITION,
+            RPCStatusCode.INVALID_ARGUMENT,
+        }
+        assert "invalid transition from Started" in str(
+            err.value
+        ) or "unable to mark activity as canceled" in str(err.value)
 
         # Request cancellation to transition activity to CANCELLATION_REQUESTED state
         await activity_handle.cancel()
@@ -767,7 +855,7 @@ async def test_manual_failure(client: Client, env: WorkflowEnvironment):
         ActivityInput(event_workflow_id=event_workflow_id),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
     async with Worker(
         client,
@@ -844,7 +932,7 @@ async def test_manual_heartbeat(client: Client, env: WorkflowEnvironment):
         ),
         id=activity_id,
         task_queue=task_queue,
-        start_to_close_timeout=timedelta(seconds=5),
+        start_to_close_timeout=timedelta(minutes=1),
     )
     wait_for_activity_start_wf_handle = await client.start_workflow(
         EventWorkflow.wait,

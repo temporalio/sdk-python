@@ -62,9 +62,7 @@ async def tmprl_client(
 ) -> AsyncIterator[Client]:
     """Temporal client wired with ExternalStorage backed by the moto S3 server."""
     driver = S3StorageDriver(client=new_aioboto3_client(aioboto3_client), bucket=BUCKET)
-    yield await Client.connect(
-        env.client.service_client.config.target_host,
-        namespace=env.client.namespace,
+    yield await env.connect_client(
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             external_storage=ExternalStorage(
@@ -112,7 +110,8 @@ async def test_s3_driver_workflow_input_key(
     # worker stores activity input with ri=run_id — same bytes, two S3 objects.
     assert len(keys) == 2
     assert all(
-        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
+        f"/ns/{tmprl_client.namespace}/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k
+        for k in keys
     )
     # Client-side store: ri=null because run ID is not yet known.
     assert sum(1 for k in keys if "/ri/null/" in k) == 1
@@ -138,7 +137,10 @@ async def test_s3_driver_workflow_output_key(
     keys = await _list_keys(aioboto3_client)
     # Activity result and workflow result dedup to same key
     assert len(keys) == 1
-    assert f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in keys[0]
+    assert (
+        f"/ns/{tmprl_client.namespace}/wt/LargeIOWorkflow/wi/{workflow_id}/ri/"
+        in keys[0]
+    )
     # Run ID is known for both activity completion and workflow completion
     assert "/ri/null/" not in keys[0]
 
@@ -162,7 +164,8 @@ async def test_s3_driver_workflow_activity_input_key(
     assert len(keys) == 2
     # Both keys are under the workflow wi/ri prefix, not the activity.
     assert all(
-        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
+        f"/ns/{tmprl_client.namespace}/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k
+        for k in keys
     )
     # Activity input is keyed under the scheduling workflow, not the activity.
     assert all("/ai/" not in k for k in keys)
@@ -185,7 +188,10 @@ async def test_s3_driver_workflow_activity_output_key(
     keys = await _list_keys(aioboto3_client)
     # Activity result and workflow result are both LARGE so they deduplicate to one object.
     assert len(keys) == 1
-    assert f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in keys[0]
+    assert (
+        f"/ns/{tmprl_client.namespace}/wt/LargeIOWorkflow/wi/{workflow_id}/ri/"
+        in keys[0]
+    )
     # ri=run_id for both stores (run ID is known by the time the activity completes).
     assert "/ri/null/" not in keys[0]
 
@@ -214,7 +220,8 @@ async def test_s3_driver_standalone_activity_input_key(
     assert len(keys) == 2
     # Both keyed under the activity, not a workflow.
     assert all(
-        f"/ns/default/at/large_io_activity/ai/{activity_id}/ri/" in k for k in keys
+        f"/ns/{tmprl_client.namespace}/at/large_io_activity/ai/{activity_id}/ri/" in k
+        for k in keys
     )
     assert all("/wt/" not in k for k in keys)
     # Client-side store does not have run ID information
@@ -244,7 +251,10 @@ async def test_s3_driver_standalone_activity_output_key(
     keys = await _list_keys(aioboto3_client)
     # Only the output is large; keyed under the activity.
     assert len(keys) == 1
-    assert f"/ns/default/at/large_output_activity/ai/{activity_id}/ri/" in keys[0]
+    assert (
+        f"/ns/{tmprl_client.namespace}/at/large_output_activity/ai/{activity_id}/ri/"
+        in keys[0]
+    )
     assert "/ri/null/" not in keys[0]
     assert "/wt/" not in keys[0]
 
@@ -337,7 +347,10 @@ async def test_s3_driver_child_workflow_input_key(
     # Child input is the only large payload — stored under the child's wi/ri.
     assert len(keys) == 1
     # Keyed under the child: child input is stored in the child's context.
-    assert f"/ns/default/wt/ChildWorkflow/wi/{child_workflow_id}/ri/" in keys[0]
+    assert (
+        f"/ns/{tmprl_client.namespace}/wt/ChildWorkflow/wi/{child_workflow_id}/ri/"
+        in keys[0]
+    )
 
 
 async def test_s3_driver_identified_casing(
@@ -359,7 +372,8 @@ async def test_s3_driver_identified_casing(
     assert len(keys) == 2
     # Workflow ID is percent-encoded but casing is preserved verbatim.
     assert all(
-        f"/ns/default/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k for k in keys
+        f"/ns/{tmprl_client.namespace}/wt/LargeIOWorkflow/wi/{workflow_id}/ri/" in k
+        for k in keys
     ), "Workflow ID should preserve original case in the key"
 
 
@@ -386,7 +400,8 @@ async def test_s3_driver_content_dedup(
     assert len(keys) == 2
     # Both are under the same workflow wi/ri prefix despite crossing activity boundaries.
     assert all(
-        f"/ns/default/wt/DocumentIngestionWorkflow/wi/{workflow_id}/ri/" in k
+        f"/ns/{tmprl_client.namespace}/wt/DocumentIngestionWorkflow/wi/{workflow_id}/ri/"
+        in k
         for k in keys
     )
     # The two keys differ by content hash only.
@@ -469,9 +484,7 @@ async def test_s3_store_failure_surfaces_in_workflow_history(
         aws_secret_access_key="testing",
     ) as client:
         driver = S3StorageDriver(client=new_aioboto3_client(client), bucket=bad_bucket)
-        bad_client = await Client.connect(
-            env.client.service_client.config.target_host,
-            namespace=env.client.namespace,
+        bad_client = await env.connect_client(
             data_converter=dataclasses.replace(
                 temporalio.converter.default(),
                 external_storage=ExternalStorage(

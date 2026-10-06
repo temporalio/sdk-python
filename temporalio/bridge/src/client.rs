@@ -366,12 +366,23 @@ fn fixed_server_name_verifier(
     // Root loading and provider selection mirror tonic's default (no custom
     // verifier) client path: unparsable certificates in the bundle are
     // skipped, and the provider is the process default if one is installed,
-    // else ring, as with the connection's `tls-ring` feature.
+    // else the build's compiled-in provider. Under a `fips` build lib.rs
+    // installs aws-lc-rs (FIPS) as the process default, so `get_default()`
+    // returns it and this fallback is not taken; the fallback is still made
+    // `cfg`-conditional because the `ring` module is absent in a FIPS build
+    // (`tokio-rustls/ring` off) and would otherwise fail to compile.
     let mut roots = RootCertStore::empty();
     roots.add_parsable_certificates(certs);
-    let provider = CryptoProvider::get_default()
-        .cloned()
-        .unwrap_or_else(|| Arc::new(rustls::crypto::ring::default_provider()));
+    let provider = CryptoProvider::get_default().cloned().unwrap_or_else(|| {
+        #[cfg(feature = "fips")]
+        {
+            Arc::new(rustls::crypto::aws_lc_rs::default_provider())
+        }
+        #[cfg(not(feature = "fips"))]
+        {
+            Arc::new(rustls::crypto::ring::default_provider())
+        }
+    });
     let inner = WebPkiServerVerifier::builder_with_provider(roots.into(), provider)
         .build()
         .map_err(|err| {

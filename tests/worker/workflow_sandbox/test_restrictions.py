@@ -75,6 +75,21 @@ def test_restricted_proxy_dunder_methods():
     assert f"{restricted_path_obj}" == expected_path
 
 
+def test_restricted_proxy_in_place_operations_preserve_proxy():
+    restricted_list = _RestrictedProxy(
+        "list",
+        list,
+        RestrictionContext(),
+        SandboxMatcher(),
+    )
+    values = restricted_list([1])
+
+    values += [2]
+
+    assert type(values) is _RestrictedProxy
+    assert RestrictionContext.unwrap_if_proxied(values) == [1, 2]
+
+
 def test_workflow_sandbox_restricted_proxy():
     obj_class = _RestrictedProxy(
         "RestrictableObject",

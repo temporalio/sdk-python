@@ -594,23 +594,19 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse,
     ]
     """Describes a worker deployment.
-    Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
     """
     DescribeWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse,
     ]
-    """Describes a worker deployment version.
-    Experimental. This API might significantly change or be removed in a future release.
-    """
+    """Describes a worker deployment version."""
     ListDeployments: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse,
     ]
     """Lists worker deployments in the namespace. Optionally can filter based on deployment series
     name.
-    Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `ListWorkerDeployments`.
     """
     GetDeploymentReachability: grpc.UnaryUnaryMultiCallable[
@@ -623,7 +619,6 @@ class WorkflowServiceStub:
     Calculating reachability is relatively expensive. Therefore, server might return a recently
     cached value. In such a case, the `last_update_time` will inform you about the actual
     reachability calculation time.
-    Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
     """
     GetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
@@ -631,7 +626,6 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse,
     ]
     """Returns the current deployment (and its info) for a given deployment series.
-    Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
     """
     SetCurrentDeployment: grpc.UnaryUnaryMultiCallable[
@@ -640,7 +634,6 @@ class WorkflowServiceStub:
     ]
     """Sets a deployment as the current deployment for its deployment series. Can optionally update
     the metadata of the deployment as well.
-    Experimental. This API might significantly change or be removed in a future release.
     Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
     """
     SetWorkerDeploymentCurrentVersion: grpc.UnaryUnaryMultiCallable[
@@ -649,22 +642,18 @@ class WorkflowServiceStub:
     ]
     """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
     Version if it is the Version being set as Current.
-    Experimental. This API might significantly change or be removed in a future release.
     """
     DescribeWorkerDeployment: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse,
     ]
-    """Describes a Worker Deployment.
-    Experimental. This API might significantly change or be removed in a future release.
-    """
+    """Describes a Worker Deployment."""
     DeleteWorkerDeployment: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse,
     ]
     """Deletes records of (an old) Deployment. A deployment can only be deleted if
     it has no Version in it.
-    Experimental. This API might significantly change or be removed in a future release.
     """
     DeleteWorkerDeploymentVersion: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentVersionRequest,
@@ -676,7 +665,6 @@ class WorkflowServiceStub:
      - It has no active pollers (none of the task queues in the Version have pollers)
      - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
        can be skipped by passing `skip-drainage=true`.
-    Experimental. This API might significantly change or be removed in a future release.
     """
     SetWorkerDeploymentRampingVersion: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionRequest,
@@ -684,15 +672,12 @@ class WorkflowServiceStub:
     ]
     """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
     gradual ramp to unversioned workers too.
-    Experimental. This API might significantly change or be removed in a future release.
     """
     ListWorkerDeployments: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse,
     ]
-    """Lists all Worker Deployments that are tracked in the Namespace.
-    Experimental. This API might significantly change or be removed in a future release.
-    """
+    """Lists all Worker Deployments that are tracked in the Namespace."""
     CreateWorkerDeployment: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.CreateWorkerDeploymentResponse,
@@ -729,9 +714,7 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse,
     ]
-    """Updates the user-given metadata attached to a Worker Deployment Version.
-    Experimental. This API might significantly change or be removed in a future release.
-    """
+    """Updates the user-given metadata attached to a Worker Deployment Version."""
     SetWorkerDeploymentManager: grpc.UnaryUnaryMultiCallable[
         temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentManagerResponse,
@@ -1877,7 +1860,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeDeploymentResponse:
         """Describes a worker deployment.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DescribeWorkerDeploymentVersion`.
         """
     @abc.abstractmethod
@@ -1886,9 +1868,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentVersionResponse:
-        """Describes a worker deployment version.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Describes a worker deployment version."""
     @abc.abstractmethod
     def ListDeployments(
         self,
@@ -1897,7 +1877,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListDeploymentsResponse:
         """Lists worker deployments in the namespace. Optionally can filter based on deployment series
         name.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `ListWorkerDeployments`.
         """
     @abc.abstractmethod
@@ -1912,7 +1891,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         Calculating reachability is relatively expensive. Therefore, server might return a recently
         cached value. In such a case, the `last_update_time` will inform you about the actual
         reachability calculation time.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced with `DrainageInfo` returned by `DescribeWorkerDeploymentVersion`.
         """
     @abc.abstractmethod
@@ -1922,7 +1900,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.GetCurrentDeploymentResponse:
         """Returns the current deployment (and its info) for a given deployment series.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `current_version` returned by `DescribeWorkerDeployment`.
         """
     @abc.abstractmethod
@@ -1933,7 +1910,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetCurrentDeploymentResponse:
         """Sets a deployment as the current deployment for its deployment series. Can optionally update
         the metadata of the deployment as well.
-        Experimental. This API might significantly change or be removed in a future release.
         Deprecated. Replaced by `SetWorkerDeploymentCurrentVersion`.
         """
     @abc.abstractmethod
@@ -1944,7 +1920,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentCurrentVersionResponse:
         """Set/unset the Current Version of a Worker Deployment. Automatically unsets the Ramping
         Version if it is the Version being set as Current.
-        Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
     def DescribeWorkerDeployment(
@@ -1952,9 +1927,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeWorkerDeploymentResponse:
-        """Describes a Worker Deployment.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Describes a Worker Deployment."""
     @abc.abstractmethod
     def DeleteWorkerDeployment(
         self,
@@ -1963,7 +1936,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.DeleteWorkerDeploymentResponse:
         """Deletes records of (an old) Deployment. A deployment can only be deleted if
         it has no Version in it.
-        Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
     def DeleteWorkerDeploymentVersion(
@@ -1977,7 +1949,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
          - It has no active pollers (none of the task queues in the Version have pollers)
          - It is not draining (see WorkerDeploymentVersionInfo.drainage_info). This condition
            can be skipped by passing `skip-drainage=true`.
-        Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
     def SetWorkerDeploymentRampingVersion(
@@ -1987,7 +1958,6 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.SetWorkerDeploymentRampingVersionResponse:
         """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage. Can be used for
         gradual ramp to unversioned workers too.
-        Experimental. This API might significantly change or be removed in a future release.
         """
     @abc.abstractmethod
     def ListWorkerDeployments(
@@ -1995,9 +1965,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.ListWorkerDeploymentsResponse:
-        """Lists all Worker Deployments that are tracked in the Namespace.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Lists all Worker Deployments that are tracked in the Namespace."""
     @abc.abstractmethod
     def CreateWorkerDeployment(
         self,
@@ -2044,9 +2012,7 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         request: temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataRequest,
         context: grpc.ServicerContext,
     ) -> temporalio.api.workflowservice.v1.request_response_pb2.UpdateWorkerDeploymentVersionMetadataResponse:
-        """Updates the user-given metadata attached to a Worker Deployment Version.
-        Experimental. This API might significantly change or be removed in a future release.
-        """
+        """Updates the user-given metadata attached to a Worker Deployment Version."""
     @abc.abstractmethod
     def SetWorkerDeploymentManager(
         self,

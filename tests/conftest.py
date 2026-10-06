@@ -1,15 +1,21 @@
 import asyncio
+import gc
 import multiprocessing.context
 import os
 import sys
 from collections.abc import AsyncGenerator, Iterator
 
+import opentelemetry._logs._internal
+import opentelemetry.metrics
+import opentelemetry.metrics._internal
 import opentelemetry.trace
 import pytest
 import pytest_asyncio
+from opentelemetry.metrics import NoOpMeterProvider
 from opentelemetry.util._once import Once
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfigProfile
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import SharedStateManager
 from tests.helpers.worker import ExternalPythonWorker, ExternalWorker
@@ -70,13 +76,52 @@ def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
         print()
 
 
+def pytest_collection_finish() -> None:
+    # Freeze the import-time heap once so full GC passes only cover test allocations
+    gc.collect()
+    gc.freeze()
+
+
 def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
     parser.addoption(
         "-E",
         "--workflow-environment",
         default="local",
-        help="Which workflow environment to use ('local', 'time-skipping-v1', 'time-skipping-v2', or ip:port for existing server)",
+        help="Which workflow environment to use ('local', 'time-skipping-v1', 'time-skipping-v2', 'envconfig', or ip:port for existing server)",
     )
+
+
+def _uses_envconfig_server(env_type: str) -> bool:
+    return env_type == "envconfig"
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "requires_local_server: test requires local-server-only behavior and cannot run against an envconfig server",
+    )
+
+
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: list[pytest.Item]
+) -> None:
+    if not _uses_envconfig_server(config.getoption("--workflow-environment")):
+        return
+    skip_local_only = pytest.mark.skip(
+        reason="requires a local Temporal server, not the configured envconfig server"
+    )
+    for item in items:
+        if item.get_closest_marker("requires_local_server"):
+            item.add_marker(skip_local_only)
+
+
+async def _create_env_from_envconfig() -> WorkflowEnvironment:
+    config = ClientConfigProfile.load().to_client_connect_config()
+    if not config.get("target_host"):
+        raise ValueError(
+            "An envconfig workflow environment requires TEMPORAL_ADDRESS or an envconfig profile with an address"
+        )
+    return WorkflowEnvironment.from_client(await Client.connect(**config))
 
 
 @pytest.fixture(scope="session")
@@ -155,13 +200,15 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "--dynamic-config-value",
         'system.system.refreshNexusEndpointsMinWait="0s"',
         "--dynamic-config-value",
-        "frontend.WorkflowTimeSkippingEnabled=true",
-        "--dynamic-config-value",
         "history.enableSignalWithStartFromWorkflow=true",
         "--dynamic-config-value",
         "history.enableUpdateCallbacks=true",
+        "--dynamic-config-value",
+        "activity.enableCallbacks=true",
     ]
-    if env_type == "local":
+    if _uses_envconfig_server(env_type):
+        env = await _create_env_from_envconfig()
+    elif env_type == "local":
         env = await WorkflowEnvironment.start_local(
             dev_server_extra_args=dev_server_extra_args,
             dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
@@ -249,11 +296,69 @@ def continue_as_new_suggest_history_count() -> int:
     return CONTINUE_AS_NEW_SUGGEST_HISTORY_COUNT
 
 
+# OpenTelemetry's global providers are set-once per process with no public
+# way to unset them, so tests needing their own provider must reset the
+# globals directly -- the same isolation pattern OpenTelemetry's own test
+# suite uses (opentelemetry.test.globals_test). Isolation cannot be delegated
+# to scheduling: CI runs pytest-xdist with --dist=worksteal, which ignores
+# xdist_group pinning, so any test in the suite can share a worker process
+# with any other. Every test that installs a global provider must therefore
+# use these fixtures and leave the globals reset behind it.
+
+
 @pytest.fixture
 def reset_otel_tracer_provider():
-    """Reset global OpenTelemetry tracer provider state around tests."""
+    """Isolate global OpenTelemetry tracer provider state around a test.
+
+    Proxy tracers bound to a real provider stay bound forever; OTel has no
+    rebind mechanism for tracers. Tests must install their provider before
+    any span is created through a proxy tracer they care about.
+    """
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
     yield
     opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()
     opentelemetry.trace._TRACER_PROVIDER = None
+
+
+def _reset_meter_provider_globals() -> None:
+    # Reset the set-once latch, then park proxy meters on a no-op provider:
+    # set_meter_provider rebinds every proxy meter and its instruments, so
+    # instruments bound during an earlier test stop recording into that
+    # test's dead reader. Reset the latch again so the next installer wins.
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None
+    opentelemetry.metrics.set_meter_provider(NoOpMeterProvider())
+    opentelemetry.metrics._internal._METER_PROVIDER_SET_ONCE = Once()
+    opentelemetry.metrics._internal._METER_PROVIDER = None
+
+
+@pytest.fixture
+def reset_otel_meter_provider():
+    """Isolate global OpenTelemetry meter provider state around a test.
+
+    Both setup and teardown park proxy meters on a no-op provider, so
+    instruments bound by other tests neither record into this test's provider
+    unexpectedly nor keep recording into this test's reader afterwards. Any
+    set_meter_provider call rebinds proxy meters, so tests that install their
+    own provider are unaffected by the parking.
+    """
+    _reset_meter_provider_globals()
+    yield
+    _reset_meter_provider_globals()
+
+
+@pytest.fixture
+def reset_otel_logger_provider():
+    """Isolate global OpenTelemetry logger provider state around a test.
+
+    Unlike proxy meters, proxy loggers cache their real logger on first use
+    and never rebind, even across a later set_logger_provider call. Tests
+    exercising a library's module-level logger must clear that cache
+    themselves (e.g. Google ADK's telemetry logger).
+    """
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None
+    yield
+    opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
+    opentelemetry._logs._internal._LOGGER_PROVIDER = None

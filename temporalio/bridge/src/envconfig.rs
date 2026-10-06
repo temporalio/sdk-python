@@ -19,6 +19,11 @@ fn data_source_to_dict(py: Python, ds: &DataSource) -> PyResult<Py<PyAny>> {
     match ds {
         DataSource::Path(p) => dict.set_item("path", p)?,
         DataSource::Data(d) => dict.set_item("data", PyBytes::new(py, d))?,
+        _ => {
+            return Err(PyRuntimeError::new_err(
+                "unsupported configuration data source",
+            ))
+        }
     };
     Ok(dict.into())
 }

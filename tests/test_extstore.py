@@ -2,6 +2,7 @@
 
 import asyncio
 from collections.abc import Sequence
+from datetime import timedelta
 
 import pytest
 
@@ -15,9 +16,15 @@ from temporalio.converter import (
     StorageDriver,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
+    StorageDriverSelectContext,
     StorageDriverStoreContext,
+    StorageDriverWorkflowInfo,
 )
-from temporalio.converter._extstore import _REFERENCE_ENCODING, _StorageReference
+from temporalio.converter._extstore import (
+    _REFERENCE_ENCODING,
+    StorageOperationMetrics,
+    _StorageReference,
+)
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
 
@@ -49,6 +56,7 @@ class InMemoryTestDriver(StorageDriver):
         self._storage: dict[str, bytes] = {}
         self._store_calls = 0
         self._retrieve_calls = 0
+        self._store_contexts: list[StorageDriverStoreContext] = []
 
     def name(self) -> str:
         return self._driver_name
@@ -59,6 +67,7 @@ class InMemoryTestDriver(StorageDriver):
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         self._store_calls += 1
+        self._store_contexts.append(context)
         start_index = len(self._storage)
 
         entries = [
@@ -537,6 +546,35 @@ class TestMultiDriver:
         assert driver_a._retrieve_calls == 0  # never consulted
         assert driver_b._retrieve_calls == 1
 
+    async def test_selector_receives_select_context_with_target(self):
+        """The selector is handed a StorageDriverSelectContext -- not the
+        StorageDriverStoreContext the driver receives -- carrying the same
+        target."""
+        driver = InMemoryTestDriver("test-driver")
+        seen: list[object] = []
+
+        def selector(context: object, _payload: Payload) -> StorageDriver:
+            seen.append(context)
+            return driver
+
+        target = StorageDriverWorkflowInfo(
+            namespace="ns", id="wf-id", type="MyWorkflow", run_id="run-id"
+        )
+        storage = ExternalStorage(
+            drivers=[driver],
+            driver_selector=selector,
+            payload_size_threshold=50,
+        )._with_store_context(StorageDriverStoreContext(target=target))
+
+        converter = DataConverter(external_storage=storage)
+        await converter.encode(["x" * 200])
+
+        assert len(seen) == 1
+        assert isinstance(seen[0], StorageDriverSelectContext)
+        assert seen[0].target == target
+        assert isinstance(driver._store_contexts[0], StorageDriverStoreContext)
+        assert driver._store_contexts[0].target == target
+
     async def test_selector_routes_payloads_to_different_drivers_in_single_batch(self):
         """When a selector routes different payloads to different drivers, a
         single encode([v1, v2, ...]) call batches payloads per driver so each
@@ -799,6 +837,35 @@ class TestBackwardCompat:
 
         decoded = await converter.decode(encoded, [str])
         assert decoded[0] == value
+
+
+def test_storage_metrics_aggregates_batches() -> None:
+    metrics = StorageOperationMetrics()
+    assert metrics.total_duration == timedelta(0)
+
+    metrics.record_batch(2, 1024, 0.0, 10.0, {"s3"})
+    metrics.record_batch(3, 2048, 5.0, 15.0, {"gcs"})
+
+    assert metrics.payload_count == 5
+    assert metrics.total_size == 3072
+    assert metrics.driver_names == {"gcs", "s3"}
+    # Concurrent batches: summing their durations would report 20 seconds.
+    assert metrics.total_duration == timedelta(seconds=15)
+
+
+def test_storage_metrics_duration_sums_disjoint_batches() -> None:
+    metrics = StorageOperationMetrics()
+    metrics.record_batch(1, 1, 0.0, 10.0, {"s3"})
+    metrics.record_batch(1, 1, 20.0, 30.0, {"s3"})
+    assert metrics.total_duration == timedelta(seconds=20)
+
+
+def test_storage_metrics_duration_merges_adjacent_and_nested_batches() -> None:
+    metrics = StorageOperationMetrics()
+    metrics.record_batch(1, 1, 0.0, 10.0, {"s3"})
+    metrics.record_batch(1, 1, 10.0, 20.0, {"s3"})
+    metrics.record_batch(1, 1, 12.0, 18.0, {"s3"})
+    assert metrics.total_duration == timedelta(seconds=20)
 
 
 if __name__ == "__main__":

@@ -59,7 +59,6 @@ from ..types import (
     ReturnType,
     SelfType,
 )
-from ._callback import Callback
 from ._exceptions import (
     WorkflowContinuedAsNewError,
     WorkflowFailureError,
@@ -175,9 +174,13 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         """Run ID used to ensure requested operations apply to a workflow ID
         started with this run ID.
 
-        This can be set when using :py:meth:`Client.get_workflow_handle`. When
-        :py:meth:`Client.start_workflow` is called without a start signal, this
-        is set to the resulting run.
+        This can be set when using :py:meth:`Client.get_workflow_handle`.
+        :py:meth:`Client.start_workflow` sets this from the server response.
+        With Temporal Server 1.32.0 or later, this is also correct when the
+        start attaches to a running workflow with a conflict policy of
+        ``USE_EXISTING``. Earlier servers may leave this unset for
+        signal-with-start or set it to the current run when a traditional
+        start attaches to a running workflow.
 
         This cannot be mutated. If a different first execution run ID is needed,
         :py:meth:`Client.get_workflow_handle` must be used instead.
@@ -331,9 +334,10 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         these values, use :py:meth:`Client.get_workflow_handle`.
 
         .. warning::
-            Handles created as a result of :py:meth:`Client.start_workflow` with
-            a start signal will cancel the latest workflow with the same
-            workflow ID even if it is unrelated to the started workflow.
+            With Temporal Server earlier than 1.32.0, handles created by
+            :py:meth:`Client.start_workflow` with a start signal may cancel the
+            latest workflow with the same workflow ID even if it is unrelated
+            to the started workflow.
 
         Args:
             reason: Reason recorded with the cancellation request. Available
@@ -715,9 +719,10 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         these values, use :py:meth:`Client.get_workflow_handle`.
 
         .. warning::
-            Handles created as a result of :py:meth:`Client.start_workflow` with
-            a start signal will terminate the latest workflow with the same
-            workflow ID even if it is unrelated to the started workflow.
+            With Temporal Server earlier than 1.32.0, handles created by
+            :py:meth:`Client.start_workflow` with a start signal may terminate
+            the latest workflow with the same workflow ID even if it is
+            unrelated to the started workflow.
 
         Args:
             args: Details to store on the termination.
@@ -956,10 +961,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         result_type: type | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
-        # The following options are for Workflow Updates exposed as Nexus Operations. Experimental and unstable
-        callbacks: Sequence[Callback] | None = None,
-        links: Sequence[temporalio.api.common.v1.Link] | None = None,
-        request_id: str | None = None,
     ) -> WorkflowUpdateHandle[Any]:
         if wait_for_stage == WorkflowUpdateStage.ADMITTED:
             raise ValueError("ADMITTED wait stage not supported")
@@ -981,9 +982,6 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
                 wait_for_stage=wait_for_stage,
-                callbacks=callbacks,
-                links=links,
-                request_id=request_id,
             )
         )
 

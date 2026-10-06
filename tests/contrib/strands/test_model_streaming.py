@@ -30,7 +30,7 @@ class StreamingModelWorkflow:
 
 
 async def test_model_streaming(client: Client):
-    task_queue = "test_model_streaming"
+    task_queue = f"test_model_streaming-{uuid4()}"
     plugin = StrandsPlugin(models={"mock": lambda: MockModel(["Done!"])})
     workflow_id = f"test_model_streaming_{uuid4()}"
 

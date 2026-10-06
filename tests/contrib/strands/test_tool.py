@@ -59,7 +59,7 @@ class ToolWorkflow:
 
 
 async def test_tool(client: Client, tmp_path: Path):
-    task_queue = "test_tool"
+    task_queue = f"test_tool-{uuid4()}"
     fixture = tmp_path / "greeting.txt"
     fixture.write_text("hello\n")
 

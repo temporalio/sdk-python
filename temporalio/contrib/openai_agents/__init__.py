@@ -1,33 +1,12 @@
-"""Support for using the OpenAI Agents SDK as part of Temporal workflows.
+"""Compatibility imports for the standalone OpenAI Agents integration.
 
-This module provides compatibility between the
-`OpenAI Agents SDK <https://github.com/openai/openai-agents-python>`_ and Temporal workflows.
+Install ``temporalio-openai-agents`` and import ``temporalio.openai_agents``
+directly in new code.
+
+Legacy ``testing`` and ``workflow`` modules forward the standalone public API.
 """
 
-from temporalio.contrib.openai_agents._mcp import (
-    StatefulMCPServerProvider,
-    StatelessMCPServerProvider,
+from temporalio.openai_agents import *  # noqa: F403  # pyright: ignore[reportMissingImports, reportWildcardImportFromLibrary]
+from temporalio.openai_agents import (  # pyright: ignore[reportMissingImports]
+    __all__ as __all__,
 )
-from temporalio.contrib.openai_agents._model_parameters import ModelActivityParameters
-from temporalio.contrib.openai_agents._temporal_openai_agents import (
-    OpenAIAgentsPlugin,
-    OpenAIPayloadConverter,
-)
-from temporalio.contrib.openai_agents.sandbox._sandbox_client_provider import (
-    SandboxClientProvider,
-)
-from temporalio.contrib.openai_agents.workflow import AgentsWorkflowError
-
-from . import testing, workflow
-
-__all__ = [
-    "AgentsWorkflowError",
-    "ModelActivityParameters",
-    "OpenAIAgentsPlugin",
-    "OpenAIPayloadConverter",
-    "SandboxClientProvider",
-    "StatelessMCPServerProvider",
-    "StatefulMCPServerProvider",
-    "testing",
-    "workflow",
-]

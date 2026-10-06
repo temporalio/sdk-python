@@ -47,6 +47,7 @@ class LoggingConfig:
 
     filter: str
     forward_to: Callable[[Sequence[BufferedLogEntry]], None] | None
+    format: str | None
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,7 @@ class RuntimeOptions:
 
     telemetry: TelemetryConfig
     worker_heartbeat_interval_millis: int | None = 60_000  # 60s
+    disable_environment_info: bool = False
 
 
 # WARNING: This must match Rust runtime::BufferedLogEntry

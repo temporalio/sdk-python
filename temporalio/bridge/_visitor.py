@@ -368,6 +368,18 @@ class PayloadVisitor:
         if o.HasField("details"):
             await self._visit_temporal_api_common_v1_Payload(fs, o.details)
 
+    async def _visit_temporal_api_sdk_v1_EventGroupMarker_Label(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("label"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.label)
+
+    async def _visit_temporal_api_sdk_v1_EventGroupMarker(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("label"):
+            await self._visit_temporal_api_sdk_v1_EventGroupMarker_Label(fs, o.label)
+
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: Any
     ):
@@ -415,6 +427,12 @@ class PayloadVisitor:
             await self._visit_temporal_api_common_v1_SearchAttributes(
                 fs, o.search_attributes
             )
+
+    async def _visit_coresdk_workflow_commands_CancelWorkflowExecution(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("details"):
+            await self._visit_temporal_api_common_v1_Payloads(fs, o.details)
 
     async def _visit_coresdk_workflow_commands_StartChildWorkflowExecution(
         self, fs: VisitorFunctions, o: Any
@@ -479,6 +497,8 @@ class PayloadVisitor:
     ):
         if o.HasField("user_metadata"):
             await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+        for v in o.event_group_markers:
+            await self._visit_temporal_api_sdk_v1_EventGroupMarker(fs, v)
         if o.HasField("schedule_activity"):
             await self._visit_coresdk_workflow_commands_ScheduleActivity(
                 fs, o.schedule_activity
@@ -498,6 +518,10 @@ class PayloadVisitor:
         elif o.HasField("continue_as_new_workflow_execution"):
             await self._visit_coresdk_workflow_commands_ContinueAsNewWorkflowExecution(
                 fs, o.continue_as_new_workflow_execution
+            )
+        elif o.HasField("cancel_workflow_execution"):
+            await self._visit_coresdk_workflow_commands_CancelWorkflowExecution(
+                fs, o.cancel_workflow_execution
             )
         elif o.HasField("start_child_workflow_execution"):
             await self._visit_coresdk_workflow_commands_StartChildWorkflowExecution(
@@ -548,6 +572,58 @@ class PayloadVisitor:
         elif o.HasField("failed"):
             await self._visit_coresdk_workflow_completion_Failure(fs, o.failed)
 
+    async def _visit_temporal_api_nexus_v1_StartOperationResponse_Sync(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("payload"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.payload)
+
+    async def _visit_temporal_api_nexus_v1_Failure(self, fs: VisitorFunctions, o: Any):
+        if o.HasField("cause"):
+            await self._visit_temporal_api_nexus_v1_Failure(fs, o.cause)
+
+    async def _visit_temporal_api_nexus_v1_UnsuccessfulOperationError(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_nexus_v1_Failure(fs, o.failure)
+
+    async def _visit_temporal_api_nexus_v1_StartOperationResponse(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("sync_success"):
+            await self._visit_temporal_api_nexus_v1_StartOperationResponse_Sync(
+                fs, o.sync_success
+            )
+        elif o.HasField("operation_error"):
+            await self._visit_temporal_api_nexus_v1_UnsuccessfulOperationError(
+                fs, o.operation_error
+            )
+        elif o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
+    async def _visit_temporal_api_nexus_v1_Response(self, fs: VisitorFunctions, o: Any):
+        if o.HasField("start_operation"):
+            await self._visit_temporal_api_nexus_v1_StartOperationResponse(
+                fs, o.start_operation
+            )
+
+    async def _visit_temporal_api_nexus_v1_HandlerError(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("failure"):
+            await self._visit_temporal_api_nexus_v1_Failure(fs, o.failure)
+
+    async def _visit_coresdk_nexus_NexusTaskCompletion(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("completed"):
+            await self._visit_temporal_api_nexus_v1_Response(fs, o.completed)
+        elif o.HasField("error"):
+            await self._visit_temporal_api_nexus_v1_HandlerError(fs, o.error)
+        elif o.HasField("failure"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failure)
+
     async def _visit_temporal_api_common_v1_Header(self, fs: VisitorFunctions, o: Any):
         for v in o.fields.values():
             await self._visit_temporal_api_common_v1_Payload(fs, v)
@@ -569,3 +645,8 @@ class PayloadVisitor:
             await self._visit_temporal_api_common_v1_Header(fs, o.header)
         if o.HasField("user_metadata"):
             await self._visit_temporal_api_sdk_v1_UserMetadata(fs, o.user_metadata)
+
+    async def _visit_temporal_api_workflowservice_v1_SignalWithStartWorkflowExecutionResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass

@@ -1,9 +1,11 @@
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Collection
 from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import timedelta
 
+from botocore.config import Config as BotocoreConfig
 from strands.models import BedrockModel, Model
+from strands.models.bedrock import DEFAULT_READ_TIMEOUT
 from strands.tools.mcp import MCPClient
 
 from temporalio.contrib.pydantic import pydantic_data_converter
@@ -14,11 +16,23 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from ._failure_converter import StrandsFailureConverter
 from ._model_activity import ModelActivity
+from ._sandbox_activity import SandboxActivities, SandboxFactory
 from ._temporal_mcp_client import (
     _evict_connection,
     build_call_tool_activity,
     build_list_tools_activity,
 )
+from ._worker_env_ref import AllowAllWorkerEnvVars
+
+
+def _default_bedrock_model() -> Model:
+    # Temporal owns retries so Botocore must not retry within an activity attempt.
+    return BedrockModel(
+        boto_client_config=BotocoreConfig(
+            read_timeout=DEFAULT_READ_TIMEOUT,
+            retries={"max_attempts": 0},
+        )
+    )
 
 
 class StrandsPlugin(SimplePlugin):
@@ -39,6 +53,16 @@ class StrandsPlugin(SimplePlugin):
     ``mcp_connection_idle_timeout`` controls how long a worker-process MCP
     connection is kept open between ``call-tool`` activities before it is
     disconnected; the timer resets on every reuse. Defaults to 5 minutes.
+
+    When ``sandboxes`` is supplied, registers one stable set of activities that
+    dispatches each operation by sandbox name. Each factory receives the
+    requesting Workflow run's context and may return a sandbox directly or
+    awaitably. The factory is called for every Activity so it can find or recover
+    the backing environment. Use the same name in workflow-side
+    ``TemporalSandbox(name)`` instances.
+
+    ``resolvable_worker_env_vars`` controls which worker environment variables
+    sandbox command ``env`` references may resolve immediately before execution.
     """
 
     def __init__(
@@ -46,21 +70,37 @@ class StrandsPlugin(SimplePlugin):
         *,
         models: dict[str, Callable[[], Model]] | None = None,
         mcp_clients: dict[str, Callable[[], MCPClient]] | None = None,
+        sandboxes: dict[str, SandboxFactory] | None = None,
         mcp_connection_idle_timeout: timedelta | None = None,
+        resolvable_worker_env_vars: Collection[str] | AllowAllWorkerEnvVars = (),
     ) -> None:
-        """Build the plugin from optional model and MCP transport factories.
+        """Build the plugin from optional model, MCP, and sandbox factories.
 
-        If ``models`` is omitted, registers a single ``BedrockModel()`` factory
-        under the name ``"bedrock"``, matching Strands' own implicit default.
+        If ``models`` is omitted, registers a single ``BedrockModel`` factory
+        under the name ``"bedrock"`` with Botocore retries disabled.
+
+        A sandbox factory may return an async context manager when its adapter
+        needs cleanup after the Activity finishes.
         """
         default_name: str | None = None
         if models is None:
-            models = {"bedrock": lambda: BedrockModel()}
+            models = {"bedrock": _default_bedrock_model}
             default_name = "bedrock"
         activities: list[Callable] = []
         if models:
             ma = ModelActivity(models, default_name=default_name)
             activities.extend([ma.invoke_model, ma.invoke_model_streaming])
+
+        sandbox_activities = (
+            SandboxActivities(
+                sandboxes,
+                resolvable_worker_env_vars,
+            )
+            if sandboxes
+            else None
+        )
+        if sandbox_activities is not None:
+            activities.extend(sandbox_activities.activities())
 
         mcp_clients = mcp_clients or {}
         for server, client_factory in mcp_clients.items():

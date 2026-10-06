@@ -69,6 +69,16 @@ class _ReplaySafeSpan(Span):
     ) -> None:
         self._span.add_event(name, attributes, timestamp)
 
+    def add_link(
+        self,
+        context: SpanContext,
+        attributes: types.Attributes = None,
+    ) -> None:
+        # Must be overridden explicitly: the Span ABC ships add_link as a
+        # non-abstract warn-and-no-op default that __getattr__ cannot
+        # intercept, which would silently drop links added after creation.
+        self._span.add_link(context, attributes)
+
     def update_name(self, name: str) -> None:
         self._span.update_name(name)
 
@@ -174,16 +184,20 @@ class ReplaySafeTracerProvider(TracerProvider):
     ):
         """Initialize the replay-safe tracer provider.
 
+        Prefer :py:func:`create_tracer_provider`, which constructs a provider
+        that satisfies these requirements.
+
         Args:
             tracer_provider: The underlying OpenTelemetry TracerProvider to wrap.
-                Must use a _TemporalIdGenerator for replay safety.
+                Must use a ``TemporalIdGenerator`` for replay safety.
+            id_generator: The ``TemporalIdGenerator`` used by ``tracer_provider``.
 
         Raises:
-            ValueError: If the tracer provider doesn't use a _TemporalIdGenerator.
+            ValueError: If the tracer provider doesn't use a ``TemporalIdGenerator``.
         """
         if not isinstance(tracer_provider.id_generator, TemporalIdGenerator):
             raise ValueError(
-                "ReplaySafeTracerProvider should only be used with a TemporalIdGenerator for replay safety. The given TracerProvider doesnt use one."
+                "ReplaySafeTracerProvider should only be used with a TemporalIdGenerator for replay safety. The given TracerProvider doesn't use one."
             )
         self._id_generator = id_generator
         self._tracer_provider = tracer_provider

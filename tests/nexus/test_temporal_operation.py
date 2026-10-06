@@ -2,23 +2,49 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import Any, cast
 
 import nexusrpc
 import pytest
 from nexusrpc import HandlerErrorType, Operation, service
-from nexusrpc.handler import operation_handler, service_handler
+from nexusrpc.handler import (
+    CancelOperationContext,
+    OperationTaskCancellation,
+    operation_handler,
+    service_handler,
+)
 from typing_extensions import override
 
 import temporalio.exceptions
-from temporalio import nexus, workflow
+from temporalio import activity, nexus, workflow
+from temporalio.api.activity.v1 import ActivityExecutionInfo
 from temporalio.api.common.v1 import Link
-from temporalio.client import Client, WorkflowExecutionStatus, WorkflowFailureError
-from temporalio.common import NexusOperationExecutionStatus, WorkflowIDConflictPolicy
+from temporalio.client import (
+    ActivityExecutionStatus,
+    Client,
+    NexusOperationFailureError,
+    WorkflowExecutionStatus,
+    WorkflowFailureError,
+    WorkflowUpdateStage,
+)
+from temporalio.common import (
+    NexusOperationExecutionStatus,
+    RetryPolicy,
+    WorkflowIDConflictPolicy,
+)
 from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers import EventType, assert_event_subsequence, assert_eventually
-from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.nexus import (
+    assert_links_match,
+    expected_nexus_operation_link,
+    make_nexus_endpoint_name,
+)
+
+# Cloud CI's namespace credentials cannot manage Nexus endpoints.
+# See https://github.com/temporalio/sdk-python/issues/1704.
+pytestmark = pytest.mark.requires_local_server
 
 
 @dataclass
@@ -59,6 +85,29 @@ class EchoWorkflow:
         return input.value
 
 
+@activity.defn
+async def echo_activity(input: Input) -> str:
+    return input.value
+
+
+@activity.defn
+async def raise_error_activity() -> None:
+    raise temporalio.exceptions.ApplicationError(
+        "test-activity-error-message",
+        type="test-activity-error-type",
+        non_retryable=True,
+    )
+
+
+@activity.defn
+async def wait_for_cancel_activity() -> None:
+    # Heartbeat in a loop so the activity receives cancellation. Letting the
+    # resulting CancelledError bubble out transitions the activity to CANCELED.
+    while True:
+        await asyncio.sleep(0.3)
+        activity.heartbeat()
+
+
 @service
 class TestService:
     echo: Operation[Input, str]
@@ -69,6 +118,14 @@ class TestService:
     sync_result: Operation[Input, str]
     custom_cancel: Operation[str, None]
     update_op: Operation[Input, str]
+    bad_update_stage_op: Operation[Input, str]
+    query_op: Operation[str, bool]
+    echo_activity: Operation[Input, str]
+    error_activity: Operation[Input, None]
+    blocking_activity: Operation[str, None]
+    custom_cancel_activity: Operation[str, None]
+    double_start_activity: Operation[Input, None]
+    mixed_start: Operation[Input, None]
 
 
 @service_handler(service=TestService)
@@ -78,6 +135,9 @@ class TestServiceHandler:
 
     def __init__(self) -> None:
         self.started_custom_cancel_workflow = asyncio.Event()
+        self.started_custom_cancel_activity = asyncio.Event()
+        self.custom_cancel_activity_called = asyncio.Event()
+        self.bad_update_stage_error: ValueError | None = None
 
     @nexus.temporal_operation
     async def echo(
@@ -234,8 +294,166 @@ class TestServiceHandler:
             input.value,
             UpdatableWorkflow.do_update,
             input.update_value,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
             update_id=input.update_id,
         )
+
+    @nexus.temporal_operation
+    async def bad_update_stage_op(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: Input,
+    ) -> nexus.TemporalOperationResult[str]:
+        try:
+            return await client.start_workflow_update(
+                input.value,
+                UpdatableWorkflow.do_update,
+                input.update_value,
+                # cast to bypass type checker
+                wait_for_stage=cast(Any, WorkflowUpdateStage.COMPLETED),
+                update_id=input.update_id,
+            )
+        except ValueError as err:
+            self.bad_update_stage_error = err
+            return nexus.TemporalOperationResult.sync(str(err))
+
+    @nexus.temporal_operation
+    async def query_op(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: str,
+    ) -> nexus.TemporalOperationResult[bool]:
+        handle = client.client.get_workflow_handle(input)
+        result = await handle.query(BlockingWorkflow.query_done)
+        return nexus.TemporalOperationResult.sync(result)
+
+    @nexus.temporal_operation
+    async def echo_activity(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: Input,
+    ) -> nexus.TemporalOperationResult[str]:
+        return await client.start_activity(
+            echo_activity,
+            input,
+            id=f"echo_activity-{uuid.uuid4()}",
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+
+    @nexus.temporal_operation
+    async def error_activity(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        _input: Input,
+    ) -> nexus.TemporalOperationResult[None]:
+        # The activity raises immediately. With a single permitted attempt it
+        # fails the backing activity, which in turn fails the Nexus operation.
+        return await client.start_activity(
+            raise_error_activity,
+            id=f"error_activity-{uuid.uuid4()}",
+            start_to_close_timeout=timedelta(seconds=5),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+    @nexus.temporal_operation
+    async def blocking_activity(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: str,
+    ) -> nexus.TemporalOperationResult[None]:
+        return await client.start_activity(
+            wait_for_cancel_activity,
+            id=input,
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
+        )
+
+    @nexus.temporal_operation
+    async def double_start_activity(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        _input: Input,
+    ) -> nexus.TemporalOperationResult[None]:
+        # Keep the first activity running so its callback cannot race the
+        # handler error raised by the second start.
+        await client.start_activity(
+            wait_for_cancel_activity,
+            id=f"double-start-activity-{uuid.uuid4()}",
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
+        )
+        await client.start_activity(
+            wait_for_cancel_activity,
+            id=f"double-start-activity-{uuid.uuid4()}",
+            start_to_close_timeout=timedelta(seconds=30),
+            heartbeat_timeout=timedelta(seconds=1),
+        )
+        return nexus.TemporalOperationResult.sync(None)
+
+    @nexus.temporal_operation
+    async def mixed_start(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: Input,
+    ) -> nexus.TemporalOperationResult[None]:
+        # Starting a workflow reserves the single async start, so the subsequent
+        # start_activity must hit the same guard and raise a BAD_REQUEST error.
+        await client.start_workflow(
+            EchoWorkflow.run, input, id=f"mixed-start-{uuid.uuid4()}"
+        )
+        await client.start_activity(
+            echo_activity,
+            input,
+            id=f"mixed-start-{uuid.uuid4()}",
+            start_to_close_timeout=timedelta(seconds=5),
+        )
+        return nexus.TemporalOperationResult.sync(None)
+
+    @operation_handler
+    def custom_cancel_activity(self) -> nexus.TemporalOperationHandler[str, None]:
+        started = self.started_custom_cancel_activity
+        cancel_called = self.custom_cancel_activity_called
+
+        class CustomCancelActivityNexusOpHandler(
+            nexus.TemporalOperationHandler[str, None]
+        ):
+            @override
+            async def start_operation(
+                self,
+                ctx: nexus.TemporalStartOperationContext,
+                client: nexus.TemporalNexusClient,
+                input: str,
+            ) -> nexus.TemporalOperationResult[None]:
+                result = await client.start_activity(
+                    wait_for_cancel_activity,
+                    id=input,
+                    start_to_close_timeout=timedelta(seconds=30),
+                    heartbeat_timeout=timedelta(seconds=1),
+                )
+                started.set()
+                return result
+
+            @override
+            async def cancel_activity(
+                self,
+                ctx: nexus.TemporalCancelOperationContext,
+                options: nexus.CancelActivityOptions,
+            ):
+                # record that the custom override ran
+                cancel_called.set()
+
+                # get a handle to the activity and cancel it
+                handle = nexus.client().get_activity_handle(options.activity_id)
+                await handle.cancel()
+
+        return CustomCancelActivityNexusOpHandler()
 
 
 @workflow.defn
@@ -283,7 +501,7 @@ async def test_temporal_operation_update_workflow(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     if (
-        env.supports_time_skipping
+        env.supports_time_skipping_v1
     ):  # time skipping server uses different dynamic configs
         pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
@@ -462,7 +680,7 @@ async def test_temporal_operation_update_workflow_delayed(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     if (
-        env.supports_time_skipping
+        env.supports_time_skipping_v1
     ):  # time skipping server uses different dynamic configs
         pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
@@ -556,6 +774,115 @@ async def test_temporal_operation_update_workflow_delayed(
         assert expected_backward_link in handler_links
 
 
+async def test_start_workflow_update_rejects_non_accepted_wait_for_stage(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    if env.supports_time_skipping_v1:
+        pytest.skip("Update workflow tests don't work with time-skipping server")
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    service_handler = TestServiceHandler()
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        workflows=[UpdatableWorkflow, BadUpdateStageCaller],
+    ):
+        update_workflow_id = f"updatable-workflow-{uuid.uuid4()}"
+        await client.start_workflow(
+            UpdatableWorkflow.run, id=update_workflow_id, task_queue=task_queue
+        )
+        result = await client.execute_workflow(
+            BadUpdateStageCaller.run,
+            Input(
+                value=update_workflow_id,
+                task_queue=task_queue,
+                update_value="Created",
+            ),
+            task_queue=task_queue,
+            id=f"bad-update-stage-caller-{uuid.uuid4()}",
+        )
+
+    assert isinstance(service_handler.bad_update_stage_error, ValueError)
+    assert result == str(service_handler.bad_update_stage_error)
+    assert result == "Only ACCEPTED wait stage is supported"
+
+
+async def test_temporal_operation_cancel_rejects_unknown_tokens():
+    class FakeNexusTaskCancellation(OperationTaskCancellation):
+        def is_cancelled(self) -> bool:
+            return False
+
+        def cancellation_reason(self) -> str | None:
+            return None
+
+        def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
+            return False
+
+        async def wait_until_cancelled(self) -> None:
+            return None
+
+        def cancel(self, _reason: str) -> bool:
+            return False
+
+    cancel_ctx = CancelOperationContext(
+        service="TestService",
+        operation="echo",
+        headers={},
+        task_cancellation=FakeNexusTaskCancellation(),
+    )
+
+    service_handler = TestServiceHandler()
+
+    # Use a factory style operation form the handler to allow calling cancel directly
+    op_handler = service_handler.custom_cancel()
+
+    # Invalid token type
+    token = OperationToken(type=30, namespace="default")  # type: ignore
+    with pytest.raises(nexusrpc.HandlerError) as err:
+        await op_handler.cancel(cancel_ctx, token.encode())
+    assert err.value.type == HandlerErrorType.INTERNAL
+    assert not err.value.retryable
+    underlying = err.value.__cause__
+    assert isinstance(underlying, TypeError)
+    assert "unknown token type, got 30" in str(underlying)
+
+    # Workflow ID missing from workflow type
+    token = OperationToken(type=OperationTokenType.WORKFLOW, namespace="default")
+    with pytest.raises(nexusrpc.HandlerError) as err:
+        await op_handler.cancel(cancel_ctx, token.encode())
+    assert err.value.type == HandlerErrorType.INTERNAL
+    assert not err.value.retryable
+    underlying = err.value.__cause__
+    assert isinstance(underlying, TypeError)
+    assert "expected non-empty workflow id for token type `WORKFLOW`" in str(underlying)
+
+    # Activity ID missing from activity type
+    token = OperationToken(type=OperationTokenType.ACTIVITY, namespace="default")
+    with pytest.raises(nexusrpc.HandlerError) as err:
+        await op_handler.cancel(cancel_ctx, token.encode())
+    assert err.value.type == HandlerErrorType.INTERNAL
+    assert not err.value.retryable
+    underlying = err.value.__cause__
+    assert isinstance(underlying, TypeError)
+    assert "expected non-empty activity id for token type `ACTIVITY`" in str(underlying)
+
+    activity_op_handler = service_handler.custom_cancel_activity()
+    for run_id in (None, ""):
+        token = OperationToken(
+            type=OperationTokenType.ACTIVITY,
+            namespace="default",
+            activity_id="activity-id",
+            run_id=run_id,
+        )
+        with pytest.raises(nexusrpc.HandlerError) as err:
+            await activity_op_handler.cancel(cancel_ctx, token.encode())
+        assert err.value.type == HandlerErrorType.INTERNAL
+        assert not err.value.retryable
+        assert not service_handler.custom_cancel_activity_called.is_set()
+
+
 @workflow.defn
 class BlockingWorkflow:
     def __init__(self) -> None:
@@ -568,6 +895,74 @@ class BlockingWorkflow:
     @workflow.update
     async def unblock(self):
         self.done = True
+
+    @workflow.query
+    def query_done(self) -> bool:
+        return self.done
+
+
+@workflow.defn
+class QueryWorkflowCaller:
+    @workflow.run
+    async def run(self, input: Input) -> bool:
+        client = workflow.create_nexus_client(
+            service=TestService, endpoint=make_nexus_endpoint_name(input.task_queue)
+        )
+        return await client.execute_operation(TestService.query_op, input.value)
+
+
+async def test_temporal_operation_query_workflow(
+    client: Client, env: WorkflowEnvironment
+) -> None:
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    target_workflow_id = f"query-target-{uuid.uuid4()}"
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[BlockingWorkflow, QueryWorkflowCaller],
+    ):
+        target_handle = await client.start_workflow(
+            BlockingWorkflow.run,
+            id=target_workflow_id,
+            task_queue=task_queue,
+        )
+        caller_handle = await client.start_workflow(
+            QueryWorkflowCaller.run,
+            Input(value=target_workflow_id, task_queue=task_queue),
+            id=f"query-caller-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+
+        try:
+            assert not await caller_handle.result()
+
+            caller_history = await caller_handle.fetch_history()
+            completed_event = next(
+                event
+                for event in caller_history.events
+                if event.event_type == EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED
+            )
+
+            target_history = await target_handle.fetch_history()
+            assert not any(event.links for event in target_history.events)
+
+            # The Java time-skipping test server does not return Nexus operation links.
+            if not env.supports_time_skipping_v1:
+                assert target_handle.result_run_id is not None
+                assert Link(
+                    workflow=Link.Workflow(
+                        namespace=client.namespace,
+                        workflow_id=target_workflow_id,
+                        run_id=target_handle.result_run_id,
+                        reason="Query processed",
+                    )
+                ) in list(completed_event.links)
+        finally:
+            await target_handle.cancel()
 
 
 @workflow.defn
@@ -783,6 +1178,41 @@ async def test_temporal_operation_failed_start_allows_retry(
             await conflict_handle.cancel()
 
 
+async def test_temporal_operation_mixed_start_raises_handler_err(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[EchoWorkflow],
+        activities=[echo_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        with pytest.raises(NexusOperationFailureError) as err:
+            await nexus_client.execute_operation(
+                TestService.mixed_start,
+                Input(value="test", task_queue=task_queue),
+                id=str(uuid.uuid4()),
+            )
+
+        assert isinstance(err.value.cause, nexusrpc.HandlerError)
+        assert err.value.cause.type == HandlerErrorType.BAD_REQUEST
+        assert (
+            "Only one async operation can be started per operation handler invocation"
+            in err.value.cause.message
+        )
+
+
 @workflow.defn
 class SyncResultCaller:
     @workflow.run
@@ -819,6 +1249,239 @@ async def test_temporal_operation_sync_result(client: Client, env: WorkflowEnvir
                 EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
                 EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
             ],
+        )
+
+
+async def test_temporal_operation_start_activity(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        activities=[echo_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        result = await nexus_client.execute_operation(
+            TestService.echo_activity,
+            Input(value="test", task_queue=task_queue),
+            id=str(uuid.uuid4()),
+        )
+        assert result == "test"
+
+
+async def test_temporal_operation_backing_activity_does_not_duplicate_links(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    activity_id = f"link-activity-{uuid.uuid4()}"
+
+    @service_handler
+    class LinkActivityHandler:
+        @nexus.temporal_operation
+        async def echo_activity(
+            self,
+            _ctx: nexus.TemporalStartOperationContext,
+            client: nexus.TemporalNexusClient,
+            input: Input,
+        ) -> nexus.TemporalOperationResult[str]:
+            return await client.start_activity(
+                echo_activity,
+                input,
+                id=activity_id,
+                start_to_close_timeout=timedelta(seconds=5),
+            )
+
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[LinkActivityHandler()],
+        activities=[echo_activity],
+    ):
+        nexus_client = client.create_nexus_client(LinkActivityHandler, endpoint_name)
+        operation_handle = await nexus_client.start_operation(
+            LinkActivityHandler.echo_activity,
+            Input(value="test", task_queue=task_queue),
+            id=str(uuid.uuid4()),
+        )
+
+        assert await operation_handle.result() == "test"
+        activity_description = await client.get_activity_handle(activity_id).describe()
+        assert isinstance(activity_description.raw_info, ActivityExecutionInfo)
+        assert operation_handle.run_id is not None
+        callback_links = [
+            link
+            for callback in activity_description.raw_callbacks
+            for link in callback.info.callback.links
+        ]
+        assert_links_match(
+            [*activity_description.raw_info.links, *callback_links],
+            expected_nexus_operation_link(
+                namespace=client.namespace,
+                operation_id=operation_handle.operation_id,
+                run_id=operation_handle.run_id,
+            ),
+        )
+
+
+async def test_temporal_operation_start_activity_raises_error(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        activities=[raise_error_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        with pytest.raises(NexusOperationFailureError) as err:
+            await nexus_client.execute_operation(
+                TestService.error_activity,
+                Input(value="test", task_queue=task_queue),
+                id=str(uuid.uuid4()),
+            )
+
+        application_err = err.value.__cause__
+        assert isinstance(application_err, temporalio.exceptions.ApplicationError)
+        assert application_err.type == "test-activity-error-type"
+        assert "test-activity-error-message" in str(application_err)
+        assert application_err.__cause__ is None
+
+
+async def test_temporal_operation_cancel_activity(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        activities=[wait_for_cancel_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        activity_id = f"blocking-activity-{uuid.uuid4()}"
+        op_handle = await nexus_client.start_operation(
+            TestService.blocking_activity, activity_id, id=str(uuid.uuid4())
+        )
+
+        await op_handle.cancel()
+
+        activity_handle = client.get_activity_handle(activity_id)
+
+        async def check_cancelled():
+            op_desc = await op_handle.describe()
+            assert op_desc.status is NexusOperationExecutionStatus.CANCELED
+            activity_desc = await activity_handle.describe()
+            assert activity_desc.status is ActivityExecutionStatus.CANCELED
+
+        await assert_eventually(check_cancelled)
+
+
+async def test_customized_temporal_operation_cancel_activity(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    service_handler = TestServiceHandler()
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[service_handler],
+        activities=[wait_for_cancel_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        activity_id = f"custom-cancel-activity-{uuid.uuid4()}"
+        op_handle = await nexus_client.start_operation(
+            TestService.custom_cancel_activity, activity_id, id=str(uuid.uuid4())
+        )
+        await service_handler.started_custom_cancel_activity.wait()
+
+        await op_handle.cancel()
+
+        activity_handle = client.get_activity_handle(activity_id)
+
+        async def check_cancelled():
+            assert service_handler.custom_cancel_activity_called.is_set()
+            op_desc = await op_handle.describe()
+            assert op_desc.status is NexusOperationExecutionStatus.CANCELED
+            activity_desc = await activity_handle.describe()
+            assert activity_desc.status is ActivityExecutionStatus.CANCELED
+
+        await assert_eventually(check_cancelled)
+
+
+async def test_temporal_operation_double_start_activity_raises_handler_err(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+    async with Worker(
+        env.client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        activities=[wait_for_cancel_activity],
+    ):
+        nexus_client = client.create_nexus_client(TestService, endpoint_name)
+
+        with pytest.raises(NexusOperationFailureError) as err:
+            await nexus_client.execute_operation(
+                TestService.double_start_activity,
+                Input(value="test", task_queue=task_queue),
+                id=str(uuid.uuid4()),
+            )
+
+        assert isinstance(err.value.cause, nexusrpc.HandlerError)
+        assert err.value.cause.type == HandlerErrorType.BAD_REQUEST
+        assert (
+            "Only one async operation can be started per operation handler invocation"
+            in err.value.cause.message
         )
 
 
@@ -1047,6 +1710,19 @@ class UpdateWorkflowCaller:
 
 
 @workflow.defn
+class BadUpdateStageCaller:
+    """Caller workflow for an update op that requests an unsupported update stage."""
+
+    @workflow.run
+    async def run(self, input: Input) -> str:
+        client = workflow.create_nexus_client(
+            service=TestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        return await client.execute_operation(TestService.bad_update_stage_op, input)
+
+
+@workflow.defn
 class UpdatableWorkflow:
     """Workflow that accepts updates and exits when it receives a specific status"""
 
@@ -1067,3 +1743,64 @@ class UpdatableWorkflow:
         self.order_status = value
         update_result = f"Updated workflow status from {status} to {value}"
         return update_result
+
+
+async def test_temporal_operation_includes_activity_token_in_callback(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    @service_handler
+    class ActivityTokenHandler:
+        @nexus.temporal_operation
+        async def echo_activity(
+            self,
+            _ctx: nexus.TemporalStartOperationContext,
+            client: nexus.TemporalNexusClient,
+            input: Input,
+        ) -> nexus.TemporalOperationResult[str]:
+            return await client.start_activity(
+                echo_activity,
+                input,
+                id=input.value,
+                start_to_close_timeout=timedelta(seconds=10),
+                start_delay=timedelta(milliseconds=100),
+            )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[ActivityTokenHandler()],
+        activities=[echo_activity],
+    ):
+        input_value = f"test-{uuid.uuid4()}"
+
+        nexus_client = client.create_nexus_client(ActivityTokenHandler, endpoint_name)
+
+        result = await nexus_client.execute_operation(
+            ActivityTokenHandler.echo_activity,
+            Input(value=input_value, task_queue=task_queue),
+            id=str(uuid.uuid4()),
+        )
+        assert result == input_value
+
+        activity_handle = client.get_activity_handle(input_value)
+
+        desc = await activity_handle.describe()
+        token = desc.raw_callbacks[0].info.callback.nexus.header[
+            "nexus-operation-token"
+        ]
+
+        expected_token = OperationToken(
+            type=OperationTokenType.ACTIVITY,
+            namespace=client.namespace,
+            activity_id=input_value,
+        ).encode()
+
+        assert token == expected_token

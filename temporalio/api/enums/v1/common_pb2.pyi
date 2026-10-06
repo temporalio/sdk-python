@@ -97,7 +97,7 @@ class _CallbackStateEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._
     CALLBACK_STATE_SUCCEEDED: _CallbackState.ValueType  # 5
     """Callback has succeeded."""
     CALLBACK_STATE_BLOCKED: _CallbackState.ValueType  # 6
-    """Callback is blocked (eg: by circuit breaker)."""
+    """Callback is blocked, e.g. by circuit breaker."""
 
 class CallbackState(_CallbackState, metaclass=_CallbackStateEnumTypeWrapper):
     """State of a callback."""
@@ -115,7 +115,7 @@ CALLBACK_STATE_FAILED: CallbackState.ValueType  # 4
 CALLBACK_STATE_SUCCEEDED: CallbackState.ValueType  # 5
 """Callback has succeeded."""
 CALLBACK_STATE_BLOCKED: CallbackState.ValueType  # 6
-"""Callback is blocked (eg: by circuit breaker)."""
+"""Callback is blocked, e.g. by circuit breaker."""
 global___CallbackState = CallbackState
 
 class _PendingNexusOperationState:
@@ -263,6 +263,8 @@ class _ExecutionTypeEnumTypeWrapper(google.protobuf.internal.enum_type_wrapper._
     """A workflow execution archetype."""
     EXECUTION_TYPE_ACTIVITY: _ExecutionType.ValueType  # 2
     """An activity execution archetype. This is reserved for standalone activities."""
+    EXECUTION_TYPE_NEXUS_OPERATION: _ExecutionType.ValueType  # 3
+    """A Nexus operation execution archetype. This is reserved for standalone Nexus operations."""
 
 class ExecutionType(_ExecutionType, metaclass=_ExecutionTypeEnumTypeWrapper): ...
 
@@ -271,4 +273,6 @@ EXECUTION_TYPE_WORKFLOW: ExecutionType.ValueType  # 1
 """A workflow execution archetype."""
 EXECUTION_TYPE_ACTIVITY: ExecutionType.ValueType  # 2
 """An activity execution archetype. This is reserved for standalone activities."""
+EXECUTION_TYPE_NEXUS_OPERATION: ExecutionType.ValueType  # 3
+"""A Nexus operation execution archetype. This is reserved for standalone Nexus operations."""
 global___ExecutionType = ExecutionType

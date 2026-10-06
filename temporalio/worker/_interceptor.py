@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import (
     Any,
@@ -21,6 +21,9 @@ import temporalio.common
 import temporalio.nexus
 import temporalio.nexus._util
 import temporalio.workflow
+from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
+    _SystemNexusWorkflowOutboundInterceptorBase,
+)
 from temporalio.workflow import ContinueAsNewVersioningBehavior, VersioningIntent
 
 
@@ -174,8 +177,12 @@ class ContinueAsNewInput:
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     versioning_intent: VersioningIntent | None
     initial_versioning_behavior: ContinueAsNewVersioningBehavior | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     # The types may be absent
-    arg_types: list[type] | None
+    arg_types: list[type] | None = None
 
 
 @dataclass
@@ -228,6 +235,10 @@ class SignalChildWorkflowInput:
     args: Sequence[Any]
     child_workflow_id: str
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
 
 @dataclass
@@ -240,6 +251,10 @@ class SignalExternalWorkflowInput:
     workflow_id: str
     workflow_run_id: str | None
     headers: Mapping[str, temporalio.api.common.v1.Payload]
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
 
 @dataclass
@@ -260,6 +275,12 @@ class StartActivityInput:
     disable_eager_execution: bool
     versioning_intent: VersioningIntent | None
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = field(
+        default=None, kw_only=True
+    )
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -290,6 +311,12 @@ class StartChildWorkflowInput:
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = field(
+        default=None, kw_only=True
+    )
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     priority: temporalio.common.Priority
     # The types may be absent
     arg_types: list[type] | None
@@ -310,6 +337,10 @@ class StartNexusOperationInput(Generic[InputT, OutputT]):
     cancellation_type: temporalio.workflow.NexusOperationCancellationType
     headers: Mapping[str, str] | None
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
     output_type: type[OutputT] | None = None
 
     def __post_init__(self) -> None:
@@ -363,10 +394,14 @@ class StartLocalActivityInput:
     cancellation_type: temporalio.workflow.ActivityCancellationType
     headers: Mapping[str, temporalio.api.common.v1.Payload]
     summary: str | None
+    event_groups: Sequence[temporalio.workflow.EventGroup] | None = None
+    """.. warning::
+        Event Groups is an experimental API and may change without notice.
+    """
 
     # The types may be absent
-    arg_types: list[type] | None
-    ret_type: type | None
+    arg_types: list[type] | None = None
+    ret_type: type | None = None
 
 
 class WorkflowInboundInterceptor:
@@ -414,11 +449,13 @@ class WorkflowInboundInterceptor:
         return await self.next.handle_update_handler(input)
 
 
-class WorkflowOutboundInterceptor:
+class WorkflowOutboundInterceptor(_SystemNexusWorkflowOutboundInterceptorBase):
     """Outbound interceptor to wrap calls made from within workflows.
 
     This should be extended by any workflow outbound interceptors.
     """
+
+    next: WorkflowOutboundInterceptor
 
     def __init__(self, next: WorkflowOutboundInterceptor) -> None:
         """Create the outbound interceptor.
@@ -428,6 +465,11 @@ class WorkflowOutboundInterceptor:
                 of all calls is to delegate to the next interceptor.
         """
         self.next = next
+
+    def _next_system_nexus_interceptor(
+        self,
+    ) -> _SystemNexusWorkflowOutboundInterceptorBase:
+        return self.next
 
     def continue_as_new(self, input: ContinueAsNewInput) -> NoReturn:
         """Called for every :py:func:`temporalio.workflow.continue_as_new` call."""
@@ -480,6 +522,12 @@ class WorkflowOutboundInterceptor:
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         """Called for every :py:func:`temporalio.workflow.NexusClient.start_operation` call."""
         return await self.next.start_nexus_operation(input)
+
+    async def start_system_nexus_operation(
+        self, input: StartNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        """Intercept a Temporal System Nexus operation started by a workflow."""
+        return await self.next.start_system_nexus_operation(input)
 
 
 @dataclass

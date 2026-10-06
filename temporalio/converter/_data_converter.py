@@ -13,9 +13,9 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.common
-from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.converter._extstore import (
     _REFERENCE_ENCODING,
+    _REFERENCE_MESSAGE_TYPE,
     ExternalStorage,
     StorageDriverStoreContext,
 )
@@ -34,8 +34,6 @@ from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
 )
-
-_REFERENCE_MESSAGE_TYPE = ExternalStorageReference.DESCRIPTOR.full_name.encode()
 
 
 def _is_reference_payload(p: temporalio.api.common.v1.Payload) -> bool:
@@ -75,7 +73,9 @@ class DataConverter(WithSerializationContext):
     """Class to instantiate for failure conversion."""
 
     payload_converter: PayloadConverter = dataclasses.field(init=False)
-    """Payload converter created from the :py:attr:`payload_converter_class`."""
+    """Payload converter created from :py:attr:`payload_converter_class` and wrapped
+    with SDK transfer type conversion, including when called directly.
+    """
 
     failure_converter: FailureConverter = dataclasses.field(init=False)
     """Failure converter created from the :py:attr:`failure_converter_class`."""

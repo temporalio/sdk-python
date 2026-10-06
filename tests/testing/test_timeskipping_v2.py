@@ -326,7 +326,7 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
             "frontend.WorkflowTimeSkippingEnabled=true",
         ],
     ) as env:
-        assert not env.supports_time_skipping
+        assert not env.supports_time_skipping_v1
 
         skipper = TimeSkipper(env.client)
         async with new_worker(skipper.client, SleepWorkflow) as worker:

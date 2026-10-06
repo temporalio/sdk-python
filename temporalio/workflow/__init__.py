@@ -94,6 +94,7 @@ from ._context import (
     upsert_memo,
     upsert_search_attributes,
     uuid4,
+    uuid7,
     wait_condition,
 )
 from ._definition import (
@@ -105,6 +106,10 @@ from ._definition import (
     dynamic_config,
     init,
     run,
+)
+from ._event_groups import (
+    EventGroup,
+    create_event_group,
 )
 from ._exceptions import (
     ContinueAsNewVersioningBehavior,
@@ -196,6 +201,7 @@ __all__ = [
     "ParentInfo",
     "RootInfo",
     "UpdateInfo",
+    "cancellation_reason",
     "current_update_info",
     "deprecate_patch",
     "extern_functions",
@@ -203,7 +209,6 @@ __all__ = [
     "get_last_completion_result",
     "get_last_failure",
     "has_last_completion_result",
-    "cancellation_reason",
     "in_workflow",
     "info",
     "instance",
@@ -225,16 +230,19 @@ __all__ = [
     "upsert_memo",
     "upsert_search_attributes",
     "uuid4",
+    "uuid7",
     "wait_condition",
     "DynamicWorkflowConfig",
     "defn",
     "dynamic_config",
     "init",
     "run",
+    "EventGroup",
+    "create_event_group",
+    "ContinueAsNewVersioningBehavior",
     "NondeterminismError",
     "ReadOnlyContextError",
     "VersioningIntent",
-    "ContinueAsNewVersioningBehavior",
     "HandlerUnfinishedPolicy",
     "UnfinishedSignalHandlersWarning",
     "UnfinishedUpdateHandlersWarning",

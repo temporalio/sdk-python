@@ -50,6 +50,7 @@ from ._activity import (
     ActivityExecutionAsyncIterator,
     ActivityExecutionCount,
     ActivityExecutionDescription,
+    ActivityExecutionOptions,
     ActivityHandle,
     AsyncActivityIDReference,
 )
@@ -87,6 +88,7 @@ from ._interceptor import (
     ListSchedulesInput,
     ListWorkflowsInput,
     OutboundInterceptor,
+    PauseActivityInput,
     PauseScheduleInput,
     QueryWorkflowInput,
     ReportCancellationAsyncActivityInput,
@@ -100,7 +102,9 @@ from ._interceptor import (
     TerminateNexusOperationInput,
     TerminateWorkflowInput,
     TriggerScheduleInput,
+    UnpauseActivityInput,
     UnpauseScheduleInput,
+    UpdateActivityOptionsInput,
     UpdateScheduleInput,
     UpdateWithStartStartWorkflowInput,
     UpdateWithStartUpdateWorkflowInput,
@@ -172,6 +176,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
+                first_execution_run_id = resp.first_execution_run_id or (
+                    resp.run_id if resp.started else None
+                )
             else:
                 resp = await self._client.workflow_service.start_workflow_execution(
                     req,
@@ -179,7 +186,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     metadata=input.rpc_metadata,
                     timeout=input.rpc_timeout,
                 )
-                first_execution_run_id = resp.run_id
+                first_execution_run_id = resp.first_execution_run_id or resp.run_id
                 eagerly_started = resp.HasField("eager_workflow_task")
         except RPCError as err:
             # If the status is ALREADY_EXISTS and the details can be extracted
@@ -188,7 +195,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 details = temporalio.api.errordetails.v1.WorkflowExecutionAlreadyStartedFailure()
                 if err.grpc_status.details[0].Unpack(details):
                     raise temporalio.exceptions.WorkflowAlreadyStartedError(
-                        input.id, input.workflow, run_id=details.run_id
+                        input.id,
+                        input.workflow,
+                        run_id=details.run_id,
+                        first_run_id=details.first_execution_run_id or None,
                     )
             raise
         handle: WorkflowHandle[Any, Any] = WorkflowHandle(
@@ -200,9 +210,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_workflow_response=resp,
         )
         setattr(handle, "__temporal_eagerly_started", eagerly_started)
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None:
-            nexus_ctx._add_start_workflow_response_link(handle)
+        temporalio.nexus._operation_context._apply_start_workflow_response_to_nexus_context(
+            handle
+        )
         return handle
 
     async def _build_start_workflow_execution_request(
@@ -214,40 +224,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # and UpdateWithStartStartWorkflowInput. UpdateWithStartStartWorkflowInput does
         # not have the following two fields so they are handled here.
         req.request_eager_execution = input.request_eager_start
-        if input.request_id:
-            req.request_id = input.request_id
 
-        req.completion_callbacks.extend(
-            temporalio.api.common.v1.Callback(
-                nexus=temporalio.api.common.v1.Callback.Nexus(
-                    url=callback.url,
-                    header=callback.headers,
-                ),
-                links=input.links,
-            )
-            for callback in input.callbacks
+        temporalio.nexus._operation_context._apply_nexus_context_to_start_workflow_request(
+            req
         )
-        # Links are duplicated on request for compatibility with older server versions.
-        req.links.extend(input.links)
-
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None:
-            # This start was issued from inside a Nexus operation handler. If the workflow ID
-            # conflict policy is WORKFLOW_ID_CONFLICT_POLICY_USE_EXISTING and a conflict is
-            # detected, attach this request's request ID, completion callbacks, and links to
-            # the existing run. The TemporalNexusClient and WorkflowRunOperationContext are
-            # responsible for setting the callbacks correctly, so it is safe to enable all
-            # on-conflict options whenever we are invoked from an operation handler.
-            req.on_conflict_options.attach_request_id = True
-            req.on_conflict_options.attach_completion_callbacks = True
-            req.on_conflict_options.attach_links = True
-            # The nexus-backing workflow already carries its inbound links via input.links
-            # (start_workflow forwards them as links=...). A plain start_workflow issued from
-            # inside a Nexus operation handler must forward the inbound Nexus task links
-            # explicitly so the started callee's WorkflowExecutionStarted event links back to
-            # the caller.
-            if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
-                req.links.extend(nexus_ctx._get_request_links())
 
         return req
 
@@ -274,15 +254,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 await data_converter.encode(input.start_signal_args)
             )
         await self._populate_start_workflow_execution_request(req, input)
-        # If this signal-with-start is issued from inside a Nexus operation handler (but not the
-        # nexus-backing workflow), forward the inbound Nexus task links so both the callee's
-        # WorkflowExecutionStarted and WorkflowExecutionSignaled events link back to the caller.
-        if not temporalio.nexus._operation_context._in_nexus_backing_workflow_start_context():
-            nexus_ctx = (
-                temporalio.nexus._operation_context._try_start_operation_context()
-            )
-            if nexus_ctx is not None:
-                req.links.extend(nexus_ctx._get_request_links())
+        temporalio.nexus._operation_context._apply_nexus_context_to_signal_with_start_workflow_request(
+            req
+        )
         return req
 
     async def _build_update_with_start_start_workflow_execution_request(
@@ -474,6 +448,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 raise WorkflowQueryFailedError(err.message)
             else:
                 raise
+        temporalio.nexus._operation_context._apply_query_workflow_response_to_nexus_context(
+            resp
+        )
         if resp.HasField("query_rejected"):
             raise WorkflowQueryRejectedError(
                 WorkflowExecutionStatus(resp.query_rejected.status)
@@ -518,18 +495,15 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.input.payloads.extend(await data_converter.encode(input.args))
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
-        # If this signal is issued from inside a Nexus operation handler, forward the inbound
-        # Nexus task links so the WorkflowExecutionSignaled event links back to the caller.
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None:
-            req.links.extend(nexus_ctx._get_request_links())
+        temporalio.nexus._operation_context._apply_nexus_context_to_signal_workflow_request(
+            req
+        )
         resp = await self._client.workflow_service.signal_workflow_execution(
             req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
         )
-        # Server >= 1.31 with EnableCHASMSignalBacklinks returns a response link pointing at the
-        # signal event; older servers leave it unset. Propagate when present.
-        if nexus_ctx is not None and resp.HasField("link"):
-            nexus_ctx._add_response_link(resp.link)
+        temporalio.nexus._operation_context._apply_signal_workflow_response_to_nexus_context(
+            resp
+        )
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
         data_converter = self._client.data_converter._with_contexts(
@@ -589,6 +563,13 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         input.id, input.activity_type, run_id=details.run_id
                     )
             raise
+
+        # Apply StartActivity response elements to the current Nexus context.
+        # No-ops if called outside a Nexus context.
+        temporalio.nexus._operation_context._apply_start_activity_response_to_nexus_context(
+            input.id, resp
+        )
+
         return ActivityHandle(
             self._client,
             input.id,
@@ -622,6 +603,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         req = temporalio.api.workflowservice.v1.StartActivityExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
             activity_id=input.id,
             activity_type=temporalio.api.common.v1.ActivityType(
                 name=input.activity_type
@@ -672,6 +654,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # Set priority
         req.priority.CopyFrom(input.priority._to_proto())
 
+        # Nexus starts use the inbound request ID so retries across the Nexus
+        # boundary resolve to the same activity execution.
+        temporalio.nexus._operation_context._apply_nexus_context_to_start_activity_request(
+            req
+        )
+
         return req
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
@@ -705,6 +693,98 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             timeout=input.rpc_timeout,
         )
 
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Pause an activity."""
+        await self._client.workflow_service.pause_activity_execution(
+            temporalio.api.workflowservice.v1.PauseActivityExecutionRequest(
+                namespace=self._client.namespace,
+                activity_id=input.activity_id,
+                run_id=input.activity_run_id or "",
+                identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
+                reason=input.reason or "",
+            ),
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Unpause an activity."""
+        req = temporalio.api.workflowservice.v1.UnpauseActivityExecutionRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+            reason=input.reason or "",
+        )
+        if input.jitter is not None:
+            req.jitter.FromTimedelta(input.jitter)
+        await self._client.workflow_service.unpause_activity_execution(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Update or restore an activity's options."""
+        # restore_original is exclusive to all other updates.
+        if input.restore_original and input.updates:
+            raise ValueError(
+                "restore_original cannot be combined with individual option updates"
+            )
+        req = temporalio.api.workflowservice.v1.UpdateActivityExecutionOptionsRequest(
+            namespace=self._client.namespace,
+            activity_id=input.activity_id,
+            run_id=input.activity_run_id or "",
+            identity=self._client.identity,
+            request_id=str(uuid.uuid4()),
+        )
+        if input.restore_original:
+            req.restore_original = True
+        else:
+            # The handle rejects a repeated option, but an interceptor could still add one.
+            seen: set[str] = set()
+            for update in input.updates:
+                name = update.key.name
+                if name in seen:
+                    raise ValueError(
+                        f"update_activity_options received more than one update for {name}"
+                    )
+                seen.add(name)
+                req.update_mask.paths.append(name)
+                if update.value is None:
+                    continue
+                if name == "task_queue.name":
+                    req.activity_options.task_queue.name = update.value
+                elif name == "retry_policy":
+                    update.value.apply_to_proto(req.activity_options.retry_policy)
+                elif name == "priority":
+                    req.activity_options.priority.CopyFrom(update.value._to_proto())
+                elif name in (
+                    "schedule_to_close_timeout",
+                    "schedule_to_start_timeout",
+                    "start_to_close_timeout",
+                    "heartbeat_timeout",
+                    "start_delay",
+                ):
+                    getattr(req.activity_options, name).FromTimedelta(update.value)
+                else:
+                    # Reached only if a key is added without a conversion for it here.
+                    raise ValueError(f"No conversion for activity option {name!r}")
+
+        resp = await self._client.workflow_service.update_activity_execution_options(
+            req,
+            retry=True,
+            metadata=input.rpc_metadata,
+            timeout=input.rpc_timeout,
+        )
+        return ActivityExecutionOptions._from_proto(resp.activity_options)
+
     async def describe_activity(
         self, input: DescribeActivityInput
     ) -> ActivityExecutionDescription:
@@ -714,15 +794,18 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 namespace=self._client.namespace,
                 activity_id=input.activity_id,
                 run_id=input.activity_run_id or "",
-                long_poll_token=input.long_poll_token or b"",
+                include_input=input.include_input,
+                include_outcome=input.include_outcome,
+                include_heartbeat_details=input.include_heartbeat_details,
+                include_last_failure=input.include_last_failure,
             ),
             retry=True,
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        return await ActivityExecutionDescription._from_execution_info(
-            info=resp.info,
-            long_poll_token=resp.long_poll_token or None,
+
+        return ActivityExecutionDescription._from_resp(
+            resp=resp,
             namespace=self._client.namespace,
             data_converter=self._client.data_converter.with_context(
                 ActivitySerializationContext(
@@ -789,10 +872,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             ):
                 break
 
-        # Add response link if its a Nexus operation
-        nexus_ctx = temporalio.nexus._operation_context._try_start_operation_context()
-        if nexus_ctx is not None and resp.HasField("link"):
-            nexus_ctx._add_response_link(resp.link)
+        temporalio.nexus._operation_context._apply_start_workflow_update_response_to_nexus_context(
+            resp
+        )
 
         # Build the handle. If the user's wait stage is COMPLETED, make sure we
         # poll for result.
@@ -859,23 +941,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 )
             ),
         )
-        # Only set Nexus fields for StartWorkflowUpdateInput, skip for UpdateWithStartUpdateWorkflowInput
         if isinstance(input, StartWorkflowUpdateInput):
-            if input.request_id:
-                req.request.request_id = input.request_id
-            if input.links:
-                req.request.links.extend(input.links)
-            if input.callbacks:
-                req.request.completion_callbacks.extend(
-                    temporalio.api.common.v1.Callback(
-                        nexus=temporalio.api.common.v1.Callback.Nexus(
-                            url=callback.url,
-                            header=callback.headers,
-                        ),
-                        links=input.links or [],
-                    )
-                    for callback in input.callbacks
-                )
+            temporalio.nexus._operation_context._apply_nexus_context_to_start_workflow_update_request(
+                req
+            )
         if input.args:
             req.request.input.args.payloads.extend(
                 await data_converter.encode(input.args)
@@ -951,6 +1020,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                                     input.start_workflow_input.id,
                                     input.start_workflow_input.workflow,
                                     run_id=details.run_id,
+                                    first_run_id=(
+                                        details.first_execution_run_id or None
+                                    ),
                                 )
                         else:
                             err = RPCError(
@@ -1488,6 +1560,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
         """Start a nexus operation and return a handle to it."""
+        nexus_context = temporalio.converter.NexusSerializationContext(
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+        )
+        data_converter = self._client.data_converter.with_context(nexus_context)
         req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
@@ -1514,7 +1592,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.start_to_close_timeout.FromTimedelta(input.start_to_close_timeout)
 
         # Set input payload
-        encoded = await self._client.data_converter.encode([input.arg])
+        encoded = await data_converter.encode([input.arg])
         if encoded:
             req.input.CopyFrom(encoded[0])
 
@@ -1525,9 +1603,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             )
 
         # Set user metadata
-        metadata = await _encode_user_metadata(
-            self._client.data_converter, input.summary, None
-        )
+        metadata = await _encode_user_metadata(data_converter, input.summary, None)
         if metadata is not None:
             req.user_metadata.CopyFrom(metadata)
 
@@ -1559,6 +1635,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             result_type=input.result_type,
             endpoint=input.endpoint,
             service=input.service,
+            operation=input.operation,
         )
 
     async def describe_nexus_operation(
@@ -1576,15 +1653,35 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
+        data_converter = self._client.data_converter.with_context(
+            temporalio.converter.NexusSerializationContext(
+                endpoint=resp.info.endpoint,
+                service=resp.info.service,
+                operation=resp.info.operation,
+            )
+        )
         return await NexusOperationExecutionDescription._from_execution_info(
             info=resp.info,
-            data_converter=self._client.data_converter,
+            data_converter=data_converter,
         )
 
     async def get_nexus_operation_result(
         self, input: GetNexusOperationResultInput
     ) -> Any:
         """Poll for nexus operation result until it's available."""
+        data_converter = self._client.data_converter
+        # These three are set together or not at all: a handle that started the operation has all
+        # of them, and a handle obtained by operation ID alone has none and defaults them to "".
+        # An empty endpoint therefore means "no operation to build a context from", not "an
+        # operation named the empty string".
+        if input.endpoint and input.service and input.operation:
+            data_converter = data_converter.with_context(
+                temporalio.converter.NexusSerializationContext(
+                    endpoint=input.endpoint,
+                    service=input.service,
+                    operation=input.operation,
+                )
+            )
         req = temporalio.api.workflowservice.v1.PollNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             operation_id=input.operation_id,
@@ -1606,21 +1703,14 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 match res.WhichOneof("outcome"):
                     case "result":
                         type_hints = [input.result_type] if input.result_type else None
-                        [result] = await self._client.data_converter.decode(
-                            [res.result], type_hints
-                        )
+                        [result] = await data_converter.decode([res.result], type_hints)
                         return result
-
                     case "failure":
                         raise NexusOperationFailureError(
-                            cause=await self._client.data_converter.decode_failure(
-                                res.failure
-                            )
+                            cause=await data_converter.decode_failure(res.failure)
                         )
-
                     case None:
-                        # poll again
-                        pass
+                        continue
             except RPCError as err:
                 match err.status:
                     case RPCStatusCode.DEADLINE_EXCEEDED:

@@ -32,8 +32,10 @@ import temporalio.activity
 import temporalio.api.common.v1
 import temporalio.client
 import temporalio.converter
+import temporalio.nexus.system.workflow_service.models
 import temporalio.worker
 import temporalio.workflow
+from temporalio.contrib.opentelemetry._context import attached_context
 from temporalio.contrib.opentelemetry._tracer_provider import (
     ReplaySafeTracerProvider,
 )
@@ -124,8 +126,7 @@ def _maybe_span(
         yield
         return
 
-    token = opentelemetry.context.attach(context) if context else None
-    try:
+    with attached_context(context):
         with tracer.start_as_current_span(
             name,
             attributes=attributes,
@@ -147,9 +148,6 @@ def _maybe_span(
                         )
                     )
                 raise
-    finally:
-        if token and context is opentelemetry.context.get_current():
-            opentelemetry.context.detach(token)
 
 
 class OpenTelemetryInterceptor(
@@ -333,8 +331,7 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
         self, input: temporalio.worker.ExecuteActivityInput
     ) -> Any:
         context = _headers_to_context(input.headers)
-        token = opentelemetry.context.attach(context)
-        try:
+        with attached_context(context):
             info = temporalio.activity.info()
             with _maybe_span(
                 get_tracer(__name__),
@@ -348,9 +345,6 @@ class _TracingActivityInboundInterceptor(temporalio.worker.ActivityInboundInterc
                 kind=opentelemetry.trace.SpanKind.SERVER,
             ):
                 return await super().execute_activity(input)
-        finally:
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
 
 
 class _TracingNexusOperationInboundInterceptor(
@@ -367,12 +361,8 @@ class _TracingNexusOperationInboundInterceptor(
     @contextmanager
     def _top_level_context(self, headers: Mapping[str, str]) -> Iterator[None]:
         context = _nexus_headers_to_context(headers)
-        token = opentelemetry.context.attach(context)
-        try:
+        with attached_context(context):
             yield
-        finally:
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
 
     async def execute_nexus_operation_start(
         self, input: temporalio.worker.ExecuteNexusOperationStartInput
@@ -500,12 +490,8 @@ class _TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterc
     @contextmanager
     def _top_level_workflow_context(self, input: _InputWithHeaders) -> Iterator[None]:
         context = _headers_to_context(input.headers)
-        token = opentelemetry.context.attach(context)
-        try:
+        with attached_context(context):
             yield
-        finally:
-            if context is opentelemetry.context.get_current():
-                opentelemetry.context.detach(token)
 
 
 class _TracingWorkflowOutboundInterceptor(
@@ -600,3 +586,15 @@ class _TracingWorkflowOutboundInterceptor(
         ):
             input.headers = _context_to_nexus_headers(input.headers or {})
             return await super().start_nexus_operation(input)
+
+    async def start_signal_with_start_workflow(
+        self,
+        request: temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowRequest,
+    ) -> temporalio.workflow.NexusOperationHandle[
+        temporalio.nexus.system.workflow_service.models.SignalWithStartWorkflowResponse
+    ]:
+        with self._workflow_maybe_span(
+            "SignalWithStartWorkflow", kind=opentelemetry.trace.SpanKind.CLIENT
+        ):
+            request.headers = _context_to_headers(request.headers or {})
+            return await super().start_signal_with_start_workflow(request)

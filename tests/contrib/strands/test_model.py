@@ -24,7 +24,7 @@ class ModelWorkflow:
 
 
 async def test_model(client: Client):
-    task_queue = "test_model"
+    task_queue = f"test_model-{uuid4()}"
     plugin = StrandsPlugin(models={"mock": lambda: MockModel(["Done!"])})
 
     async with Worker(

@@ -3,18 +3,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import timedelta
 from typing import TYPE_CHECKING
-from collections.abc import Mapping
 
 import google.protobuf.empty_pb2
 
-import temporalio.api.workflowservice.v1
-import temporalio.api.operatorservice.v1
 import temporalio.api.cloud.cloudservice.v1
+import temporalio.api.operatorservice.v1
 import temporalio.api.testservice.v1
+import temporalio.api.workflowservice.v1
 import temporalio.bridge.proto.health.v1
-
 
 if TYPE_CHECKING:
     from temporalio.service import ServiceClient
@@ -22,6 +21,7 @@ if TYPE_CHECKING:
 
 class WorkflowService:
     """RPC calls for the WorkflowService."""
+
     def __init__(self, client: ServiceClient):
         """Initialize service with the provided ServiceClient."""
         self._client = client
@@ -45,7 +45,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def count_nexus_operation_executions(
         self,
         req: temporalio.api.workflowservice.v1.CountNexusOperationExecutionsRequest,
@@ -63,7 +62,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def count_schedules(
         self,
@@ -83,7 +81,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def count_workers(
         self,
         req: temporalio.api.workflowservice.v1.CountWorkersRequest,
@@ -101,7 +98,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def count_workflow_executions(
         self,
@@ -121,7 +117,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def create_schedule(
         self,
         req: temporalio.api.workflowservice.v1.CreateScheduleRequest,
@@ -139,7 +134,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_worker_deployment(
         self,
@@ -159,7 +153,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def create_worker_deployment_version(
         self,
         req: temporalio.api.workflowservice.v1.CreateWorkerDeploymentVersionRequest,
@@ -177,7 +170,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_workflow_rule(
         self,
@@ -197,7 +189,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def delete_activity_execution(
         self,
         req: temporalio.api.workflowservice.v1.DeleteActivityExecutionRequest,
@@ -215,7 +206,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_nexus_operation_execution(
         self,
@@ -235,7 +225,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def delete_schedule(
         self,
         req: temporalio.api.workflowservice.v1.DeleteScheduleRequest,
@@ -253,7 +242,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_worker_deployment(
         self,
@@ -273,7 +261,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def delete_worker_deployment_version(
         self,
         req: temporalio.api.workflowservice.v1.DeleteWorkerDeploymentVersionRequest,
@@ -291,7 +278,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_workflow_execution(
         self,
@@ -311,7 +297,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def delete_workflow_rule(
         self,
         req: temporalio.api.workflowservice.v1.DeleteWorkflowRuleRequest,
@@ -329,7 +314,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def deprecate_namespace(
         self,
@@ -349,7 +333,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_activity_execution(
         self,
         req: temporalio.api.workflowservice.v1.DescribeActivityExecutionRequest,
@@ -367,7 +350,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_batch_operation(
         self,
@@ -387,7 +369,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_deployment(
         self,
         req: temporalio.api.workflowservice.v1.DescribeDeploymentRequest,
@@ -405,7 +386,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_namespace(
         self,
@@ -425,7 +405,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_nexus_operation_execution(
         self,
         req: temporalio.api.workflowservice.v1.DescribeNexusOperationExecutionRequest,
@@ -443,7 +422,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_schedule(
         self,
@@ -463,7 +441,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_task_queue(
         self,
         req: temporalio.api.workflowservice.v1.DescribeTaskQueueRequest,
@@ -481,7 +458,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_worker(
         self,
@@ -501,7 +477,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_worker_deployment(
         self,
         req: temporalio.api.workflowservice.v1.DescribeWorkerDeploymentRequest,
@@ -519,7 +494,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_worker_deployment_version(
         self,
@@ -539,7 +513,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def describe_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.DescribeWorkflowExecutionRequest,
@@ -557,7 +530,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def describe_workflow_rule(
         self,
@@ -577,7 +549,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def execute_multi_operation(
         self,
         req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
@@ -595,7 +566,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def fetch_worker_config(
         self,
@@ -615,7 +585,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def get_cluster_info(
         self,
         req: temporalio.api.workflowservice.v1.GetClusterInfoRequest,
@@ -633,7 +602,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_current_deployment(
         self,
@@ -653,7 +621,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def get_deployment_reachability(
         self,
         req: temporalio.api.workflowservice.v1.GetDeploymentReachabilityRequest,
@@ -671,7 +638,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_search_attributes(
         self,
@@ -691,7 +657,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def get_system_info(
         self,
         req: temporalio.api.workflowservice.v1.GetSystemInfoRequest,
@@ -709,7 +674,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_worker_build_id_compatibility(
         self,
@@ -729,7 +693,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def get_worker_task_reachability(
         self,
         req: temporalio.api.workflowservice.v1.GetWorkerTaskReachabilityRequest,
@@ -747,7 +710,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_worker_versioning_rules(
         self,
@@ -767,7 +729,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def get_workflow_execution_history(
         self,
         req: temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryRequest,
@@ -785,7 +746,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_workflow_execution_history_reverse(
         self,
@@ -805,7 +765,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_activity_executions(
         self,
         req: temporalio.api.workflowservice.v1.ListActivityExecutionsRequest,
@@ -823,7 +782,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_archived_workflow_executions(
         self,
@@ -843,7 +801,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_batch_operations(
         self,
         req: temporalio.api.workflowservice.v1.ListBatchOperationsRequest,
@@ -861,7 +818,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_closed_workflow_executions(
         self,
@@ -881,7 +837,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_deployments(
         self,
         req: temporalio.api.workflowservice.v1.ListDeploymentsRequest,
@@ -899,7 +854,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_namespaces(
         self,
@@ -919,7 +873,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_nexus_operation_executions(
         self,
         req: temporalio.api.workflowservice.v1.ListNexusOperationExecutionsRequest,
@@ -937,7 +890,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_open_workflow_executions(
         self,
@@ -957,7 +909,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_schedule_matching_times(
         self,
         req: temporalio.api.workflowservice.v1.ListScheduleMatchingTimesRequest,
@@ -975,7 +926,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_schedules(
         self,
@@ -995,7 +945,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_task_queue_partitions(
         self,
         req: temporalio.api.workflowservice.v1.ListTaskQueuePartitionsRequest,
@@ -1013,7 +962,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_worker_deployments(
         self,
@@ -1033,7 +981,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_workers(
         self,
         req: temporalio.api.workflowservice.v1.ListWorkersRequest,
@@ -1051,7 +998,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_workflow_executions(
         self,
@@ -1071,7 +1017,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def list_workflow_rules(
         self,
         req: temporalio.api.workflowservice.v1.ListWorkflowRulesRequest,
@@ -1089,7 +1034,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def patch_schedule(
         self,
@@ -1109,7 +1053,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def pause_activity(
         self,
         req: temporalio.api.workflowservice.v1.PauseActivityRequest,
@@ -1127,7 +1070,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def pause_activity_execution(
         self,
@@ -1147,7 +1089,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def pause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.PauseWorkflowExecutionRequest,
@@ -1165,7 +1106,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def poll_activity_execution(
         self,
@@ -1185,7 +1125,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def poll_activity_task_queue(
         self,
         req: temporalio.api.workflowservice.v1.PollActivityTaskQueueRequest,
@@ -1203,7 +1142,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def poll_nexus_operation_execution(
         self,
@@ -1223,7 +1161,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def poll_nexus_task_queue(
         self,
         req: temporalio.api.workflowservice.v1.PollNexusTaskQueueRequest,
@@ -1241,7 +1178,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def poll_workflow_execution_time_skipping(
         self,
@@ -1261,7 +1197,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def poll_workflow_execution_update(
         self,
         req: temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest,
@@ -1279,7 +1214,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def poll_workflow_task_queue(
         self,
@@ -1299,7 +1233,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def query_workflow(
         self,
         req: temporalio.api.workflowservice.v1.QueryWorkflowRequest,
@@ -1317,7 +1250,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def record_activity_task_heartbeat(
         self,
@@ -1337,7 +1269,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def record_activity_task_heartbeat_by_id(
         self,
         req: temporalio.api.workflowservice.v1.RecordActivityTaskHeartbeatByIdRequest,
@@ -1355,7 +1286,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def record_worker_heartbeat(
         self,
@@ -1375,7 +1305,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def register_namespace(
         self,
         req: temporalio.api.workflowservice.v1.RegisterNamespaceRequest,
@@ -1393,7 +1322,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def request_cancel_activity_execution(
         self,
@@ -1413,7 +1341,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def request_cancel_nexus_operation_execution(
         self,
         req: temporalio.api.workflowservice.v1.RequestCancelNexusOperationExecutionRequest,
@@ -1431,7 +1358,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def request_cancel_workflow_execution(
         self,
@@ -1451,7 +1377,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def reset_activity(
         self,
         req: temporalio.api.workflowservice.v1.ResetActivityRequest,
@@ -1469,7 +1394,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def reset_activity_execution(
         self,
@@ -1489,7 +1413,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def reset_sticky_task_queue(
         self,
         req: temporalio.api.workflowservice.v1.ResetStickyTaskQueueRequest,
@@ -1507,7 +1430,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def reset_workflow_execution(
         self,
@@ -1527,7 +1449,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_activity_task_canceled(
         self,
         req: temporalio.api.workflowservice.v1.RespondActivityTaskCanceledRequest,
@@ -1545,7 +1466,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def respond_activity_task_canceled_by_id(
         self,
@@ -1565,7 +1485,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_activity_task_completed(
         self,
         req: temporalio.api.workflowservice.v1.RespondActivityTaskCompletedRequest,
@@ -1583,7 +1502,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def respond_activity_task_completed_by_id(
         self,
@@ -1603,7 +1521,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_activity_task_failed(
         self,
         req: temporalio.api.workflowservice.v1.RespondActivityTaskFailedRequest,
@@ -1621,7 +1538,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def respond_activity_task_failed_by_id(
         self,
@@ -1641,7 +1557,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_nexus_task_completed(
         self,
         req: temporalio.api.workflowservice.v1.RespondNexusTaskCompletedRequest,
@@ -1659,7 +1574,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def respond_nexus_task_failed(
         self,
@@ -1679,7 +1593,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_query_task_completed(
         self,
         req: temporalio.api.workflowservice.v1.RespondQueryTaskCompletedRequest,
@@ -1697,7 +1610,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def respond_workflow_task_completed(
         self,
@@ -1717,7 +1629,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def respond_workflow_task_failed(
         self,
         req: temporalio.api.workflowservice.v1.RespondWorkflowTaskFailedRequest,
@@ -1735,7 +1646,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def scan_workflow_executions(
         self,
@@ -1755,7 +1665,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def set_current_deployment(
         self,
         req: temporalio.api.workflowservice.v1.SetCurrentDeploymentRequest,
@@ -1773,7 +1682,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def set_worker_deployment_current_version(
         self,
@@ -1793,7 +1701,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def set_worker_deployment_manager(
         self,
         req: temporalio.api.workflowservice.v1.SetWorkerDeploymentManagerRequest,
@@ -1811,7 +1718,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def set_worker_deployment_ramping_version(
         self,
@@ -1831,7 +1737,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def shutdown_worker(
         self,
         req: temporalio.api.workflowservice.v1.ShutdownWorkerRequest,
@@ -1849,7 +1754,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def signal_with_start_workflow_execution(
         self,
@@ -1869,7 +1773,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def signal_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest,
@@ -1887,7 +1790,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def start_activity_execution(
         self,
@@ -1907,7 +1809,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def start_batch_operation(
         self,
         req: temporalio.api.workflowservice.v1.StartBatchOperationRequest,
@@ -1925,7 +1826,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def start_nexus_operation_execution(
         self,
@@ -1945,7 +1845,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def start_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest,
@@ -1963,7 +1862,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def stop_batch_operation(
         self,
@@ -1983,7 +1881,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def terminate_activity_execution(
         self,
         req: temporalio.api.workflowservice.v1.TerminateActivityExecutionRequest,
@@ -2001,7 +1898,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def terminate_nexus_operation_execution(
         self,
@@ -2021,7 +1917,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def terminate_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.TerminateWorkflowExecutionRequest,
@@ -2039,7 +1934,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def trigger_workflow_rule(
         self,
@@ -2059,7 +1953,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def unpause_activity(
         self,
         req: temporalio.api.workflowservice.v1.UnpauseActivityRequest,
@@ -2077,7 +1970,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def unpause_activity_execution(
         self,
@@ -2097,7 +1989,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def unpause_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.UnpauseWorkflowExecutionRequest,
@@ -2115,7 +2006,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_activity_execution_options(
         self,
@@ -2135,7 +2025,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_activity_options(
         self,
         req: temporalio.api.workflowservice.v1.UpdateActivityOptionsRequest,
@@ -2153,7 +2042,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_namespace(
         self,
@@ -2173,7 +2061,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_schedule(
         self,
         req: temporalio.api.workflowservice.v1.UpdateScheduleRequest,
@@ -2191,7 +2078,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_task_queue_config(
         self,
@@ -2211,7 +2097,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_worker_build_id_compatibility(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkerBuildIdCompatibilityRequest,
@@ -2229,7 +2114,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_worker_config(
         self,
@@ -2249,7 +2133,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_worker_deployment_version_compute_config(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionComputeConfigRequest,
@@ -2268,14 +2151,15 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_worker_deployment_version_metadata(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataRequest,
         retry: bool = False,
         metadata: Mapping[str, str | bytes] = {},
         timeout: timedelta | None = None,
-    ) -> temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataResponse:
+    ) -> (
+        temporalio.api.workflowservice.v1.UpdateWorkerDeploymentVersionMetadataResponse
+    ):
         """Invokes the WorkflowService.update_worker_deployment_version_metadata rpc method."""
         return await self._client._rpc_call(
             rpc="update_worker_deployment_version_metadata",
@@ -2286,7 +2170,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_worker_versioning_rules(
         self,
@@ -2306,7 +2189,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_workflow_execution(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest,
@@ -2325,7 +2207,6 @@ class WorkflowService:
             timeout=timeout,
         )
 
-
     async def update_workflow_execution_options(
         self,
         req: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionOptionsRequest,
@@ -2343,7 +2224,6 @@ class WorkflowService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def validate_worker_deployment_version_compute_config(
         self,
@@ -2364,9 +2244,9 @@ class WorkflowService:
         )
 
 
-
 class OperatorService:
     """RPC calls for the OperatorService."""
+
     def __init__(self, client: ServiceClient):
         """Initialize service with the provided ServiceClient."""
         self._client = client
@@ -2390,7 +2270,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def add_search_attributes(
         self,
         req: temporalio.api.operatorservice.v1.AddSearchAttributesRequest,
@@ -2408,7 +2287,6 @@ class OperatorService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_nexus_endpoint(
         self,
@@ -2428,7 +2306,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def delete_namespace(
         self,
         req: temporalio.api.operatorservice.v1.DeleteNamespaceRequest,
@@ -2446,7 +2323,6 @@ class OperatorService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_nexus_endpoint(
         self,
@@ -2466,7 +2342,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def get_nexus_endpoint(
         self,
         req: temporalio.api.operatorservice.v1.GetNexusEndpointRequest,
@@ -2484,7 +2359,6 @@ class OperatorService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_clusters(
         self,
@@ -2504,7 +2378,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def list_nexus_endpoints(
         self,
         req: temporalio.api.operatorservice.v1.ListNexusEndpointsRequest,
@@ -2522,7 +2395,6 @@ class OperatorService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def list_search_attributes(
         self,
@@ -2542,7 +2414,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def remove_remote_cluster(
         self,
         req: temporalio.api.operatorservice.v1.RemoveRemoteClusterRequest,
@@ -2561,7 +2432,6 @@ class OperatorService:
             timeout=timeout,
         )
 
-
     async def remove_search_attributes(
         self,
         req: temporalio.api.operatorservice.v1.RemoveSearchAttributesRequest,
@@ -2579,7 +2449,6 @@ class OperatorService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_nexus_endpoint(
         self,
@@ -2600,9 +2469,9 @@ class OperatorService:
         )
 
 
-
 class CloudService:
     """RPC calls for the CloudService."""
+
     def __init__(self, client: ServiceClient):
         """Initialize service with the provided ServiceClient."""
         self._client = client
@@ -2626,7 +2495,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def add_user_group_member(
         self,
         req: temporalio.api.cloud.cloudservice.v1.AddUserGroupMemberRequest,
@@ -2644,7 +2512,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_account_audit_log_sink(
         self,
@@ -2664,7 +2531,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def create_api_key(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateApiKeyRequest,
@@ -2682,7 +2548,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_billing_report(
         self,
@@ -2702,7 +2567,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def create_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateConnectivityRuleRequest,
@@ -2720,7 +2584,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_custom_role(
         self,
@@ -2740,7 +2603,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def create_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateNamespaceRequest,
@@ -2758,7 +2620,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_namespace_export_sink(
         self,
@@ -2778,7 +2639,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def create_nexus_endpoint(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateNexusEndpointRequest,
@@ -2796,7 +2656,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_service_account(
         self,
@@ -2816,7 +2675,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def create_user(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateUserRequest,
@@ -2834,7 +2692,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def create_user_group(
         self,
@@ -2854,7 +2711,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_account_audit_log_sink(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteAccountAuditLogSinkRequest,
@@ -2872,7 +2728,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_api_key(
         self,
@@ -2892,7 +2747,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteConnectivityRuleRequest,
@@ -2910,7 +2764,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_custom_role(
         self,
@@ -2930,7 +2783,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteNamespaceRequest,
@@ -2948,7 +2800,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_namespace_export_sink(
         self,
@@ -2968,7 +2819,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_namespace_region(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteNamespaceRegionRequest,
@@ -2986,7 +2836,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_nexus_endpoint(
         self,
@@ -3006,7 +2855,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_service_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteServiceAccountRequest,
@@ -3024,7 +2872,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def delete_user(
         self,
@@ -3044,7 +2891,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def delete_user_group(
         self,
         req: temporalio.api.cloud.cloudservice.v1.DeleteUserGroupRequest,
@@ -3062,7 +2908,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def failover_namespace_region(
         self,
@@ -3082,7 +2927,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetAccountRequest,
@@ -3100,7 +2944,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_account_audit_log_sink(
         self,
@@ -3120,7 +2963,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_account_audit_log_sinks(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetAccountAuditLogSinksRequest,
@@ -3138,7 +2980,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_api_key(
         self,
@@ -3158,7 +2999,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_api_keys(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetApiKeysRequest,
@@ -3176,7 +3016,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_async_operation(
         self,
@@ -3196,7 +3035,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_audit_logs(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetAuditLogsRequest,
@@ -3214,7 +3052,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_billing_report(
         self,
@@ -3234,7 +3071,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetConnectivityRuleRequest,
@@ -3252,7 +3088,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_connectivity_rules(
         self,
@@ -3272,7 +3107,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_current_identity(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetCurrentIdentityRequest,
@@ -3290,7 +3124,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_custom_role(
         self,
@@ -3310,7 +3143,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_custom_roles(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetCustomRolesRequest,
@@ -3328,7 +3160,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_namespace(
         self,
@@ -3348,7 +3179,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_namespace_capacity_info(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetNamespaceCapacityInfoRequest,
@@ -3366,7 +3196,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_namespace_export_sink(
         self,
@@ -3386,7 +3215,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_namespace_export_sinks(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetNamespaceExportSinksRequest,
@@ -3404,7 +3232,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_namespaces(
         self,
@@ -3424,7 +3251,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_nexus_endpoint(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetNexusEndpointRequest,
@@ -3442,7 +3268,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_nexus_endpoints(
         self,
@@ -3462,7 +3287,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_region(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetRegionRequest,
@@ -3480,7 +3304,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_regions(
         self,
@@ -3500,7 +3323,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_service_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountRequest,
@@ -3518,7 +3340,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_service_account_namespace_assignments(
         self,
@@ -3538,7 +3359,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_service_accounts(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountsRequest,
@@ -3556,7 +3376,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_usage(
         self,
@@ -3576,7 +3395,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_user(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserRequest,
@@ -3594,7 +3412,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_user_group(
         self,
@@ -3614,7 +3431,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_user_group_members(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserGroupMembersRequest,
@@ -3632,7 +3448,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_user_group_namespace_assignments(
         self,
@@ -3652,7 +3467,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_user_groups(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserGroupsRequest,
@@ -3670,7 +3484,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def get_user_namespace_assignments(
         self,
@@ -3690,7 +3503,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def get_users(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUsersRequest,
@@ -3708,7 +3520,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def remove_user_group_member(
         self,
@@ -3728,7 +3539,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def rename_custom_search_attribute(
         self,
         req: temporalio.api.cloud.cloudservice.v1.RenameCustomSearchAttributeRequest,
@@ -3746,7 +3556,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def set_service_account_namespace_access(
         self,
@@ -3766,7 +3575,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def set_user_group_namespace_access(
         self,
         req: temporalio.api.cloud.cloudservice.v1.SetUserGroupNamespaceAccessRequest,
@@ -3784,7 +3592,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def set_user_namespace_access(
         self,
@@ -3804,7 +3611,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateAccountRequest,
@@ -3822,7 +3628,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_account_audit_log_sink(
         self,
@@ -3842,7 +3647,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_api_key(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateApiKeyRequest,
@@ -3860,7 +3664,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_custom_role(
         self,
@@ -3880,7 +3683,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_namespace(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateNamespaceRequest,
@@ -3898,7 +3700,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_namespace_export_sink(
         self,
@@ -3918,7 +3719,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_namespace_tags(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateNamespaceTagsRequest,
@@ -3936,7 +3736,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_nexus_endpoint(
         self,
@@ -3956,7 +3755,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_service_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateServiceAccountRequest,
@@ -3974,7 +3772,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def update_user(
         self,
@@ -3994,7 +3791,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def update_user_group(
         self,
         req: temporalio.api.cloud.cloudservice.v1.UpdateUserGroupRequest,
@@ -4013,7 +3809,6 @@ class CloudService:
             timeout=timeout,
         )
 
-
     async def validate_account_audit_log_sink(
         self,
         req: temporalio.api.cloud.cloudservice.v1.ValidateAccountAuditLogSinkRequest,
@@ -4031,7 +3826,6 @@ class CloudService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def validate_namespace_export_sink(
         self,
@@ -4052,9 +3846,9 @@ class CloudService:
         )
 
 
-
 class TestService:
     """RPC calls for the TestService."""
+
     def __init__(self, client: ServiceClient):
         """Initialize service with the provided ServiceClient."""
         self._client = client
@@ -4078,7 +3872,6 @@ class TestService:
             timeout=timeout,
         )
 
-
     async def lock_time_skipping(
         self,
         req: temporalio.api.testservice.v1.LockTimeSkippingRequest,
@@ -4096,7 +3889,6 @@ class TestService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def sleep(
         self,
@@ -4116,7 +3908,6 @@ class TestService:
             timeout=timeout,
         )
 
-
     async def sleep_until(
         self,
         req: temporalio.api.testservice.v1.SleepUntilRequest,
@@ -4135,7 +3926,6 @@ class TestService:
             timeout=timeout,
         )
 
-
     async def unlock_time_skipping(
         self,
         req: temporalio.api.testservice.v1.UnlockTimeSkippingRequest,
@@ -4153,7 +3943,6 @@ class TestService:
             metadata=metadata,
             timeout=timeout,
         )
-
 
     async def unlock_time_skipping_with_sleep(
         self,
@@ -4174,9 +3963,9 @@ class TestService:
         )
 
 
-
 class HealthService:
     """RPC calls for the HealthService."""
+
     def __init__(self, client: ServiceClient):
         """Initialize service with the provided ServiceClient."""
         self._client = client
@@ -4199,5 +3988,3 @@ class HealthService:
             metadata=metadata,
             timeout=timeout,
         )
-
-

@@ -33,7 +33,7 @@ class StructuredOutputWorkflow:
 
 
 async def test_structured_output(client: Client):
-    task_queue = "test_structured_output"
+    task_queue = f"test_structured_output-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(

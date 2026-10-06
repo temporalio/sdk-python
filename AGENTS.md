@@ -74,8 +74,16 @@ For release artifacts, use `uv build`. Documentation can be generated with
 * Format and lint code before submitting.
 * Include tests for behavior changes.
 * Update public API documentation or doc comments for public behavior changes.
-* Add a high-level changelog entry for user-facing changes according to the
-  existing `CHANGELOG.md` convention.
+* For user-facing changes, add a Markdown fragment under `changelog/<category>/`
+  for each applicable category. Use `stabilized/` for features that are no longer
+  experimental. Use fun, whimsical, unique lowercase kebab-case
+  filenames, such as `giggling-teapot.md`. The folder supplies the category;
+  write only the release-note body, without a leading list marker (`-`). Keep
+  entries concise, ideally one or two sentences. Write each entry entirely on
+  one line: release tooling turns each nonempty line into a separate list item.
+  A fragment may contain multiple entries. See `changelog/README.md` for
+  the convention.
+  `CHANGELOG.md` contains completed releases and is assembled by release tooling.
 * Keep commit messages short and in the imperative mood.
 * Provide a clear PR description outlining what changed, why it changed, and
   what validation was run.
@@ -102,6 +110,7 @@ Reviewers will look for:
   * `temporalio/bridge/` - Rust bridge and generated bridge bindings.
 * `tests/` - pytest suites mirroring SDK areas.
 * `scripts/` - generation, documentation, and helper scripts.
+* `changelog/` - pending per-PR release notes in category folders.
 * `build/apidocs/` - generated API documentation.
 * `dist/` - built wheels and source distributions.
 * `temporalio/bridge/target/` - Rust build output. You should not need to inspect

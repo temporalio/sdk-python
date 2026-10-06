@@ -1,0 +1,16 @@
+name: Changelog
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changelog-check:
+    name: Changelog checkpoint
+    uses: temporalio/.github/.github/workflows/changelog-fragments.yml@f2a689950aa8b18272aa57f6007fe9cec46b9f47
+    with:
+      sdk-rust-path: temporalio/bridge/sdk-core

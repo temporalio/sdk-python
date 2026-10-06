@@ -30,12 +30,16 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
 from google.genai import Client as GeminiClient
 from google.genai.types import HttpResponse as SdkHttpResponse
 
 from temporalio.contrib.google_genai._google_genai_plugin import GoogleGenAIPlugin
+
+if TYPE_CHECKING:
+    from temporalio.contrib.google_genai._mcp import McpSessionFactory
 
 __all__ = [
     "GeminiTestServer",
@@ -100,7 +104,8 @@ class GeminiTestServer:
 
     Only model calls (``client.models``) are scripted.  File, interaction, and
     agent operations are not; mock those on a ``genai.Client`` directly if a
-    test needs them.
+    test needs them.  MCP servers can be registered with
+    ``plugin(mcp_servers=...)`` and run for real.
     """
 
     def __init__(self, responses: Sequence[str]) -> None:
@@ -119,12 +124,29 @@ class GeminiTestServer:
             )
         return self._responses[idx]
 
-    def plugin(self) -> GoogleGenAIPlugin:
+    def plugin(
+        self,
+        *,
+        mcp_servers: dict[str, McpSessionFactory] | None = None,
+        mcp_connection_idle_timeout: timedelta | None = None,
+    ) -> GoogleGenAIPlugin:
         """Return a :class:`GoogleGenAIPlugin` whose model calls serve the script.
 
         The real plugin activities run; only the underlying HTTP layer is
         replaced, so request formatting and the AFC loop are exercised exactly
         as in production.
+
+        Args:
+            mcp_servers: MCP servers to expose to workflows, as on
+                :class:`temporalio.contrib.google_genai.GoogleGenAIPlugin`.
+                These are *not* scripted — ``list_tools`` / ``call_tool`` run
+                for real against the given sessions — so a test can drive an
+                MCP tool call with a scripted
+                :func:`function_call_response` and assert on what the server
+                actually returned.
+            mcp_connection_idle_timeout: How long an idle worker-side MCP
+                connection stays open, as on
+                :class:`temporalio.contrib.google_genai.GoogleGenAIPlugin`.
         """
         client = GeminiClient(api_key="fake-test-key")
 
@@ -148,4 +170,8 @@ class GeminiTestServer:
 
         client._api_client.async_request = fake_async_request  # type: ignore[assignment]
         client._api_client.async_request_streamed = fake_async_request_streamed  # type: ignore[assignment]
-        return GoogleGenAIPlugin(client)
+        return GoogleGenAIPlugin(
+            client,
+            mcp_servers=mcp_servers,
+            mcp_connection_idle_timeout=mcp_connection_idle_timeout,
+        )

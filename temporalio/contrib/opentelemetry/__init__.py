@@ -1,22 +1,39 @@
 """OpenTelemetry v2 integration for Temporal SDK.
 
-This package provides OpenTelemetry tracing integration for Temporal workflows,
-activities, and other operations. It includes automatic span creation and
-propagation for distributed tracing.
+This package provides OpenTelemetry tracing and metrics integration for
+Temporal workflows, activities, and other operations. It includes automatic
+span creation and propagation for distributed tracing, a
+:py:class:`MetricsExporter` for exporting Temporal SDK/Core metrics through
+the standard OpenTelemetry metrics API, and replay-safe wrappers for the
+global OpenTelemetry tracer, meter, and logger providers.
 """
 
 from temporalio.contrib.opentelemetry._interceptor import (
     TracingInterceptor,
     TracingWorkflowInboundInterceptor,
 )
+from temporalio.contrib.opentelemetry._logger_provider import (
+    ReplaySafeLoggerProvider,
+)
+from temporalio.contrib.opentelemetry._meter_provider import (
+    ReplaySafeMeterProvider,
+)
+from temporalio.contrib.opentelemetry._metrics_exporter import MetricsExporter
 from temporalio.contrib.opentelemetry._otel_interceptor import OpenTelemetryInterceptor
 from temporalio.contrib.opentelemetry._plugin import OpenTelemetryPlugin
-from temporalio.contrib.opentelemetry._tracer_provider import create_tracer_provider
+from temporalio.contrib.opentelemetry._tracer_provider import (
+    ReplaySafeTracerProvider,
+    create_tracer_provider,
+)
 
 __all__ = [
     "TracingInterceptor",
     "TracingWorkflowInboundInterceptor",
     "OpenTelemetryInterceptor",
     "OpenTelemetryPlugin",
+    "MetricsExporter",
+    "ReplaySafeLoggerProvider",
+    "ReplaySafeMeterProvider",
+    "ReplaySafeTracerProvider",
     "create_tracer_provider",
 ]

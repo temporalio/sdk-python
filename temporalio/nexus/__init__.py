@@ -25,6 +25,7 @@ from ._operation_context import (
     wait_for_worker_shutdown_sync,
 )
 from ._operation_handlers import (
+    CancelActivityOptions,
     CancelUpdateWorkflowOptions,
     CancelWorkflowRunOptions,
     TemporalOperationHandler,
@@ -34,6 +35,7 @@ from ._token import WorkflowHandle
 
 __all__ = (
     "workflow_run_operation",
+    "CancelActivityOptions",
     "CancelWorkflowRunOptions",
     "CancelUpdateWorkflowOptions",
     "Info",

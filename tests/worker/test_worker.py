@@ -5,11 +5,13 @@ import concurrent.futures
 import multiprocessing
 import multiprocessing.context
 import os
+import sys
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
+from unittest.mock import Mock
 from urllib.request import urlopen
 
 import nexusrpc
@@ -75,6 +77,36 @@ def test_load_default_worker_binary_id():
     val1 = temporalio.worker._worker.load_default_build_id(memoize=False)
     val2 = temporalio.worker._worker.load_default_build_id(memoize=False)
     assert val1 == val2
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 14),
+    reason="InterpreterPoolExecutor requires Python 3.14 or newer",
+)
+@pytest.mark.parametrize("subclass", [False, True])
+def test_activity_executor_rejects_interpreter_pool(subclass: bool):
+    if sys.version_info >= (3, 14):
+
+        class CustomInterpreterPoolExecutor(concurrent.futures.InterpreterPoolExecutor):  # pyright: ignore[reportUnreachable]
+            pass
+
+        executor_class = concurrent.futures.InterpreterPoolExecutor
+        if subclass:
+            executor_class = CustomInterpreterPoolExecutor
+
+        client = Mock(spec=Client)
+        client.config.return_value = {"plugins": []}
+        with executor_class(max_workers=1) as executor:
+            with pytest.raises(
+                ValueError,
+                match="InterpreterPoolExecutor is not supported as an activity_executor",
+            ):
+                Worker(
+                    client,
+                    task_queue="test-interpreter-pool",
+                    activities=[never_run_activity],
+                    activity_executor=executor,
+                )
 
 
 @activity.defn
@@ -399,6 +431,7 @@ class CustomSlotSupplierWorkflow:
         workflow.logger.info(f"Signal: {value}")
 
 
+@pytest.mark.requires_local_server
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work under Java test server")
@@ -755,6 +788,7 @@ async def test_worker_with_worker_deployment_config(
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-{uuid.uuid4()}"
+    workflow_id_prefix = f"basic-versioning-{uuid.uuid4()}"
     worker_v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
     worker_v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
     worker_v3 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="3.0")
@@ -797,7 +831,7 @@ async def test_worker_with_worker_deployment_config(
         # Start workflow 1 which will use the 1.0 worker on auto-upgrade
         wf1 = await client.start_workflow(
             DeploymentVersioningWorkflowV1AutoUpgrade.run,
-            id="basic-versioning-v1",
+            id=f"{workflow_id_prefix}-v1",
             task_queue=w1.task_queue,
         )
         assert "v1" == await wf1.query("state")
@@ -809,7 +843,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf2 = await client.start_workflow(
             DeploymentVersioningWorkflowV2Pinned.run,
-            id="basic-versioning-v2",
+            id=f"{workflow_id_prefix}-v2",
             task_queue=w1.task_queue,
         )
         assert "v2" == await wf2.query("state")
@@ -821,7 +855,7 @@ async def test_worker_with_worker_deployment_config(
 
         wf3 = await client.start_workflow(
             DeploymentVersioningWorkflowV3AutoUpgrade.run,
-            id="basic-versioning-v3",
+            id=f"{workflow_id_prefix}-v3",
             task_queue=w1.task_queue,
         )
         assert "v3" == await wf3.query("state")
@@ -873,9 +907,15 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
                 client, describe_resp.conflict_token, v1
             )
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id
+        )
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 100)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 100
+        )
 
         # Run workflows and verify they run on v2
         for i in range(3):
@@ -892,6 +932,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
         conflict_token = (
             await set_ramping_version(client, conflict_token, v2, 0)
         ).conflict_token
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 0
+        )
         for i in range(3):
             wfa = await client.start_workflow(
                 DeploymentVersioningWorkflowV1AutoUpgrade.run,
@@ -904,6 +947,9 @@ async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
 
         # Set ramp to 50 and eventually verify workflows run on both versions
         await set_ramping_version(client, conflict_token, v2, 50)
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, v1.build_id, v2.build_id, 50
+        )
         seen_results = set()
 
         async def run_and_record():
@@ -1206,7 +1252,9 @@ async def test_workflows_can_use_versioning_override(
         )
 
 
-async def test_can_run_autoscaling_polling_worker(client: Client):
+async def test_can_run_autoscaling_polling_worker(
+    client: Client, env: WorkflowEnvironment
+):
     # Create new runtime with Prom server
     prom_addr = f"127.0.0.1:{find_free_port()}"
     runtime = Runtime(
@@ -1214,9 +1262,7 @@ async def test_can_run_autoscaling_polling_worker(client: Client):
             metrics=PrometheusConfig(bind_address=prom_addr),
         )
     )
-    client = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client = await env.connect_client(
         runtime=runtime,
     )
 
@@ -1267,7 +1313,8 @@ async def wait_until_worker_deployment_visible(
                 DescribeWorkerDeploymentRequest(
                     namespace=client.namespace,
                     deployment_name=version.deployment_name,
-                )
+                ),
+                retry=True,
             )
         except RPCError:
             # Expected
@@ -1290,7 +1337,8 @@ async def set_current_deployment_version(
             deployment_name=version.deployment_name,
             version=version.to_canonical_string(),
             conflict_token=conflict_token,
-        )
+        ),
+        retry=True,
     )
 
 
@@ -1307,7 +1355,8 @@ async def set_ramping_version(
             version=version.to_canonical_string(),
             conflict_token=conflict_token,
             percentage=percentage,
-        )
+        ),
+        retry=True,
     )
     return response
 
@@ -1317,6 +1366,7 @@ async def wait_for_worker_deployment_routing_config_propagation(
     deployment_name: str,
     expected_current_build_id: str,
     expected_ramping_build_id: str = "",
+    expected_ramping_percentage: float | None = None,
 ) -> None:
     """Wait for routing config to be propagated to all task queues."""
     import temporalio.api.enums.v1
@@ -1326,7 +1376,8 @@ async def wait_for_worker_deployment_routing_config_propagation(
             DescribeWorkerDeploymentRequest(
                 namespace=client.namespace,
                 deployment_name=deployment_name,
-            )
+            ),
+            retry=True,
         )
         routing_config = resp.worker_deployment_info.routing_config
         if (
@@ -1337,6 +1388,11 @@ async def wait_for_worker_deployment_routing_config_propagation(
         if (
             routing_config.ramping_deployment_version.build_id
             != expected_ramping_build_id
+        ):
+            return False
+        if (
+            expected_ramping_percentage is not None
+            and routing_config.ramping_version_percentage != expected_ramping_percentage
         ):
             return False
         state = resp.worker_deployment_info.routing_config_update_state
@@ -1467,15 +1523,14 @@ class TestForkUseWorker(_TestFork):
         self.run(mp_fork_ctx)
 
 
-async def test_activity_client_updates_when_worker_client_changes(client: Client):
+async def test_activity_client_updates_when_worker_client_changes(
+    client: Client, env: WorkflowEnvironment
+):
     """Test that activities get the updated client when worker.client is changed."""
     # Create a second client (simulating a new client after cert rotation)
     # Must use the same runtime
-    client2 = await Client.connect(
-        client.service_client.config.target_host,
-        namespace=client.namespace,
+    client2 = await env.connect_client(
         data_converter=client.data_converter,
-        runtime=client.service_client.config.runtime,
     )
 
     captured_clients: list[Client] = []

@@ -13,8 +13,8 @@ use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
 use temporalio_common::telemetry::{
     build_otlp_metric_exporter, start_prometheus_metric_exporter, CoreLog, CoreLogStreamConsumer,
-    Logger, MetricTemporality, OtelCollectorOptions, OtlpProtocol, PrometheusExporterOptions,
-    TelemetryOptions,
+    Logger, LoggerFormat, MetricTemporality, OtelCollectorOptions, OtlpProtocol,
+    PrometheusExporterOptions, TelemetryOptions,
 };
 use temporalio_sdk_core::telemetry::MetricsCallBuffer;
 use temporalio_sdk_core::{CoreRuntime, TokioRuntimeBuilder};
@@ -48,6 +48,7 @@ pub struct TelemetryConfig {
 pub struct LoggingConfig {
     filter: String,
     forward_to: Option<Py<PyAny>>,
+    format: Option<String>,
 }
 
 #[pyclass]
@@ -91,6 +92,7 @@ pub struct PrometheusConfig {
 pub struct RuntimeOptions {
     telemetry: TelemetryConfig,
     worker_heartbeat_interval_millis: Option<u64>,
+    disable_environment_info: bool,
 }
 
 const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
@@ -100,6 +102,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
+        disable_environment_info,
     } = options;
 
     // Have to build/start telemetry config pieces
@@ -119,6 +122,15 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         } else {
             Logger::Console {
                 filter: logging_conf.filter.to_string(),
+                format: logging_conf
+                    .format
+                    .map(|format| match format.as_str() {
+                        "compact" => Ok(LoggerFormat::Compact),
+                        "pretty" => Ok(LoggerFormat::Pretty),
+                        "json" => Ok(LoggerFormat::Json),
+                        _ => Err(PyValueError::new_err("Unrecognized logging format")),
+                    })
+                    .transpose()?,
             }
         })
     } else {
@@ -134,6 +146,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
                 .build(),
         )
         .heartbeat_interval(worker_heartbeat_interval_millis.map(Duration::from_millis))
+        .disable_environment_info(disable_environment_info)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid runtime options: {err}")))?;
 

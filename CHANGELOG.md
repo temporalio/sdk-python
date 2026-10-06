@@ -1,22 +1,259 @@
 <!--
-High-level release notes.
-Loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
-When your PR includes a user-facing change, add an entry below under the
-appropriate heading. Within each heading content can be free-form. Feel free
-to include examples, links to docs, or any other relevant information.
-
-### Added            — new features
-### Changed          — changes in existing functionality
-### Deprecated       — soon-to-be-removed features
-### Breaking Changes — removed or backwards-incompatible features
-### Fixed            — notable bug fixes
-### Security         — notable security fixes
+High-level release notes, loosely based on Keep a Changelog.
+For user-facing PR changes, add Markdown fragments under changelog/<category>/.
+See changelog/README.md for categories and whimsical filename examples.
+This file contains assembled releases only.
 -->
 
 # Changelog
 
-## [Unreleased]
+## [1.34.0] - 2026-09-30
+
+### Added
+
+- Added `WorkflowAlreadyStartedError.first_run_id` for the first execution run
+  ID when provided by the server.
+- **Experimental**: `temporalio.contrib.google_adk_agents` now supports ADK v2
+  graph workflows, dynamic `@node` workflows, and durable HITL.
+- **Experimental**: Experimental support for _Event Groups_. **Event Groups** is a new form of
+  Workflow-level metadata that allows for improved visibility into a Workflow execution's history
+  by grouping logically related Events together based on user-defined or system-inferred criteria.
+  `workflow.create_event_group(...)` takes the Event Group's ID as its first and only required
+  argument; the user-provided ID is used verbatim and should not contain sensitive information.
+  The label is optional and passed as a keyword argument; it is a codec-encoded Payload.
+
+- Added `workflow.Info.original_execution_run_id`, the run ID recorded on the workflow
+  execution started event. Unlike `run_id`, this value is preserved across workflow resets.
+
+- **Experimental**: `temporalio.contrib.strands` now supports durable,
+  Workflow-isolated Strands sandboxes through `TemporalSandbox` and
+  worker-side factories registered with `StrandsPlugin(sandboxes=...)`.
+
+- Added the `temporalio.contrib.gcp.cloud_run.id` module with the `CloudRunIdPlugin` client plugin to set the worker identity on Cloud Run.
+
+### Changed
+
+- The `deepagents` extra now requires `deepagents>=0.7,<0.8` (was `<0.7`). Because
+  deepagents 0.7 requires `langsmith>=0.10.9`, the `langsmith` extra now allows
+  `langsmith<0.13` (was `<0.9`).
+
+### :boom: Breaking Changes
+
+- The `google-adk` extra now requires `google-adk>=2.8.0,<3`, up from `>=2.2.0`.
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from the
+  workflow's deterministic random stream. A workflow started under an earlier release that calls
+  `workflow.random()` or `workflow.uuid4()` after ADK code may not replay deterministically
+  across the upgrade; drain such workflows or use worker versioning.
+
+### Fixed
+
+- `temporalio.contrib.deepagents` now preserves model binding options such as
+  `response_format` and `tool_choice` when tools are also bound.
+- Workflow handles returned when a start attaches to a running workflow now use
+  the server-provided first execution run ID with Temporal Server 1.32.0 or
+  later.
+- Restore `frozenset` values when decoding JSON payloads with a `frozenset` type hint,
+  including nested frozen sets.
+
+- Ordinary absolute imports of already-loaded modules in sandboxed workflows no longer go through
+  importlib's module locks, fixing intermittent `Failed validating workflow` errors on Python 3.10
+  caused by a `KeyError` in `importlib._bootstrap._ModuleLock.acquire` when a garbage-collection
+  finalizer imported `warnings` during a workflow load
+  ([#585](https://github.com/temporalio/sdk-python/issues/585)).
+- `temporalio.contrib.deepagents.TemporalBackend` is fixed for deepagents 0.7 compatibility
+  (e.g., adding `delete` / `adelete`).
+- `temporalio.contrib.deepagents.TemporalBackend` now forwards the per-command `timeout` of
+  deepagents' `execute` tool for a wrapped sandbox backend such as `LocalShellBackend`.
+- `GoogleAdkPlugin` now passes the optional `anthropic`, `litellm`, and `openai` SDKs through
+  the workflow sandbox.
+- `GoogleAdkPlugin` now passes OpenTelemetry modules through the workflow sandbox so ADK 2.9
+  graph workflows can load their context support during execution.
+- `contrib.deepagents`: prevent duplicate input messages after continue-as-new.
+- `DataConverter.payload_converter` and current workflow and activity payload converter accessors
+  now return the configured converter without SDK-internal transfer type conversion.
+- Restore pickling of Pydantic data converters, preserving the type adapter cache
+  size limit while excluding cached adapters.
+- Current workflow and activity payload converter accessors now return the configured converter
+  without SDK-internal transfer type conversion.
+- A Nexus operation's user metadata is now serialized with `NexusSerializationContext`, the same way
+  workflow and activity user metadata are serialized with theirs. This covers the static summary
+  sent when starting an operation, and the summary and details read back from a description.
+
+## [1.33.0] - 2026-09-14
+
+### Added
+
+#### Standalone Activity operator commands
+
+- `ActivityHandle` now supports operator commands for standalone activities: `pause`,
+  `unpause`, `update_options` and `restore_original_options`.
+- Added GCP Cloud Run serverless-worker OpenTelemetry plugin in `temporalio.contrib.opentelemetry`.
+- Added new options to ActivityHandle.describe() to retrieve associated payloads, such as activity input and outcome.
+- New properties and methods in ActivityExecution and ActivityExecutionDescription.
+- Added experimental `temporalio.converter.NexusSerializationContext` support for Nexus callers
+  and handlers. Callers use it for inputs, results, and failures; handlers use it for inputs,
+  synchronous results, and failures. Asynchronous handler results and detached standalone handles
+  are not yet supported. Standalone `USE_EXISTING` handles use their start request's context.
+
+### Changed
+
+- Standalone Activities are now generally available (GA). (Standalone Activities as Nexus operations
+  and Standalone Activities operator commands remain experimental. Operator commands are `pause`,
+  `unpause`, `updateOptions`, `restoreOriginal`.)
+- System Nexus Signal-with-Start Workflow operations now use the typed
+  `WorkflowOutboundInterceptor.start_signal_with_start_workflow` interception point instead of
+  the generic `WorkflowOutboundInterceptor.start_nexus_operation` method.
+- System Nexus Signal-with-Start Workflow operations now invoke
+  `WorkflowOutboundInterceptor.start_system_nexus_operation` after their typed interception
+  point. They continue not to invoke `WorkflowOutboundInterceptor.start_nexus_operation`.
+- The experimental `GetNexusOperationResultInput` now includes the Nexus endpoint, service, and
+  operation.
+
+### :boom: Breaking Changes
+
+- Experimental external storage: `ExternalStorage.driver_selector` is now called with a
+  `StorageDriverSelectContext` instead of a `StorageDriverStoreContext`. Update the annotation;
+  the new type carries the same `target` field. Since selectors are plain callables, a stale
+  annotation fails type checking rather than at runtime.
+- `client.ActivityExecution` and `client.ActivityExecutionDescription` had some fields removed or renamed
+  to match RPC API.
+  - Dataclass parameters for these types were changed to `frozen=True, eq=False, kw_only=True`.
+  - `scheduled_time` was renamed `schedule_time`.
+  - `last_failure` was changed from field to method that runs data converter on demand.
+  - `state_transition_count`, `eager_execution_requested`, `paused` and `long_poll_token`  were removed.
+- ActivityHandle.describe() long-poll token was removed.  The functionality can still be used manually
+  through raw gRPC API.
+
+### Fixed
+
+- `temporalio.contrib.google_genai` now requires `google-genai` 2.21.0 or later
+  and supports its file download API, including video inputs and download
+  destinations.
+- `temporalio.contrib.deepagents` no longer dedups repeated identical tool,
+  model, and backend-op calls: each dispatch runs its own Activity, and the
+  continue-as-new result cache is retired for new executions (a continued run
+  resumes from the carried transcript and never re-executes prior dispatches,
+  so a carried cache entry could only serve stale results). Patch-gated
+  (`deepagents.retire-result-cache`), so histories recorded before this change
+  replay unchanged; note that deferring the patch keeps the full legacy dedup
+  cache — including the stale-result behavior this entry describes — and that
+  a chain upgraded mid-continue-as-new re-executes rather than reuses a
+  repeated identical call (the conservative direction).
+- `contrib.deepagents`: summarization middleware configured with a model name string now routes its LLM calls through Activities instead of running them in the Workflow.
+
+- **Experimental**: External storage metrics now report the wall-clock time storage was in flight.
+  Previously each batch's duration was summed, over-reporting the time whenever storage operations
+  ran concurrently.
+- System Nexus Signal-with-Start workflow operations now give custom payload
+  converters the target workflow's serialization context when encoding their
+  inner request payloads.
+- Cancelling an activity from a signal while the workflow itself is cancelled
+  no longer causes a nondeterminism error from duplicate activity-cancellation
+  commands.
+- `StrandsPlugin` now disables Botocore retries for its default Bedrock model so
+  model request retries are handled exclusively by Temporal.
+- `temporalio.contrib.openai_agents` now honors the `retry-after-ms` and
+  `retry-after` headers when OpenAI returns `x-should-retry: true`. Previously
+  the delay the server asked for was discarded on that path and the activity
+  retried on its configured interval instead.
+- Nexus-context workflow/activity starts no longer set `on_conflict_options` when there are no links
+  or callbacks to attach.
+- The workflow sandbox now passes `pydantic_core` through by default, alongside `pydantic`.
+
+## [1.32.0] - 2026-08-24
+
+### Added
+
+- Added `temporalio.converter.create_payload_validation_error` to create the
+  non-retryable application error used when a converted payload fails validation.
+- Added experimental `temporalio.contrib.opentelemetry.ReplaySafeMeterProvider` and
+  `ReplaySafeLoggerProvider` (and exported `ReplaySafeTracerProvider`): wrap an
+  OpenTelemetry provider so metrics and log events recorded from workflow code (e.g. by
+  Google ADK) are not duplicated on replay. `GoogleAdkPlugin` warns when a global OTel
+  provider is not replay-safe.
+- Added `LoggingConfig.format` to select compact, pretty, or newline-delimited JSON output for
+  Core logs written to the console.
+
+- Added the `Runtime(disable_environment_info=...)` option to control whether
+  runtime, hosting, and platform information is included in worker heartbeats.
+
+- `temporalio.workflow.uuid7()` generates a determinism-safe, time-sortable
+  UUIDv7 (RFC 9562) from workflow time and the workflow's deterministic random
+  generator, complementing the existing `workflow.uuid4()`
+  ([#1450](https://github.com/temporalio/sdk-python/issues/1450)). The
+  workflow sandbox now also restricts the non-deterministic `uuid.uuid7()`
+  added to the standard library in Python 3.14, matching the existing
+  `uuid.uuid1()`/`uuid.uuid4()` restrictions.
+- **Experimental**: `TemporalOperationHandler` can now use Standalone Activities as asynchronous
+  Nexus Operation backing executions through `TemporalNexusClient.start_activity`.
+- **Experimental**: `temporalio.contrib.openai_agents.temporal_worker_env_ref` names an environment
+  variable the worker reads for a hosted tool credential, keeping it out of workflow history.
+- **Experimental**: `temporalio.contrib.openai_agents.TemporalWorkerEnvValue` names an environment
+  variable the worker reads for a sandbox environment value, keeping it out of workflow history.
+- **Experimental**: `OpenAIAgentsPlugin(resolvable_worker_env_vars=...)` allowlists the environment
+  variable names a worker will read.
+- **Experimental**: `temporalio.contrib.openai_agents.AllowAllWorkerEnvVars` allowlists every
+  environment variable name on the worker.
+- Added Nexus operation link propagation for Workflow Queries issued from operation handlers. The
+  queried Workflow link returned by the server is attached to the caller's Nexus operation event.
+
+### Changed
+
+- The `opentelemetry` and `lambda-worker-otel` extras now require
+  `opentelemetry-api`/`opentelemetry-sdk` `>= 1.26`, matching what
+  `temporalio.contrib.opentelemetry` already required in practice.
+- `temporalio.contrib.pydantic` converters now reuse Pydantic type adapters
+  for repeated type hints instead of rebuilding their schemas for every
+  payload, greatly speeding up decode of non-model hints such as discriminated
+  unions ([#1695](https://github.com/temporalio/sdk-python/issues/1695)). Up
+  to 1024 type adapters are cached per converter instance by default, with
+  least-recently-used eviction. To change the bound, pass
+  ``max_cached_type_adapters`` to ``PydanticPayloadConverter`` (or
+  ``PydanticJSONPlainPayloadConverter``) from a nullary subclass used as the
+  ``DataConverter.payload_converter_class``; ``None`` makes the cache
+  unbounded and zero disables caching.
+- A data converter can now report that it understood a Nexus operation's input
+  but considers it invalid by raising a non-retryable `ApplicationError` of type
+  `PayloadValidationError` while decoding it. Such a failure is reported to the
+  caller as a `BAD_REQUEST` Nexus handler error with the message
+  `Invalid operation input`, retaining the original error as its cause. Raised
+  from a payload codec, that replaces a handler-side `INTERNAL` error; raised
+  from a payload converter, the type was already `BAD_REQUEST` and only the
+  message becomes specific to validation. Any other decode failure, and a
+  retryable `PayloadValidationError`, keep their existing treatment.
+
+### :boom: Breaking Changes
+
+- The `openai-agents` extra now requires `openai-agents>=0.19.2,<0.20`, up from `>=0.17.5` with no
+  upper bound.
+- `temporalio.contrib.openai_agents` now rejects a sandbox `SandboxPathGrant` bound to a
+  `host_path`.
+- `temporalio.contrib.openai_agents` now rejects `run_config.sandbox.session`.
+
+### Fixed
+
+- `create_payload_validation_error(None)` now creates an application error with no
+  details instead of encoding `None` as a detail.
+- Client header encoding no longer mutates interceptor-provided payloads, preventing
+  update-with-start from encoding a shared header twice when
+  `HeaderCodecBehavior.CODEC` is enabled ([#1769](https://github.com/temporalio/sdk-python/issues/1769)).
+- `temporalio.contrib.opentelemetry` replay-safe spans now delegate
+  `Span.add_link` to the wrapped span. Previously the wrapper inherited
+  OpenTelemetry's non-abstract no-op default, silently dropping links added
+  after span creation.
+- Standalone activity start requests now include a unique request ID so RPC retries are deduplicated.
+- OpenTelemetry trace and span IDs propagated by concurrent workers no longer
+  interfere with each other, preserving the correct parent-child hierarchy.
+- The `google-adk` extra now depends on `mcp`, so fresh installs of
+  `temporalio[google-adk]` can import `temporalio.contrib.google_adk_agents`
+  without separately installing `mcp`. Previously the import failed with an
+  `ImportError` because `google.adk.tools.mcp_tool` only exports `McpToolset`
+  when `mcp` is installed.
+- `temporalio.contrib.openai_agents` no longer crashes when a plain `dict`
+  is passed for `run_config`. (openai-agents >= 0.19.0 accepts `dict` run
+  configs at its public runner API)
+
+## [1.31.0] - 2026-07-29
 
 ### Added
 
@@ -28,6 +265,10 @@ to include examples, links to docs, or any other relevant information.
   This lets types with transfer type converters delegate their wire representation to the
   configured payload converter, preserving SDK behavior such as serialization
   contexts.
+- Added `temporalio.contrib.opentelemetry.MetricsExporter`, which drains a
+  `temporalio.runtime.MetricBuffer` on a fixed interval and exports through a
+  real OpenTelemetry `MeterProvider`, giving SDK/Core metrics access to
+  standard OTel features (views, resource, exemplars). Experimental.
 - Added `TLSConfig.verification_server_name` to verify the server certificate against a fixed name
   instead of the connection's server name. Unlike `domain`, it does not change the TLS SNI or
   HTTP/2 authority values, which keep following the connected host, so it can be used when the
@@ -38,6 +279,7 @@ to include examples, links to docs, or any other relevant information.
 - Added the experimental `Worker` `patch_activation_callback` option, allowing workers
   to decide whether a first non-replay `workflow.patched` call should activate a patch
   during rolling deployments.
+- Added external storage support to Nexus task handling.
 
 ### Changed
 
@@ -50,9 +292,7 @@ to include examples, links to docs, or any other relevant information.
   overrides for this flag from `tests/worker/test_workflow.py`, and replace this rollout
   note with a `Fixed` entry announcing the behavior change.
 
-### Deprecated
-
-### Breaking Changes
+### :boom: Breaking Changes
 
 - Custom workflow runners that construct `WorkflowInstanceDetails` must now pass
   `payload_converter_factory` instead of `payload_converter_class`. The factory
@@ -69,10 +309,10 @@ to include examples, links to docs, or any other relevant information.
 
 ### Fixed
 
+- Continue-as-new requests from workflow update handlers now fail the workflow
+  task instead of leaving the update unresolved.
 - Marked system Nexus envelope payloads so nested payloads can be detected and
   visited after the envelope is already stored as a payload.
-
-### Security
 
 ## [1.30.0] - 2026-07-01
 
@@ -94,7 +334,7 @@ to include examples, links to docs, or any other relevant information.
   with the selected optional dependencies.
 - Standalone Nexus operation links are now forwarded on start workflow and signal requests.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - AWS Lambda worker `configure` parameter has been changed to be invoked
   per-invocation of the worker instead of only at startup. It is advised that
@@ -117,7 +357,7 @@ to include examples, links to docs, or any other relevant information.
   Pass `grpc_compression=GrpcCompression.NONE` to `Client.connect` or
   `CloudOperationsClient.connect` to disable it.
 
-### Breaking Changes
+### :boom: Breaking Changes
 
 - `StartWorkflowUpdateWithStartInput` now owns the authoritative
   `rpc_metadata` and `rpc_timeout` fields for

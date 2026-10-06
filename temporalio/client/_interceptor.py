@@ -18,18 +18,16 @@ from typing import (
 import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
-from temporalio.converter import (
-    DataConverter,
-)
-
-from ._callback import Callback
+from temporalio.converter import DataConverter
 
 if TYPE_CHECKING:
     from ._activity import (
         ActivityExecutionAsyncIterator,
         ActivityExecutionCount,
         ActivityExecutionDescription,
+        ActivityExecutionOptions,
         ActivityHandle,
+        ActivityOptionsUpdate,
         AsyncActivityIDReference,
     )
     from ._nexus import (
@@ -97,10 +95,6 @@ class StartWorkflowInput:
     rpc_timeout: timedelta | None
     request_eager_start: bool
     priority: temporalio.common.Priority
-    # The following options are experimental and unstable.
-    callbacks: Sequence[Callback]
-    links: Sequence[temporalio.api.common.v1.Link]
-    request_id: str | None
     versioning_override: temporalio.common.VersioningOverride | None = None
     time_skipping_config: temporalio.api.common.v1.TimeSkippingConfig | None = None
 
@@ -207,11 +201,7 @@ class TerminateWorkflowInput:
 
 @dataclass
 class StartActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.start_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.start_activity`."""
 
     activity_type: str
     args: Sequence[Any]
@@ -236,11 +226,7 @@ class StartActivityInput:
 
 @dataclass
 class CancelActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.cancel_activity`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.cancel_activity`."""
 
     activity_id: str
     activity_run_id: str | None
@@ -251,7 +237,18 @@ class CancelActivityInput:
 
 @dataclass
 class TerminateActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.terminate_activity`.
+    """Input for :py:meth:`OutboundInterceptor.terminate_activity`."""
+
+    activity_id: str
+    activity_run_id: str | None
+    reason: str | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class PauseActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.pause_activity`.
 
     .. warning::
        This API is experimental.
@@ -265,8 +262,8 @@ class TerminateActivityInput:
 
 
 @dataclass
-class DescribeActivityInput:
-    """Input for :py:meth:`OutboundInterceptor.describe_activity`.
+class UnpauseActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.unpause_activity`.
 
     .. warning::
        This API is experimental.
@@ -274,18 +271,45 @@ class DescribeActivityInput:
 
     activity_id: str
     activity_run_id: str | None
-    long_poll_token: bytes | None
+    reason: str | None
+    jitter: timedelta | None
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class UpdateActivityOptionsInput:
+    """Input for :py:meth:`OutboundInterceptor.update_activity_options`.
+
+    .. warning::
+       This API is experimental.
+    """
+
+    activity_id: str
+    activity_run_id: str | None
+    updates: Sequence[ActivityOptionsUpdate[Any]]
+    restore_original: bool
+    rpc_metadata: Mapping[str, str | bytes]
+    rpc_timeout: timedelta | None
+
+
+@dataclass
+class DescribeActivityInput:
+    """Input for :py:meth:`OutboundInterceptor.describe_activity`."""
+
+    activity_id: str
+    activity_run_id: str | None
+    include_input: bool
+    include_outcome: bool
+    include_heartbeat_details: bool
+    include_last_failure: bool
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
 
 
 @dataclass
 class ListActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.list_activities`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.list_activities`."""
 
     query: str | None
     page_size: int
@@ -297,11 +321,7 @@ class ListActivitiesInput:
 
 @dataclass
 class CountActivitiesInput:
-    """Input for :py:meth:`OutboundInterceptor.count_activities`.
-
-    .. warning::
-       This API is experimental.
-    """
+    """Input for :py:meth:`OutboundInterceptor.count_activities`."""
 
     query: str | None
     rpc_metadata: Mapping[str, str | bytes]
@@ -323,10 +343,6 @@ class StartWorkflowUpdateInput:
     ret_type: type | None
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
-    # The following options are for Workflow Updates exposed as Nexus Operations. Experimental and unstable
-    callbacks: Sequence[Callback] | None = None
-    links: Sequence[temporalio.api.common.v1.Link] | None = None
-    request_id: str | None = None
 
 
 @dataclass
@@ -617,6 +633,9 @@ class GetNexusOperationResultInput:
 
     operation_id: str
     run_id: str | None
+    endpoint: str
+    service: str
+    operation: str
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
     result_type: type[Any] | None
@@ -767,57 +786,60 @@ class OutboundInterceptor:
     ### Activity calls
 
     async def start_activity(self, input: StartActivityInput) -> ActivityHandle[Any]:
-        """Called for every :py:meth:`Client.start_activity` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.start_activity` call."""
         return await self.next.start_activity(input)
 
     async def cancel_activity(self, input: CancelActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.cancel` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`ActivityHandle.cancel` call."""
         await self.next.cancel_activity(input)
 
     async def terminate_activity(self, input: TerminateActivityInput) -> None:
-        """Called for every :py:meth:`ActivityHandle.terminate` call.
+        """Called for every :py:meth:`ActivityHandle.terminate` call."""
+        await self.next.terminate_activity(input)
+
+    async def pause_activity(self, input: PauseActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.pause` call.
 
         .. warning::
            This API is experimental.
         """
-        await self.next.terminate_activity(input)
+        await self.next.pause_activity(input)
+
+    async def unpause_activity(self, input: UnpauseActivityInput) -> None:
+        """Called for every :py:meth:`ActivityHandle.unpause` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        await self.next.unpause_activity(input)
+
+    async def update_activity_options(
+        self, input: UpdateActivityOptionsInput
+    ) -> ActivityExecutionOptions:
+        """Called for every :py:meth:`ActivityHandle.update_options` and
+        :py:meth:`ActivityHandle.restore_original_options` call.
+
+        .. warning::
+           This API is experimental.
+        """
+        return await self.next.update_activity_options(input)
 
     async def describe_activity(
         self, input: DescribeActivityInput
     ) -> ActivityExecutionDescription:
-        """Called for every :py:meth:`ActivityHandle.describe` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`ActivityHandle.describe` call."""
         return await self.next.describe_activity(input)
 
     def list_activities(
         self, input: ListActivitiesInput
     ) -> ActivityExecutionAsyncIterator:
-        """Called for every :py:meth:`Client.list_activities` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.list_activities` call."""
         return self.next.list_activities(input)
 
     async def count_activities(
         self, input: CountActivitiesInput
     ) -> ActivityExecutionCount:
-        """Called for every :py:meth:`Client.count_activities` call.
-
-        .. warning::
-           This API is experimental.
-        """
+        """Called for every :py:meth:`Client.count_activities` call."""
         return await self.next.count_activities(input)
 
     async def start_workflow_update(

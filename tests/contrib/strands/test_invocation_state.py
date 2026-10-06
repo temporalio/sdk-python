@@ -58,11 +58,12 @@ class _InvocationStateWorkflow:
 
 async def test_invocation_state_round_trip(client: Client):
     _RECEIVED.clear()
+    task_queue = f"test_invocation_state-{uuid4()}"
     plugin = StrandsPlugin(models={"recording": lambda: _RecordingModel()})
 
     async with Worker(
         client,
-        task_queue="test_invocation_state",
+        task_queue=task_queue,
         workflows=[_InvocationStateWorkflow],
         plugins=[plugin],
         max_cached_workflows=0,
@@ -71,7 +72,7 @@ async def test_invocation_state_round_trip(client: Client):
             _InvocationStateWorkflow.run,
             "hi",
             id=f"test_invocation_state_{uuid4()}",
-            task_queue="test_invocation_state",
+            task_queue=task_queue,
         )
 
     # The serializable key crosses the activity boundary; the non-serializable

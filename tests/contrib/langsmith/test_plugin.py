@@ -12,18 +12,21 @@ from langsmith import traceable, tracing_context
 from temporalio.client import Client, WorkflowHandle
 from temporalio.contrib.langsmith import LangSmithInterceptor, LangSmithPlugin
 from temporalio.testing import WorkflowEnvironment
-from tests.contrib.langsmith.conftest import dump_traces, find_traces
+from tests.contrib.langsmith.conftest import (
+    build_trace_trees,
+    find_trace_trees,
+)
 from tests.contrib.langsmith.test_integration import (
     ComprehensiveWorkflow,
     NexusService,
     TraceableActivityWorkflow,
     _make_client_and_collector,
-    _poll_query,
     nested_traceable_activity,
     traceable_activity,
 )
 from tests.helpers import new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.helpers.trace import assert_trace_hierarchy
 
 
 class TestPluginConstruction:
@@ -53,12 +56,13 @@ class TestPluginConstruction:
 class TestPluginIntegration:
     """End-to-end test using LangSmithPlugin as a Temporal client plugin."""
 
+    @pytest.mark.requires_local_server
     async def test_comprehensive_plugin_trace_hierarchy(
         self, client: Client, env: WorkflowEnvironment
     ) -> None:
         """Plugin wired to a real Temporal worker produces the full trace hierarchy.
 
-        user_pipeline only wraps start_workflow, so poll/query/signal/update
+        user_pipeline only wraps start_workflow, so query/signal/update
         traces are naturally separate root traces.
         """
         if env.supports_time_skipping_v1:
@@ -95,27 +99,25 @@ class TestPluginIntegration:
                     make_nexus_endpoint_name(worker.task_queue),
                     worker.task_queue,
                 )
-                assert await _poll_query(
-                    handle,
-                    ComprehensiveWorkflow.is_waiting_for_signal,
-                    expected=True,
-                ), "Workflow never reached signal wait point"
-                await handle.query(ComprehensiveWorkflow.my_query)
-                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
+                # Updates and the signal are handled at the next workflow task
+                # wherever the run is; the queries then hit the completed
+                # workflow, which has no workflow task in flight by definition.
                 await handle.execute_update(
                     ComprehensiveWorkflow.my_unvalidated_update, "test"
                 )
                 await handle.execute_update(ComprehensiveWorkflow.my_update, "finish")
+                await handle.signal(ComprehensiveWorkflow.my_signal, "hello")
                 result = await handle.result()
+                assert await handle.query(ComprehensiveWorkflow.my_query)
 
         assert result == "comprehensive-done"
 
-        traces = dump_traces(collector)
+        trace_trees = build_trace_trees(collector)
 
         # user_pipeline trace: StartWorkflow + full workflow execution tree
-        workflow_traces = find_traces(traces, "user_pipeline")
-        assert len(workflow_traces) == 1
-        assert workflow_traces[0] == [
+        workflow_trace_trees = find_trace_trees(trace_trees, "user_pipeline")
+        assert len(workflow_trace_trees) == 1
+        expected_workflow = [
             "user_pipeline",
             "  StartWorkflow:ComprehensiveWorkflow",
             "  RunWorkflow:ComprehensiveWorkflow",
@@ -177,46 +179,51 @@ class TestPluginIntegration:
             "        outer_chain",
             "          inner_llm_call",
         ]
-
-        # poll_query trace (separate root, variable number of iterations)
-        poll_traces = find_traces(traces, "poll_query")
-        assert len(poll_traces) == 1
-        poll = poll_traces[0]
-        assert poll[0] == "poll_query"
-        poll_children = poll[1:]
-        for i in range(0, len(poll_children), 2):
-            assert poll_children[i] == "  QueryWorkflow:is_waiting_for_signal"
-            assert poll_children[i + 1] == "    HandleQuery:is_waiting_for_signal"
+        assert_trace_hierarchy(workflow_trace_trees, expected_workflow)
 
         # Each remaining operation is its own root trace
-        query_traces = find_traces(traces, "QueryWorkflow:my_query")
-        assert len(query_traces) == 1
-        assert query_traces[0] == [
-            "QueryWorkflow:my_query",
-            "  HandleQuery:my_query",
-        ]
+        query_trace_trees = find_trace_trees(trace_trees, "QueryWorkflow:my_query")
+        assert len(query_trace_trees) == 1
+        assert_trace_hierarchy(
+            query_trace_trees,
+            [
+                "QueryWorkflow:my_query",
+                "  HandleQuery:my_query",
+            ],
+        )
 
-        signal_traces = find_traces(traces, "SignalWorkflow:my_signal")
-        assert len(signal_traces) == 1
-        assert signal_traces[0] == [
-            "SignalWorkflow:my_signal",
-            "  HandleSignal:my_signal",
-        ]
+        signal_trace_trees = find_trace_trees(trace_trees, "SignalWorkflow:my_signal")
+        assert len(signal_trace_trees) == 1
+        assert_trace_hierarchy(
+            signal_trace_trees,
+            [
+                "SignalWorkflow:my_signal",
+                "  HandleSignal:my_signal",
+            ],
+        )
 
-        update_traces = find_traces(traces, "StartWorkflowUpdate:my_update")
-        assert len(update_traces) == 1
-        assert update_traces[0] == [
-            "StartWorkflowUpdate:my_update",
-            "  ValidateUpdate:my_update",
-            "  HandleUpdate:my_update",
-        ]
+        update_trace_trees = find_trace_trees(
+            trace_trees, "StartWorkflowUpdate:my_update"
+        )
+        assert len(update_trace_trees) == 1
+        assert_trace_hierarchy(
+            update_trace_trees,
+            [
+                "StartWorkflowUpdate:my_update",
+                "  ValidateUpdate:my_update",
+                "  HandleUpdate:my_update",
+            ],
+        )
 
         # Update without a validator — no ValidateUpdate trace
-        unvalidated_traces = find_traces(
-            traces, "StartWorkflowUpdate:my_unvalidated_update"
+        unvalidated_trace_trees = find_trace_trees(
+            trace_trees, "StartWorkflowUpdate:my_unvalidated_update"
         )
-        assert len(unvalidated_traces) == 1
-        assert unvalidated_traces[0] == [
-            "StartWorkflowUpdate:my_unvalidated_update",
-            "  HandleUpdate:my_unvalidated_update",
-        ]
+        assert len(unvalidated_trace_trees) == 1
+        assert_trace_hierarchy(
+            unvalidated_trace_trees,
+            [
+                "StartWorkflowUpdate:my_unvalidated_update",
+                "  HandleUpdate:my_unvalidated_update",
+            ],
+        )

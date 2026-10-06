@@ -1066,6 +1066,7 @@ class NexusOperationHandle(Generic[ReturnType]):
         result_type: type | None = None,
         endpoint: str = "",
         service: str = "",
+        operation: str = "",
     ) -> None:
         """Create nexus operation handle."""
         self._client = client
@@ -1074,6 +1075,7 @@ class NexusOperationHandle(Generic[ReturnType]):
         self._result_type = result_type
         self._endpoint = endpoint
         self._service = service
+        self._operation = operation
         # the default value is `_arg_unset` because ReturnType could be None
         self._known_outcome: ReturnType | NexusOperationFailureError | object = (
             temporalio.common._arg_unset
@@ -1136,9 +1138,12 @@ class NexusOperationHandle(Generic[ReturnType]):
                         GetNexusOperationResultInput(
                             operation_id=self._operation_id,
                             run_id=self._run_id,
-                            result_type=self._result_type,
+                            endpoint=self._endpoint,
+                            service=self._service,
+                            operation=self._operation,
                             rpc_metadata=rpc_metadata,
                             rpc_timeout=rpc_timeout,
+                            result_type=self._result_type,
                         )
                     )
                 )

@@ -1,1 +1,1 @@
-DEV_SERVER_DOWNLOAD_VERSION = "v1.7.2-one-time-versioning-override"
+DEV_SERVER_DOWNLOAD_VERSION = "v1.8.3-server-1.32.0-162.0"

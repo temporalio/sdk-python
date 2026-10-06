@@ -22,6 +22,7 @@ import uuid
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator
 from datetime import timedelta
+from enum import Enum, IntEnum
 from typing import Any
 
 import pytest
@@ -42,7 +43,8 @@ from mcp import StdioServerParameters
 from openinference.instrumentation.google_adk import GoogleADKInstrumentor
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import set_tracer_provider
+from opentelemetry.trace import get_tracer_provider, set_tracer_provider
+from pydantic import BaseModel, TypeAdapter
 
 import temporalio.contrib.google_adk_agents.workflow
 from temporalio import activity, workflow
@@ -52,6 +54,9 @@ from temporalio.contrib.google_adk_agents import (
     TemporalMcpToolSet,
     TemporalMcpToolSetProvider,
     TemporalModel,
+)
+from temporalio.contrib.google_adk_agents._model import (
+    _with_serializable_response_schema,
 )
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.worker import Worker
@@ -69,7 +74,7 @@ async def get_weather(city: str) -> str:  #  type: ignore[reportUnusedParameter]
 
 def weather_agent(model_name: str) -> Agent:
     # Wraps 'get_weather' activity as a Tool
-    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+    weather_tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
         get_weather, start_to_close_timeout=timedelta(seconds=60)
     )
 
@@ -97,7 +102,7 @@ class WeatherAgent:
             app_name="test_app",
         )
 
-        # 3. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        # 3. Create Session (uses runtime.new_uuid() -> the plugin's private stream)
         logger.info("Create session.")
         session = await runner.session_service.create_session(
             app_name="test_app", user_id="test"
@@ -416,7 +421,7 @@ class McpAgent:
         # 1. Define Agent using Temporal Helpers
         agent = mcp_agent(model_name)
 
-        # 2. Create Session (uses runtime.new_uuid() -> workflow.uuid4())
+        # 2. Create Session (uses runtime.new_uuid() -> the plugin's private stream)
         session_service = InMemorySessionService()
         logger.info("Create session.")
         session = await session_service.create_session(
@@ -538,45 +543,55 @@ async def test_single_agent_telemetry(
     provider = create_tracer_provider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     set_tracer_provider(provider)
+    assert get_tracer_provider() is provider, (
+        "Global tracer provider install was a no-op; a previous test in this"
+        " process left a provider set without resetting it"
+    )
+    # Instrumentors are process-global singletons bound to the provider seen
+    # at instrument() time; without uninstrument() ADK code in every later
+    # test in this process would keep emitting spans into this test's
+    # provider, and re-instrumentation attempts would silently no-op.
     GoogleADKInstrumentor().instrument()
+    try:
+        new_config = client.config()
+        new_config["plugins"] = [
+            GoogleAdkPlugin(),
+            OpenTelemetryPlugin(add_temporal_spans=True),
+        ]
+        client = Client(**new_config)
 
-    new_config = client.config()
-    new_config["plugins"] = [
-        GoogleAdkPlugin(),
-        OpenTelemetryPlugin(add_temporal_spans=True),
-    ]
-    client = Client(**new_config)
-
-    # Run Worker with the ADK plugin
-    async with Worker(
-        client,
-        task_queue="adk-task-queue-telemetry",
-        activities=[
-            get_weather,
-        ],
-        workflows=[WeatherAgent],
-        max_cached_workflows=0,
-    ):
-        LLMRegistry.register(WeatherModel)
-
-        # Test Weather Agent
-        handle = await client.start_workflow(
-            WeatherAgent.run,
-            args=[
-                "What is the weather in New York?",
-                "weather_model",
-            ],
-            id=f"weather-agent-telemetry-workflow-{uuid.uuid4()}",
+        # Run Worker with the ADK plugin
+        async with Worker(
+            client,
             task_queue="adk-task-queue-telemetry",
-            execution_timeout=timedelta(seconds=60),
-        )
-        result = await handle.result()
-        print(f"Workflow result: {result}")
+            activities=[
+                get_weather,
+            ],
+            workflows=[WeatherAgent],
+            max_cached_workflows=0,
+        ):
+            LLMRegistry.register(WeatherModel)
 
-        assert result is not None
-        assert result.content is not None
-        assert result.content.parts is not None
-        assert result.content.parts[0].text == "warm and sunny"
+            # Test Weather Agent
+            handle = await client.start_workflow(
+                WeatherAgent.run,
+                args=[
+                    "What is the weather in New York?",
+                    "weather_model",
+                ],
+                id=f"weather-agent-telemetry-workflow-{uuid.uuid4()}",
+                task_queue="adk-task-queue-telemetry",
+                execution_timeout=timedelta(seconds=60),
+            )
+            result = await handle.result()
+            print(f"Workflow result: {result}")
+
+            assert result is not None
+            assert result.content is not None
+            assert result.content.parts is not None
+            assert result.content.parts[0].text == "warm and sunny"
+    finally:
+        GoogleADKInstrumentor().uninstrument()
 
     print("\n".join(dump_spans(exporter.get_finished_spans(), with_attributes=False)))
     assert dump_spans(exporter.get_finished_spans(), with_attributes=False) == [
@@ -700,7 +715,7 @@ def test_summary_and_summary_fn_raises():
 
 @pytest.mark.asyncio
 async def test_agent_outside_workflow():
-    """Test that an agent using TemporalModel and activity_tool works outside a Temporal workflow."""
+    """Test that an agent using TemporalModel and activity_as_tool works outside a Temporal workflow."""
     LLMRegistry.register(WeatherModel)
 
     agent = weather_agent("weather_model")
@@ -827,13 +842,13 @@ class ComplexActivityInputAgent:
             name="complex_input_agent",
             model=TemporalModel(model_name),
             tools=[
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     book_trip, start_to_close_timeout=timedelta(seconds=60)
                 ),
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     summarize_payload, start_to_close_timeout=timedelta(seconds=60)
                 ),
-                temporalio.contrib.google_adk_agents.workflow.activity_tool(
+                temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
                     method_holder.annotate_trip,
                     start_to_close_timeout=timedelta(seconds=60),
                 ),
@@ -934,7 +949,7 @@ class ComplexActivityInputModel(TestModel):
 
 
 @pytest.mark.asyncio
-async def test_activity_tool_supports_complex_inputs_via_adk(client: Client):
+async def test_activity_as_tool_supports_complex_inputs_via_adk(client: Client):
     new_config = client.config()
     new_config["plugins"] = [GoogleAdkPlugin()]
     client = Client(**new_config)
@@ -1122,8 +1137,8 @@ def test_explicitly_set_none_preserved() -> None:
     assert serialized["cache_config"] is None
 
 
-def test_activity_tool_preserves_metadata() -> None:
-    """activity_tool wrapper preserves the original function's metadata.
+def test_activity_as_tool_preserves_metadata() -> None:
+    """activity_as_tool wrapper preserves the original function's metadata.
 
     This ensures ADK's tool schema generation can inspect __annotations__
     and __module__ on the wrapper, which are needed by
@@ -1135,7 +1150,7 @@ def test_activity_tool_preserves_metadata() -> None:
         """Get info for a city."""
         return f"{city}: {count}"
 
-    tool = temporalio.contrib.google_adk_agents.workflow.activity_tool(
+    tool = temporalio.contrib.google_adk_agents.workflow.activity_as_tool(
         my_activity, start_to_close_timeout=timedelta(seconds=30)
     )
 
@@ -1158,3 +1173,183 @@ def test_activity_tool_preserves_metadata() -> None:
     assert params == ["city", "count"]
     assert sig.parameters["city"].annotation is str
     assert sig.parameters["count"].default == 1
+
+
+class CityWeather(BaseModel):
+    city: str
+    temperature_c: float
+
+
+class NumericChoice(IntEnum):
+    FIRST = 10
+    SECOND = 20
+
+
+class IntegerChoice(Enum):
+    FIRST = 1
+    SECOND = 2
+
+
+class MixedChoice(Enum):
+    FIRST = 1
+    SECOND = "other"
+
+
+class StringChoice(str, Enum):
+    FIRST = "first"
+    SECOND = "second"
+
+
+class OutputSchemaModel(TestModel):
+    def responses(self) -> list[LlmResponse]:
+        return [
+            LlmResponse(
+                content=Content(
+                    role="model",
+                    parts=[Part(text='{"city": "Paris", "temperature_c": 17.5}')],
+                )
+            )
+        ]
+
+    @classmethod
+    def supported_models(cls) -> list[str]:
+        return ["output_schema_model"]
+
+
+@workflow.defn
+class OutputSchemaAgentWorkflow:
+    @workflow.run
+    async def run(self, prompt: str) -> dict[str, Any] | None:
+        agent = LlmAgent(
+            name="output_schema_agent",
+            model=TemporalModel("output_schema_model"),
+            output_schema=CityWeather,
+            output_key="weather",
+        )
+        runner = InMemoryRunner(agent=agent, app_name="output_schema_app")
+        session = await runner.session_service.create_session(
+            app_name="output_schema_app", user_id="test"
+        )
+        async with Aclosing(
+            runner.run_async(
+                user_id="test",
+                session_id=session.id,
+                new_message=types.Content(role="user", parts=[types.Part(text=prompt)]),
+            )
+        ) as agen:
+            async for _ in agen:
+                pass
+
+        final_session = await runner.session_service.get_session(
+            app_name="output_schema_app", user_id="test", session_id=session.id
+        )
+        return final_session.state.get("weather") if final_session else None
+
+
+@pytest.mark.asyncio
+async def test_agent_with_output_schema(client: Client):
+    LLMRegistry.register(OutputSchemaModel)
+
+    new_config = client.config()
+    new_config["plugins"] = [GoogleAdkPlugin()]
+    client = Client(**new_config)
+
+    async with Worker(
+        client,
+        task_queue="adk-task-queue-output-schema",
+        workflows=[OutputSchemaAgentWorkflow],
+        max_cached_workflows=0,
+    ):
+        result = await client.execute_workflow(
+            OutputSchemaAgentWorkflow.run,
+            "What is the weather in Paris?",
+            id=f"output-schema-agent-workflow-{uuid.uuid4()}",
+            task_queue="adk-task-queue-output-schema",
+            execution_timeout=timedelta(seconds=60),
+        )
+
+    assert result == {"city": "Paris", "temperature_c": 17.5}
+
+
+@pytest.mark.parametrize("schema", [CityWeather, list[CityWeather], StringChoice])
+def test_output_schema_type_sent_as_json_schema(schema: Any) -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(role="user", parts=[Part(text="hello")])],
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(schema)
+
+    converted = _with_serializable_response_schema(request)
+
+    assert request.config.response_schema is schema
+    assert converted.config.response_mime_type == "application/json"
+    converter = GoogleAdkPlugin()._configure_data_converter(None)
+    payloads = converter.payload_converter.to_payloads([converted])
+    serialized = json.loads(payloads[0].data)
+    assert serialized["config"]["response_schema"] == TypeAdapter(schema).json_schema()
+
+
+def test_output_schema_preserves_custom_model_json_schema() -> None:
+    class CustomCityWeather(CityWeather):
+        @classmethod
+        def model_json_schema(cls, *args: Any, **kwargs: Any) -> dict[str, Any]:
+            """Include the cities supported by the weather model."""
+            schema = super().model_json_schema(*args, **kwargs)
+            schema["properties"]["city"]["enum"] = ["Paris", "London"]
+            return schema
+
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(CustomCityWeather)
+
+    converted = _with_serializable_response_schema(request)
+    converter = GoogleAdkPlugin()._configure_data_converter(None).payload_converter
+    payloads = converter.to_payloads([converted])
+    restored = converter.from_payloads(payloads, [LlmRequest])[0]
+    response_schema = types.Schema.model_validate(restored.config.response_schema)
+
+    assert request.config.response_schema is CustomCityWeather
+    assert response_schema.properties is not None
+    assert response_schema.properties["city"].enum == ["Paris", "London"]
+
+
+@pytest.mark.parametrize(
+    ("schema", "expected_values"),
+    [
+        (NumericChoice, ["10", "20"]),
+        (IntegerChoice, ["1", "2"]),
+        (MixedChoice, ["1", "other"]),
+    ],
+)
+def test_output_schema_integer_enum_is_serializable(
+    schema: type[Enum], expected_values: list[str]
+) -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(schema)
+
+    converted = _with_serializable_response_schema(request)
+
+    assert request.config.response_schema is schema
+    converter = GoogleAdkPlugin()._configure_data_converter(None).payload_converter
+    payloads = converter.to_payloads([converted])
+    restored = converter.from_payloads(payloads, [LlmRequest])[0]
+    response_schema = types.Schema.model_validate(restored.config.response_schema)
+    assert response_schema.type == types.Type.STRING
+    assert response_schema.enum == expected_values
+
+
+def test_json_output_schema_left_unchanged() -> None:
+    request = LlmRequest(
+        model="gemini-2.0-flash",
+        contents=[Content(role="user", parts=[Part(text="hello")])],
+        config=types.GenerateContentConfig(),
+    )
+    request.set_output_schema(CityWeather.model_json_schema())
+
+    assert _with_serializable_response_schema(request) is request

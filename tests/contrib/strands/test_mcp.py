@@ -52,7 +52,7 @@ class MCPWorkflow:
 
 
 async def test_mcp(client: Client):
-    task_queue = "test_mcp"
+    task_queue = f"test_mcp-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(
@@ -125,7 +125,7 @@ class MCPReuseWorkflow:
 
 async def test_mcp_reuses_connection(client: Client):
     """Successive MCP tool calls reuse one cached worker-side connection."""
-    task_queue = "test_mcp_reuses_connection"
+    task_queue = f"test_mcp_reuses_connection-{uuid4()}"
     # Count how often the worker opens a connection. One lazily-opened
     # connection serves the list-tools discovery and both tool calls (1);
     # reconnecting per call would make it more.
@@ -206,7 +206,7 @@ class MCPIdleWorkflow:
 
 async def test_mcp_connection_idle_timeout(client: Client):
     """A short idle timeout evicts the cached connection while the worker runs."""
-    task_queue = "test_mcp_connection_idle_timeout"
+    task_queue = f"test_mcp_connection_idle_timeout-{uuid4()}"
     factory_calls = [0]
 
     def counting_factory() -> MCPClient:
@@ -282,7 +282,7 @@ class MCPNoCacheWorkflow:
 
 async def test_mcp_lists_tools_each_turn_when_uncached(client: Client):
     """With cache_tools=False the tool list is re-fetched on every model call."""
-    task_queue = "test_mcp_lists_tools_each_turn_when_uncached"
+    task_queue = f"test_mcp_lists_tools_each_turn_when_uncached-{uuid4()}"
     plugin = StrandsPlugin(
         models={
             "mock": lambda: MockModel(

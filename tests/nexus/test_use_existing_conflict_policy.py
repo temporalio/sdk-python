@@ -4,6 +4,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 
+import pytest
 from nexusrpc.handler import service_handler
 
 from temporalio import nexus, workflow
@@ -12,6 +13,10 @@ from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
+
+# Cloud CI's namespace credentials cannot manage Nexus endpoints.
+# See https://github.com/temporalio/sdk-python/issues/1704.
+pytestmark = pytest.mark.requires_local_server
 
 
 @dataclass

@@ -1,10 +1,8 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
-[![Python 3.9+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.10+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
-
-**📣 News: Integration between OpenAI Agents SDK and Temporal is now in public preview. [Learn more](temporalio/contrib/openai_agents/README.md).**
 
 [Temporal](https://temporal.io/) is a distributed, scalable, durable, and highly available orchestration engine used to
 execute asynchronous, long-running business logic in a scalable and resilient way.
@@ -113,6 +111,7 @@ informal introduction to the features and their implementation.
     - [Observability](#observability)
       - [Metrics](#metrics)
       - [OpenTelemetry Tracing](#opentelemetry-tracing)
+      - [OpenTelemetry Metrics](#opentelemetry-metrics)
     - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
@@ -121,6 +120,7 @@ informal introduction to the features and their implementation.
       - [Prepare](#prepare)
       - [Build](#build)
       - [Use](#use)
+      - [FIPS Compliance (Experimental)](#fips-compliance-experimental)
     - [Local SDK development environment](#local-sdk-development-environment)
       - [Testing](#testing-2)
       - [Proto Generation and Testing](#proto-generation-and-testing)
@@ -328,7 +328,7 @@ The default data converter supports converting multiple types including:
   * Anything that [`json.dump`](https://docs.python.org/3/library/json.html#json.dump) supports natively
   * [dataclasses](https://docs.python.org/3/library/dataclasses.html)
   * Iterables including ones JSON dump may not support by default, e.g. `set`
-  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates
+  * [IntEnum, StrEnum](https://docs.python.org/3/library/enum.html) based enumerates, including enums that mix in `int` or `str`
   * [UUID](https://docs.python.org/3/library/uuid.html)
   * `datetime.datetime`
 
@@ -1989,6 +1989,40 @@ as an interceptor on the `interceptors` argument of `Client.connect`. When set, 
 calls and for all activity and workflow invocations on the worker, spans will be created and properly serialized through
 the server to give one proper trace for a workflow execution.
 
+#### OpenTelemetry Metrics
+
+Metrics support also requires the `opentelemetry` extra (see above). If you want your Temporal SDK/Core metrics (and
+any custom metrics recorded via `activity.metric_meter()`/`workflow.metric_meter()`) to flow through the standard
+OpenTelemetry metrics pipeline (views, resources, any OTel-compatible backend) rather than only through
+`PrometheusConfig`/`OpenTelemetryConfig`, set a `temporalio.runtime.MetricBuffer` as the `metrics` on
+`TelemetryConfig`, then drain it into a real OpenTelemetry `MeterProvider` using
+`temporalio.contrib.opentelemetry.MetricsExporter`:
+
+```python
+from datetime import timedelta
+
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import ConsoleMetricExporter, PeriodicExportingMetricReader
+
+from temporalio.client import Client
+from temporalio.contrib.opentelemetry import MetricsExporter
+from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
+
+buffer = MetricBuffer(10_000)
+runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
+meter_provider = MeterProvider(
+    metric_readers=[PeriodicExportingMetricReader(ConsoleMetricExporter(), export_interval_millis=5000)]
+)
+
+async with MetricsExporter(buffer, meter_provider):
+    client = await Client.connect("localhost:7233", runtime=runtime)
+    # ... run workers/workflows while the exporter drains the buffer in the background
+```
+
+`MetricsExporter` must be running (via `async with` or manual `run()`/`shutdown()`) for as long as metrics should be
+exported, since it works by draining the buffer on a fixed interval (`poll_interval`, default one second) -- per the
+warning on `MetricBuffer`, updates are dropped if the buffer isn't drained regularly.
+
 ### Protobuf 3.x vs 4.x
 
 Python currently has two somewhat-incompatible protobuf library versions - the 3.x series and the 4.x series. Python
@@ -2014,7 +2048,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.9 and newer. It is built using
+The Python SDK is built to work with Python 3.10 and newer. It is built using
 [SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building
@@ -2111,6 +2145,50 @@ python example.py
 It should output:
 
     Result: Hello, Temporal!
+
+#### FIPS Compliance (Experimental)
+
+> **NOTE**: FIPS support is **experimental**. It is opt-in, source-build only, and currently exercised
+> on Linux only. This build wires the TLS/gRPC cryptography through a FIPS-validated module; it is
+> **not** a claim that the SDK has passed a FIPS compliance audit or certification.
+
+FIPS 140-3 compliant cryptography is available as an **opt-in source build**. The published wheels are
+**not** FIPS compliant — they use the [`ring`](https://github.com/briansmith/ring) backend, which is not
+FIPS-validated. Because the crypto backend is chosen at compile time, FIPS cannot be enabled on a
+precompiled wheel: you must build the native extension yourself with `TEMPORALIO_FIPS=1`. When set, the
+build selects [`aws-lc-rs`](https://github.com/aws/aws-lc-rs) in FIPS mode (AWS-LC's FIPS 140-3 module)
+for the gRPC client (and the OTLP metric exporter, when enabled), in place of `ring`.
+
+Building `aws-lc-rs` in FIPS mode compiles AWS-LC from source, so in addition to the
+[Prepare](#prepare) prerequisites it requires **Go**, **CMake**, **Perl**, and a **C compiler**.
+
+To produce an installable FIPS wheel:
+
+```bash
+TEMPORALIO_FIPS=1 uv run maturin build --release --no-default-features --features fips
+```
+
+or, equivalently, the provided task:
+
+```bash
+poe build-wheel-fips
+```
+
+For a local develop build, use `poe build-develop-fips`. You can confirm at runtime that a FIPS build is
+loaded:
+
+```python
+from temporalio.bridge import temporal_sdk_bridge
+assert temporal_sdk_bridge.FIPS
+```
+
+> **NOTE**: When a `Worker` or `Replayer` is created without a `build_id` (or `deployment_config`), the
+> SDK derives a default build ID by hashing loaded module bytecode with MD5 (via
+> `hashlib.md5(usedforsecurity=False)`). Although md5 is among Python's
+> [guaranteed hash algorithms](https://docs.python.org/3/library/hashlib.html#hashlib.algorithms_guaranteed),
+> some vendors ship "FIPS" Python builds that remove it entirely — on such an interpreter this call
+> raises. If you run on one, pass an explicit `build_id` (directly or inside `deployment_config`) so the
+> default MD5-based path is not used.
 
 ### Local SDK development environment
 
