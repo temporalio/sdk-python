@@ -132,15 +132,11 @@ def make_interaction_dict(status: str = "completed") -> dict[str, Any]:
 
 
 def make_interaction_sse_events() -> list[dict[str, Any]]:
-    """Build a small SSE event sequence for a streamed interaction.
-
-    Includes a sparse ``interaction.created`` payload (just ``id`` and
-    ``object``) to exercise the lenient ``_deserialize`` rehydration.
-    """
+    """Build a minimal SSE event sequence for a streamed interaction."""
     return [
         {
             "event_type": "interaction.created",
-            "interaction": {"id": INTERACTION_ID, "object": "interaction"},
+            "interaction": make_interaction_dict(status="in_progress"),
         },
         {
             "event_type": "step.delta",

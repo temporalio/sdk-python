@@ -47,9 +47,9 @@ def _deserialize(value: dict[str, Any], type_: Any) -> Any:
     ``InteractionSSEEvent`` is deserialized through its ``TypeAdapter``, which
     dispatches the discriminated union (and nested unions) and tolerates the
     sparse nested payloads the API legitimately emits (e.g. an
-    ``interaction.created`` event carrying an ``Interaction`` with just ``id``
-    and ``object``).  Plain models use ``model_validate``, which recurses nested
-    models (e.g. ``AgentListResponse.agents`` into ``Agent``) and resolves
+    ``interaction.created`` event carrying an ``Interaction`` with just ``id``,
+    ``object``, and ``status``).  Plain models use ``model_validate``, which
+    recurses nested models (e.g. ``AgentListResponse.agents`` into ``Agent``) and resolves
     aliases; the SDK's optional fields keep it tolerant of the minimal objects
     the API returns.  Both paths are pure functions, safe to run in the workflow
     on every replay.
