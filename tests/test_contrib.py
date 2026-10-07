@@ -1,4 +1,5 @@
 import importlib
+import os
 import sys
 import warnings
 from types import ModuleType
@@ -8,7 +9,6 @@ import temporalio.openai_agents as standalone  # pyright: ignore[reportMissingIm
 import temporalio.openai_agents.testing as standalone_testing  # pyright: ignore[reportMissingImports]
 import temporalio.openai_agents.workflow as standalone_workflow  # pyright: ignore[reportMissingImports]
 
-import temporalio.contrib
 import temporalio.contrib.openai_agents as compatibility
 import temporalio.contrib.openai_agents.testing as compatibility_testing
 import temporalio.contrib.openai_agents.workflow as compatibility_workflow
@@ -97,8 +97,23 @@ def test_openai_agents_compatibility_new_exports(
 @pytest.mark.parametrize(
     "legacy,canonical,submodules",
     [
-        ("deepagents", "deepagents", ("testing", "workflow")),
-        ("google_adk_agents", "google_adk", ("workflow",)),
+        pytest.param(
+            "deepagents",
+            "deepagents",
+            ("testing", "workflow"),
+            marks=pytest.mark.skipif(
+                sys.version_info < (3, 11), reason="Deep Agents requires Python 3.11"
+            ),
+        ),
+        pytest.param(
+            "google_adk_agents",
+            "google_adk",
+            ("workflow",),
+            marks=pytest.mark.skipif(
+                bool(os.getenv("TEMPORAL_TEST_PROTO3")),
+                reason="Google ADK is omitted from the protobuf 3 test environment",
+            ),
+        ),
         ("google_genai", "google_genai", ("testing", "workflow")),
         ("langgraph", "langgraph", ()),
         ("langsmith", "langsmith", ()),
@@ -106,39 +121,29 @@ def test_openai_agents_compatibility_new_exports(
     ],
 )
 def test_ai_integration_compatibility_imports(
-    monkeypatch: pytest.MonkeyPatch,
     legacy: str,
     canonical: str,
     submodules: tuple[str, ...],
 ) -> None:
-    # Exercise the forwarding contract before the standalone packages are released.
-    root = ModuleType(f"temporalio.{canonical}")
-    setattr(root, "__path__", [])
-    modules = [root]
-    for name in submodules:
-        module = ModuleType(f"{root.__name__}.{name}")
-        setattr(root, name, module)
-        modules.append(module)
-    for module in modules:
-        setattr(module, "future_value", object())
-        if not module.__name__.endswith(".workflow"):
-            setattr(module, "__all__", ["future_value"])
-        monkeypatch.setitem(sys.modules, module.__name__, module)
-
-    compatibility_name = f"temporalio.contrib.{legacy}"
-    monkeypatch.setattr(temporalio.contrib, legacy, None, raising=False)
-    for module in modules:
-        suffix = module.__name__.removeprefix(root.__name__)
-        name = f"{compatibility_name}{suffix}"
-        monkeypatch.setitem(sys.modules, name, None)
-        del sys.modules[name]
     with warnings.catch_warnings():
         warnings.simplefilter("error", DeprecationWarning)
-        for module in modules:
-            suffix = module.__name__.removeprefix(root.__name__)
-            name = f"{compatibility_name}{suffix}"
+        for suffix in ("", *(f".{name}" for name in submodules)):
+            module = importlib.import_module(f"temporalio.{canonical}{suffix}")
+            name = f"temporalio.contrib.{legacy}{suffix}"
             forwarded = importlib.import_module(name)
+            importlib.reload(forwarded)
             assert forwarded.__name__ == name
-            assert getattr(forwarded, "future_value") is getattr(module, "future_value")
+            exported = getattr(
+                module,
+                "__all__",
+                [name for name in vars(module) if not name.startswith("_")],
+            )
+            assert set(exported) == {
+                name for name in vars(forwarded) if not name.startswith("_")
+            }
+            for exported_name in exported:
+                assert getattr(forwarded, exported_name) is getattr(
+                    module, exported_name
+                )
             if hasattr(module, "__all__"):
                 assert getattr(forwarded, "__all__") is getattr(module, "__all__")

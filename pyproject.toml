@@ -29,10 +29,10 @@ grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.26,<2", "opentelemetry-sdk>=1.26,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["temporalio-openai-agents>=1.0.0"]
-google-adk = ["temporalio-google-adk>=0.1.0"]
+google-adk = ["temporalio-google-adk[mcp]>=0.0.1"]
 langgraph = ["temporalio-langgraph>=0.1.0"]
 langsmith = ["temporalio-langsmith>=0.1.0"]
-deepagents = ["temporalio-deepagents>=0.1.0; python_version >= '3.11'"]
+deepagents = ["temporalio-deepagents>=0.0.1; python_version >= '3.11'"]
 lambda-worker-otel = [
   "opentelemetry-api>=1.26,<2",
   "opentelemetry-sdk>=1.26,<2",
@@ -51,7 +51,7 @@ cloud-run-worker-otel = [
   "protobuf<7",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
-google-genai = ["temporalio-google-genai>=0.1.0"]
+google-genai = ["temporalio-google-genai[mcp]>=0.1.0"]
 strands-agents = ["temporalio-strands-agents>=0.1.0"]
 
 [project.urls]
@@ -279,3 +279,5 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
+# The SDK compatibility extras need the newly published standalone integrations.
+exclude-newer-package = { temporalio-deepagents = false, temporalio-google-adk = false, temporalio-google-genai = false, temporalio-langgraph = false, temporalio-langsmith = false, temporalio-strands-agents = false }
