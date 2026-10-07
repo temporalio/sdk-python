@@ -1,4 +1,4 @@
-"""Ports of time-skipping tests in testing/test_workflow.py"""
+"""V2 equivalents of testing/test_workflow.py"""
 
 import uuid
 from datetime import timedelta
