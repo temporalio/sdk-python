@@ -75,12 +75,10 @@ async def test_skip_full_run(env: WorkflowEnvironment) -> None:
         wall_elapsed = monotonic() - wall_start
 
     assert result["message"] == "all done"
-    # Virtual time advanced by ~1h even though wall time was just a few seconds.
     virtual_elapsed = result["end"] - result["start"]
     assert virtual_elapsed >= 3600, (
         f"virtual elapsed was {virtual_elapsed}s; expected >= 3600s (timer did not fire fully)"
     )
-    # 1-hour timer should be auto-skipped in well under 3s of wall time.
     assert wall_elapsed < 3, (
         f"workflow took {wall_elapsed:.3f}s wall time; time skipping did not engage"
     )
@@ -108,8 +106,7 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
     async with new_worker(env.client, InteractionWorkflow) as worker:
         wall_start = monotonic()
         # Start the workflow with time-skipping stamping suspended, then issue an
-        # explicit fast-forward. Keeps auto-skip from blowing through the
-        # 10h wait_condition timeout before the test can interact.
+        # explicit fast-forward. Uses signals to move the workflow along.
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
                 InteractionWorkflow.run,
@@ -118,10 +115,8 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
                 task_queue=worker.task_queue,
             )
 
-        # Baseline: workflow's virtual clock before any fast-forward.
         t0 = await env.get_current_time(handle)
 
-        # Fast-forward 1h; skipping pauses so we can interact.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
             "expected first fast-forward to complete at 1h"
         )
@@ -130,7 +125,6 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
         t1 = await env.get_current_time(handle)
         assert_duration_same(3600, (t1 - t0).total_seconds(), tolerance=10)
 
-        # Fast-forward another 1h, then send the second signal to release.
         assert await env.fast_forward(handle, timedelta(hours=1)), (
             "expected second fast-forward to complete at 2h total"
         )
@@ -163,20 +157,14 @@ async def test_partial_fast_forward_then_unbounded(
 
         t0 = await env.get_current_time(handle)
 
-        # Fast-forward 30m; time skipping auto-disables at that point.
         assert await env.fast_forward(handle, timedelta(minutes=30))
         t1 = await env.get_current_time(handle)
         assert_duration_same(30 * 60, (t1 - t0).total_seconds(), tolerance=10)
 
-        # Unbounded resume — the workflow's remaining 30m timer fires and it
-        # completes. fast_forward returns False because unbounded (duration=None)
-        # has no target, so no disabled_after_fast_forward transition can fire;
-        # the wait loop sees only the workflow's terminal event.
         assert not await env.fast_forward(handle, None)
         result = await handle.result()
         assert result["message"] == "all done"
 
-        # Final virtual time on the closed workflow is ~+1h from start.
         t_end = await env.get_current_time(handle)
         assert_duration_same(3600, (t_end - t0).total_seconds(), tolerance=10)
 
@@ -240,12 +228,10 @@ async def test_child_workflow_propagates_time_skipping(
 
     assert result["message"] == "all done"
     assert result["child_message"] == "all done"
-    # Total 3h of virtual work should complete in a few seconds of wall time.
+
     assert wall_elapsed < 10, (
         f"parent+child took {wall_elapsed:.1f}s wall time; expected < 10s"
     )
-
-    # Each 1h wait should have advanced the workflow's clock by ~3600s.
     assert_duration_same(
         3600, result["parent_after_wait_1"] - result["parent_start"], tolerance=10
     )
@@ -255,13 +241,9 @@ async def test_child_workflow_propagates_time_skipping(
     assert_duration_same(
         3600, result["parent_end"] - result["parent_after_child_start"], tolerance=10
     )
-
-    # Forward propagation: child's clock at start matches parent's clock at spawn.
     assert_duration_same(
         0, result["child_start"] - result["parent_after_wait_1"], tolerance=10
     )
-    # Parent's clock does not advance while child is running (no backward
-    # propagation from child at completion).
     assert_duration_same(
         0, result["parent_after_child_start"] - result["parent_after_wait_1"], tolerance=5
     )
@@ -302,13 +284,11 @@ async def test_child_workflow_with_propagation_disabled() -> None:
 
         assert result["message"] == "all done"
         assert result["child_message"] == "all done"
-        # Child's 5s sleep runs in real time; parent's two 1h waits skip.
-        # Total wall time is dominated by the child's real sleep.
+        # Child runs in real time; parent's two 1h waits are skipped.
         assert 4 < wall_elapsed < 15, (
             f"expected ~5s wall time (child didn't skip), got {wall_elapsed:.1f}s"
         )
 
-        # Parent had time skipping engaged (its own waits skipped); child did not.
         await assert_time_was_skipped(parent_handle)
         child_handle = env.client.get_workflow_handle(child_id)
         await assert_time_was_not_skipped(child_handle)
@@ -341,13 +321,10 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
             wall_elapsed = monotonic() - wall_start
 
         assert result["message"] == "all done"
-        # Virtual clock advanced ~1h.
         assert_duration_same(3600, result["end"] - result["start"], tolerance=10)
-        # But wall time was seconds, not an hour.
         assert wall_elapsed < 10, (
             f"expected fast wall finish under time skipping, got {wall_elapsed:.1f}s"
         )
-        # And the workflow's history has the time-skipping transition event.
         await assert_time_was_skipped(handle)
 
 
@@ -399,11 +376,9 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
                     maximum_attempts=2,
                 ),
             )
-        # 1h sleep, 1h retry backoff, 1h sleep. 2.5h fast forward should
-        # end solidly in the second run.
+
+        # Fast forward into the second sleep.
         assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
-        # FF auto-disables TS at target. Re-enable (unbounded) so the
-        # remaining ~30m of attempt-2 sleep is skipped rather than waited out.
         await env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
@@ -412,11 +387,7 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
 
 @workflow.defn
 class ContinueAsNewSleepWorkflow:
-    """Sleeps ``sleep_seconds``, then continues-as-new until ``runs_remaining`` is 1.
-
-    ``current_run`` counts up through the CAN chain (1, 2, 3, ...) and is
-    queryable so tests can verify how far the chain progressed.
-    """
+    """Sleep and CAN until ``runs_remaining`` is 1."""
 
     def __init__(self) -> None:
         self._current_run = 1

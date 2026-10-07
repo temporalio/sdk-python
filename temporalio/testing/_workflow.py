@@ -231,7 +231,7 @@ class WorkflowEnvironment:
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
                     identity=identity,
-                    runtime=runtime,0
+                    runtime=runtime,
                 ),
                 server,
             )
