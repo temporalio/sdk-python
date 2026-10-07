@@ -74,7 +74,7 @@ async def test_workflow_env_time_skipping_disabled_v2():
         dev_server_extra_args=_TS_EXTRA_ARGS,
     ) as env:
         async with new_worker(env.client, SleepWorkflow) as worker:
-            # With time-skipping enabled (env default), fast finish.
+            # With time-skipping.
             start = monotonic()
             ts_on_handle = await env.client.start_workflow(
                 SleepWorkflow.run,
@@ -87,8 +87,7 @@ async def test_workflow_env_time_skipping_disabled_v2():
             assert monotonic() - start < 2.5
             await assert_time_was_skipped(ts_on_handle)
 
-            # Without time-skipping, the workflow's 3s timer waits real
-            # wall time.
+            # Without time-skipping.
             start = monotonic()
             with env.with_time_skipping_disabled():
                 handle = await env.client.start_workflow(
@@ -119,9 +118,6 @@ async def test_workflow_env_time_skipping_basic_via_update_v2():
                     task_queue=worker.task_queue,
                 )
 
-            # Enable unbounded skipping mid-flight. Returns False because
-            # the workflow terminates before a ``disabled_after_fast_forward``
-            # transition can fire (there's no target).
             assert not await env.fast_forward(handle, None)
             result = await handle.result()
             assert result["message"] == "all done"

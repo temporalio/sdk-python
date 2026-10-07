@@ -443,9 +443,6 @@ async def test_fast_forward_spans_cron_restarts(
         try:
             assert await env.fast_forward(handle, timedelta(hours=3))
 
-            # list_workflows is eventually consistent — the FF has already
-            # completed on the history side, but the visibility index may
-            # not yet reflect all 3 cron-produced runs. Poll until it does.
             async def _at_least_three_cron_runs() -> None:
                 run_count = 0
                 async for _ in env.client.list_workflows(
@@ -487,7 +484,6 @@ async def test_signal_with_start_stamps_time_skipping_config(
     """Timeskip a signal-with-start workflow."""
     async with new_worker(env.client, SignalWithStartTargetWorkflow) as worker:
         wall_start = monotonic()
-        # signal_with_start via start_workflow's start_signal= kwarg.
         handle = await env.client.start_workflow(
             SignalWithStartTargetWorkflow.run,
             3600.0,
@@ -498,7 +494,6 @@ async def test_signal_with_start_stamps_time_skipping_config(
         result = await handle.result()
         wall_elapsed = monotonic() - wall_start
 
-    # 1h sleep was time-skipped → wall time small; virtual clock advanced by ~1h.
     assert wall_elapsed < 10
     virtual_elapsed = result["end"] - result["after_signal"]
     assert 3550 <= virtual_elapsed <= 3650, (
@@ -510,12 +505,7 @@ async def test_signal_with_start_stamps_time_skipping_config(
 async def test_get_time_skipping_info_during_workflow(
     env: WorkflowEnvironment,
 ) -> None:
-    """``env.get_time_skipping_info`` on a running (not fast-forwarded)
-    workflow returns a populated ``TimeSkippingInfo`` with a current
-    virtual clock and no fast-forward info set."""
     async with new_worker(env.client, InteractionWorkflow) as worker:
-        # InteractionWorkflow waits on a signal, so it stays running while
-        # we read.
         handle = await env.client.start_workflow(
             InteractionWorkflow.run,
             1,
@@ -609,7 +599,6 @@ async def test_time_skipping_virtual_clock(
                 task_queue=worker.task_queue,
             )
         wf_start_wall = datetime.now(tz=timezone.utc)
-        # FF 1h. Virtual clock advances to +1h and time skipping auto-disables.
         assert await env.fast_forward(handle, timedelta(hours=1))
         current_time = await env.get_current_time(handle)
         offset_seconds = (current_time - wf_start_wall).total_seconds()
@@ -649,17 +638,13 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
                     break
         assert transition is not None, "no disabled_after_fast_forward transition found"
 
-        # target_time: virtual time the FF advanced to. Should be ~+30m from
-        # the pre-FF wall clock (since the workflow started with time skipping off,
-        # virtual clock at start ≈ wall clock).
         target = transition.target_time.ToDatetime().replace(tzinfo=timezone.utc)
         target_offset = (target - wall_before_ff).total_seconds()
         assert 1780 <= target_offset <= 1820, (
             f"target_time offset {target_offset}s from pre-FF wall; expected ~1800s"
         )
 
-        # wall_clock_time: real time when transition fired. Should be near
-        # the wall time we observed around the FF call.
+        # wall_clock_time should be around wall clock time when fast forward started.
         wct = transition.wall_clock_time.ToDatetime().replace(tzinfo=timezone.utc)
         assert wall_before_ff <= wct <= wall_after_ff + timedelta(seconds=5), (
             f"wall_clock_time {wct} not in expected wall-time window "
@@ -698,10 +683,9 @@ async def test_child_workflow_started_event_has_state_propagation(
         )
 
 
-async def test_fast_forward_clamped_to_execution_timeout(
+async def test_fast_forward_exceeds_execution_timeout(
     env: WorkflowEnvironment,
 ) -> None:
-    """FF duration exceeds execution timeout → workflow times out; FF returns False."""
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
@@ -711,12 +695,9 @@ async def test_fast_forward_clamped_to_execution_timeout(
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(minutes=30),
             )
-        # FF for 1h — but the workflow's execution_timeout is 30m, so the
-        # workflow terminates (TIMED_OUT) at ~30m virtual before the FF
-        # target at 1h is reached.
         assert (await env.fast_forward(handle, timedelta(hours=1))) is False
 
-        # Confirm the workflow ended via TIMED_OUT rather than completing.
+        # Confirm it timed out.
         timed_out = False
         async for event in handle.fetch_history_events():
             if (
@@ -731,10 +712,6 @@ async def test_fast_forward_clamped_to_execution_timeout(
 async def test_overriding_fast_forward_raises_on_original(
     env: WorkflowEnvironment,
 ) -> None:
-    """Override a fast-forward with another one. Awaiting the first raises
-    ``RuntimeError``, but the second completes properly. The test starts
-    with no worker to prevent fast-forwards from completing immediately.
-    """
     task_queue = f"tq-{uuid.uuid4()}"
     with env.with_time_skipping_disabled():
         handle = await env.client.start_workflow(
@@ -743,7 +720,7 @@ async def test_overriding_fast_forward_raises_on_original(
             id=f"wf-{uuid.uuid4()}",
             task_queue=task_queue,
         )
-    # No worker yet.
+    # No worker yet, to keep fast forwards from finishing.
 
     original = asyncio.create_task(env.fast_forward(handle, timedelta(hours=2)))
 
