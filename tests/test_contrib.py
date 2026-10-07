@@ -116,25 +116,27 @@ def test_ai_integration_compatibility_imports(
     canonical: str,
     submodules: tuple[str, ...],
 ) -> None:
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        for suffix in ("", *(f".{name}" for name in submodules)):
-            module = importlib.import_module(f"temporalio.{canonical}{suffix}")
-            name = f"temporalio.contrib.{legacy}{suffix}"
-            forwarded = importlib.import_module(name)
-            importlib.reload(forwarded)
-            assert forwarded.__name__ == name
-            exported = getattr(
+    for suffix in ("", *(f".{name}" for name in submodules)):
+        # Load lazy exports too so dependency warnings do not fail the shim check.
+        module = importlib.import_module(f"temporalio.{canonical}{suffix}")
+        exported = {
+            name: getattr(module, name)
+            for name in getattr(
                 module,
                 "__all__",
                 [name for name in vars(module) if not name.startswith("_")],
             )
-            assert set(exported) == {
-                name for name in vars(forwarded) if not name.startswith("_")
-            }
-            for exported_name in exported:
-                assert getattr(forwarded, exported_name) is getattr(
-                    module, exported_name
-                )
-            if hasattr(module, "__all__"):
-                assert getattr(forwarded, "__all__") is getattr(module, "__all__")
+        }
+        name = f"temporalio.contrib.{legacy}{suffix}"
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            forwarded = importlib.import_module(name)
+            importlib.reload(forwarded)
+        assert forwarded.__name__ == name
+        assert set(exported) == {
+            name for name in vars(forwarded) if not name.startswith("_")
+        }
+        for exported_name, value in exported.items():
+            assert getattr(forwarded, exported_name) is value
+        if hasattr(module, "__all__"):
+            assert getattr(forwarded, "__all__") is getattr(module, "__all__")
