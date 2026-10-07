@@ -104,13 +104,13 @@ class WorkflowEnvironment:
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
-        Per-workflow time skipping is off by default. Pass ``ts_config``
-        to enable it — the returned environment wraps :py:attr:`client` with a
-        :py:class:`TimeSkipper` that stamps ``time_skipping_config`` on every
-        workflow started via :py:attr:`client`, and exposes
-        :py:meth:`fast_forward` for driving time skipping on running workflows.
-        In contrast to :py:meth:`start_time_skipping`
-        (time-skipping V1, server-wide clock), each workflow has its own virtual clock.
+        Per-workflow time skipping is off by default. Pass ``ts_config`` to
+        enable V2 time skipping — the returned environment wraps
+        :py:attr:`client` with a :py:class:`TimeSkipper` that stamps
+        ``time_skipping_config`` on every workflow started via
+        :py:attr:`client`, and exposes :py:meth:`fast_forward` for driving time
+        skipping on running workflows. Each workflow has its own virtual clock,
+        unlike time-skipping V1.
 
         Internally, this uses the Temporal CLI dev server from
         https://github.com/temporalio/cli. This is a self-contained binary for
@@ -162,10 +162,10 @@ class WorkflowEnvironment:
             dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
             ui_port: UI port to use if UI is enabled.
-            ts_config: Per-workflow time-skipping config stamped on every
-                workflow started via :py:attr:`client`. Off by default (no
-                time skipping). If set, the returned environment supports
-                :py:meth:`fast_forward` and related time-skipping V2 methods.
+            time-skipping config stamped on every workflow started via
+                :py:attr:`client`. Off by default (no time skipping). If set,
+                the returned environment supports :py:meth:`fast_forward` and
+                related time-skipping V2 methods.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -231,7 +231,7 @@ class WorkflowEnvironment:
                     retry_config=retry_config,
                     rpc_metadata=rpc_metadata,
                     identity=identity,
-                    runtime=runtime,
+                    runtime=runtime,0
                 ),
                 server,
             )
@@ -455,7 +455,7 @@ class WorkflowEnvironment:
 
     @property
     def supports_time_skipping_v1(self) -> bool:
-        """True if this environment uses the deprecated V1 Java time-skipping server (which has limited server features)."""
+        """True if this environment uses the V1 Java time-skipping server (which has limited server features)."""
         return False
 
     @property
@@ -559,7 +559,7 @@ class WorkflowEnvironment:
 
     @contextmanager
     def with_time_skipping_disabled(self) -> Iterator[None]:
-        """Suspend time-skipping config stamping on newly-started workflows within the block.
+        """Suspend V2 time-skipping config stamping on newly-started workflows within the block.
 
         Workflows started via :py:attr:`client` during the block do not
         receive a ``time_skipping_config`` on their start request. Existing
@@ -647,7 +647,7 @@ class _EphemeralServerWorkflowEnvironment(WorkflowEnvironment):
         self,
         handle: temporalio.client.WorkflowHandle[Any, Any] | None = None,
     ) -> datetime:
-        """Current time known to this environment.
+        """Current time, or current virtual time for a time-skipping environment.
 
         System time on non-time-skipping envs; the V1 test server's virtual
         clock on V1 envs. On V2 envs a ``handle`` is required — each

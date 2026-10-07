@@ -92,8 +92,8 @@ class TimeSkipper:
     Wraps a client with an interceptor that stamps a ``TimeSkippingConfig``
     on every workflow started through :py:attr:`client`. Use
     :py:meth:`fast_forward` to advance a running workflow's virtual clock
-    (awaited call waits for the fast-forward to complete and the transition
-    event to fire).
+    (awaited the call to :py:meth:`fast_forward` waits for the fast-forward
+    to complete and the transition event to fire).
 
     In tests, the same functionality is available via
     :py:class:`WorkflowEnvironment.start_time_skipping_v2`. Use
@@ -160,7 +160,7 @@ class TimeSkipper:
             For a bounded ``duration``: True if the fast-forward completes,
             False if the workflow chain terminates first or the fast-forward
             id is overridden. For ``duration=None``: always False (there is
-            no fast-forward completion to observe; the wait ends on the
+            no fast-forward completion to observe; the call waits unitl the
             workflow's terminal event).
         """
         if duration is not None and not isinstance(duration, timedelta):
@@ -238,22 +238,15 @@ class TimeSkipper:
                 resp.fast_forward_polling_result
                 == FastForwardPollingResult.FAST_FORWARD_POLLING_RESULT_FAST_FORWARD_FAILED
             ):
-                # Server explains the specific cause in failed_reason (e.g.
-                # id mismatch, execution ended, config reset, TS disabled).
-                # In this SDK, id-mismatch means the caller (or the SDK)
-                # overrode the fast_forward — surface that loudly. Other
-                # causes (workflow ended, TS disabled before completion)
-                # mean the FF simply couldn't complete: return False.
-                if "fast_forward_id" in resp.failed_reason:
+                # An ID mismatch means this fast-forward was overridden by a laster one,
+                # so raise in that case; otherwise, return False.
+                if "fast_forward_id does not match" in resp.failed_reason:
                     raise RuntimeError(
                         f"PollWorkflowExecutionTimeSkipping failed for id "
-                        f"{fast_forward_id!r}: {resp.failed_reason}. "
-                        "This is the expected result when another fast_forward() "
-                        "call overrode this one; if the caller did not do that, "
-                        "it's an internal bug."
+                        f"{fast_forward_id!r}: {resp.failed_reason}: overridden by a "
+                        "later fast-forward."
                     )
                 return False
-            # RESULT_POLL_TIMEOUT (server-side long-poll expiry): re-poll.
 
     async def get_time_skipping_info(
         self,
