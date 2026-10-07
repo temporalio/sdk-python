@@ -535,6 +535,12 @@ class NestedDataClass:
     qux: UUID | None = None
 
 
+@dataclass(frozen=True)
+class InitFalseDataClass:
+    foo: str
+    bar: str = dataclasses.field(default="default-bar", init=False)
+
+
 class MyTypedDict(TypedDict):
     foo: str
     bar: MyDataClass
@@ -633,6 +639,8 @@ def test_json_type_hints():
     fail(NestedDataClass, {})
     # Additional dataclass fields is ok
     ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
+    # Dataclass with init=False fields
+    ok(InitFalseDataClass, InitFalseDataClass("hello"))
 
     # Optional/Union
     ok(int | None, 5)

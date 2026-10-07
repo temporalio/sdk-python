@@ -997,6 +997,9 @@ def value_to_type(
         field_hints = get_type_hints(hint)
         field_values = {}
         for field in fields:
+            # Skip fields excluded from __init__; they use defaults or __post_init__
+            if not field.init:
+                continue
             field_value = value.get(field.name, dataclasses.MISSING)
             # We do not check whether field is required here. Rather, we let the
             # attempted instantiation of the dataclass raise if a field is
