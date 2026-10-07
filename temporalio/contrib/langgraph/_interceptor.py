@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from langgraph.graph import StateGraph
@@ -22,6 +23,9 @@ from temporalio.worker import (
 
 _workflow_graphs: dict[str, dict[str, StateGraph[Any, Any, Any, Any]]] = {}
 _workflow_entrypoints: dict[str, dict[str, Pregel[Any, Any, Any, Any]]] = {}
+_workflow_registration_owners: dict[str, object] = {}
+# Cleanup can run reentrantly during GC while a registration is being replaced.
+_workflow_registration_lock = threading.RLock()
 
 
 class LangGraphInterceptor(Interceptor):
@@ -48,9 +52,14 @@ class LangGraphInterceptor(Interceptor):
 
         class Inbound(WorkflowInboundInterceptor):
             def init(self, outbound: WorkflowOutboundInterceptor) -> None:
-                run_id = outbound.info().run_id
-                _workflow_graphs[run_id] = graphs
-                _workflow_entrypoints[run_id] = entrypoints
+                self._run_id = outbound.info().run_id
+                self._registration_owner = object()
+                with _workflow_registration_lock:
+                    _workflow_registration_owners[self._run_id] = (
+                        self._registration_owner
+                    )
+                    _workflow_graphs[self._run_id] = graphs
+                    _workflow_entrypoints[self._run_id] = entrypoints
                 super().init(outbound)
 
             async def execute_workflow(self, input: ExecuteWorkflowInput) -> Any:
@@ -69,9 +78,16 @@ class LangGraphInterceptor(Interceptor):
                 try:
                     return await self.next.execute_workflow(input)
                 finally:
-                    run_id = workflow.info().run_id
-                    _workflow_graphs.pop(run_id, None)
-                    _workflow_entrypoints.pop(run_id, None)
-                    clear_store_warning(run_id)
+                    # A retired coroutine can be collected after a replacement
+                    # registers, including inside a different workflow's context.
+                    with _workflow_registration_lock:
+                        if (
+                            _workflow_registration_owners.get(self._run_id)
+                            is self._registration_owner
+                        ):
+                            _workflow_registration_owners.pop(self._run_id, None)
+                            _workflow_graphs.pop(self._run_id, None)
+                            _workflow_entrypoints.pop(self._run_id, None)
+                            clear_store_warning(self._run_id)
 
         return Inbound
