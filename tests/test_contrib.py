@@ -1,5 +1,4 @@
 import importlib
-import os
 import sys
 import warnings
 from types import ModuleType
@@ -105,15 +104,7 @@ def test_openai_agents_compatibility_new_exports(
                 sys.version_info < (3, 11), reason="Deep Agents requires Python 3.11"
             ),
         ),
-        pytest.param(
-            "google_adk_agents",
-            "google_adk",
-            ("workflow",),
-            marks=pytest.mark.skipif(
-                bool(os.getenv("TEMPORAL_TEST_PROTO3")),
-                reason="Google ADK is omitted from the protobuf 3 test environment",
-            ),
-        ),
+        ("google_adk_agents", "google_adk", ("workflow",)),
         ("google_genai", "google_genai", ("testing", "workflow")),
         ("langgraph", "langgraph", ()),
         ("langsmith", "langsmith", ()),
