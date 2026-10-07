@@ -311,6 +311,9 @@ class StartChildWorkflowInput:
     versioning_intent: VersioningIntent | None
     static_summary: str | None
     static_details: str | None
+    versioning_override: temporalio.common.VersioningOverride | None = field(
+        default=None, kw_only=True
+    )
     event_groups: Sequence[temporalio.workflow.EventGroup] | None = field(
         default=None, kw_only=True
     )
