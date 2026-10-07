@@ -95,6 +95,17 @@ class _ActivityWorker:
                     f"Activity named {defn.name} is a class instead of an instance"
                 )
 
+            # A plain function whose first parameter is "self" is almost always
+            # a method referenced from the class instead of from an instance
+            if inspect.isfunction(activity):
+                params = list(inspect.signature(activity).parameters)
+                if params and params[0] == "self":
+                    warnings.warn(
+                        f"Activity named {defn.name} has a first parameter named self "
+                        "but is not bound to an instance, did you mean to register it "
+                        "from an instance of the class?"
+                    )
+
             # Some extra requirements for sync functions
             if not defn.is_async:
                 if not activity_executor:
@@ -197,7 +208,14 @@ class _ActivityWorker:
     async def wait_all_completed(self) -> None:
         running_tasks = [v.task for v in self._running_activities.values() if v.task]
         if running_tasks:
-            await asyncio.gather(*running_tasks, return_exceptions=False)
+            # Never let a task exception escape and stall shutdown
+            for result in await asyncio.gather(*running_tasks, return_exceptions=True):
+                if isinstance(result, BaseException) and not isinstance(
+                    result, asyncio.CancelledError
+                ):
+                    logger.warning(
+                        "Activity task raised during worker shutdown", exc_info=result
+                    )
 
     def _handle_cancel_activity_task(
         self,
@@ -223,7 +241,7 @@ class _ActivityWorker:
         # converter is async, we have to schedule it. If the activity is done,
         # we do not schedule any more. Technically this should be impossible to
         # call if the activity is done because this sync call can only be called
-        # inside the activity and done is set to False when the activity
+        # inside the activity and done is set to True when the activity
         # returns.
         logger = temporalio.activity.logger
         activity = self._running_activities.get(task_token)
@@ -348,9 +366,15 @@ class _ActivityWorker:
             context, StorageDriverStoreContext(target=store_target)
         )
         try:
-            result = await self._execute_activity(
-                start, running_activity, task_token, data_converter
-            )
+            try:
+                result = await self._execute_activity(
+                    start, running_activity, task_token, data_converter
+                )
+            finally:
+                # The activity code has finished, so a cancel from here on must
+                # not interrupt reporting its outcome; done stops cancel() from
+                # cancelling this task
+                running_activity.done = True
             [payload] = await data_converter.encode([result])
             completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
@@ -472,9 +496,7 @@ class _ActivityWorker:
 
         # Do final completion
         try:
-            # We mark the activity as done and let the currently running
-            # heartbeat task finish
-            running_activity.done = True
+            # Let the currently running heartbeat task finish
             if running_activity.last_heartbeat_task:
                 try:
                     await running_activity.last_heartbeat_task

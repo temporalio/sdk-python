@@ -75,6 +75,12 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: (
         _StartChildWorkflowExecutionFailedCause.ValueType
     )  # 1
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
+        _StartChildWorkflowExecutionFailedCause.ValueType
+    )  # 2
+    START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE: (
+        _StartChildWorkflowExecutionFailedCause.ValueType
+    )  # 3
 
 class StartChildWorkflowExecutionFailedCause(
     _StartChildWorkflowExecutionFailedCause,
@@ -88,6 +94,12 @@ START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
 START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_WORKFLOW_ALREADY_EXISTS: (
     StartChildWorkflowExecutionFailedCause.ValueType
 )  # 1
+START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_NAMESPACE_NOT_FOUND: (
+    StartChildWorkflowExecutionFailedCause.ValueType
+)  # 2
+START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE: (
+    StartChildWorkflowExecutionFailedCause.ValueType
+)  # 3
 global___StartChildWorkflowExecutionFailedCause = StartChildWorkflowExecutionFailedCause
 
 class _ChildWorkflowCancellationType:

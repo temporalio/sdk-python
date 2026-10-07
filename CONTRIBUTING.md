@@ -61,12 +61,49 @@ Good pull requests are focused and easy to review:
 * Keep each pull request scoped to one logical change.
 * Include tests for behavior changes.
 * Update public API documentation or doc comments when public behavior changes.
-* Add a high-level changelog entry for user-facing changes according to the
-  repository's local changelog convention.
+* For user-facing changes, add a Markdown fragment in each applicable
+  `changelog/<category>/` folder. Use `stabilized/` for features that are no longer
+  experimental. Choose fun, whimsical, unique lowercase
+  kebab-case filenames, such as `giggling-teapot.md`. Include only the release-note
+  body without a leading list marker; the folder supplies its category. Keep
+  entries concise, ideally one or two sentences. Write each entry entirely on
+  one line: release tooling turns each nonempty line into a separate list item.
+  A fragment may contain multiple entries. See [the fragment guide](changelog/README.md).
+  Release tooling assembles `CHANGELOG.md` from these fragments.
 * Describe what changed, why it changed, and what validation you ran.
 
 Run the relevant local checks when practical. CI must pass before a pull request can
 be merged.
+
+## Updating SDK Core
+
+Initialize the checked-in submodule, then use the shared update command:
+
+```bash
+git submodule update --init
+poe update-core
+```
+
+This fetches and updates Core to `origin/main`, importing user-facing entries from
+`crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
+`poe update-core --revision <ref>` to select a particular locally available revision.
+Each affected category gets a fragment with an automatically generated whimsical
+filename. Core entries join the language entries in the same categories with a
+`Core: ` prefix. Wrapped Core prose becomes one line per entry; unsupported block
+Markdown must be rewritten before importing.
+
+Start with a clean Core checkout. Backward and divergent updates are rejected.
+Repeated updates import only the range since the previous checkout; an unchanged
+pin creates no fragments. Review and commit the updated pin and generated fragments
+together with the bridge manifest and lockfile. Python copies Core path dependency
+versions from the updated checkout into `temporalio/bridge/Cargo.toml` and runs
+`cargo fetch` to refresh `Cargo.lock`, preserving existing valid registry pins.
+The command does not stage or commit changes or resolve Rust API
+compatibility issues. If dependency refresh fails, inspect the updated pin,
+fragments, and manifest before retrying.
+
+If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
+regenerated bindings in the update PR.
 
 ## Things to Avoid
 

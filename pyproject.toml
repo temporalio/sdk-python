@@ -77,6 +77,7 @@ dev = [
   "pytest-timeout~=2.2",
   "ruff>=0.15.12,<0.16",
   "toml>=0.10.2,<0.11",
+  "tomlkit>=0.13,<0.14",
   "twine>=4.0.1,<5",
   "maturin>=1.8.2",
   "temporalio-openai-agents>=1.0.0",
@@ -139,6 +140,7 @@ lint-types = [
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest -n auto --dist=worksteal"
+update-core = { cmd = "uv run python scripts/update_core.py", help = "Update Core, import changelog fragments, and refresh bridge dependencies" }
 
 
 [tool.pytest.ini_options]

@@ -4188,6 +4188,12 @@ async def test_workflow_activity_method(client: Client):
         assert result == MyDataClass(field1="in worker, workflow param, in workflow")
 
 
+async def test_workflow_activity_method_unbound_register(client: Client):
+    # Registering the method from the class instead of from an instance
+    with pytest.warns(UserWarning, match="is not bound to an instance"):
+        new_worker(client, ActivityMethodWorkflow, activities=[MethodActivity.add])
+
+
 @workflow.defn
 class WaitConditionTimeoutWorkflow:
     def __init__(self) -> None:
@@ -9153,7 +9159,7 @@ async def test_activity_pause_unpause(client: Client, env: WorkflowEnvironment):
 
             # Wait for sync activity
             activity_info_1 = await assert_pending_activity_exists_eventually(
-                handle, test_activity_id
+                handle, test_activity_id, timeout=timedelta(seconds=10)
             )
             # Assert not paused
             assert not activity_info_1.paused

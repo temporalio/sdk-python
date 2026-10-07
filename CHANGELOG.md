@@ -1,96 +1,11 @@
 <!--
-High-level release notes.
-Loosely based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
-When your PR includes a user-facing change, add an entry below under the
-appropriate heading. Within each heading content can be free-form. Feel free
-to include examples, links to docs, or any other relevant information.
-
-### Added            — new features
-### Changed          — changes in existing functionality
-### Deprecated       — soon-to-be-removed features
-### :boom: Breaking Changes — removed or backwards-incompatible features
-### Fixed            — notable bug fixes
-### Security         — notable security fixes
+High-level release notes, loosely based on Keep a Changelog.
+For user-facing PR changes, add Markdown fragments under changelog/<category>/.
+See changelog/README.md for categories and whimsical filename examples.
+This file contains assembled releases only.
 -->
 
 # Changelog
-
-## [Unreleased]
-
-### Added
-
-- `workflow.new_random()` accepts an optional `name` that is mixed into the seed, so differently
-  named generators, and `workflow.random()`, produce different sequences.
-
-### Changed
-
-- Payload converters exposed by data converters and workflow/activity accessors
-  retain transfer type conversion, so direct use behaves consistently with SDK
-  serialization.
-
-### Deprecated
-
-### :boom: Breaking Changes
-
-- The Deep Agents, Google ADK, Google GenAI, LangGraph, LangSmith, and Strands Agents
-  integrations have moved to independently versioned packages in
-  [`temporalio/ai-integrations`](https://github.com/temporalio/ai-integrations).
-  The existing `deepagents`, `google-adk`, `google-genai`, `langgraph`, `langsmith`,
-  and `strands-agents` extras now install the corresponding standalone packages,
-  and the old public `temporalio.contrib` imports forward their APIs.
-  New code should depend on `temporalio-deepagents`, `temporalio-google-adk`,
-  `temporalio-google-genai`, `temporalio-langgraph`, `temporalio-langsmith`, or
-  `temporalio-strands-agents` directly and import `temporalio.deepagents`,
-  `temporalio.google_adk`, `temporalio.google_genai`, `temporalio.langgraph`,
-  `temporalio.langsmith`, or `temporalio.strands_agents`, respectively.
-- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a
-  workflow-private deterministic stream (a `workflow.new_random()` per run) instead of
-  `workflow.random()`. A workflow started under 1.34.0 that generated
-  ADK ids or jitter (for example one waiting on a HITL response) may not replay
-  deterministically across this upgrade; drain such workflows or use worker versioning.
-- The OpenAI Agents integration has moved to the independently versioned
-  [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/)
-  package. The existing `temporalio[openai-agents]` extra now installs that
-  package, and the old public `temporalio.contrib.openai_agents` imports
-  remain available at runtime and retain their static type information.
-  New code should depend on `temporalio-openai-agents` directly and import
-  `temporalio.openai_agents`.
-- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
-
-### Fixed
-
-- Fixed Pydantic constraints being silently ignored inside or outside workflow
-  sandboxes by passing through `annotated_types` by default.
-
-- `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers,
-  update validators), returning the workflow's deterministic time and fresh entropy without
-  touching the workflow's random state.
-- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task
-  when calling the model. The schema type is now sent to the model activity as its JSON schema.
-  Custom Pydantic schema generation is preserved.
-  Integer-valued output enums are normalized to strings to match Google GenAI.
-
-- `temporalio.contrib.strands` activity and MCP tools now give the model the
-  Activity's failure message and expose its exception to after-tool hooks.
-- Reject unsupported `InterpreterPoolExecutor` activity executors when creating
-  a worker instead of failing during activity execution.
-
-- Encoding a datetime search attribute without a timezone now raises
-  `ValueError("Timezone must be present on all search attribute dates")` on
-  the typed path, matching the deprecated untyped encoder, instead of sending
-  a naive ISO string that the server rejects with `BadSearchAttributes`.
-
-- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer
-  log `Failed to detach context` when a context is torn down on a different thread while
-  OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a
-  context is now detached exactly when its token is still valid in the current
-  `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
-
-- Decode enums that mix in `str` or `int` (for example `class Color(str, Enum)`) to the enum
-  instead of a list of characters or an error, and decode `dict` keys typed as an `int` enum.
-
-### Security
 
 ## [1.34.0] - 2026-09-30
 

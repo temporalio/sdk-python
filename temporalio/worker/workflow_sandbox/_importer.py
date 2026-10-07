@@ -53,11 +53,15 @@ class Importer:
     """Importer that restricts modules."""
 
     def __init__(
-        self, restrictions: SandboxRestrictions, restriction_context: RestrictionContext
+        self,
+        restrictions: SandboxRestrictions,
+        restriction_context: RestrictionContext,
+        workflow_module_name: str | None = None,
     ) -> None:
         """Create importer."""
         self.restrictions = restrictions
         self.restriction_context = restriction_context
+        self._workflow_module_name = workflow_module_name
         self.new_modules: dict[str, types.ModuleType] = {
             "sys": sys,
             "builtins": builtins,
@@ -315,6 +319,9 @@ class Importer:
             not temporalio.workflow.unsafe.is_imports_passed_through()
             and not self.module_configured_passthrough(name)
         ):
+            # Workflow modules are intentionally reloaded to isolate their state.
+            if name == self._workflow_module_name:
+                return None
             if self._is_import_notification_policy_applied(
                 temporalio.workflow.SandboxImportNotificationPolicy.RAISE_ON_UNINTENTIONAL_PASSTHROUGH
             ):
