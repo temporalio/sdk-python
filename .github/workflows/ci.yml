@@ -228,7 +228,6 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv remove google-adk --optional google-adk
       - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.10 "protobuf<4"
       - run: uv sync --all-extras
@@ -239,7 +238,7 @@ jobs:
         run: |
           [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
       - name: Test with protobuf 3.x
-        run: poe test -s --ignore=tests/contrib/google_adk_agents/
+        run: poe test -s
         env:
           TEMPORAL_TEST_PROTO3: 1
 

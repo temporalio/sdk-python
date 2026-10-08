@@ -14,7 +14,7 @@ from .service import __version__ as __sdk_version
 
 # After Python finds this ``temporalio`` package, it does not keep searching for
 # other ``temporalio`` directories, such as one containing the separately
-# installed ``temporalio-openai-agents`` package. Explicitly extend the search
+# installed AI integration packages. Explicitly extend the search
 # path so they can be found. Every package that provides ``temporalio/__init__.py``
 # must do this: https://docs.python.org/3.14/library/pkgutil.html#pkgutil.extend_path
 __path__ = _extend_path(__path__, __name__)
