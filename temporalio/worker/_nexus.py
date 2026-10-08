@@ -234,13 +234,19 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         completion: temporalio.bridge.proto.nexus.NexusTaskCompletion,
         data_converter: temporalio.converter.DataConverter,
     ) -> None:
-        """Apply the payload codec then external storage to the completion's payloads."""
+        """Apply the payload codec, external storage, then the payload codec to
+        any storage references in the completion's payloads.
+        """
         await PayloadVisitor(skip_search_attributes=True, skip_headers=True).visit(
             _PayloadTransformVisitor(data_converter._encode_payload_sequence),
             completion,
         )
         await PayloadVisitor(skip_search_attributes=True).visit(
             _PayloadTransformVisitor(data_converter._external_store_payload_sequence),
+            completion,
+        )
+        await PayloadVisitor(skip_search_attributes=True, skip_headers=True).visit(
+            _PayloadTransformVisitor(data_converter._encode_reference_payload_sequence),
             completion,
         )
 
@@ -566,6 +572,17 @@ class _NexusPayloadSerializer:
         # payload untouched.
         payload = temporalio.api.common.v1.Payload()
         payload.CopyFrom(self.payload)
+        try:
+            await PayloadVisitor(skip_search_attributes=True, skip_headers=True).visit(
+                _PayloadTransformVisitor(dc._decode_reference_payload_sequence),
+                payload,
+            )
+        except Exception as err:
+            raise nexusrpc.HandlerError(
+                "Payload codec failed to decode Nexus operation input storage reference",
+                type=nexusrpc.HandlerErrorType.INTERNAL,
+            ) from err
+
         try:
             await PayloadVisitor(skip_search_attributes=True).visit(
                 _PayloadTransformVisitor(dc._external_retrieve_payload_sequence),

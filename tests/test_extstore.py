@@ -7,6 +7,7 @@ from datetime import timedelta
 import pytest
 
 from temporalio.api.common.v1 import Payload
+from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.converter import (
     DataConverter,
@@ -410,8 +411,7 @@ class TestPayloadCodecWithExternalStorage:
 
     async def test_dc_payload_codec_encodes_stored_bytes(self):
         """DataConverter.payload_codec encodes the bytes handed to the driver
-        for storage. The reference payload written to workflow history is NOT
-        encoded by the DataConverter codec."""
+        for storage."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
 
@@ -427,10 +427,6 @@ class TestPayloadCodecWithExternalStorage:
         encoded = await converter.encode([large_value])
         assert len(encoded) == 1
         assert driver._store_calls == 1
-
-        # The reference payload written to history must NOT carry the dc_codec label.
-        assert dc_codec.encoded_count == 1
-        assert encoded[0].metadata.get("encoding") != b"binary/dc-encoded"
 
         # The bytes given to the driver must carry the dc_codec label.
         stored_payload = Payload()
@@ -440,13 +436,11 @@ class TestPayloadCodecWithExternalStorage:
         # Round-trip must recover the original value.
         decoded = await converter.decode(encoded, [str])
         assert decoded[0] == large_value
-        assert dc_codec.decoded_count == 1
         assert driver._retrieve_calls == 1
 
-    async def test_dc_payload_codec_does_not_encode_reference_payload(self):
-        """The reference payload stored in workflow history is NOT encoded by
-        DataConverter.payload_codec – encoding is applied to the stored bytes
-        instead."""
+    async def test_dc_payload_codec_encodes_reference_payload(self):
+        """The reference payload written to workflow history is encoded by
+        DataConverter.payload_codec and marked, keeping its size details."""
         driver = InMemoryTestDriver()
         dc_codec = RecordingPayloadCodec("binary/dc-encoded")
 
@@ -461,22 +455,131 @@ class TestPayloadCodecWithExternalStorage:
         large_value = "x" * 200
         encoded = await converter.encode([large_value])
         assert len(encoded) == 1
-        assert driver._store_calls == 1
 
-        # Reference payload in history is NOT encoded by DataConverter.payload_codec.
-        assert dc_codec.encoded_count == 1
-        assert encoded[0].metadata.get("encoding") != b"binary/dc-encoded"
+        # Once for the stored payload, once for the reference payload.
+        assert dc_codec.encoded_count == 2
+        assert encoded[0].metadata.get("encoding") == b"binary/dc-encoded"
+        assert (
+            encoded[0].metadata.get("__temporal_external_storage_reference") == b"true"
+        )
+        stored_size = len(next(iter(driver._storage.values())))
+        assert [d.size_bytes for d in encoded[0].external_payloads] == [stored_size]
 
-        # Stored bytes ARE encoded by DataConverter.payload_codec.
-        stored_payload = Payload()
-        stored_payload.ParseFromString(next(iter(driver._storage.values())))
-        assert stored_payload.metadata.get("encoding") == b"binary/dc-encoded"
-
-        # Round-trip.
         decoded = await converter.decode(encoded, [str])
         assert decoded[0] == large_value
-        assert dc_codec.decoded_count == 1
+        assert dc_codec.decoded_count == 2
         assert driver._retrieve_calls == 1
+
+    async def test_inline_payload_not_marked(self):
+        """Payloads that stay inline are encoded once and never marked."""
+        dc_codec = RecordingPayloadCodec("binary/dc-encoded")
+        converter = DataConverter(
+            payload_codec=dc_codec,
+            external_storage=ExternalStorage(
+                drivers=[InMemoryTestDriver()],
+                payload_size_threshold=1000,
+            ),
+        )
+
+        encoded = await converter.encode(["small"])
+
+        assert dc_codec.encoded_count == 1
+        assert "__temporal_external_storage_reference" not in encoded[0].metadata
+        assert await converter.decode(encoded, [str]) == ["small"]
+
+    async def test_reference_payload_marked_without_codec(self):
+        """Without a codec, the reference payload is left unencoded but still
+        marked, and round-trips."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[driver], payload_size_threshold=50
+            )
+        )
+
+        encoded = await converter.encode(["x" * 200])
+
+        assert encoded[0].metadata.get("encoding") == b"json/protobuf"
+        assert (
+            encoded[0].metadata.get("__temporal_external_storage_reference") == b"true"
+        )
+        assert await converter.decode(encoded, [str]) == ["x" * 200]
+
+    async def test_unmarked_reference_payload_still_decodes(self):
+        """A reference payload written before references were marked and
+        encoded still decodes when a codec is configured."""
+        driver = InMemoryTestDriver()
+        dc_codec = RecordingPayloadCodec("binary/dc-encoded")
+        external_storage = ExternalStorage(drivers=[driver], payload_size_threshold=50)
+
+        # Produce an unencoded, unmarked reference that points at codec-encoded
+        # bytes, as older SDK versions did.
+        encoded_value = await DataConverter(payload_codec=dc_codec).encode(["x" * 200])
+        old_reference = await external_storage._store_payload(encoded_value[0])
+        del old_reference.metadata["__temporal_external_storage_reference"]
+
+        converter = DataConverter(
+            payload_codec=dc_codec, external_storage=external_storage
+        )
+        decoded = await converter.decode([old_reference], [str])
+        assert decoded[0] == "x" * 200
+
+    async def test_encoded_reference_payload_without_codec_fails(self):
+        """An encoded reference payload cannot be read without a codec."""
+        driver = InMemoryTestDriver()
+        external_storage = ExternalStorage(drivers=[driver], payload_size_threshold=50)
+        encoded = await DataConverter(
+            payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+            external_storage=external_storage,
+        ).encode(["x" * 200])
+
+        with pytest.raises(
+            RuntimeError,
+            match=r"\[TMPRL1106\] Encountered an encoded external storage reference that could not be decoded",
+        ):
+            await DataConverter(external_storage=external_storage).decode(
+                encoded, [str]
+            )
+
+    async def test_marked_payload_that_is_not_a_reference_fails(self):
+        """A marked payload that does not decode to a reference fails before
+        external storage retrieval."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+            external_storage=ExternalStorage(drivers=[driver]),
+        )
+        encoded = await converter.encode(["value"])
+        encoded[0].metadata["__temporal_external_storage_reference"] = b"true"
+
+        with pytest.raises(
+            RuntimeError,
+            match=r"\[TMPRL1106\] Encountered an encoded external storage reference that could not be decoded",
+        ):
+            await converter.decode(encoded, [str])
+        assert driver._retrieve_calls == 0
+
+    async def test_failure_reference_payload_encoded(self):
+        """Reference payloads inside failures are encoded and marked too."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=50,
+            ),
+        )
+        failure = Failure()
+        await converter.encode_failure(ApplicationError("boom", "x" * 200), failure)
+
+        details = failure.application_failure_info.details.payloads
+        assert (
+            details[0].metadata.get("__temporal_external_storage_reference") == b"true"
+        )
+
+        error = await converter.decode_failure(failure)
+        assert isinstance(error, ApplicationError)
+        assert error.details == ("x" * 200,)
 
 
 class TestMultiDriver:

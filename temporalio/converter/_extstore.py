@@ -28,6 +28,10 @@ _T = TypeVar("_T")
 
 _REFERENCE_ENCODING = b"json/external-storage-reference"
 _REFERENCE_MESSAGE_TYPE = ExternalStorageReference.DESCRIPTOR.full_name.encode()
+# Indicates this payload represents an externally stored payload. If encoded, the
+# _REFERENCE_ENCODING could be any value. The presence of the _REFERENCE_MARKER_KEY
+# with a value of b"true" is used to reliably identify such payloads.
+_REFERENCE_MARKER_KEY = "__temporal_external_storage_reference"
 
 
 @dataclass
@@ -430,6 +434,7 @@ class ExternalStorage:
                 f"Failed to serialize storage reference for driver '{driver.name()}'"
             )
         reference_payload.external_payloads.add().size_bytes = external_size
+        reference_payload.metadata[_REFERENCE_MARKER_KEY] = b"true"
 
         ExternalStorage._record_metrics(1, external_size, start_time, {driver.name()})
 
@@ -494,6 +499,7 @@ class ExternalStorage:
                         f"Failed to serialize storage reference for driver '{driver.name()}'"
                     )
                 reference_payload.external_payloads.add().size_bytes = sizes[i]
+                reference_payload.metadata[_REFERENCE_MARKER_KEY] = b"true"
                 results[indices[i]] = reference_payload
                 external_size += sizes[i]
 
