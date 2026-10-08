@@ -3419,7 +3419,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         return super().cancel(msg)
 
     def _request_cancel(self) -> None:
-        if self._cancel_command_seq == self._seq:
+        # While evicting, _add_command must still run because the
+        # _WorkflowBeingEvictedError it raises is what ends this handle's task
+        if self._cancel_command_seq == self._seq and not self._instance._deleting:
             return
         self._cancel_command_seq = self._seq
         self._apply_cancel_command(self._instance._add_command())
