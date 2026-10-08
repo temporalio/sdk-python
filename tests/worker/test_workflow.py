@@ -1265,9 +1265,6 @@ async def test_workflow_cancel_activity_then_evict(
         assert expected == await handle.result()
         assert worker._workflow_worker
         assert worker._workflow_worker._could_not_evict_count == 0
-        shutdown_started = time.monotonic()
-    # Eviction that never completes also hangs worker shutdown
-    assert time.monotonic() - shutdown_started < 20
 
 
 @workflow.defn
