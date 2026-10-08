@@ -1156,26 +1156,41 @@ class CancelActivityThenEvictWorkflowParams:
 cancel_activity_then_evict_failed_runs: set[str] = set()
 
 
+class ActivityStartedWaitCancel:
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    @activity.defn
+    async def wait_cancel(self) -> str:
+        self.started.set()
+        return await wait_cancel()
+
+
 # Not sandboxed so the set of failed runs survives eviction
 @workflow.defn(sandboxed=False)
 class CancelActivityThenEvictWorkflow:
+    def __init__(self) -> None:
+        self._cancel_activity = False
+
     @workflow.run
     async def run(self, params: CancelActivityThenEvictWorkflowParams) -> str:
         cancellation_type = workflow.ActivityCancellationType[params.cancellation_type]
         if params.local:
-            handle = workflow.start_local_activity(
-                wait_cancel,
+            handle = workflow.start_local_activity_method(
+                ActivityStartedWaitCancel.wait_cancel,
                 schedule_to_close_timeout=timedelta(minutes=1),
                 cancellation_type=cancellation_type,
             )
         else:
-            handle = workflow.start_activity(
-                wait_cancel,
+            handle = workflow.start_activity_method(
+                ActivityStartedWaitCancel.wait_cancel,
                 schedule_to_close_timeout=timedelta(minutes=1),
                 heartbeat_timeout=timedelta(seconds=5),
                 cancellation_type=cancellation_type,
             )
-        await workflow.sleep(0.1)
+        # Cancel only once the activity is running, otherwise the cancel can
+        # resolve before the activity ever sees it
+        await workflow.wait_condition(lambda: self._cancel_activity)
         handle.cancel()
         # Let the handle task send its cancel command before the task can fail
         await asyncio.sleep(0)
@@ -1189,6 +1204,10 @@ class CancelActivityThenEvictWorkflow:
             return await handle
         except ActivityError as err:
             return f"Error: {err.cause.__class__.__name__}"
+
+    @workflow.signal
+    def cancel_activity(self) -> None:
+        self._cancel_activity = True
 
 
 @pytest.mark.parametrize(
@@ -1227,10 +1246,11 @@ class CancelActivityThenEvictWorkflow:
 async def test_workflow_cancel_activity_then_evict(
     client: Client, params: CancelActivityThenEvictWorkflowParams, expected: str
 ):
+    activity_inst = ActivityStartedWaitCancel()
     async with new_worker(
         client,
         CancelActivityThenEvictWorkflow,
-        activities=[wait_cancel],
+        activities=[activity_inst.wait_cancel],
         max_cached_workflows=1000 if params.fail_task_after_cancel else 0,
         max_heartbeat_throttle_interval=timedelta(milliseconds=300),
     ) as worker:
@@ -1240,6 +1260,8 @@ async def test_workflow_cancel_activity_then_evict(
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        await activity_inst.started.wait()
+        await handle.signal(CancelActivityThenEvictWorkflow.cancel_activity)
         assert expected == await handle.result()
         assert worker._workflow_worker
         assert worker._workflow_worker._could_not_evict_count == 0
