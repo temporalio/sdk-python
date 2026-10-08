@@ -24,7 +24,6 @@ wit_input_dir = (
 )
 wit_path = wit_input_dir / "workflow-service.wit"
 wit_deps_dir = wit_input_dir / "deps"
-python_support_path = base_dir / "scripts" / "nex_gen_support.py"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 workflowservice_request_response_proto = (
@@ -35,27 +34,30 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
-NEX_GEN_VERSION = "0.2.4"
+# The support-package CLI is not available in the published 0.2.7 binary.
+# Pin the source revision until a release includes it.
+NEX_GEN_REV = "985c81f5f4dbae614b2965e0d27882e63c1d586c"
 
 
 def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
 
-    if shutil.which("nexgen") is None:
-        subprocess.check_call(
-            [
-                "cargo",
-                "install",
-                "--locked",
-                "nexgen",
-                "--version",
-                NEX_GEN_VERSION,
-                "--features",
-                "advanced",
-                "--force",
-            ]
-        )
+    subprocess.check_call(
+        [
+            "cargo",
+            "install",
+            "--locked",
+            "--git",
+            "https://github.com/temporalio/nexgen.git",
+            "--rev",
+            NEX_GEN_REV,
+            "--features",
+            "advanced",
+            "--force",
+            "nexgen",
+        ]
+    )
     return ["nexgen"]
 
 
@@ -114,8 +116,6 @@ def generate_nexus_system_api() -> None:
         raise RuntimeError(f"missing WIT source: {wit_path}")
     if not wit_deps_dir.exists():
         raise RuntimeError(f"missing WIT dependency directory: {wit_deps_dir}")
-    if not python_support_path.exists():
-        raise RuntimeError(f"missing Python support source: {python_support_path}")
 
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
         descriptor_path = Path(temp_dir) / "temporal_api.bin"
@@ -132,8 +132,8 @@ def generate_nexus_system_api() -> None:
                 str(wit_deps_dir),
                 "--native-api",
                 "--system-nexus",
-                "--support-file",
-                str(python_support_path),
+                "--support-package",
+                "temporalio.nexus.system._support",
                 "--descriptors",
                 str(descriptor_path),
                 "--output",
