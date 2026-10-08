@@ -31,7 +31,7 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
 from temporalio.worker import Replayer
 from tests.helpers import assert_task_fail_eventually, new_worker
-from tests.test_extstore import InMemoryTestDriver
+from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
 
 
 @dataclass(frozen=True)
@@ -426,6 +426,63 @@ async def test_replay_extstore_history_succeeds_with_correct_extstore(
                 payload_size_threshold=512,
             ),
         ),
+    ).replay_workflow(history)
+
+
+async def test_extstore_reference_payloads_codec_encoded_in_history(
+    env: WorkflowEnvironment,
+) -> None:
+    """Every reference payload written to history by the client, workflow
+    worker, and activity worker is codec-encoded and marked, and the history
+    replays."""
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            payload_size_threshold=512,
+        ),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,
+                activity_input_size=1024,
+                activity_output_size=1024,
+                output_size=1024,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == "wo" * 512
+
+    history = await handle.fetch_history()
+    reference_payloads = []
+    for event in history.events:
+        if event.HasField("workflow_execution_started_event_attributes"):
+            attrs = event.workflow_execution_started_event_attributes
+            reference_payloads.append(attrs.input.payloads[0])
+        elif event.HasField("activity_task_scheduled_event_attributes"):
+            attrs = event.activity_task_scheduled_event_attributes
+            reference_payloads.append(attrs.input.payloads[0])
+        elif event.HasField("activity_task_completed_event_attributes"):
+            attrs = event.activity_task_completed_event_attributes
+            reference_payloads.append(attrs.result.payloads[0])
+        elif event.HasField("workflow_execution_completed_event_attributes"):
+            attrs = event.workflow_execution_completed_event_attributes
+            reference_payloads.append(attrs.result.payloads[0])
+    assert len(reference_payloads) == 4
+    for payload in reference_payloads:
+        assert payload.metadata["encoding"] == b"binary/test-encoded"
+        assert payload.metadata["__temporal_external_storage_reference"] == b"true"
+        assert payload.external_payloads[0].size_bytes > 0
+
+    await Replayer(
+        workflows=[ExtStoreWorkflow], data_converter=data_converter
     ).replay_workflow(history)
 
 

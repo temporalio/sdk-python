@@ -956,6 +956,16 @@ class _CommandAwareDataConverter(temporalio.converter.DataConverter):
         dc = self._get_current_dc()._with_store_context(store_ctx)
         return await dc._external_store_payload_sequence(payloads)
 
+    async def _encode_reference_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._encode_reference_payload_sequence(payloads)
+
+    async def _decode_reference_payload_sequence(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return await self._get_current_dc()._decode_reference_payload_sequence(payloads)
+
     async def _external_retrieve_payload_sequence(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
