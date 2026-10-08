@@ -1,0 +1,1 @@
+**Experimental**: New external storage concurrency controls. `ExternalStorage.concurrency` sets `max_driver_operations` (across all drivers on that instance) and `max_operations_per_message` (for one message). Drivers must use `context.limiter` for store and retrieve operations.
