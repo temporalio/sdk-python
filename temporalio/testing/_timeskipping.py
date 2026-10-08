@@ -158,9 +158,10 @@ class TimeSkipper:
 
         Returns:
             For a bounded ``duration``: True if the fast-forward completes,
-            False if the workflow chain terminates first or the fast-forward
-            id is overridden. For ``duration=None``: always False (there is
-            no fast-forward completion to observe; the call waits unitl the
+            False if the workflow chain terminates first. Raises
+            ``RuntimeError`` if the fast-forward id is overridden by a later
+            fast-forward. For ``duration=None``: always False (there is no
+            fast-forward completion to observe; the call waits until the
             workflow's terminal event).
         """
         if duration is not None and not isinstance(duration, timedelta):

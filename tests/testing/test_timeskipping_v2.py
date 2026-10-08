@@ -345,6 +345,25 @@ async def test_fast_forward_returns_false_when_workflow_terminates_first(
         assert (await env.fast_forward(handle, timedelta(hours=2))) is False
 
 
+async def test_fast_forward_accepts_float_duration(
+    env: WorkflowEnvironment,
+) -> None:
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                SleepWorkflow.run,
+                3600.0,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        t0 = await env.get_current_time(handle)
+        assert await env.fast_forward(handle, 1800.0)
+        t1 = await env.get_current_time(handle)
+        assert_duration_same(1800, (t1 - t0).total_seconds(), tolerance=10)
+        await handle.cancel()
+        await assert_time_was_skipped(handle)
+
+
 @workflow.defn
 class FailOnceThenSleepWorkflow:
     """Sleeps ``sleep_seconds``; fails on the first attempt, succeeds on later ones."""
