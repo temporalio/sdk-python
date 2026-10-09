@@ -398,6 +398,11 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
 
         # Fast forward into the second sleep.
         assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
+
+        async def _in_attempt_2() -> None:
+            assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
+        await assert_eventually(_in_attempt_2)
+
         await env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
@@ -439,6 +444,11 @@ async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> N
                 task_queue=worker.task_queue,
             )
         assert await env.fast_forward(handle, timedelta(hours=2))
+
+        async def _in_run_3() -> None:
+            assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
+        await assert_eventually(_in_run_3)
+
         await env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
