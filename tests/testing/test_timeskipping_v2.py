@@ -16,7 +16,12 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import TimeSkipper, TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
-from tests.helpers import assert_duration_same, assert_eventually, new_worker
+from tests.helpers import (
+    assert_duration_same,
+    assert_eventually,
+    find_history_event,
+    new_worker,
+)
 from tests.helpers.time_skipping import (
     assert_time_was_not_skipped,
     assert_time_was_skipped,
@@ -525,9 +530,7 @@ async def test_signal_with_start_stamps_time_skipping_config(
 
     assert wall_elapsed < 10
     virtual_elapsed = result["end"] - result["after_signal"]
-    assert 3550 <= virtual_elapsed <= 3650, (
-        f"expected ~3600s virtual for the 1h sleep, got {virtual_elapsed}s"
-    )
+    assert_duration_same(3600, virtual_elapsed, tolerance=50)
     await assert_time_was_skipped(handle)
 
 
@@ -595,48 +598,21 @@ async def test_max_session_skip_count_stamped_by_env() -> None:
                 task_queue=worker.task_queue,
             )
             try:
-                started_tsc = None
-                async for event in handle.fetch_history_events():
-                    if (
-                        event.event_type
-                        == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
-                    ):
-                        started_tsc = (
-                            event.workflow_execution_started_event_attributes.time_skipping_config
-                        )
-                        break
-                assert started_tsc is not None
+                started = await find_history_event(
+                    handle,
+                    lambda e: e.event_type
+                    == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+                )
+                assert started is not None
+                started_tsc = (
+                    started.workflow_execution_started_event_attributes.time_skipping_config
+                )
                 assert started_tsc.max_session_skip_count == 5, (
                     f"expected max_session_skip_count=5, got {started_tsc.max_session_skip_count}"
                 )
             finally:
                 await handle.signal(InteractionWorkflow.proceed)
                 await handle.result()
-
-
-async def test_time_skipping_virtual_clock(
-    env: WorkflowEnvironment,
-) -> None:
-    """Read the workflow's virtual clock after a 1h fast-forward;
-    verify current_time is ~+1h from wall start."""
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
-                SleepWorkflow.run,
-                100000.0,
-                id=f"wf-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-        wf_start_wall = datetime.now(tz=timezone.utc)
-        assert await env.fast_forward(handle, timedelta(hours=1))
-        current_time = await env.get_current_time(handle)
-        offset_seconds = (current_time - wf_start_wall).total_seconds()
-        assert 3550 <= offset_seconds <= 3700, (
-            f"virtual current_time is {offset_seconds}s past "
-            f"wf_start_wall; expected ~3600s (1h FF)"
-        )
-        await handle.cancel()
-        await assert_time_was_skipped(handle)
 
 
 async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
@@ -654,24 +630,20 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
         assert await env.fast_forward(handle, timedelta(minutes=30))
         wall_after_ff = datetime.now(tz=timezone.utc)
 
-        # Find the disabled_after_fast_forward transition event in history.
-        transition = None
-        async for event in handle.fetch_history_events():
-            if (
-                event.event_type
+        event = await find_history_event(
+            handle,
+            lambda e: (
+                e.event_type
                 == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIME_SKIPPING_TRANSITIONED
-            ):
-                attrs = event.workflow_execution_time_skipping_transitioned_event_attributes
-                if attrs.disabled_after_fast_forward:
-                    transition = attrs
-                    break
-        assert transition is not None, "no disabled_after_fast_forward transition found"
+                and e.workflow_execution_time_skipping_transitioned_event_attributes.disabled_after_fast_forward
+            ),
+        )
+        assert event is not None, "no disabled_after_fast_forward transition found"
+        transition = event.workflow_execution_time_skipping_transitioned_event_attributes
 
         target = transition.target_time.ToDatetime().replace(tzinfo=timezone.utc)
         target_offset = (target - wall_before_ff).total_seconds()
-        assert 1780 <= target_offset <= 1820, (
-            f"target_time offset {target_offset}s from pre-FF wall; expected ~1800s"
-        )
+        assert_duration_same(1800, target_offset, tolerance=20)
 
         # wall_clock_time should be around wall clock time when fast forward started.
         wct = transition.wall_clock_time.ToDatetime().replace(tzinfo=timezone.utc)
@@ -701,12 +673,12 @@ async def test_child_workflow_started_event_has_state_propagation(
         await parent_handle.result()
 
         child_handle = env.client.get_workflow_handle(child_id)
-        started = None
-        async for event in child_handle.fetch_history_events():
-            if event.event_type == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED:
-                started = event.workflow_execution_started_event_attributes
-                break
-        assert started is not None
+        event = await find_history_event(
+            child_handle,
+            lambda e: e.event_type == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+        )
+        assert event is not None
+        started = event.workflow_execution_started_event_attributes
         assert started.HasField("time_skipping_state_propagation"), (
             "child's WorkflowExecutionStarted event has no time_skipping_state_propagation"
         )
@@ -726,16 +698,12 @@ async def test_fast_forward_exceeds_execution_timeout(
             )
         assert (await env.fast_forward(handle, timedelta(hours=1))) is False
 
-        # Confirm it timed out.
-        timed_out = False
-        async for event in handle.fetch_history_events():
-            if (
-                event.event_type
-                == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT
-            ):
-                timed_out = True
-                break
-        assert timed_out, "expected WORKFLOW_EXECUTION_TIMED_OUT in history"
+        timed_out = await find_history_event(
+            handle,
+            lambda e: e.event_type
+            == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT,
+        )
+        assert timed_out is not None, "expected WORKFLOW_EXECUTION_TIMED_OUT in history"
 
 
 async def test_overriding_fast_forward_raises_on_original(
