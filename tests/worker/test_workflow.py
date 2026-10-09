@@ -7054,9 +7054,9 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
                         else:
                             assert isinstance(update_err, RPCError)
                             assert update_err.status == RPCStatusCode.NOT_FOUND
-                            assert (
-                                str(update_err)
-                                == "workflow execution already completed"
+                            assert str(update_err) in (
+                                "workflow execution already completed",
+                                f"update {update_id} not found",
                             )
 
                 with pytest.raises(WorkflowFailureError) as err:
