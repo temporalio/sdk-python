@@ -2240,8 +2240,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input.operation_name,
                 input.input,
             )
-            user_payload_converter = self._workflow_context_payload_converter
-            user_failure_converter = self._workflow_context_failure_converter
+            user_payload_converter = self._context_free_payload_converter
+            user_failure_converter = self._context_free_failure_converter
             if serialization_context is not None:
                 user_payload_converter = self._payload_converter_with_context(
                     serialization_context
@@ -3419,7 +3419,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         return super().cancel(msg)
 
     def _request_cancel(self) -> None:
-        if self._cancel_command_seq == self._seq:
+        # While evicting, _add_command must still run because the
+        # _WorkflowBeingEvictedError it raises is what ends this handle's task
+        if self._cancel_command_seq == self._seq and not self._instance._deleting:
             return
         self._cancel_command_seq = self._seq
         self._apply_cancel_command(self._instance._add_command())
