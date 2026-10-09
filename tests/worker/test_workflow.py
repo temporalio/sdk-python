@@ -36,6 +36,7 @@ from typing_extensions import Protocol, runtime_checkable
 
 import temporalio.activity
 import temporalio.api.sdk.v1
+import temporalio.api.workflowservice.v1
 import temporalio.client
 import temporalio.converter
 import temporalio.converter._extstore
@@ -5487,6 +5488,51 @@ async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironmen
         and update.value == 1
         for update in updates
     )
+
+
+@pytest.mark.requires_local_server
+async def test_workflow_buffered_metrics_worker_heartbeat(env: WorkflowEnvironment):
+    runtime = Runtime(
+        telemetry=TelemetryConfig(metrics=MetricBuffer(10000)),
+        worker_heartbeat_interval=timedelta(seconds=1),
+    )
+    client = await env.connect_client(runtime=runtime)
+    async with new_worker(
+        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+    ) as worker:
+        await client.execute_workflow(
+            CustomMetricsWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def assert_worker_heartbeat() -> None:
+            response = await client.workflow_service.list_workers(
+                temporalio.api.workflowservice.v1.ListWorkersRequest(
+                    namespace=client.namespace,
+                    query=f'TaskQueue = "{worker.task_queue}"',
+                    page_size=100,
+                )
+            )
+            heartbeat = next(
+                (
+                    info.worker_heartbeat
+                    for info in response.workers_info
+                    if info.worker_heartbeat.task_queue == worker.task_queue
+                ),
+                None,
+            )
+            assert heartbeat is not None
+            assert heartbeat.workflow_task_slots_info.total_processed_tasks > 0
+            assert heartbeat.activity_task_slots_info.total_processed_tasks > 0
+            assert heartbeat.workflow_task_slots_info.current_available_slots > 0
+            assert heartbeat.activity_task_slots_info.current_available_slots > 0
+            assert heartbeat.local_activity_slots_info.current_available_slots > 0
+            assert heartbeat.workflow_poller_info.current_pollers > 0
+            assert heartbeat.activity_poller_info.current_pollers > 0
+
+        # Do not drain the buffer: heartbeats must not depend on initializing Python attributes.
+        await assert_eventually(assert_worker_heartbeat)
 
 
 async def test_workflow_metrics_other_types(env: WorkflowEnvironment):
