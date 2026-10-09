@@ -5492,6 +5492,9 @@ async def test_workflow_buffered_metrics(client: Client, env: WorkflowEnvironmen
 
 @pytest.mark.requires_local_server
 async def test_workflow_buffered_metrics_worker_heartbeat(env: WorkflowEnvironment):
+    if env.supports_time_skipping:
+        pytest.skip("Time-skipping server does not implement ListWorkers")
+
     runtime = Runtime(
         telemetry=TelemetryConfig(metrics=MetricBuffer(10000)),
         worker_heartbeat_interval=timedelta(seconds=1),
