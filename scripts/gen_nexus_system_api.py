@@ -34,9 +34,7 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
-# The support-package CLI is not available in the published 0.2.7 binary.
-# Pin the source revision until a release includes it.
-NEX_GEN_REV = "985c81f5f4dbae614b2965e0d27882e63c1d586c"
+NEX_GEN_VERSION = "0.2.8"
 
 
 def nex_gen_command() -> list[str]:
@@ -48,14 +46,12 @@ def nex_gen_command() -> list[str]:
             "cargo",
             "install",
             "--locked",
-            "--git",
-            "https://github.com/temporalio/nexgen.git",
-            "--rev",
-            NEX_GEN_REV,
+            "nexgen",
+            "--version",
+            NEX_GEN_VERSION,
             "--features",
             "advanced",
             "--force",
-            "nexgen",
         ]
     )
     return ["nexgen"]
