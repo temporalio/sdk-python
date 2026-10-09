@@ -1,5 +1,6 @@
 """Serverless tests of child workflow versioning commands and start failures."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -163,7 +164,10 @@ async def test_child_workflow_versioning(
 ) -> None:
     instance = _create_instance(ParentWorkflow)
     try:
-        completion = instance.activate(
+        # Workers run activations off-loop so workflow tasks do not nest inside
+        # the caller's asyncio task.
+        completion = await asyncio.to_thread(
+            instance.activate,
             workflow_activation.WorkflowActivation(
                 run_id="parent-run",
                 jobs=[
@@ -182,7 +186,7 @@ async def test_child_workflow_versioning(
                         )
                     )
                 ],
-            )
+            ),
         )
         assert completion.HasField("successful")
         assert len(completion.successful.commands) == 1
@@ -197,7 +201,8 @@ async def test_child_workflow_versioning(
             assert start.HasField("versioning_override")
             assert start.versioning_override == expected_override
 
-        completion = instance.activate(
+        completion = await asyncio.to_thread(
+            instance.activate,
             workflow_activation.WorkflowActivation(
                 run_id="parent-run",
                 jobs=[
@@ -212,7 +217,7 @@ async def test_child_workflow_versioning(
                         )
                     )
                 ],
-            )
+            ),
         )
         assert completion.HasField("successful")
         assert len(completion.successful.commands) == 1
@@ -222,7 +227,8 @@ async def test_child_workflow_versioning(
             [command.complete_workflow_execution.result]
         ) == [error_type.__name__]
     finally:
-        instance.activate(
+        await asyncio.to_thread(
+            instance.activate,
             workflow_activation.WorkflowActivation(
                 run_id="parent-run",
                 jobs=[
@@ -230,5 +236,5 @@ async def test_child_workflow_versioning(
                         remove_from_cache=workflow_activation.RemoveFromCache()
                     )
                 ],
-            )
+            ),
         )
