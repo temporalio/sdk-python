@@ -2,13 +2,11 @@
 
 import asyncio
 import uuid
-from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from time import monotonic
 from typing import Any
 
 import pytest
-import pytest_asyncio
 
 from temporalio import workflow
 from temporalio.api.enums.v1 import event_type_pb2 as _event_type
@@ -27,19 +25,6 @@ from tests.helpers.time_skipping import (
     assert_time_was_skipped,
 )
 from tests.testing.test_workflow import SleepWorkflow
-
-
-@pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
-async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
-    """Spawn a module-scoped time-skipping V2 dev server for the tests in this file."""
-    async with await WorkflowEnvironment.start_time_skipping_v2(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-        dev_server_extra_args=[
-            "--dynamic-config-value",
-            "frontend.WorkflowTimeSkippingEnabled=true",
-        ],
-    ) as workflow_env:
-        yield workflow_env
 
 
 @workflow.defn

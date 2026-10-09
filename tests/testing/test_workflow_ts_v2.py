@@ -5,7 +5,6 @@ from datetime import timedelta
 from time import monotonic
 
 from temporalio.testing import WorkflowEnvironment
-from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
 from tests.helpers.time_skipping import (
     assert_time_was_not_skipped,
@@ -16,110 +15,89 @@ from tests.testing.test_workflow import (
     assert_timestamp_from_now,
 )
 
-_TS_EXTRA_ARGS = [
-    "--dynamic-config-value",
-    "frontend.WorkflowTimeSkippingEnabled=true",
-]
 
-
-async def test_workflow_env_time_skipping_basic_v2():
+async def test_workflow_env_time_skipping_basic_v2(env: WorkflowEnvironment):
     """Time-skip a very long sleep."""
-    async with await WorkflowEnvironment.start_time_skipping_v2(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-        dev_server_extra_args=_TS_EXTRA_ARGS,
-    ) as env:
-        async with new_worker(env.client, SleepWorkflow) as worker:
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        handle = await env.client.start_workflow(
+            SleepWorkflow.run,
+            100000.0,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        result = await handle.result()
+        assert result["message"] == "all done"
+        assert_timestamp_from_now(await env.get_current_time(handle), 100000)
+        await assert_time_was_skipped(handle)
+
+
+async def test_workflow_env_time_skipping_manual_v2(env: WorkflowEnvironment):
+    """Start a very long sleep, then fast forward the first 1000s."""
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
             handle = await env.client.start_workflow(
                 SleepWorkflow.run,
                 100000.0,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            result = await handle.result()
-            assert result["message"] == "all done"
-            assert_timestamp_from_now(await env.get_current_time(handle), 100000)
-            await assert_time_was_skipped(handle)
+
+        assert_timestamp_from_now(
+            await env.get_current_time(handle), 0, max_delta=1
+        )
+
+        assert await env.fast_forward(handle, timedelta(seconds=1000))
+        assert_timestamp_from_now(await env.get_current_time(handle), 1000)
+        await assert_time_was_skipped(handle)
+
+        await handle.cancel()
 
 
-async def test_workflow_env_time_skipping_manual_v2():
-    """Start a very long sleep, then fast forward the first 1000s."""
-    async with await WorkflowEnvironment.start_time_skipping_v2(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-        dev_server_extra_args=_TS_EXTRA_ARGS,
-    ) as env:
-        async with new_worker(env.client, SleepWorkflow) as worker:
-            with env.with_time_skipping_disabled():
-                handle = await env.client.start_workflow(
-                    SleepWorkflow.run,
-                    100000.0,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-
-            assert_timestamp_from_now(
-                await env.get_current_time(handle), 0, max_delta=1
-            )
-
-            assert await env.fast_forward(handle, timedelta(seconds=1000))
-            assert_timestamp_from_now(await env.get_current_time(handle), 1000)
-            await assert_time_was_skipped(handle)
-
-            await handle.cancel()
-
-
-async def test_workflow_env_time_skipping_disabled_v2():
+async def test_workflow_env_time_skipping_disabled_v2(env: WorkflowEnvironment):
     """With and without per-workflow auto-skip."""
-    async with await WorkflowEnvironment.start_time_skipping_v2(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-        dev_server_extra_args=_TS_EXTRA_ARGS,
-    ) as env:
-        async with new_worker(env.client, SleepWorkflow) as worker:
-            # With time-skipping.
-            start = monotonic()
-            ts_on_handle = await env.client.start_workflow(
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        # With time-skipping.
+        start = monotonic()
+        ts_on_handle = await env.client.start_workflow(
+            SleepWorkflow.run,
+            3.0,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        ts_on_result = await ts_on_handle.result()
+        assert ts_on_result["message"] == "all done"
+        assert monotonic() - start < 2.5
+        await assert_time_was_skipped(ts_on_handle)
+
+        # Without time-skipping.
+        start = monotonic()
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
                 SleepWorkflow.run,
                 3.0,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-            ts_on_result = await ts_on_handle.result()
-            assert ts_on_result["message"] == "all done"
-            assert monotonic() - start < 2.5
-            await assert_time_was_skipped(ts_on_handle)
-
-            # Without time-skipping.
-            start = monotonic()
-            with env.with_time_skipping_disabled():
-                handle = await env.client.start_workflow(
-                    SleepWorkflow.run,
-                    3.0,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
-            ts_off_result = await handle.result()
-            assert ts_off_result["message"] == "all done"
-            assert monotonic() - start > 2.5
-            await assert_time_was_not_skipped(handle)
+        ts_off_result = await handle.result()
+        assert ts_off_result["message"] == "all done"
+        assert monotonic() - start > 2.5
+        await assert_time_was_not_skipped(handle)
 
 
-async def test_workflow_env_time_skipping_basic_via_update_v2():
+async def test_workflow_env_time_skipping_basic_via_update_v2(env: WorkflowEnvironment):
     """Start a very long sleep with time skipping off, then enable it
     and run to completion."""
-    async with await WorkflowEnvironment.start_time_skipping_v2(
-        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
-        dev_server_extra_args=_TS_EXTRA_ARGS,
-    ) as env:
-        async with new_worker(env.client, SleepWorkflow) as worker:
-            with env.with_time_skipping_disabled():
-                handle = await env.client.start_workflow(
-                    SleepWorkflow.run,
-                    100000.0,
-                    id=f"workflow-{uuid.uuid4()}",
-                    task_queue=worker.task_queue,
-                )
+    async with new_worker(env.client, SleepWorkflow) as worker:
+        with env.with_time_skipping_disabled():
+            handle = await env.client.start_workflow(
+                SleepWorkflow.run,
+                100000.0,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
 
-            assert not await env.fast_forward(handle, None)
-            result = await handle.result()
-            assert result["message"] == "all done"
-            assert_timestamp_from_now(await env.get_current_time(handle), 100000)
-            await assert_time_was_skipped(handle)
+        assert not await env.fast_forward(handle, None)
+        result = await handle.result()
+        assert result["message"] == "all done"
+        assert_timestamp_from_now(await env.get_current_time(handle), 100000)
+        await assert_time_was_skipped(handle)
