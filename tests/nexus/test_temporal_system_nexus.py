@@ -14,6 +14,7 @@ from google.protobuf.message import Message
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
+import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus.system as nexus_system
@@ -447,7 +448,23 @@ def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Pay
     return payload
 
 
-async def test_nexus_payload_serializer_decodes_system_input() -> None:
+@pytest.mark.parametrize(
+    "versioning_override",
+    [
+        None,
+        temporalio.common.PinnedVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion("deployment", "build")
+        ),
+        temporalio.common.AutoUpgradeVersioningOverride(),
+        temporalio.common.OneTimeVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion("deployment", "build")
+        ),
+    ],
+    ids=["absent", "pinned", "auto-upgrade", "one-time"],
+)
+async def test_nexus_payload_serializer_decodes_system_input(
+    versioning_override: temporalio.common.VersioningOverride | None,
+) -> None:
     """A marked system request is decoded into its generated Nexus model."""
     data_converter = temporalio.converter.default()
     request = workflow_service_models.SignalWithStartWorkflowRequest(
@@ -458,6 +475,7 @@ async def test_nexus_payload_serializer_decodes_system_input() -> None:
         signal="test-signal",
         namespace="target-namespace",
         headers={"test-header": "header-value"},
+        versioning_override=versioning_override,
     )
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
