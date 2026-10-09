@@ -996,27 +996,37 @@ def value_to_type(
         fields = dataclasses.fields(hint)
         field_hints = get_type_hints(hint)
         field_values = {}
+        non_init_field_values = {}
         for field in fields:
-            # Skip fields excluded from __init__; they use defaults or __post_init__
-            if not field.init:
-                continue
             field_value = value.get(field.name, dataclasses.MISSING)
             # We do not check whether field is required here. Rather, we let the
             # attempted instantiation of the dataclass raise if a field is
             # missing
             if field_value is not dataclasses.MISSING:
+                # Convert init=False fields too, so a mismatched type still
+                # rejects this dataclass when trying union members
                 try:
-                    field_values[field.name] = value_to_type(
+                    converted = value_to_type(
                         field_hints[field.name], field_value, custom_converters
                     )
                 except Exception as err:
                     raise TypeError(
                         f"Failed converting field {field.name} on dataclass {hint}"
                     ) from err
+                if field.init:
+                    field_values[field.name] = converted
+                else:
+                    non_init_field_values[field.name] = converted
         # Simply instantiate the dataclass. This will fail as expected when
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
-        return hint(**field_values)
+        obj = hint(**field_values)
+        # init=False fields cannot be passed to __init__ but are serialized, so
+        # restore them afterwards. object.__setattr__ also works on frozen
+        # dataclasses.
+        for name, field_value in non_init_field_values.items():
+            object.__setattr__(obj, name, field_value)
+        return obj
 
     # Pydantic model instance
     # Pydantic users should use Pydantic v2 with

@@ -535,10 +535,22 @@ class NestedDataClass:
     qux: UUID | None = None
 
 
-@dataclass(frozen=True)
+@dataclass
 class InitFalseDataClass:
     foo: str
     bar: str = dataclasses.field(default="default-bar", init=False)
+
+
+@dataclass(frozen=True)
+class FrozenInitFalseDataClass:
+    foo: str
+    bar: str = dataclasses.field(default="default-bar", init=False)
+
+
+@dataclass
+class InitFalseIntDataClass:
+    foo: str
+    bar: int = dataclasses.field(default=0, init=False)
 
 
 class MyTypedDict(TypedDict):
@@ -639,8 +651,16 @@ def test_json_type_hints():
     fail(NestedDataClass, {})
     # Additional dataclass fields is ok
     ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
-    # Dataclass with init=False fields
+    # Dataclass with init=False fields restores their values
     ok(InitFalseDataClass, InitFalseDataClass("hello"))
+    init_false = InitFalseDataClass("hello")
+    init_false.bar = "custom-bar"
+    ok(InitFalseDataClass, init_false)
+    frozen_init_false = FrozenInitFalseDataClass("hello")
+    object.__setattr__(frozen_init_false, "bar", "custom-bar")
+    ok(FrozenInitFalseDataClass, frozen_init_false)
+    # init=False field types still decide which union member matches
+    ok(InitFalseIntDataClass | InitFalseDataClass, init_false)
 
     # Optional/Union
     ok(int | None, 5)
