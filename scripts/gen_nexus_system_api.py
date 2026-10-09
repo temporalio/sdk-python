@@ -41,28 +41,20 @@ def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
 
-    if shutil.which("nexgen") is not None:
-        version = subprocess.run(
-            ["nexgen", "--version"], capture_output=True, text=True, check=False
+    if shutil.which("nexgen") is None:
+        subprocess.check_call(
+            [
+                "cargo",
+                "install",
+                "--locked",
+                "nexgen",
+                "--version",
+                NEX_GEN_VERSION,
+                "--features",
+                "advanced",
+                "--force",
+            ]
         )
-        if version.returncode == 0 and version.stdout.strip() == (
-            f"nexgen {NEX_GEN_VERSION}"
-        ):
-            return ["nexgen"]
-
-    subprocess.check_call(
-        [
-            "cargo",
-            "install",
-            "--locked",
-            "nexgen",
-            "--version",
-            NEX_GEN_VERSION,
-            "--features",
-            "advanced",
-            "--force",
-        ]
-    )
     return ["nexgen"]
 
 
