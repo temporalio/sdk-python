@@ -21,8 +21,10 @@ document as a quick reference when submitting pull requests.
 * Tests that use the workflow environment may start a local Temporal dev server
   and may download a test server binary on first run. Unit tests that do not use
   the workflow environment do not start a server.
-* Time-skipping tests are run with `poe test -s --workflow-environment
-  time-skipping`. Time-skipping does not work on Linux ARM or Windows ARM.
+* Time-skipping V1 tests are run with `poe test -s --workflow-environment
+  time-skipping-v1`. Time-skipping V1 does not work on Linux ARM or Windows ARM.
+* Time-skipping V2 tests are run with `poe test -s --workflow-environment
+  time-skipping-v2`. Time-skipping V1 works on both Linux ARM and Windows ARM.
 * It is extremely important that comments explain why something is necessary,
   not what the code already says. Avoid comments unless they clarify nonobvious
   behavior.
