@@ -24,7 +24,6 @@ wit_input_dir = (
 )
 wit_path = wit_input_dir / "workflow-service.wit"
 wit_deps_dir = wit_input_dir / "deps"
-python_support_path = base_dir / "scripts" / "nex_gen_support.py"
 output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 workflowservice_request_response_proto = (
@@ -35,7 +34,7 @@ workflowservice_request_response_proto = (
     / "v1"
     / "request_response.proto"
 )
-NEX_GEN_VERSION = "0.2.4"
+NEX_GEN_VERSION = "0.2.8"
 
 
 def nex_gen_command() -> list[str]:
@@ -114,8 +113,6 @@ def generate_nexus_system_api() -> None:
         raise RuntimeError(f"missing WIT source: {wit_path}")
     if not wit_deps_dir.exists():
         raise RuntimeError(f"missing WIT dependency directory: {wit_deps_dir}")
-    if not python_support_path.exists():
-        raise RuntimeError(f"missing Python support source: {python_support_path}")
 
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
         descriptor_path = Path(temp_dir) / "temporal_api.bin"
@@ -132,8 +129,8 @@ def generate_nexus_system_api() -> None:
                 str(wit_deps_dir),
                 "--native-api",
                 "--system-nexus",
-                "--support-file",
-                str(python_support_path),
+                "--support-package",
+                "temporalio.nexus.system._support",
                 "--descriptors",
                 str(descriptor_path),
                 "--output",
