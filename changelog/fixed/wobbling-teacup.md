@@ -1,1 +1,1 @@
-Fixed deserialization of dataclass fields with `init=False`, which previously caused a `TypeError` when the converter tried to pass them as constructor arguments.
+Decoding a dataclass with `field(init=False)` fields no longer raises `TypeError`; those fields are left out of the constructor call and their serialized values are restored afterwards, including on frozen dataclasses.
