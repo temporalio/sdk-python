@@ -9,6 +9,7 @@ import logging
 import sys
 import warnings
 from collections.abc import Awaitable, Callable, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
@@ -34,6 +35,7 @@ from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
+from ._signals import _SigtermHandler
 from ._tuning import WorkerTuner
 from ._workflow import (
     _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
@@ -132,6 +134,7 @@ class Worker:
         max_task_queue_activities_per_second: float | None = None,
         max_eager_activity_reservations_per_workflow_task: int = 3,
         graceful_shutdown_timeout: timedelta = timedelta(),
+        shutdown_on_sigterm: bool = True,
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         shared_state_manager: SharedStateManager | None = None,
         debug_mode: bool = False,
@@ -278,6 +281,10 @@ class Worker:
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
+            shutdown_on_sigterm: If true, request graceful shutdown on SIGTERM
+                while running on the main thread on POSIX. Existing application
+                signal handlers, including SIG_IGN, are preserved. With
+                ``async with``, the context body is cancelled so it can unwind.
             workflow_failure_exception_types: The types of exceptions that, if a
                 workflow-thrown exception extends, will cause the
                 workflow/update to fail instead of suspending the workflow via
@@ -379,6 +386,7 @@ class Worker:
             max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             max_eager_activity_reservations_per_workflow_task=max_eager_activity_reservations_per_workflow_task,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
+            shutdown_on_sigterm=shutdown_on_sigterm,
             workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
@@ -805,6 +813,11 @@ class Worker:
         async function assuming that it is currently running. A cancel could
         also cancel the shutdown process. Therefore users are encouraged to use
         explicit shutdown instead.
+
+        By default, SIGTERM requests graceful shutdown when running on the main
+        thread on POSIX and no application SIGTERM handler is installed. Set
+        ``shutdown_on_sigterm=False`` to manage this signal yourself. Signal
+        handling is removed when this method exits.
         """
 
         def make_lambda(plugin: Plugin, next: Callable[[Worker], Awaitable[None]]):
@@ -814,7 +827,12 @@ class Worker:
         for plugin in reversed(self._plugins):
             next_function = make_lambda(plugin, next_function)
 
-        await next_function(self)
+        with (
+            _SigtermHandler(self._shutdown_event, self._async_context_inner_task)
+            if self._config["shutdown_on_sigterm"]  # type: ignore[reportTypedDictNotRequiredAccess]
+            else nullcontext()
+        ):
+            await next_function(self)
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core.
@@ -1014,6 +1032,7 @@ class WorkerConfig(TypedDict, total=False):
     max_task_queue_activities_per_second: float | None
     max_eager_activity_reservations_per_workflow_task: int
     graceful_shutdown_timeout: timedelta
+    shutdown_on_sigterm: bool
     workflow_failure_exception_types: Sequence[type[BaseException]]
     shared_state_manager: SharedStateManager | None
     debug_mode: bool
