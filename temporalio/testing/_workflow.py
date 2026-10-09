@@ -37,15 +37,17 @@ logger = logging.getLogger(__name__)
 class WorkflowEnvironment:
     """Workflow environment for testing workflows.
 
-    Most developers will want to use the static :py:meth:`start_time_skipping`
-    or :py:meth:`start_time_skipping_v2` to start a server process that skips
-    time as needed. Alternatively, :py:meth:`start_local` may be used for a
-    full, local Temporal server with more features. To use an existing server,
-    use :py:meth:`from_client`.
+    Most developers will want to use one of these static methods:
+    - :py:meth:`start_local`: start a local, full-featured Temporal server
+    - :py:meth:`start_time_skipping_v2`: start a local, full-featured Temporal
+      server with time-skipping enabled
+    - :py:meth:`start_time_skipping`: start the older, featured-limited Java
+      test server
+    - :py:meth:`from_client`: use an existing server
 
-    This environment is an async context manager, so it can be used with
-    ``async with`` to make sure it shuts down properly. Otherwise,
-    :py:meth:`shutdown` can be manually called.
+    This environment is an async context manager, so it can be used with ``async
+    with`` to make sure it shuts down properly. Otherwise, :py:meth:`shutdown`
+    can be manually called.
 
     To use the environment, simply use the :py:attr:`client` on it.
 
