@@ -1314,6 +1314,29 @@ class AutoUpgradeVersioningOverride(VersioningOverride):
         )
 
 
+@dataclass(frozen=True)
+class OneTimeVersioningOverride(VersioningOverride):
+    """Route workflow tasks to a specific deployment version until a task completes
+    on that version, then clear the override.
+
+    The worker's reported versioning behavior governs subsequent tasks. This does
+    not pin the workflow to the target version.
+
+    .. warning::
+        This API is experimental and requires Temporal Server 1.32 or newer.
+    """
+
+    target_version: WorkerDeploymentVersion
+
+    def _to_proto(self) -> temporalio.api.workflow.v1.VersioningOverride:
+        """Convert to proto representation."""
+        return temporalio.api.workflow.v1.VersioningOverride(
+            one_time=temporalio.api.workflow.v1.VersioningOverride.OneTimeOverride(
+                target_deployment_version=self.target_version._to_proto(),
+            ),
+        )
+
+
 # Should be set as the "arg" argument for _arg_or_args checks where the argument
 # is unset. This is different than None which is a legitimate argument.
 _arg_unset = object()

@@ -78,6 +78,16 @@ class WorkflowAlreadyStartedError(FailureError):
         self.first_run_id = first_run_id
 
 
+class InvalidVersioningOverrideError(FailureError):
+    """Thrown by a workflow when a child cannot start because its versioning
+    override is invalid.
+    """
+
+    def __init__(self) -> None:
+        """Initialize an invalid versioning override error."""
+        super().__init__("Invalid versioning override")
+
+
 class ActivityAlreadyStartedError(FailureError):
     """Thrown by a client when an activity execution has already started.
 
