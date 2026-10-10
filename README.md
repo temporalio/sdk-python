@@ -1528,6 +1528,13 @@ cancellation of all outstanding activities.
 The `shutdown()` invocation will wait on all activities to complete, so if a long-running activity does not at least
 respect cancellation, the shutdown may never complete.
 
+On POSIX, workers running on the main thread also request graceful shutdown on `SIGTERM` by default. This uses the
+same shutdown process and `graceful_shutdown_timeout` as `shutdown()`. `run()` returns after shutdown completes;
+with `async with Worker(...)`, the context body receives `asyncio.CancelledError` so application cleanup can run.
+Repeated `SIGTERM` signals do not interrupt shutdown. The signal handler is removed after the last participating
+worker exits. Existing application `SIGTERM` handlers (including `SIG_IGN` and asyncio signal handlers) are preserved.
+Set `shutdown_on_sigterm=False` to manage the signal yourself. `SIGINT` continues to use Python's existing handling.
+
 #### Testing
 
 Unit testing an activity or any code that could run in an activity is done via the
