@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Any
 
 import temporalio.api.common.v1
 import temporalio.common
@@ -182,7 +183,7 @@ def decode_typed_search_attributes(
         )
         if not key:
             continue
-        val = conv.from_payload(v)
+        val: Any = conv.from_payload(v)
         # If the value is a list but the type is not keyword list, pull out
         # single item or consider this an invalid value and ignore
         if (
@@ -200,6 +201,13 @@ def decode_typed_search_attributes(
             parser = _get_iso_datetime_parser()
             # We will let this throw
             val = parser(val)
+        elif (
+            key.indexed_value_type
+            == temporalio.common.SearchAttributeIndexedValueType.DOUBLE
+            and type(val) is int
+        ):
+            # Visibility returns a whole-number Double as a JSON integer
+            val = float(val)
         # If the value isn't the right type, we need to ignore
         if isinstance(val, key.origin_value_type):
             pairs.append(temporalio.common.SearchAttributePair(key, val))
