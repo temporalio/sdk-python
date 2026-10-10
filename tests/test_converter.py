@@ -51,6 +51,7 @@ from temporalio.converter import (
     TransferTypeConverter,
     create_payload_validation_error,
     decode_search_attributes,
+    decode_typed_search_attributes,
     encode_search_attribute_values,
     encode_typed_search_attribute_value,
     transfer_type_convertible,
@@ -486,6 +487,22 @@ def test_encode_typed_search_attribute_value_datetime_requires_timezone():
         key, datetime(2024, 7, 5, 15, 43, 7, 875302, tzinfo=timezone.utc)
     )
     assert payload.metadata["type"] == b"Datetime"
+
+
+def test_decode_typed_search_attributes_whole_number_double():
+    # Visibility returns a whole-number Double as a JSON integer
+    key = temporalio.common.SearchAttributeKey.for_float("score")
+    api = temporalio.api.common.v1.SearchAttributes(
+        indexed_fields={
+            "score": temporalio.api.common.v1.Payload(
+                data=b"5",
+                metadata={"type": b"Double", "encoding": b"json/plain"},
+            )
+        }
+    )
+    val = decode_typed_search_attributes(api).get(key)
+    assert val == 5.0
+    assert type(val) is float
 
 
 def test_decode_search_attributes():
