@@ -900,6 +900,10 @@ def value_to_type(
 
     # Union
     if is_union:
+        # The int conversion accepts a float and truncates it, so give a float
+        # to a float member before trying an earlier int member
+        if isinstance(value, float) and float in type_args:
+            return value_to_type(float, value, custom_converters)
         # Try each one. Note, Optional is just a union w/ none.
         for arg in type_args:
             try:

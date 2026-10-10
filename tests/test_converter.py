@@ -675,6 +675,11 @@ def test_json_type_hints():
     fail(int | None, "1")
     ok(MyDataClass | NestedDataClass, MyDataClass("foo", 5, SerializableEnum.FOO))
     ok(MyDataClass | NestedDataClass, NestedDataClass("foo"))
+    # An earlier int member must not truncate a float
+    ok(int | float, 5)
+    ok(int | float, 5.5)
+    ok(int | float | None, 5.5)
+    ok(list[int | float], [5, 5.5])
 
     # NewType
     ok(NewIntType, 5)
