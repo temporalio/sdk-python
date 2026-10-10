@@ -762,13 +762,15 @@ class _ThreadExceptionRaiser:
     def set_thread_id(self, thread_id: int) -> None:
         with self._lock:
             self._thread_id = thread_id
+            self._raise_in_thread_if_pending_unlocked()
 
     @contextmanager
     def active_thread(self) -> Iterator[None]:
         thread_id = threading.current_thread().ident
-        if thread_id is not None:
-            self.set_thread_id(thread_id)
         try:
+            # Registration can raise, so it must be covered by thread cleanup.
+            if thread_id is not None:
+                self.set_thread_id(thread_id)
             yield None
         finally:
             if thread_id is not None:
