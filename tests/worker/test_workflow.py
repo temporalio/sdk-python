@@ -6669,6 +6669,40 @@ async def test_workflow_replace_worker_client_diff_runtimes_fail(
             worker.client = other_client
 
 
+async def test_workflow_replace_worker_client_implicit_default_runtime(
+    env: WorkflowEnvironment,
+):
+    # Neither client sets a runtime, so both are on the default one
+    worker_client = await env.connect_client(runtime=None)
+    new_client = await env.connect_client(runtime=None)
+    async with new_worker(worker_client, HelloWorkflow) as worker:
+        worker.client = new_client
+        assert worker.client is new_client
+        result = await new_client.execute_workflow(
+            HelloWorkflow.run,
+            "Temporal",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Hello, Temporal!"
+
+
+async def test_workflow_replace_worker_client_implicit_default_runtime_mismatch_fail(
+    env: WorkflowEnvironment,
+):
+    # No runtime means the default one, which isn't the worker's
+    worker_client = await env.connect_client(
+        runtime=Runtime(telemetry=TelemetryConfig())
+    )
+    default_runtime_client = await env.connect_client(runtime=None)
+    async with new_worker(worker_client, HelloWorkflow) as worker:
+        with pytest.raises(
+            ValueError,
+            match="New client is not on the same runtime as the existing client",
+        ):
+            worker.client = default_runtime_client
+
+
 @activity.defn(dynamic=True)
 async def return_name_activity(_args: Sequence[RawValue]) -> str:
     return activity.info().activity_type
