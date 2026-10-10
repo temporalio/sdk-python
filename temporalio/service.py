@@ -418,6 +418,8 @@ class _BridgeServiceClient(ServiceClient):
         self._bridge_config = config._to_bridge_config()
         self._bridge_client: temporalio.bridge.client.Client | None = None
         self._bridge_client_connect_lock = asyncio.Lock()
+        # Runtime we connected with, so the default one if none was set
+        self._runtime: temporalio.runtime.Runtime | None = None
 
     async def _connected_client(self) -> temporalio.bridge.client.Client:
         # Fast path avoids touching the lock once connected. This keeps the
@@ -433,6 +435,7 @@ class _BridgeServiceClient(ServiceClient):
                     runtime._core_runtime,
                     self._bridge_config,
                 )
+                self._runtime = runtime
             return self._bridge_client
 
     @property

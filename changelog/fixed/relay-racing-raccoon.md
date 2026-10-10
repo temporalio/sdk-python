@@ -1,0 +1,1 @@
+Setting `Worker.client` no longer raises "New client is not on the same runtime as the existing client" when both clients connected without a `runtime`, since both use the default runtime. The check now compares the runtime each client actually connected with.
