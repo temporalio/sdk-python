@@ -43,6 +43,7 @@ document as a quick reference when submitting pull requests.
     docstyle.
   * `poe lint-types` - run pyright, mypy, and basedpyright.
   * `poe bridge-lint` - run clippy for the Rust bridge.
+  * `poe update-core` - update the Core pin and import its changelog fragments.
   * `poe format` - run Ruff import sorting, Ruff formatting, and `cargo fmt` for
     the bridge.
   * `poe gen-protos-docker` - regenerate protobuf-related files using Docker.
@@ -124,5 +125,13 @@ Reviewers will look for:
 * Generated protobuf and bridge files have specific regeneration workflows; see
   `README.md` before changing them.
 * The Rust bridge uses SDK Core from `temporalio/bridge/sdk-core`.
+* Update Core with `poe update-core`, which invokes the shared command documented in
+  `CONTRIBUTING.md` under "Updating SDK Core". It updates the submodule and imports
+  Core's user-facing changelog entries into category fragments. Review and commit the new Core pin
+  and generated fragments together; do not update the pin and defer its notes
+  until release time. The Python task copies Core path dependency versions from the new checkout
+  and refreshes the bridge lockfile; review both and check Rust API compatibility as needed.
+  If Core protobuf definitions changed, run `poe gen-protos-docker` and commit the
+  regenerated bindings with the pin update.
 * `__pycache__`, `build`, `dist`, and Rust `target` outputs are generated
   artifacts and should not be reviewed as source changes.

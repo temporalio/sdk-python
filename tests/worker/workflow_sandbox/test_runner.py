@@ -558,6 +558,27 @@ async def test_workflow_sandbox_import_default_warnings(client: Client):
             )
 
 
+async def test_workflow_sandbox_import_workflow_without_warning():
+    restrictions = SandboxRestrictions.default.with_import_notification_policy(
+        SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH
+    )
+    with warnings.catch_warnings(record=True) as recorder:
+        warnings.simplefilter("always")
+        SandboxedWorkflowRunner(restrictions).prepare_workflow(
+            workflow._Definition.must_from_class(GlobalStateWorkflow)
+        )
+
+    actual_warnings = {str(w.message) for w in recorder}
+    assert (
+        f"Module {GlobalStateWorkflow.__module__} was not intentionally passed through to the sandbox."
+        not in actual_warnings
+    )
+    assert (
+        f"Module {stateful_module.__package__} was not intentionally passed through to the sandbox."
+        in actual_warnings
+    )
+
+
 async def test_workflow_sandbox_import_all_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,

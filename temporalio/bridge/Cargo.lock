@@ -2589,7 +2589,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-client"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2621,7 +2621,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-common"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2662,7 +2662,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-common-wasm"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2687,7 +2687,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-macros"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2696,7 +2696,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-protos"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "base64 0.23.1",
@@ -2716,7 +2716,7 @@ dependencies = [
 
 [[package]]
 name = "temporalio-sdk-core"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "anyhow",
  "async-trait",

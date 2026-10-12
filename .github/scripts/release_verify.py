@@ -6,7 +6,6 @@ import argparse
 import ast
 import pathlib
 import re
-import subprocess
 import sys
 from collections.abc import Sequence
 
@@ -115,48 +114,21 @@ def verify_dist(args: argparse.Namespace) -> None:
         print(f"  {name}")
 
 
-def _git(args: Sequence[str], *, cwd: pathlib.Path | None = None) -> str:
-    return subprocess.check_output(
-        ["git", *args],
-        cwd=cwd,
-        encoding="utf-8",
-        stderr=subprocess.STDOUT,
-    ).strip()
-
-
-def _sdk_core_release_notes(version: str, path: str) -> list[str]:
-    notes = run_tool(
-        pathlib.Path.cwd(),
-        [
-            "core-notes",
-            "--version",
-            version,
-            "--submodule",
-            path,
-        ],
-    ).strip("\n")
-    return ["### SDK Core", "", *notes.splitlines()] if notes else []
-
-
 def changelog_notes(args: argparse.Namespace) -> None:
-    section_lines = run_tool(
+    run_tool(
         pathlib.Path.cwd(),
         [
-            "notes",
+            "release-notes",
             "--version",
             args.version,
             "--changelog",
             args.changelog,
+            "--submodule",
+            args.sdk_core_path,
+            "--output",
+            args.output,
         ],
-    ).splitlines()
-
-    note_lines = ["## Notable Changes", "", *section_lines]
-    sdk_core_notes = _sdk_core_release_notes(args.version, args.sdk_core_path)
-    if sdk_core_notes:
-        note_lines.extend(["", *sdk_core_notes])
-
-    notes = "\n".join(note_lines) + "\n"
-    pathlib.Path(args.output).write_text(notes, encoding="utf-8")
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> None:

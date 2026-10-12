@@ -32,6 +32,10 @@ Entries can include inline Markdown and documentation links. Do not edit
 `CHANGELOG.md` for pending changes: it contains completed releases only. Maintainers
 can apply `skip-changelog` to PRs that need no release note.
 
+`poe update-core` imports Core changelog entries into category fragments when
+updating the submodule. See [Updating SDK Core](../CONTRIBUTING.md#updating-sdk-core)
+for contributor instructions.
+
 ## Preparing a release
 
 Release tooling requires Rust/Cargo and the checked-in sdk-rust submodule:
@@ -46,6 +50,12 @@ Run preparation from a clean worktree. The script creates a release branch from
 shared tool to write the dated changelog and consume its fragments. It commits
 the resulting version, lockfile, changelog, and fragment-deletion changes. It pushes the branch and opens a PR with the `skip-changelog` label.
 Review the assembled notes before merging the release PR.
+
+Preparation consumes both language and imported Core fragments. Publishing calls
+the shared `release-notes` command to read that completed release and append Core
+commit links under `### SDK Core Commits`. Core changelog entries are not collected
+again during publishing. Both publishing jobs check out the pinned Core tool;
+the commit range comes from the previous release tag and the current release's pin.
 
 Assembly creates a dated section at the top of the changelog, groups notes in the
 category order above, and sorts filenames within each category. Empty categories

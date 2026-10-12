@@ -31,9 +31,17 @@ class SandboxImportNotificationPolicy(Flag):
     WARN_ON_DYNAMIC_IMPORT = auto()
     """Allows dynamic imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox after initial workflow load."""
     WARN_ON_UNINTENTIONAL_PASSTHROUGH = auto()
-    """Allows imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox that was unintentionally passed through."""
+    """Allows imports that do not violate sandbox restrictions but issues a warning when an import is triggered in the sandbox that was unintentionally passed through.
+
+    The workflow's defining module is exempt because it is intentionally reloaded
+    in the sandbox.
+    """
     RAISE_ON_UNINTENTIONAL_PASSTHROUGH = auto()
-    """Raise an error when an import is triggered in the sandbox that was unintentionally passed through."""
+    """Raise an error when an import is triggered in the sandbox that was unintentionally passed through.
+
+    The workflow's defining module is exempt because it is intentionally reloaded
+    in the sandbox.
+    """
 
 
 class unsafe:
