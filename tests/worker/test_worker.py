@@ -18,7 +18,9 @@ import nexusrpc
 import pytest
 
 import temporalio.api.enums.v1
+import temporalio.common
 import temporalio.nexus
+import temporalio.service
 import temporalio.worker._worker
 from temporalio import activity, workflow
 from temporalio.api.workflowservice.v1 import (
@@ -1250,6 +1252,155 @@ async def test_workflows_can_use_versioning_override(
             )
             for event in history.events
         )
+
+
+@workflow.defn(versioning_behavior=VersioningBehavior.PINNED)
+class ChildVersioningOverrideParent:
+    def __init__(self) -> None:
+        self.start_child = False
+
+    @workflow.run
+    async def run(
+        self,
+        child_id: str,
+        override_kind: str,
+        target_version: WorkerDeploymentVersion,
+        use_execute: bool,
+    ) -> tuple[str, str]:
+        await workflow.wait_condition(lambda: self.start_child)
+        override: temporalio.common.VersioningOverride
+        if override_kind == "pinned":
+            override = PinnedVersioningOverride(target_version)
+        elif override_kind == "auto_upgrade":
+            override = temporalio.common.AutoUpgradeVersioningOverride()
+        else:
+            override = temporalio.common.OneTimeVersioningOverride(target_version)
+        if use_execute:
+            result = await workflow.execute_child_workflow(
+                ChildVersioningOverrideWorkflow.run,
+                id=child_id,
+                versioning_override=override,
+            )
+        else:
+            child = await workflow.start_child_workflow(
+                ChildVersioningOverrideWorkflow.run,
+                id=child_id,
+                versioning_override=override,
+            )
+            result = await child
+        version = workflow.info().get_current_deployment_version()
+        assert version
+        return version.build_id, result
+
+    @workflow.signal
+    def launch_child(self) -> None:
+        self.start_child = True
+
+
+@workflow.defn
+class ChildVersioningOverrideWorkflow:
+    def __init__(self) -> None:
+        self.finish = False
+
+    @workflow.run
+    async def run(self) -> str:
+        version = workflow.info().get_current_deployment_version()
+        assert version
+        # Memo records the first task without issuing a query that could trigger routing.
+        workflow.upsert_memo({"initial_build_id": version.build_id})
+        await workflow.wait_condition(lambda: self.finish)
+        version = workflow.info().get_current_deployment_version()
+        assert version
+        return version.build_id
+
+    @workflow.signal
+    def do_finish(self) -> None:
+        self.finish = True
+
+
+@pytest.mark.parametrize("use_execute", [False, True], ids=["start", "execute"])
+@pytest.mark.parametrize(
+    "override_kind, child_behavior, expected_final_build_id",
+    [
+        ("pinned", VersioningBehavior.AUTO_UPGRADE, "2.0"),
+        ("auto_upgrade", VersioningBehavior.PINNED, "2.0"),
+        ("one_time", VersioningBehavior.AUTO_UPGRADE, "1.0"),
+        ("one_time", VersioningBehavior.PINNED, "2.0"),
+    ],
+    ids=["pinned", "auto-upgrade", "one-time-auto-upgrade", "one-time-pinned"],
+)
+async def test_child_workflows_can_use_versioning_override(
+    client: Client,
+    env: WorkflowEnvironment,
+    use_execute: bool,
+    override_kind: str,
+    child_behavior: VersioningBehavior,
+    expected_final_build_id: str,
+):
+    if env.supports_time_skipping:
+        pytest.skip("Test Server doesn't support worker deployments")
+
+    deployment_name = f"child-versioning-override-{uuid.uuid4()}"
+    v1 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="1.0")
+    v2 = WorkerDeploymentVersion(deployment_name=deployment_name, build_id="2.0")
+    async with (
+        new_worker(
+            client,
+            ChildVersioningOverrideParent,
+            ChildVersioningOverrideWorkflow,
+            deployment_config=WorkerDeploymentConfig(
+                version=v1,
+                use_worker_versioning=True,
+                default_versioning_behavior=child_behavior,
+            ),
+        ) as w1,
+        new_worker(
+            client,
+            ChildVersioningOverrideParent,
+            ChildVersioningOverrideWorkflow,
+            task_queue=w1.task_queue,
+            deployment_config=WorkerDeploymentConfig(
+                version=v2,
+                use_worker_versioning=True,
+                default_versioning_behavior=child_behavior,
+            ),
+        ),
+    ):
+        await wait_until_worker_deployment_visible(client, v1)
+        describe_resp = await wait_until_worker_deployment_visible(client, v2)
+        current_version = v2 if override_kind == "auto_upgrade" else v1
+        await set_current_deployment_version(
+            client, describe_resp.conflict_token, current_version
+        )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, current_version.build_id
+        )
+
+        child_id = f"child-versioning-override-{uuid.uuid4()}"
+        parent = await client.start_workflow(
+            ChildVersioningOverrideParent.run,
+            args=[child_id, override_kind, v2, use_execute],
+            id=f"parent-{child_id}",
+            task_queue=w1.task_queue,
+            versioning_override=PinnedVersioningOverride(v1),
+        )
+        await wait_for_workflow_running_on_version(parent, v1.build_id)
+        await parent.signal(ChildVersioningOverrideParent.launch_child)
+        child = client.get_workflow_handle(child_id)
+
+        async def check_initial_version() -> None:
+            try:
+                desc = await child.describe()
+            except RPCError as err:
+                if err.status != temporalio.service.RPCStatusCode.NOT_FOUND:
+                    raise
+                assert False, "Child has not started yet"
+            assert await desc.memo_value("initial_build_id", None) == v2.build_id
+
+        await assert_eventually(check_initial_version)
+        await child.signal(ChildVersioningOverrideWorkflow.do_finish)
+        assert await parent.result() == (v1.build_id, expected_final_build_id)
+        assert await child.result() == expected_final_build_id
 
 
 async def test_can_run_autoscaling_polling_worker(
