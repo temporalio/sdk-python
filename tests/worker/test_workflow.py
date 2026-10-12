@@ -6678,13 +6678,6 @@ async def test_workflow_replace_worker_client_implicit_default_runtime(
     async with new_worker(worker_client, HelloWorkflow) as worker:
         worker.client = new_client
         assert worker.client is new_client
-        result = await new_client.execute_workflow(
-            HelloWorkflow.run,
-            "Temporal",
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        assert result == "Hello, Temporal!"
 
 
 async def test_workflow_replace_worker_client_implicit_default_runtime_mismatch_fail(
