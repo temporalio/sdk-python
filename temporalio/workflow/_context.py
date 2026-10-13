@@ -463,6 +463,7 @@ class _Runtime(ABC):
         static_details: str | None = None,
         event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> ChildWorkflowHandle[Any, Any]: ...
 
     @abstractmethod

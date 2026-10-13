@@ -263,6 +263,16 @@ def versioning_override_from_proto(
                 build_id=version.build_id,
             )
         )
+    if proto.HasField("one_time") and proto.one_time.HasField(
+        "target_deployment_version"
+    ):
+        version = proto.one_time.target_deployment_version
+        return temporalio.common.OneTimeVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion(
+                deployment_name=version.deployment_name,
+                build_id=version.build_id,
+            )
+        )
     if proto.pinned_version:
         return temporalio.common.PinnedVersioningOverride(
             temporalio.common.WorkerDeploymentVersion.from_canonical_string(
