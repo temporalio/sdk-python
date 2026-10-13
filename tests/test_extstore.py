@@ -1038,6 +1038,63 @@ class TestExternalStorageConcurrency:
         gate.release()
         await asyncio.gather(first, second)
 
+    async def test_store_context_copies_share_max_driver_operations(self):
+        """Workers bind a store context per message by copying the instance.
+        Those copies must still draw from the original's budget."""
+        gate = _Gate()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)],
+            payload_size_threshold=0,
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=3, max_operations_per_message=10
+            ),
+        )
+
+        async def one_message() -> None:
+            copy = storage._with_store_context(StorageDriverStoreContext(target=None))
+            with message_scope(copy):
+                await copy._store_payload_sequence([_payload(), _payload(), _payload()])
+
+        first = asyncio.create_task(one_message())
+        second = asyncio.create_task(one_message())
+        await _settle()
+        assert gate.peak == 3
+
+        gate.release()
+        await asyncio.gather(first, second)
+
+    async def test_data_converter_store_context_copies_share_max_driver_operations(
+        self,
+    ):
+        gate = _Gate()
+        data_converter = DataConverter(
+            external_storage=ExternalStorage(
+                drivers=[_PermittingDriver(gate)],
+                payload_size_threshold=0,
+                concurrency=ExternalStorageConcurrency(
+                    max_driver_operations=3, max_operations_per_message=10
+                ),
+            )
+        )
+
+        async def one_message() -> None:
+            copy = data_converter._with_store_context(
+                StorageDriverStoreContext(target=None)
+            )
+            assert copy.external_storage is not None
+            with message_scope(copy.external_storage):
+                await copy._external_store_payload_sequence(
+                    [_payload(), _payload(), _payload()]
+                )
+
+        first = asyncio.create_task(one_message())
+        second = asyncio.create_task(one_message())
+        await _settle()
+        assert gate.peak == 3
+
+        gate.release()
+        await asyncio.gather(first, second)
+
     async def test_warns_when_driver_takes_no_permit(
         self, caplog: pytest.LogCaptureFixture
     ):

@@ -193,8 +193,7 @@ class StorageDriverLimiter(ABC):
     ) -> contextlib.AbstractAsyncContextManager[None]:
         """Holds a permit for the duration of the ``async with`` block.
 
-        Waits for a permit to be available before entering, and releases it on
-        exit. ``item`` is the payload being stored or the claim being retrieved.
+        ``item`` is the payload being stored or the claim being retrieved.
         """
         ...
 
@@ -570,6 +569,9 @@ class ExternalStorage:
     def _with_store_context(self, ctx: StorageDriverStoreContext) -> ExternalStorage:
         """Return a copy of this instance with ``ctx`` bound as the store context."""
         result = dataclasses.replace(self)
+        object.__setattr__(
+            result, "_per_instance_semaphores", self._per_instance_semaphores
+        )
         object.__setattr__(result, "_store_context", ctx)
         object.__setattr__(
             result, "_select_context", StorageDriverSelectContext(target=ctx.target)
