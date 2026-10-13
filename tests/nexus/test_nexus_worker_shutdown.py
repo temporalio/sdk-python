@@ -2,6 +2,8 @@
 
 import asyncio
 import concurrent.futures
+import gc
+import logging
 import threading
 import uuid
 from dataclasses import dataclass
@@ -120,6 +122,74 @@ class ShutdownTestCallerWorkflow:
                 return await nexus_client.execute_operation(
                     ShutdownTestService.check_shutdown, None
                 )
+
+
+@workflow.defn(sandboxed=False)
+class NexusPendingOperationCallerWorkflow:
+    """Caller that parks on a Nexus operation that never starts."""
+
+    @workflow.run
+    async def run(self, input: ShutdownTestCallerInput) -> str:
+        nexus_client = workflow.create_nexus_client(
+            service=ShutdownTestService,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        return await nexus_client.execute_operation(
+            ShutdownTestService.hang_until_cancelled, None
+        )
+
+
+async def test_nexus_operation_handle_task_not_destroyed_on_shutdown(
+    env: WorkflowEnvironment, caplog: pytest.LogCaptureFixture
+):
+    """Dropping a workflow parked on a Nexus operation must not leak a pending task.
+
+    The Nexus operation handle creates its asyncio task directly. Before it was
+    registered with the workflow instance, dropping the workflow on worker
+    shutdown (or eviction) left that task pending and asyncio logged "Task was
+    destroyed but it is pending!" once per waiting workflow -- unlike activity
+    and child workflow handles, which register their tasks with the instance.
+    """
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    caller_task_queue = str(uuid.uuid4())
+    # No handler worker is started for this endpoint, so the Nexus operation
+    # never starts and the caller workflow stays parked on it.
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(caller_task_queue), caller_task_queue
+    )
+
+    with caplog.at_level(logging.ERROR, logger="asyncio"):
+        async with Worker(
+            env.client,
+            task_queue=caller_task_queue,
+            workflows=[NexusPendingOperationCallerWorkflow],
+        ):
+            handle = await env.client.start_workflow(
+                NexusPendingOperationCallerWorkflow.run,
+                ShutdownTestCallerInput(
+                    operation="hang_until_cancelled", task_queue=caller_task_queue
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=caller_task_queue,
+            )
+            # Give the workflow time to schedule the Nexus operation before the
+            # worker block exits and drops it from the cache
+            await asyncio.sleep(1)
+
+    # Give the loop a chance to GC the discarded workflow instance and its tasks
+    await asyncio.sleep(0.1)
+    gc.collect()
+    await asyncio.sleep(0.1)
+
+    await handle.terminate("test cleanup")
+
+    assert not [
+        r
+        for r in caplog.records
+        if "Task was destroyed but it is pending" in r.getMessage()
+    ]
 
 
 async def test_nexus_worker_shutdown(env: WorkflowEnvironment):

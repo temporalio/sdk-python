@@ -3782,6 +3782,11 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._seq = seq
         self._input = input
         self._task = asyncio.Task(fn)
+        # Register with the instance like activity/child workflow tasks: on
+        # eviction or worker shutdown the task must be cancelled with the rest
+        # instead of being dropped pending (which logs "Task was destroyed but
+        # it is pending!" once per waiting workflow).
+        self._instance._register_task(self._task, name=f"nexus: {input.operation_name}")
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
