@@ -308,16 +308,17 @@ class _Visitor(VisitorFunctions):
 @contextlib.contextmanager
 def _external_storage_message(
     data_converter: temporalio.converter.DataConverter,
-) -> Iterator[temporalio.converter._extstore.StorageOperationMetrics]:
-    """Scopes one message's external storage limit and metrics."""
+) -> Iterator[tuple[temporalio.converter._extstore.StorageOperationMetrics, int]]:
+    """Yields one message's external storage metrics and payload visit limit."""
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     storage = data_converter.external_storage
     if storage is None:
         with metrics.track():
-            yield metrics
+            yield metrics, 1
         return
+    visit_limit = storage.concurrency.max_operations_per_message
     with metrics.track(), temporalio.converter._extstore.message_scope(storage):
-        yield metrics
+        yield metrics, visit_limit
 
 
 async def decode_activation(
@@ -335,11 +336,11 @@ async def decode_activation(
         skip_headers=not decode_headers,
     ).visit(_Visitor(data_converter._decode_reference_payload_sequence), activation)
 
-    with _external_storage_message(data_converter) as metrics:
+    with _external_storage_message(data_converter) as (metrics, visit_limit):
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not decode_headers,
-            concurrency_limit=None,
+            concurrency_limit=visit_limit,
         ).visit(
             _Visitor(data_converter._external_retrieve_payload_sequence), activation
         )
@@ -376,11 +377,11 @@ async def encode_completion(
     )
 
     if data_converter.external_storage:
-        with _external_storage_message(data_converter) as metrics:
+        with _external_storage_message(data_converter) as (metrics, visit_limit):
             await CommandAwarePayloadVisitor(
                 skip_search_attributes=True,
                 skip_headers=not encode_headers,
-                concurrency_limit=None,
+                concurrency_limit=visit_limit,
             ).visit(
                 _Visitor(data_converter._external_store_payload_sequence),
                 completion,
