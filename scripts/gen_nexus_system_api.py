@@ -81,7 +81,12 @@ def build_descriptor_set(descriptor_path: Path) -> None:
 
 
 def generate_package(
-    command: list[str], wit_name: str, output_dir: Path, *, native_api: bool
+    command: list[str],
+    wit_name: str,
+    output_dir: Path,
+    descriptor_path: Path,
+    *,
+    native_api: bool,
 ) -> None:
     args = [*command, "python", str(wit_input_dir / wit_name), str(wit_deps_dir)]
     if native_api:
@@ -93,15 +98,15 @@ def generate_package(
             "--support-package",
             "temporalio.nexus.system._support",
             "--descriptors",
-            str(output_dir.parent / "temporal_api.bin"),
+            str(descriptor_path),
             "--output",
             str(output_dir),
         ]
     )
 
 
-def workflow_exports() -> list[str]:
-    tree = ast.parse((workflow_output_dir / "__init__.py").read_text())
+def generated_exports(init_path: Path) -> list[str]:
+    tree = ast.parse(init_path.read_text())
     for statement in tree.body:
         if not isinstance(statement, ast.Assign) or not any(
             isinstance(target, ast.Name) and target.id == "__all__"
@@ -113,10 +118,10 @@ def workflow_exports() -> list[str]:
             isinstance(item, str) for item in value
         ):
             raise RuntimeError(
-                "generated workflow package __all__ must be a list of strings"
+                f"generated package {init_path} __all__ must be a list of strings"
             )
         return value
-    raise RuntimeError("generated workflow package does not define __all__")
+    raise RuntimeError(f"generated package {init_path} does not define __all__")
 
 
 def replace_marker_block(
@@ -128,7 +133,7 @@ def replace_marker_block(
 
 
 def generate_workflow_exports() -> None:
-    exports = workflow_exports()
+    exports = generated_exports(workflow_output_dir / "__init__.py")
     import_block = [
         "# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n",
         "from temporalio.nexus.system.workflow_service import (\n",
@@ -155,28 +160,6 @@ def generate_workflow_exports() -> None:
     )
 
 
-def publish_generated_packages(
-    staged_workflow: Path, staged_notification: Path
-) -> None:
-    for output_dir in (workflow_output_dir, notification_output_dir):
-        shutil.rmtree(output_dir, ignore_errors=True)
-    workflow_output_dir.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(staged_workflow, workflow_output_dir)
-    notification_output_dir.mkdir(parents=True)
-    shutil.copy2(
-        staged_notification / "models.py", notification_output_dir / "models.py"
-    )
-    notification_output_dir.joinpath("__init__.py").write_text(
-        "from .models import OnCompleteRequest, OnCompleteRequestResult, OnCompleteResponse\n\n"
-        "__all__ = [\n"
-        '    "OnCompleteRequest",\n'
-        '    "OnCompleteRequestResult",\n'
-        '    "OnCompleteResponse",\n'
-        "]\n"
-    )
-    workflow_output_dir.parent.joinpath("__init__.py").touch()
-
-
 def generate_nexus_system_api() -> None:
     required_paths = [
         wit_input_dir / "workflow-service.wit",
@@ -188,19 +171,23 @@ def generate_nexus_system_api() -> None:
         if not path.exists():
             raise RuntimeError(f"missing generator input: {path}")
     with tempfile.TemporaryDirectory(dir=base_dir) as temp_dir:
-        staging_dir = Path(temp_dir)
-        descriptor_path = staging_dir / "temporal_api.bin"
+        descriptor_path = Path(temp_dir) / "temporal_api.bin"
         build_descriptor_set(descriptor_path)
         command = nex_gen_command()
-        staged_workflow = staging_dir / "workflow_service"
-        staged_notification = staging_dir / "notifications"
-        generate_package(
-            command, "workflow-service.wit", staged_workflow, native_api=True
-        )
-        generate_package(
-            command, "notification-service.wit", staged_notification, native_api=False
-        )
-        publish_generated_packages(staged_workflow, staged_notification)
+        for wit_name, output_dir, native_api in (
+            ("workflow-service.wit", workflow_output_dir, True),
+            ("notification-service.wit", notification_output_dir, False),
+        ):
+            shutil.rmtree(output_dir, ignore_errors=True)
+            output_dir.parent.mkdir(parents=True, exist_ok=True)
+            generate_package(
+                command,
+                wit_name,
+                output_dir,
+                descriptor_path,
+                native_api=native_api,
+            )
+    workflow_output_dir.parent.joinpath("__init__.py").touch()
     generate_workflow_exports()
     format_paths = [
         str(workflow_output_dir),

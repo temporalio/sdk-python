@@ -129,25 +129,19 @@ def _value_to_payload(value: object | common_pb2.Payload) -> common_pb2.Payload:
     return _clone_payload(payloads.payloads[0])
 
 
-def _payload_to_value(payload: common_pb2.Payload) -> object:
-    wrapper = common_pb2.Payloads()
-    wrapper.payloads.add().CopyFrom(payload)
-
-    return typing.cast(
-        object,
-        temporalio.nexus.system._current_user_payload_converter().from_payloads_wrapper(
-            wrapper
-        )[0],
-    )
+def _payload_to_value(
+    payload: common_pb2.Payload, type_hint: typing.Any = None
+) -> object:
+    return temporalio.nexus.system._current_user_payload_converter().from_payloads(
+        [_clone_payload(payload)], [type_hint] if type_hint is not None else None
+    )[0]
 
 
 def payload_from_proto(
     proto: common_pb2.Payload,
     type_hint: typing.Any = None,
 ) -> object:
-    return temporalio.nexus.system._current_user_payload_converter().from_payloads(
-        [proto], [type_hint] if type_hint is not None else None
-    )[0]
+    return _payload_to_value(proto, type_hint)
 
 
 def payload_to_proto(
