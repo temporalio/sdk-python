@@ -164,7 +164,8 @@ class ChildWorkflowConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_child_workflow`
     and :py:func:`execute_child_workflow`.
 
-    ``event_groups`` is experimental and may change without notice.
+    ``event_groups`` and ``versioning_override`` are experimental and may change
+    without notice.
     """
 
     id: str | None
@@ -182,6 +183,7 @@ class ChildWorkflowConfig(TypedDict, total=False):
         temporalio.common.SearchAttributes | temporalio.common.TypedSearchAttributes
     )
     versioning_intent: VersioningIntent | None
+    versioning_override: temporalio.common.VersioningOverride | None
     static_summary: str | None
     static_details: str | None
     event_groups: Sequence[EventGroup] | None
@@ -213,6 +215,7 @@ async def start_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -242,6 +245,7 @@ async def start_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -271,6 +275,7 @@ async def start_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ChildWorkflowHandle[SelfType, ReturnType]: ...
 
 
@@ -302,6 +307,7 @@ async def start_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ChildWorkflowHandle[Any, Any]: ...
 
 
@@ -331,6 +337,7 @@ async def start_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ChildWorkflowHandle[Any, Any]:
     """Start a child workflow and return its handle.
 
@@ -371,6 +378,9 @@ async def start_child_workflow(
             addition to those active in the current scope. See
             :py:func:`temporalio.workflow.create_event_group`.
         priority: Priority to use for this workflow.
+        versioning_override: Experimental override of the child workflow's versioning
+            behavior. Takes precedence over versioning inherited from the parent
+            workflow. Requires Temporal Server 1.32 or newer.
 
     Returns:
         A workflow handle to the started/existing workflow.
@@ -397,6 +407,7 @@ async def start_child_workflow(
         static_details=static_details,
         event_groups=event_groups,
         priority=priority,
+        versioning_override=versioning_override,
     )
 
 
@@ -425,6 +436,7 @@ async def execute_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ReturnType: ...
 
 
@@ -454,6 +466,7 @@ async def execute_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ReturnType: ...
 
 
@@ -483,6 +496,7 @@ async def execute_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> ReturnType: ...
 
 
@@ -514,6 +528,7 @@ async def execute_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> Any: ...
 
 
@@ -543,6 +558,7 @@ async def execute_child_workflow(
     static_details: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    versioning_override: temporalio.common.VersioningOverride | None = None,
 ) -> Any:
     """Start a child workflow and wait for completion.
 
@@ -572,6 +588,7 @@ async def execute_child_workflow(
         static_details=static_details,
         event_groups=event_groups,
         priority=priority,
+        versioning_override=versioning_override,
     )
     return await handle
 

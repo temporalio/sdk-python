@@ -491,7 +491,9 @@ class Worker:
 
         self._activity_worker: _ActivityWorker | None = None
         self._runtime = (
-            bridge_client.config.runtime or temporalio.runtime.Runtime.default()
+            bridge_client._runtime
+            or bridge_client.config.runtime
+            or temporalio.runtime.Runtime.default()
         )
         activities = config.get("activities")
         if activities:
@@ -743,7 +745,7 @@ class Worker:
         must be using the same runtime as the current client.
         """
         bridge_client = _extract_bridge_client_for_worker(value)
-        if self._runtime is not bridge_client.config.runtime:
+        if self._runtime is not bridge_client._runtime:
             raise ValueError(
                 "New client is not on the same runtime as the existing client"
             )

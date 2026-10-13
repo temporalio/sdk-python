@@ -23,8 +23,6 @@ class Plugin(abc.ABC):
     Plugins allow customization of worker creation and execution processes
     through a chain of responsibility pattern. Each plugin can modify the worker
     configuration or intercept worker execution.
-
-    WARNING: This is an experimental feature and may change in the future.
     """
 
     def name(self) -> str:

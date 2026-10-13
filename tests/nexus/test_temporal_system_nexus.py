@@ -14,6 +14,7 @@ from google.protobuf.message import Message
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
+import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus.system as nexus_system
@@ -28,6 +29,7 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
 from temporalio.client import Client
 from temporalio.converter import (
     CompositePayloadConverter,
+    DefaultFailureConverter,
     DefaultPayloadConverter,
     EncodingPayloadConverter,
     ExternalStorage,
@@ -290,6 +292,15 @@ class ContextPayloadConverterSet(CompositePayloadConverter):
         )
 
 
+class ContextFailureConverter(DefaultFailureConverter, WithSerializationContext):
+    def __init__(self, context: SerializationContext | None = None) -> None:
+        super().__init__()
+        self.context = context
+
+    def with_context(self, context: SerializationContext) -> ContextFailureConverter:
+        return ContextFailureConverter(context)
+
+
 class ContextPayloadCodec(PayloadCodec, WithSerializationContext):
     def __init__(
         self,
@@ -447,7 +458,23 @@ def _new_unmarked_system_nexus_request_payload() -> temporalio.api.common.v1.Pay
     return payload
 
 
-async def test_nexus_payload_serializer_decodes_system_input() -> None:
+@pytest.mark.parametrize(
+    "versioning_override",
+    [
+        None,
+        temporalio.common.PinnedVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion("deployment", "build")
+        ),
+        temporalio.common.AutoUpgradeVersioningOverride(),
+        temporalio.common.OneTimeVersioningOverride(
+            temporalio.common.WorkerDeploymentVersion("deployment", "build")
+        ),
+    ],
+    ids=["absent", "pinned", "auto-upgrade", "one-time"],
+)
+async def test_nexus_payload_serializer_decodes_system_input(
+    versioning_override: temporalio.common.VersioningOverride | None,
+) -> None:
     """A marked system request is decoded into its generated Nexus model."""
     data_converter = temporalio.converter.default()
     request = workflow_service_models.SignalWithStartWorkflowRequest(
@@ -458,6 +485,7 @@ async def test_nexus_payload_serializer_decodes_system_input() -> None:
         signal="test-signal",
         namespace="target-namespace",
         headers={"test-header": "header-value"},
+        versioning_override=versioning_override,
     )
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
@@ -881,11 +909,39 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
 
 
 @pytest.mark.requires_local_server
-async def test_signal_with_start_uses_target_context_for_converter_and_codec(
+@pytest.mark.parametrize("use_operation_context", [True, False])
+async def test_signal_with_start_uses_operation_context_for_converter_and_codec(
     env: WorkflowEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+    use_operation_context: bool,
 ) -> None:
     if env.supports_time_skipping:
         pytest.skip("Nexus tests don't work with the Java test server")
+
+    failure_converter_contexts: list[SerializationContext | None] = []
+    original_get_payload_converter = nexus_system._get_payload_converter
+
+    def capture_failure_converter_context(
+        internal_payload_converter: temporalio.converter.PayloadConverter,
+        user_failure_converter: temporalio.converter.FailureConverter,
+    ) -> temporalio.converter.PayloadConverter:
+        assert isinstance(user_failure_converter, ContextFailureConverter)
+        failure_converter_contexts.append(user_failure_converter.context)
+        return original_get_payload_converter(
+            internal_payload_converter, user_failure_converter
+        )
+
+    monkeypatch.setattr(
+        nexus_system,
+        "_get_payload_converter",
+        capture_failure_converter_context,
+    )
+    if not use_operation_context:
+        monkeypatch.setattr(
+            nexus_system,
+            "_get_serialization_context",
+            lambda _service, _operation, _request: None,
+        )
 
     codec_contexts: list[SerializationContext | None] = []
     payload_converter = ContextPayloadConverterSet()
@@ -894,6 +950,7 @@ async def test_signal_with_start_uses_target_context_for_converter_and_codec(
         temporalio.converter.default(),
         payload_converter_class=cast(type[PayloadConverter], lambda: payload_converter),
         payload_codec=ContextPayloadCodec(codec_contexts),
+        failure_converter_class=ContextFailureConverter,
     )
     caller_client = Client(**caller_config)
     caller_task_queue = str(uuid.uuid4())
@@ -915,14 +972,25 @@ async def test_signal_with_start_uses_target_context_for_converter_and_codec(
 
     assert result == target_workflow_id
     assert len(payload_converter.contexts) >= 2
-    assert all(
-        isinstance(context, WorkflowSerializationContext)
-        and context.workflow_id == target_workflow_id
-        for context in payload_converter.contexts
-    ), payload_converter.contexts
     assert len(codec_contexts) >= 2
-    assert all(
-        isinstance(context, WorkflowSerializationContext)
-        and context.workflow_id == target_workflow_id
-        for context in codec_contexts
-    ), codec_contexts
+    assert failure_converter_contexts
+    if use_operation_context:
+        assert all(
+            isinstance(context, WorkflowSerializationContext)
+            and context.workflow_id == target_workflow_id
+            for context in payload_converter.contexts
+        ), payload_converter.contexts
+        assert all(
+            isinstance(context, WorkflowSerializationContext)
+            and context.workflow_id == target_workflow_id
+            for context in codec_contexts
+        ), codec_contexts
+        assert all(
+            isinstance(context, WorkflowSerializationContext)
+            and context.workflow_id == target_workflow_id
+            for context in failure_converter_contexts
+        ), failure_converter_contexts
+    else:
+        assert all(context is None for context in payload_converter.contexts)
+        assert all(context is None for context in codec_contexts)
+        assert all(context is None for context in failure_converter_contexts)

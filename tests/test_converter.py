@@ -51,6 +51,7 @@ from temporalio.converter import (
     TransferTypeConverter,
     create_payload_validation_error,
     decode_search_attributes,
+    decode_typed_search_attributes,
     encode_search_attribute_values,
     encode_typed_search_attribute_value,
     transfer_type_convertible,
@@ -488,6 +489,22 @@ def test_encode_typed_search_attribute_value_datetime_requires_timezone():
     assert payload.metadata["type"] == b"Datetime"
 
 
+def test_decode_typed_search_attributes_whole_number_double():
+    # Visibility returns a whole-number Double as a JSON integer
+    key = temporalio.common.SearchAttributeKey.for_float("score")
+    api = temporalio.api.common.v1.SearchAttributes(
+        indexed_fields={
+            "score": temporalio.api.common.v1.Payload(
+                data=b"5",
+                metadata={"type": b"Double", "encoding": b"json/plain"},
+            )
+        }
+    )
+    val = decode_typed_search_attributes(api).get(key)
+    assert val == 5.0
+    assert type(val) is float
+
+
 def test_decode_search_attributes():
     """Tests decode from protobuf for python types"""
 
@@ -533,6 +550,24 @@ class NestedDataClass:
     bar: list[NestedDataClass] = dataclasses.field(default_factory=list)
     baz: NestedDataClass | None = None
     qux: UUID | None = None
+
+
+@dataclass
+class InitFalseDataClass:
+    foo: str
+    bar: str = dataclasses.field(default="default-bar", init=False)
+
+
+@dataclass(frozen=True)
+class FrozenInitFalseDataClass:
+    foo: str
+    bar: str = dataclasses.field(default="default-bar", init=False)
+
+
+@dataclass
+class InitFalseIntDataClass:
+    foo: str
+    bar: int = dataclasses.field(default=0, init=False)
 
 
 class MyTypedDict(TypedDict):
@@ -633,6 +668,16 @@ def test_json_type_hints():
     fail(NestedDataClass, {})
     # Additional dataclass fields is ok
     ok(NestedDataClass, {"foo": "bar", "unknownfield": "baz"}, NestedDataClass("bar"))
+    # Dataclass with init=False fields restores their values
+    ok(InitFalseDataClass, InitFalseDataClass("hello"))
+    init_false = InitFalseDataClass("hello")
+    init_false.bar = "custom-bar"
+    ok(InitFalseDataClass, init_false)
+    frozen_init_false = FrozenInitFalseDataClass("hello")
+    object.__setattr__(frozen_init_false, "bar", "custom-bar")
+    ok(FrozenInitFalseDataClass, frozen_init_false)
+    # init=False field types still decide which union member matches
+    ok(InitFalseIntDataClass | InitFalseDataClass, init_false)
 
     # Optional/Union
     ok(int | None, 5)

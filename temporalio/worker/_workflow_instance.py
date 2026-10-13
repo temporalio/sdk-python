@@ -987,6 +987,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         job.failed.workflow_id, job.failed.workflow_type
                     )
                 )
+            elif (
+                job.failed.cause
+                == temporalio.bridge.proto.child_workflow.StartChildWorkflowExecutionFailedCause.START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_INVALID_VERSIONING_OVERRIDE
+            ):
+                handle._resolve_failure(
+                    temporalio.exceptions.InvalidVersioningOverrideError()
+                )
             else:
                 handle._resolve_failure(
                     RuntimeError(f"Unknown child start fail cause: {job.failed.cause}")
@@ -1655,6 +1662,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         static_details: str | None = None,
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        versioning_override: temporalio.common.VersioningOverride | None = None,
     ) -> temporalio.workflow.ChildWorkflowHandle[Any, Any]:
         # Use definition if callable
         name: str
@@ -1692,6 +1700,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 arg_types=arg_types,
                 ret_type=ret_type,
                 versioning_intent=versioning_intent,
+                versioning_override=versioning_override,
                 static_summary=static_summary,
                 static_details=static_details,
                 event_groups=event_groups,
@@ -2240,8 +2249,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 input.operation_name,
                 input.input,
             )
-            user_payload_converter = self._workflow_context_payload_converter
-            user_failure_converter = self._workflow_context_failure_converter
+            user_payload_converter = self._context_free_payload_converter
+            user_failure_converter = self._context_free_failure_converter
             if serialization_context is not None:
                 user_payload_converter = self._payload_converter_with_context(
                     serialization_context
@@ -3419,7 +3428,9 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         return super().cancel(msg)
 
     def _request_cancel(self) -> None:
-        if self._cancel_command_seq == self._seq:
+        # While evicting, _add_command must still run because the
+        # _WorkflowBeingEvictedError it raises is what ends this handle's task
+        if self._cancel_command_seq == self._seq and not self._instance._deleting:
             return
         self._cancel_command_seq = self._seq
         self._apply_cancel_command(self._instance._add_command())
@@ -3665,6 +3676,8 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
         )
         if self._input.versioning_intent:
             v.versioning_intent = self._input.versioning_intent._to_proto()
+        if self._input.versioning_override:
+            v.versioning_override.CopyFrom(self._input.versioning_override._to_proto())
         if self._input.static_summary:
             command.user_metadata.summary.CopyFrom(
                 self._payload_converter.to_payload(self._input.static_summary)

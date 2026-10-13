@@ -1,0 +1,1 @@
+`GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers, update validators), returning the workflow's deterministic time and fresh entropy without touching the workflow's random state.

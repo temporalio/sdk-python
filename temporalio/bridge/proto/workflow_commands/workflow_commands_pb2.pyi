@@ -25,6 +25,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
 import temporalio.bridge.proto.nexus.nexus_pb2
@@ -1227,6 +1228,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
     CANCELLATION_TYPE_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    VERSIONING_OVERRIDE_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     namespace: builtins.str
@@ -1287,6 +1289,13 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """The Priority to use for this activity"""
+    @property
+    def versioning_override(
+        self,
+    ) -> temporalio.api.workflow.v1.message_pb2.VersioningOverride:
+        """Allows routing the child independently of the parent's worker deployment version.
+        Requires Temporal Server 1.32+.
+        """
     def __init__(
         self,
         *,
@@ -1317,6 +1326,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
         cancellation_type: temporalio.bridge.proto.child_workflow.child_workflow_pb2.ChildWorkflowCancellationType.ValueType = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        versioning_override: temporalio.api.workflow.v1.message_pb2.VersioningOverride
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1327,6 +1338,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             b"retry_policy",
             "search_attributes",
             b"search_attributes",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_run_timeout",
@@ -1364,6 +1377,8 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             b"task_queue",
             "versioning_intent",
             b"versioning_intent",
+            "versioning_override",
+            b"versioning_override",
             "workflow_execution_timeout",
             b"workflow_execution_timeout",
             "workflow_id",
