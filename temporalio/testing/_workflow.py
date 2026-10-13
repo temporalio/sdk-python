@@ -368,7 +368,7 @@ class WorkflowEnvironment:
 
     async def get_current_time(
         self,
-        handle: temporalio.client.WorkflowHandle[Any, Any] | None = None,
+        handle: temporalio.client.WorkflowHandle[Any, Any] | None = None,  # pyright: ignore[reportUnusedParameter]
     ) -> datetime:
         """Get the current time known to this environment.
 
@@ -453,8 +453,8 @@ class WorkflowEnvironment:
 
     async def fast_forward(
         self,
-        handle: temporalio.client.WorkflowHandle[Any, Any],
-        duration: timedelta | float | None = None,
+        handle: temporalio.client.WorkflowHandle[Any, Any],  # pyright: ignore[reportUnusedParameter]
+        duration: timedelta | float | None = None,  # pyright: ignore[reportUnusedParameter]
         /,
     ) -> bool:
         """Fast-forward this workflow's virtual clock by ``duration``, and wait for it to complete.
@@ -493,7 +493,7 @@ class WorkflowEnvironment:
 
     async def get_time_skipping_info(
         self,
-        handle: temporalio.client.WorkflowHandle[Any, Any],
+        handle: temporalio.client.WorkflowHandle[Any, Any],  # pyright: ignore[reportUnusedParameter]
     ) -> temporalio.api.common.v1.TimeSkippingInfo | None:
         """Fetch a workflow's ``TimeSkippingInfo`` via ``DescribeWorkflowExecution``.
 
@@ -838,7 +838,7 @@ class _V2WorkflowEnvironment(_HasAServer):
             "env.with_time_skipping_disabled() to suspend time-skipping config "
             "stamping on newly-started workflows."
         )
-        yield None  # unreachable; makes this a generator for @contextmanager
+        yield None  # pyright: ignore[reportUnreachable]  # unreachable; makes this a generator for @contextmanager
 
     async def fast_forward(
         self,
