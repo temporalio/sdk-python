@@ -19,13 +19,18 @@ from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
 from temporalio.common import RetryPolicy
 from temporalio.converter import (
+    ActivitySerializationContext,
     ExternalStorage,
+    PayloadCodec,
+    SerializationContext,
     StorageDriver,
     StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
+    WithSerializationContext,
+    WorkflowSerializationContext,
 )
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
@@ -484,6 +489,86 @@ async def test_extstore_reference_payloads_codec_encoded_in_history(
     await Replayer(
         workflows=[ExtStoreWorkflow], data_converter=data_converter
     ).replay_workflow(history)
+
+
+class ReferenceContextRecordingCodec(PayloadCodec, WithSerializationContext):
+    """Encodes like RecordingPayloadCodec and records the serialization context
+    each storage reference payload is encoded with."""
+
+    def __init__(
+        self,
+        reference_contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self._reference_contexts = reference_contexts
+        self._context = context
+        self._codec = RecordingPayloadCodec("binary/test-encoded")
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> "ReferenceContextRecordingCodec":
+        return ReferenceContextRecordingCodec(self._reference_contexts, context)
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        for p in payloads:
+            if (
+                p.metadata.get("messageType")
+                == b"temporal.api.sdk.v1.ExternalStorageReference"
+            ):
+                self._reference_contexts.append(self._context)
+        return await self._codec.encode(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return await self._codec.decode(payloads)
+
+
+async def test_extstore_reference_payloads_use_payload_serialization_context(
+    env: WorkflowEnvironment,
+) -> None:
+    """Each reference payload is encoded with the serialization context of the
+    value it replaces: workflow context for workflow input and result, activity
+    context for activity input and result."""
+    reference_contexts: list[SerializationContext | None] = []
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=ReferenceContextRecordingCodec(reference_contexts),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            payload_size_threshold=512,
+        ),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        await client.execute_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,
+                activity_input_size=1024,
+                activity_output_size=1024,
+                output_size=1024,
+            ),
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    workflow_contexts = [
+        c for c in reference_contexts if isinstance(c, WorkflowSerializationContext)
+    ]
+    activity_contexts = [
+        c for c in reference_contexts if isinstance(c, ActivitySerializationContext)
+    ]
+    # Workflow input (client) and workflow result (workflow worker).
+    assert len(workflow_contexts) == 2
+    assert all(c.workflow_id == workflow_id for c in workflow_contexts)
+    # Activity input (workflow worker) and activity result (activity worker).
+    assert len(activity_contexts) == 2
+    assert all(
+        c.workflow_id == workflow_id and not c.is_local for c in activity_contexts
+    )
+    assert len(reference_contexts) == 4
 
 
 async def test_replay_extstore_history_fails_with_empty_driver(
