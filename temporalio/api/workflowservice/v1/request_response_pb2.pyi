@@ -605,6 +605,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     PRIORITY_FIELD_NUMBER: builtins.int
     EAGER_WORKER_DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -731,6 +732,11 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
         """Time-skipping configuration. If not set, time skipping is disabled."""
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this workflow."""
     def __init__(
         self,
         *,
@@ -774,6 +780,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         | None = ...,
         time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -794,6 +802,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"on_conflict_options",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "search_attributes",
@@ -847,6 +857,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"on_conflict_options",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "request_eager_execution",
             b"request_eager_execution",
             "request_id",
@@ -1020,6 +1032,7 @@ class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
     RAW_HISTORY_FIELD_NUMBER: builtins.int
     NEXT_PAGE_TOKEN_FIELD_NUMBER: builtins.int
     ARCHIVED_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     @property
     def history(self) -> temporalio.api.history.v1.message_pb2.History: ...
     @property
@@ -1034,6 +1047,14 @@ class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
     next_page_token: builtins.bytes
     """Will be set if there are more history events than were included in this response"""
     archived: builtins.bool
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this run.
+        Returned on the initial request (without next_page_token) when present. Clients should
+        retain it across paginated responses, which may omit it.
+        """
     def __init__(
         self,
         *,
@@ -1044,9 +1065,17 @@ class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
         | None = ...,
         next_page_token: builtins.bytes = ...,
         archived: builtins.bool = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["history", b"history"]
+        self,
+        field_name: typing_extensions.Literal[
+            "history",
+            b"history",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -1057,6 +1086,8 @@ class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
             b"history",
             "next_page_token",
             b"next_page_token",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "raw_history",
             b"raw_history",
         ],
@@ -2095,6 +2126,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     ACTIVITY_RUN_ID_FIELD_NUMBER: builtins.int
     POLLER_GROUP_INFOS_FIELD_NUMBER: builtins.int
     POLLER_GROUPS_INFO_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     task_token: builtins.bytes
     """A unique identifier for this task"""
     workflow_namespace: builtins.str
@@ -2200,6 +2232,11 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
           3. If every group has some pending polls, assign the next poll to a group randomly
             according to the weights.
         """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this activity."""
     def __init__(
         self,
         *,
@@ -2232,6 +2269,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
         | None = ...,
         poller_groups_info: temporalio.api.taskqueue.v1.message_pb2.PollerGroupsInfo
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2254,6 +2293,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             b"poller_scaling_decision",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -2299,6 +2340,8 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
             b"poller_scaling_decision",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -11999,6 +12042,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
     LINKS_FIELD_NUMBER: builtins.int
     ON_CONFLICT_OPTIONS_FIELD_NUMBER: builtins.int
     START_DELAY_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     """The identity of the client who initiated this request"""
@@ -12102,6 +12147,17 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
     @property
     def start_delay(self) -> google.protobuf.duration_pb2.Duration:
         """Time to wait before making the first activity task available for dispatch. This delay is not applied to retry attempts."""
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this activity."""
+    request_eager_execution: builtins.bool
+    """Request that the first activity task be returned directly in the start response instead of
+    being dispatched through a task queue. If set to true, the caller is expected to have a
+    worker available and capable of processing the task. The returned task will be marked as
+    started. The server may ignore this request.
+    """
     def __init__(
         self,
         *,
@@ -12134,6 +12190,9 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
         on_conflict_options: temporalio.api.common.v1.message_pb2.OnConflictOptions
         | None = ...,
         start_delay: google.protobuf.duration_pb2.Duration | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
+        request_eager_execution: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -12150,6 +12209,8 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"on_conflict_options",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -12197,6 +12258,10 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
             b"on_conflict_options",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+            "request_eager_execution",
+            b"request_eager_execution",
             "request_id",
             b"request_id",
             "retry_policy",
@@ -12226,6 +12291,7 @@ class StartActivityExecutionResponse(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     STARTED_FIELD_NUMBER: builtins.int
     LINK_FIELD_NUMBER: builtins.int
+    EAGER_ACTIVITY_TASK_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run ID of the activity that was started - or used (via ACTIVITY_ID_CONFLICT_POLICY_USE_EXISTING)."""
     started: builtins.bool
@@ -12233,20 +12299,36 @@ class StartActivityExecutionResponse(google.protobuf.message.Message):
     @property
     def link(self) -> temporalio.api.common.v1.message_pb2.Link:
         """Link to the started activity."""
+    @property
+    def eager_activity_task(self) -> global___PollActivityTaskQueueResponse:
+        """The first activity task when eager execution was requested and accepted.
+        This is set only for the first attempt of a newly started activity.
+        """
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
         started: builtins.bool = ...,
         link: temporalio.api.common.v1.message_pb2.Link | None = ...,
+        eager_activity_task: global___PollActivityTaskQueueResponse | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["link", b"link"]
+        self,
+        field_name: typing_extensions.Literal[
+            "eager_activity_task", b"eager_activity_task", "link", b"link"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "link", b"link", "run_id", b"run_id", "started", b"started"
+            "eager_activity_task",
+            b"eager_activity_task",
+            "link",
+            b"link",
+            "run_id",
+            b"run_id",
+            "started",
+            b"started",
         ],
     ) -> None: ...
 
@@ -12430,26 +12512,45 @@ class PollActivityExecutionResponse(google.protobuf.message.Message):
 
     RUN_ID_FIELD_NUMBER: builtins.int
     OUTCOME_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The run ID of the activity, useful when run_id was not specified in the request."""
     @property
     def outcome(
         self,
     ) -> temporalio.api.activity.v1.message_pb2.ActivityExecutionOutcome: ...
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this activity."""
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
         outcome: temporalio.api.activity.v1.message_pb2.ActivityExecutionOutcome
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["outcome", b"outcome"]
+        self,
+        field_name: typing_extensions.Literal[
+            "outcome",
+            b"outcome",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "outcome", b"outcome", "run_id", b"run_id"
+            "outcome",
+            b"outcome",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+            "run_id",
+            b"run_id",
         ],
     ) -> None: ...
 
@@ -12979,6 +13080,7 @@ class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     WAIT_STAGE_FIELD_NUMBER: builtins.int
     OPERATION_TOKEN_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     RESULT_FIELD_NUMBER: builtins.int
     FAILURE_FIELD_NUMBER: builtins.int
     run_id: builtins.str
@@ -12987,6 +13089,13 @@ class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
     """The current stage of the operation. May be more advanced than the stage requested in the poll."""
     operation_token: builtins.str
     """Operation token. Only populated for asynchronous operations after a successful StartOperation call."""
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context for this operation's payloads, derived from its stored target.
+        For a reused operation, this is the original execution's context.
+        """
     @property
     def result(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """The result if the operation completed successfully."""
@@ -12999,13 +13108,22 @@ class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
         run_id: builtins.str = ...,
         wait_stage: temporalio.api.enums.v1.nexus_pb2.NexusOperationWaitStage.ValueType = ...,
         operation_token: builtins.str = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
         result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "failure", b"failure", "outcome", b"outcome", "result", b"result"
+            "failure",
+            b"failure",
+            "outcome",
+            b"outcome",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+            "result",
+            b"result",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -13017,6 +13135,8 @@ class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
             b"operation_token",
             "outcome",
             b"outcome",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "result",
             b"result",
             "run_id",

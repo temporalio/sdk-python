@@ -26,6 +26,33 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class PropagatedSerializationContext(google.protobuf.message.Message):
+    """PropagatedSerializationContext represents the context of the Nexus caller that started this execution."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ENDPOINT_FIELD_NUMBER: builtins.int
+    SERVICE_FIELD_NUMBER: builtins.int
+    OPERATION_FIELD_NUMBER: builtins.int
+    endpoint: builtins.str
+    service: builtins.str
+    operation: builtins.str
+    def __init__(
+        self,
+        *,
+        endpoint: builtins.str = ...,
+        service: builtins.str = ...,
+        operation: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "endpoint", b"endpoint", "operation", b"operation", "service", b"service"
+        ],
+    ) -> None: ...
+
+global___PropagatedSerializationContext = PropagatedSerializationContext
+
 class Failure(google.protobuf.message.Message):
     """A general purpose failure message.
     See: https://github.com/nexus-rpc/api/blob/main/SPEC.md#failure

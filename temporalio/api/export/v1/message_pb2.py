@@ -17,14 +17,19 @@ _sym_db = _symbol_database.Default()
 from temporalio.api.history.v1 import (
     message_pb2 as temporal_dot_api_dot_history_dot_v1_dot_message__pb2,
 )
+from temporalio.api.workflowservice.v1 import (
+    request_response_pb2 as temporal_dot_api_dot_workflowservice_dot_v1_dot_request__response__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n$temporal/api/export/v1/message.proto\x12\x16temporal.api.export.v1\x1a%temporal/api/history/v1/message.proto"F\n\x11WorkflowExecution\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History"N\n\x12WorkflowExecutions\x12\x38\n\x05items\x18\x01 \x03(\x0b\x32).temporal.api.export.v1.WorkflowExecutionB\x89\x01\n\x19io.temporal.api.export.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/export/v1;export\xaa\x02\x18Temporalio.Api.Export.V1\xea\x02\x1bTemporalio::Api::Export::V1b\x06proto3'
+    b'\n$temporal/api/export/v1/message.proto\x12\x16temporal.api.export.v1\x1a%temporal/api/history/v1/message.proto\x1a\x36temporal/api/workflowservice/v1/request_response.proto"F\n\x11WorkflowExecution\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History"N\n\x12WorkflowExecutions\x12\x38\n\x05items\x18\x01 \x03(\x0b\x32).temporal.api.export.v1.WorkflowExecution"i\n\x11\x41\x63tivityExecution\x12T\n\x08\x61\x63tivity\x18\x01 \x01(\x0b\x32\x42.temporal.api.workflowservice.v1.DescribeActivityExecutionResponse"\x91\x01\n\x12\x45xportedExecutions\x12<\n\tworkflows\x18\x01 \x03(\x0b\x32).temporal.api.export.v1.WorkflowExecution\x12=\n\nactivities\x18\x02 \x03(\x0b\x32).temporal.api.export.v1.ActivityExecutionB\x89\x01\n\x19io.temporal.api.export.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/export/v1;export\xaa\x02\x18Temporalio.Api.Export.V1\xea\x02\x1bTemporalio::Api::Export::V1b\x06proto3'
 )
 
 
 _WORKFLOWEXECUTION = DESCRIPTOR.message_types_by_name["WorkflowExecution"]
 _WORKFLOWEXECUTIONS = DESCRIPTOR.message_types_by_name["WorkflowExecutions"]
+_ACTIVITYEXECUTION = DESCRIPTOR.message_types_by_name["ActivityExecution"]
+_EXPORTEDEXECUTIONS = DESCRIPTOR.message_types_by_name["ExportedExecutions"]
 WorkflowExecution = _reflection.GeneratedProtocolMessageType(
     "WorkflowExecution",
     (_message.Message,),
@@ -47,11 +52,37 @@ WorkflowExecutions = _reflection.GeneratedProtocolMessageType(
 )
 _sym_db.RegisterMessage(WorkflowExecutions)
 
+ActivityExecution = _reflection.GeneratedProtocolMessageType(
+    "ActivityExecution",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _ACTIVITYEXECUTION,
+        "__module__": "temporalio.api.export.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.ActivityExecution)
+    },
+)
+_sym_db.RegisterMessage(ActivityExecution)
+
+ExportedExecutions = _reflection.GeneratedProtocolMessageType(
+    "ExportedExecutions",
+    (_message.Message,),
+    {
+        "DESCRIPTOR": _EXPORTEDEXECUTIONS,
+        "__module__": "temporalio.api.export.v1.message_pb2",
+        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.ExportedExecutions)
+    },
+)
+_sym_db.RegisterMessage(ExportedExecutions)
+
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.export.v1B\014MessageProtoP\001Z#go.temporal.io/api/export/v1;export\252\002\030Temporalio.Api.Export.V1\352\002\033Temporalio::Api::Export::V1"
-    _WORKFLOWEXECUTION._serialized_start = 103
-    _WORKFLOWEXECUTION._serialized_end = 173
-    _WORKFLOWEXECUTIONS._serialized_start = 175
-    _WORKFLOWEXECUTIONS._serialized_end = 253
+    _WORKFLOWEXECUTION._serialized_start = 159
+    _WORKFLOWEXECUTION._serialized_end = 229
+    _WORKFLOWEXECUTIONS._serialized_start = 231
+    _WORKFLOWEXECUTIONS._serialized_end = 309
+    _ACTIVITYEXECUTION._serialized_start = 311
+    _ACTIVITYEXECUTION._serialized_end = 416
+    _EXPORTEDEXECUTIONS._serialized_start = 419
+    _EXPORTEDEXECUTIONS._serialized_end = 564
 # @@protoc_insertion_point(module_scope)

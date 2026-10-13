@@ -27,6 +27,7 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
+    REGION_IDS_FIELD_NUMBER: builtins.int
     PROVIDER_FIELD_NUMBER: builtins.int
     SCALER_FIELD_NUMBER: builtins.int
     @property
@@ -38,6 +39,13 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
         """Optional. The set of task queue types this scaling group serves.
         If not provided, this scaling group serves all not otherwise defined
         task types.
+        """
+    @property
+    def region_ids(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """Optional. If set, this scaling group is used only while the namespace is
+        active in one of these regions.
         """
     @property
     def provider(self) -> temporalio.api.compute.v1.provider_pb2.ComputeProvider:
@@ -56,6 +64,7 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
             temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
         ]
         | None = ...,
+        region_ids: collections.abc.Iterable[builtins.str] | None = ...,
         provider: temporalio.api.compute.v1.provider_pb2.ComputeProvider | None = ...,
         scaler: temporalio.api.compute.v1.scaler_pb2.ComputeScaler | None = ...,
     ) -> None: ...
@@ -70,6 +79,8 @@ class ComputeConfigScalingGroup(google.protobuf.message.Message):
         field_name: typing_extensions.Literal[
             "provider",
             b"provider",
+            "region_ids",
+            b"region_ids",
             "scaler",
             b"scaler",
             "task_queue_types",
@@ -152,7 +163,7 @@ class ComputeConfigScalingGroupUpdate(google.protobuf.message.Message):
         - Empty mask for an existing scaling group is no-op: no change.
         - Non-empty mask for an existing scaling group will update/unset only to the fields
           mentioned in the mask.
-        - Accepted paths: "task_queue_types", "provider", "provider.type", "provider.details",
+        - Accepted paths: "task_queue_types", "region_ids", "provider", "provider.type", "provider.details",
           "provider.nexus_endpoint", "scaler", "scaler.type", "scaler.details"
         """
     def __init__(
@@ -229,6 +240,7 @@ class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
 
     TASK_QUEUE_TYPES_FIELD_NUMBER: builtins.int
     PROVIDER_TYPE_FIELD_NUMBER: builtins.int
+    REGION_IDS_FIELD_NUMBER: builtins.int
     @property
     def task_queue_types(
         self,
@@ -236,6 +248,12 @@ class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
         temporalio.api.enums.v1.task_queue_pb2.TaskQueueType.ValueType
     ]: ...
     provider_type: builtins.str
+    @property
+    def region_ids(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
+        builtins.str
+    ]: ...
     def __init__(
         self,
         *,
@@ -244,11 +262,17 @@ class ComputeConfigScalingGroupSummary(google.protobuf.message.Message):
         ]
         | None = ...,
         provider_type: builtins.str = ...,
+        region_ids: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing_extensions.Literal[
-            "provider_type", b"provider_type", "task_queue_types", b"task_queue_types"
+            "provider_type",
+            b"provider_type",
+            "region_ids",
+            b"region_ids",
+            "task_queue_types",
+            b"task_queue_types",
         ],
     ) -> None: ...
 

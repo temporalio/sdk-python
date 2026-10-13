@@ -19,6 +19,7 @@ import temporalio.api.deployment.v1.message_pb2
 import temporalio.api.enums.v1.activity_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
@@ -236,6 +237,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     SDK_VERSION_FIELD_NUMBER: builtins.int
     START_DELAY_FIELD_NUMBER: builtins.int
     EXECUTION_TIME_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -378,6 +381,15 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         """The time at which the first activity task is made available for dispatch, computed as
         `schedule_time + start_delay`. Same as `schedule_time` if `start_delay` is not set.
         """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this activity."""
+    eager_execution_accepted: builtins.bool
+    """Indicates whether eager execution was requested for this activity and accepted by the server
+    for its first task.
+    """
     def __init__(
         self,
         *,
@@ -425,6 +437,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         sdk_version: builtins.str = ...,
         start_delay: google.protobuf.duration_pb2.Duration | None = ...,
         execution_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
+        eager_execution_accepted: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -461,6 +476,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"next_attempt_schedule_time",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "schedule_time",
@@ -494,6 +511,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"close_time",
             "current_retry_interval",
             b"current_retry_interval",
+            "eager_execution_accepted",
+            b"eager_execution_accepted",
             "execution_duration",
             b"execution_duration",
             "execution_time",
@@ -524,6 +543,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"next_attempt_schedule_time",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "run_id",
