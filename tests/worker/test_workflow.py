@@ -3884,6 +3884,8 @@ async def test_workflow_patch_activation_callback(client: Client):
             args=["my-patch", False],
             id=workflow_id,
             task_queue=worker.task_queue,
+            # A timed-out attempt would consult the callback again.
+            task_timeout=timedelta(seconds=60),
         )
 
     assert result == [True, True]
@@ -3904,6 +3906,8 @@ async def test_workflow_patch_activation_callback_can_decline(client: Client):
             args=["my-patch", False],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # A timed-out attempt would consult the callback again.
+            task_timeout=timedelta(seconds=60),
         )
         assert await handle.result() == [False, False]
 
@@ -3939,6 +3943,8 @@ async def test_workflow_patch_activation_callback_not_recalled_on_replay(
             args=["my-patch", True],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # A timed-out attempt would consult the callback again.
+            task_timeout=timedelta(seconds=60),
         )
         assert result == [False, False]
 
@@ -6832,6 +6838,8 @@ async def test_workflow_current_update(client: Client):
             CurrentUpdateWorkflow.run,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
+            # Repeated task timeouts would reject updates before their handlers run.
+            task_timeout=timedelta(seconds=60),
         )
         update_ids = await asyncio.gather(
             handle.execute_update(CurrentUpdateWorkflow.do_update, id="update1"),
@@ -6945,16 +6953,23 @@ class _UnfinishedHandlersWarningsTest:
         # If we don't capture warnings then -- since the unfinished handler warning is converted to
         # an exception in the test suite -- we see WFT failures when we don't wait for handlers.
         handle: asyncio.Future[WorkflowHandle] = asyncio.Future()
-        asyncio.create_task(
+        result_task = asyncio.create_task(
             self._get_workflow_result(
-                wait_all_handlers_finished=False, handle_future=handle
+                wait_all_handlers_finished=False,
+                handle_future=handle,
+                # Keep deliberate task failure/retry inside the history assertion's deadline.
+                task_timeout=timedelta(seconds=1),
             )
         )
-        await assert_eq_eventually(
-            True,
-            partial(self._workflow_task_failed, workflow_id=(await handle).id),
-            timeout=timedelta(seconds=20),
-        )
+        try:
+            await assert_eq_eventually(
+                True,
+                partial(self._workflow_task_failed, workflow_id=(await handle).id),
+                timeout=timedelta(seconds=20),
+            )
+        finally:
+            result_task.cancel()
+            await asyncio.gather(result_task, return_exceptions=True)
 
     async def _workflow_task_failed(self, workflow_id: str) -> bool:
         resp = await self.client.workflow_service.get_workflow_execution_history(
@@ -6991,12 +7006,14 @@ class _UnfinishedHandlersWarningsTest:
         wait_all_handlers_finished: bool,
         unfinished_policy: workflow.HandlerUnfinishedPolicy | None = None,
         handle_future: asyncio.Future[WorkflowHandle] | None = None,
+        task_timeout: timedelta = timedelta(seconds=60),
     ) -> bool:
         handle = await self.client.start_workflow(
             UnfinishedHandlersWarningsWorkflow.run,
             arg=wait_all_handlers_finished,
             id=f"wf-{uuid.uuid4()}",
             task_queue=self.worker.task_queue,
+            task_timeout=task_timeout,
         )
         if handle_future:
             handle_future.set_result(handle)
@@ -7179,7 +7196,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     async def _run_workflow_and_get_warning(self) -> bool:
         workflow_id = f"wf-{uuid.uuid4()}"
         update_id = "update-id"
-        task_queue = "tq"
+        task_queue = str(uuid.uuid4())
 
         # We require a startWorkflow, an update, and maybe a cancellation request, to be delivered
         # in the same WFT. To do this we start the worker after they've all been accepted by the
@@ -7194,6 +7211,8 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
             ],
             id=workflow_id,
             task_queue=task_queue,
+            # Repeated task timeouts would reject updates before their handlers run.
+            task_timeout=timedelta(seconds=60),
         )
         if self.handler_type == "-update-":
             update_method = (
