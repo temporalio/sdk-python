@@ -24,6 +24,7 @@ import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.event_type_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 
@@ -327,6 +328,7 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     REQUEST_ID_INFOS_FIELD_NUMBER: builtins.int
     PAUSE_INFO_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     @property
     def execution_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Workflow execution expiration time is defined as workflow start time plus expiration timeout.
@@ -366,6 +368,11 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
         """Information about time skipping of the workflow execution.
         If the execution has never enabled time skipping, it will be nil.
         """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this workflow."""
     def __init__(
         self,
         *,
@@ -380,6 +387,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
         pause_info: global___WorkflowExecutionPauseInfo | None = ...,
         time_skipping_info: temporalio.api.common.v1.message_pb2.TimeSkippingInfo
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -392,6 +401,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
             b"original_start_time",
             "pause_info",
             b"pause_info",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "run_expiration_time",
             b"run_expiration_time",
             "time_skipping_info",
@@ -411,6 +422,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
             b"original_start_time",
             "pause_info",
             b"pause_info",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "request_id_infos",
             b"request_id_infos",
             "reset_run_id",

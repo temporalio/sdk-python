@@ -23,9 +23,12 @@ from temporalio.api.enums.v1 import (
 from temporalio.api.failure.v1 import (
     message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
 )
+from temporalio.api.nexus.v1 import (
+    message_pb2 as temporal_dot_api_dot_nexus_dot_v1_dot_message__pb2,
+)
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n$temporal/api/update/v1/message.proto\x12\x16temporal.api.update.v1\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/update.proto\x1a%temporal/api/failure/v1/message.proto"c\n\nWaitPolicy\x12U\n\x0flifecycle_stage\x18\x01 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage"e\n\tUpdateRef\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x11\n\tupdate_id\x18\x02 \x01(\t"|\n\x07Outcome\x12\x33\n\x07success\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.PayloadsH\x00\x12\x33\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x42\x07\n\x05value"+\n\x04Meta\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t"u\n\x05Input\x12.\n\x06header\x18\x01 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x0c\n\x04name\x18\x02 \x01(\t\x12.\n\x04\x61rgs\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xe4\x01\n\x07Request\x12*\n\x04meta\x18\x01 \x01(\x0b\x32\x1c.temporal.api.update.v1.Meta\x12,\n\x05input\x18\x02 \x01(\x0b\x32\x1d.temporal.api.update.v1.Input\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12>\n\x14\x63ompletion_callbacks\x18\x04 \x03(\x0b\x32 .temporal.api.common.v1.Callback\x12+\n\x05links\x18\x05 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link"\xcc\x01\n\tRejection\x12#\n\x1brejected_request_message_id\x18\x01 \x01(\t\x12,\n$rejected_request_sequencing_event_id\x18\x02 \x01(\x03\x12\x39\n\x10rejected_request\x18\x03 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request\x12\x31\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"\x9a\x01\n\nAcceptance\x12#\n\x1b\x61\x63\x63\x65pted_request_message_id\x18\x01 \x01(\t\x12,\n$accepted_request_sequencing_event_id\x18\x02 \x01(\x03\x12\x39\n\x10\x61\x63\x63\x65pted_request\x18\x03 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request"h\n\x08Response\x12*\n\x04meta\x18\x01 \x01(\x0b\x32\x1c.temporal.api.update.v1.Meta\x12\x30\n\x07outcome\x18\x02 \x01(\x0b\x32\x1f.temporal.api.update.v1.OutcomeB\x89\x01\n\x19io.temporal.api.update.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/update/v1;update\xaa\x02\x18Temporalio.Api.Update.V1\xea\x02\x1bTemporalio::Api::Update::V1b\x06proto3'
+    b'\n$temporal/api/update/v1/message.proto\x12\x16temporal.api.update.v1\x1a$temporal/api/common/v1/message.proto\x1a"temporal/api/enums/v1/update.proto\x1a%temporal/api/failure/v1/message.proto\x1a#temporal/api/nexus/v1/message.proto"c\n\nWaitPolicy\x12U\n\x0flifecycle_stage\x18\x01 \x01(\x0e\x32<.temporal.api.enums.v1.UpdateWorkflowExecutionLifecycleStage"e\n\tUpdateRef\x12\x45\n\x12workflow_execution\x18\x01 \x01(\x0b\x32).temporal.api.common.v1.WorkflowExecution\x12\x11\n\tupdate_id\x18\x02 \x01(\t"|\n\x07Outcome\x12\x33\n\x07success\x18\x01 \x01(\x0b\x32 .temporal.api.common.v1.PayloadsH\x00\x12\x33\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x42\x07\n\x05value"+\n\x04Meta\x12\x11\n\tupdate_id\x18\x01 \x01(\t\x12\x10\n\x08identity\x18\x02 \x01(\t"u\n\x05Input\x12.\n\x06header\x18\x01 \x01(\x0b\x32\x1e.temporal.api.common.v1.Header\x12\x0c\n\x04name\x18\x02 \x01(\t\x12.\n\x04\x61rgs\x18\x03 \x01(\x0b\x32 .temporal.api.common.v1.Payloads"\xcb\x02\n\x07Request\x12*\n\x04meta\x18\x01 \x01(\x0b\x32\x1c.temporal.api.update.v1.Meta\x12,\n\x05input\x18\x02 \x01(\x0b\x32\x1d.temporal.api.update.v1.Input\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12>\n\x14\x63ompletion_callbacks\x18\x04 \x03(\x0b\x32 .temporal.api.common.v1.Callback\x12+\n\x05links\x18\x05 \x03(\x0b\x32\x1c.temporal.api.common.v1.Link\x12\x65\n&propagated_nexus_serialization_context\x18\x06 \x01(\x0b\x32\x35.temporal.api.nexus.v1.PropagatedSerializationContext"\xcc\x01\n\tRejection\x12#\n\x1brejected_request_message_id\x18\x01 \x01(\t\x12,\n$rejected_request_sequencing_event_id\x18\x02 \x01(\x03\x12\x39\n\x10rejected_request\x18\x03 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request\x12\x31\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure"\x9a\x01\n\nAcceptance\x12#\n\x1b\x61\x63\x63\x65pted_request_message_id\x18\x01 \x01(\t\x12,\n$accepted_request_sequencing_event_id\x18\x02 \x01(\x03\x12\x39\n\x10\x61\x63\x63\x65pted_request\x18\x03 \x01(\x0b\x32\x1f.temporal.api.update.v1.Request"h\n\x08Response\x12*\n\x04meta\x18\x01 \x01(\x0b\x32\x1c.temporal.api.update.v1.Meta\x12\x30\n\x07outcome\x18\x02 \x01(\x0b\x32\x1f.temporal.api.update.v1.OutcomeB\x89\x01\n\x19io.temporal.api.update.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/update/v1;update\xaa\x02\x18Temporalio.Api.Update.V1\xea\x02\x1bTemporalio::Api::Update::V1b\x06proto3'
 )
 
 
@@ -140,22 +143,22 @@ _sym_db.RegisterMessage(Response)
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.update.v1B\014MessageProtoP\001Z#go.temporal.io/api/update/v1;update\252\002\030Temporalio.Api.Update.V1\352\002\033Temporalio::Api::Update::V1"
-    _WAITPOLICY._serialized_start = 177
-    _WAITPOLICY._serialized_end = 276
-    _UPDATEREF._serialized_start = 278
-    _UPDATEREF._serialized_end = 379
-    _OUTCOME._serialized_start = 381
-    _OUTCOME._serialized_end = 505
-    _META._serialized_start = 507
-    _META._serialized_end = 550
-    _INPUT._serialized_start = 552
-    _INPUT._serialized_end = 669
-    _REQUEST._serialized_start = 672
-    _REQUEST._serialized_end = 900
-    _REJECTION._serialized_start = 903
-    _REJECTION._serialized_end = 1107
-    _ACCEPTANCE._serialized_start = 1110
-    _ACCEPTANCE._serialized_end = 1264
-    _RESPONSE._serialized_start = 1266
-    _RESPONSE._serialized_end = 1370
+    _WAITPOLICY._serialized_start = 214
+    _WAITPOLICY._serialized_end = 313
+    _UPDATEREF._serialized_start = 315
+    _UPDATEREF._serialized_end = 416
+    _OUTCOME._serialized_start = 418
+    _OUTCOME._serialized_end = 542
+    _META._serialized_start = 544
+    _META._serialized_end = 587
+    _INPUT._serialized_start = 589
+    _INPUT._serialized_end = 706
+    _REQUEST._serialized_start = 709
+    _REQUEST._serialized_end = 1040
+    _REJECTION._serialized_start = 1043
+    _REJECTION._serialized_end = 1247
+    _ACCEPTANCE._serialized_start = 1250
+    _ACCEPTANCE._serialized_end = 1404
+    _RESPONSE._serialized_start = 1406
+    _RESPONSE._serialized_end = 1510
 # @@protoc_insertion_point(module_scope)
