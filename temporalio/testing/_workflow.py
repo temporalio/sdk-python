@@ -103,6 +103,13 @@ class WorkflowEnvironment:
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
+        This environment is good for testing full server capabilities, but does
+        not support time skipping like :py:meth:`start_time_skipping` or
+        :py:meth:`start_time_skipping_v2` do. :py:attr:`supports_time_skipping_v1`
+        and :py:attr:`supports_time_skipping_v2` will both return ``False`` for
+        this environment. :py:meth:`sleep` will sleep the actual amount of time
+        and :py:meth:`get_current_time` will return the current time.
+
         Internally, this uses the Temporal CLI dev server from
         https://github.com/temporalio/cli. This is a self-contained binary for
         Temporal using Sqlite persistence. This call will download the CLI to a
@@ -205,6 +212,10 @@ class WorkflowEnvironment:
     ) -> WorkflowEnvironment:
         """Start a V1 time skipping workflow environment.
 
+        This environment uses a legacy Java Temporal server which does not have
+        feature parity with the full temporal server, and which is no longer
+        getting new features.
+
         By default, this environment will automatically skip to the next events
         in time when a workflow's
         :py:meth:`temporalio.client.WorkflowHandle.result` is awaited on (which
@@ -255,7 +266,6 @@ class WorkflowEnvironment:
             test_server_extra_args: Extra arguments for the test server binary.
             test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
                 will be cached indefinitely.
-
         Returns:
             The started workflow environment with time skipping.
         """
@@ -285,12 +295,14 @@ class WorkflowEnvironment:
     ) -> WorkflowEnvironment:
         """Start a local Temporal server with per-workflow time skipping enabled.
 
-        Equivalent to :py:meth:`start_local` plus a :py:class:`TimeSkipper`
-        wrap on the client, which stamps ``time_skipping_config`` on every
-        workflow started via :py:attr:`client` and exposes
-        :py:meth:`fast_forward` for driving time skipping on running
-        workflows. Each workflow has its own virtual clock, unlike
-        time-skipping V1.
+        This environment is good for testing full server capabilities, and
+        supports time skipping.
+
+        Equivalent to :py:meth:`start_local` plus a :py:class:`TimeSkipper` wrap
+        on the client, which stamps ``time_skipping_config`` on every workflow
+        started via :py:attr:`client` and exposes :py:meth:`fast_forward` for
+        driving time skipping on running workflows. Each workflow has its own
+        virtual clock, unlike time-skipping V1.
 
         See :py:meth:`start_local` for other keyword arguments.
         """
