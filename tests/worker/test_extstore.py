@@ -469,17 +469,21 @@ async def test_extstore_reference_payloads_codec_encoded_in_history(
     reference_payloads = []
     for event in history.events:
         if event.HasField("workflow_execution_started_event_attributes"):
-            attrs = event.workflow_execution_started_event_attributes
-            reference_payloads.append(attrs.input.payloads[0])
+            reference_payloads.append(
+                event.workflow_execution_started_event_attributes.input.payloads[0]
+            )
         elif event.HasField("activity_task_scheduled_event_attributes"):
-            attrs = event.activity_task_scheduled_event_attributes
-            reference_payloads.append(attrs.input.payloads[0])
+            reference_payloads.append(
+                event.activity_task_scheduled_event_attributes.input.payloads[0]
+            )
         elif event.HasField("activity_task_completed_event_attributes"):
-            attrs = event.activity_task_completed_event_attributes
-            reference_payloads.append(attrs.result.payloads[0])
+            reference_payloads.append(
+                event.activity_task_completed_event_attributes.result.payloads[0]
+            )
         elif event.HasField("workflow_execution_completed_event_attributes"):
-            attrs = event.workflow_execution_completed_event_attributes
-            reference_payloads.append(attrs.result.payloads[0])
+            reference_payloads.append(
+                event.workflow_execution_completed_event_attributes.result.payloads[0]
+            )
     assert len(reference_payloads) == 4
     for payload in reference_payloads:
         assert payload.metadata["encoding"] == b"binary/test-encoded"
