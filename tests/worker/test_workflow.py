@@ -4693,9 +4693,7 @@ async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v2(
         await asyncio.sleep(0.5)
         # Buffer the cancel signal server-side. It will be delivered on the
         # next workflow task, which the fast-forward below triggers.
-        await handle.signal(
-            CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer
-        )
+        await handle.signal(CancelSignalAndTimerFiredInSameTaskWorkflow.cancel_timer)
         # Fast-forward past the timer deadline. The timer-fired event lands
         # in the same workflow task as the pre-buffered signal; the signal
         # handler cancels the timer_task first, so the timer-fired event is

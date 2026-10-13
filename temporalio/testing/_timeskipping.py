@@ -59,9 +59,7 @@ class TimeSkippingConfig:
     def __post_init__(self) -> None:
         """Validates that a fast-forward isn't configured with skipping off."""
         if not self.enabled and self.fast_forward_config is not None:
-            raise ValueError(
-                "fast_forward_config cannot be set when enabled is False"
-            )
+            raise ValueError("fast_forward_config cannot be set when enabled is False")
 
     def _to_proto(self) -> temporalio.api.common.v1.TimeSkippingConfig:
         proto = temporalio.api.common.v1.TimeSkippingConfig(

@@ -235,7 +235,9 @@ async def test_child_workflow_propagates_time_skipping(
         0, result["child_start"] - result["parent_after_wait_1"], tolerance=10
     )
     assert_duration_same(
-        0, result["parent_after_child_start"] - result["parent_after_wait_1"], tolerance=5
+        0,
+        result["parent_after_child_start"] - result["parent_after_wait_1"],
+        tolerance=5,
     )
 
     # Time skipping engaged on both workflows.
@@ -321,8 +323,7 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
 async def test_fast_forward_returns_false_when_workflow_terminates_first(
     env: WorkflowEnvironment,
 ) -> None:
-    """Workflow's own 1h timer fires before FF's 2h target → FF returns False.
-    """
+    """Workflow's own 1h timer fires before FF's 2h target → FF returns False."""
 
     async with new_worker(env.client, SleepWorkflow) as worker:
         with env.with_time_skipping_disabled():
@@ -391,6 +392,7 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
 
         async def _in_attempt_2() -> None:
             assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
+
         await assert_eventually(_in_attempt_2)
 
         await env.fast_forward(handle)
@@ -437,6 +439,7 @@ async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> N
 
         async def _in_run_3() -> None:
             assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
+
         await assert_eventually(_in_run_3)
 
         await env.fast_forward(handle)
@@ -585,13 +588,13 @@ async def test_max_session_skip_count_stamped_by_env() -> None:
             try:
                 started = await find_history_event(
                     handle,
-                    lambda e: e.event_type
-                    == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+                    lambda e: (
+                        e.event_type
+                        == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED
+                    ),
                 )
                 assert started is not None
-                started_tsc = (
-                    started.workflow_execution_started_event_attributes.time_skipping_config
-                )
+                started_tsc = started.workflow_execution_started_event_attributes.time_skipping_config
                 assert started_tsc.max_session_skip_count == 5, (
                     f"expected max_session_skip_count=5, got {started_tsc.max_session_skip_count}"
                 )
@@ -624,7 +627,9 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
             ),
         )
         assert event is not None, "no disabled_after_fast_forward transition found"
-        transition = event.workflow_execution_time_skipping_transitioned_event_attributes
+        transition = (
+            event.workflow_execution_time_skipping_transitioned_event_attributes
+        )
 
         target = transition.target_time.ToDatetime().replace(tzinfo=timezone.utc)
         target_offset = (target - wall_before_ff).total_seconds()
@@ -643,7 +648,7 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
 async def test_child_workflow_started_event_has_state_propagation(
     env: WorkflowEnvironment,
 ) -> None:
-    """A child workflow spawned under time skipping carries TimeSkippingStatePropagation. """
+    """A child workflow spawned under time skipping carries TimeSkippingStatePropagation."""
     async with new_worker(
         env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:
@@ -685,8 +690,9 @@ async def test_fast_forward_exceeds_execution_timeout(
 
         timed_out = await find_history_event(
             handle,
-            lambda e: e.event_type
-            == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT,
+            lambda e: (
+                e.event_type == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_TIMED_OUT
+            ),
         )
         assert timed_out is not None, "expected WORKFLOW_EXECUTION_TIMED_OUT in history"
 
@@ -720,7 +726,11 @@ async def test_overriding_fast_forward_raises_on_original(
                 )
             tsi = await env.get_time_skipping_info(handle)
             ffi = tsi.fast_forward_info if tsi is not None else None
-            if ffi and ffi.fast_forward_id and ffi.fast_forward_id != expect_change_from:
+            if (
+                ffi
+                and ffi.fast_forward_id
+                and ffi.fast_forward_id != expect_change_from
+            ):
                 return ffi.fast_forward_id
             await asyncio.sleep(0.05)
         raise AssertionError("timed out waiting for expected fast_forward_id")

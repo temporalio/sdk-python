@@ -161,9 +161,7 @@ async def ensure_search_attributes_present(
         assert {key.name for key in keys}.issubset(resp.custom_attributes.keys())
 
 
-def assert_duration_same(
-    expected: float, actual: float, tolerance: float
-) -> None:
+def assert_duration_same(expected: float, actual: float, tolerance: float) -> None:
     """Assert two durations (in seconds) are the same within ``tolerance``."""
     delta = abs(actual - expected)
     assert delta <= tolerance, (

@@ -42,9 +42,7 @@ async def test_workflow_env_time_skipping_manual_v2(env: WorkflowEnvironment):
                 task_queue=worker.task_queue,
             )
 
-        assert_timestamp_from_now(
-            await env.get_current_time(handle), 0, max_delta=1
-        )
+        assert_timestamp_from_now(await env.get_current_time(handle), 0, max_delta=1)
 
         assert await env.fast_forward(handle, timedelta(seconds=1000))
         assert_timestamp_from_now(await env.get_current_time(handle), 1000)
