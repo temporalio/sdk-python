@@ -146,6 +146,7 @@ class Client:
         tls: bool | TLSConfig | None = None,
         retry_config: RetryConfig | None = None,
         keep_alive_config: KeepAliveConfig | None = KeepAliveConfig.default,
+        connect_timeout: timedelta | None = None,
         rpc_metadata: Mapping[str, str | bytes] = {},
         identity: str | None = None,
         lazy: bool = False,
@@ -200,6 +201,10 @@ class Client:
                 connection. Default is to check every 30s and kill the
                 connection if a response doesn't come back in 15s. Can be set to
                 ``None`` to disable.
+            connect_timeout: Maximum duration of a TCP connection attempt.
+                If unset, no explicit connection timeout is applied. This is
+                separate from RPC timeouts and does not bound the total duration
+                of a call with retries.
             rpc_metadata: Headers to use for all calls to the server. Keys here
                 can be overriden by per-call RPC metadata keys.
             identity: Identity for this client. If unset, a default is created
@@ -227,6 +232,7 @@ class Client:
             tls=tls,
             retry_config=retry_config,
             keep_alive_config=keep_alive_config,
+            connect_timeout=connect_timeout,
             rpc_metadata=rpc_metadata,
             identity=identity or "",
             lazy=lazy,
@@ -3013,6 +3019,7 @@ class ClientConnectConfig(TypedDict, total=False):
     tls: bool | TLSConfig | None
     retry_config: RetryConfig | None
     keep_alive_config: KeepAliveConfig | None
+    connect_timeout: timedelta | None
     rpc_metadata: Mapping[str, str | bytes]
     identity: str | None
     lazy: bool

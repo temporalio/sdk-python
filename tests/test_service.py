@@ -1,6 +1,8 @@
+import asyncio
 import inspect
 import os
 import re
+import socket
 from collections.abc import Callable, Mapping
 from datetime import timedelta
 from typing import Any
@@ -330,4 +332,59 @@ async def test_rpc_execution_not_unknown(client: Client):
         proto_module=temporalio.bridge.proto.health.v1.health_pb2.DESCRIPTOR,
         proto_service="Health",
         target_service_name="health_service",
+    )
+
+
+@pytest.mark.parametrize("timeout", [None, timedelta(0), timedelta(milliseconds=1250)])
+def test_connect_config_connect_timeout(timeout: timedelta | None):
+    config = temporalio.service.ConnectConfig(
+        target_host="localhost:7233", connect_timeout=timeout
+    )
+    assert config._to_bridge_config().connect_timeout_millis == (
+        None if timeout is None else int(timeout.total_seconds() * 1000)
+    )
+
+
+async def test_connect_timeout_bounds_tcp_connection():
+    listener = socket.socket()
+    connections: list[socket.socket] = []
+    try:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
+        address = listener.getsockname()
+        loop = asyncio.get_running_loop()
+        # Fill the accept queue without accepting connections, so subsequent TCP
+        # attempts stall locally instead of depending on an unreachable remote IP.
+        for _ in range(128):
+            connection = socket.socket()
+            connections.append(connection)
+            connection.setblocking(False)
+            try:
+                await asyncio.wait_for(loop.sock_connect(connection, address), 0.1)
+            except asyncio.TimeoutError:
+                break
+        else:
+            pytest.fail("Could not fill the listener's accept queue")
+
+        with pytest.raises(RuntimeError, match="tcp connect error.*TimedOut"):
+            await asyncio.wait_for(
+                Client.connect(
+                    f"127.0.0.1:{address[1]}",
+                    connect_timeout=timedelta(milliseconds=100),
+                ),
+                timeout=5,
+            )
+    finally:
+        for connection in connections:
+            connection.close()
+        listener.close()
+
+
+async def test_connect_timeout_allows_healthy_connection(client: Client):
+    connect_args = vars(client.service_client.config).copy()
+    connect_args["connect_timeout"] = timedelta(seconds=5)
+    connect_args["lazy"] = False
+    connected = await Client.connect(**connect_args)
+    await connected.workflow_service.get_system_info(
+        temporalio.api.workflowservice.v1.GetSystemInfoRequest()
     )
