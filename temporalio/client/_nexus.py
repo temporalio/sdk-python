@@ -37,9 +37,8 @@ if TYPE_CHECKING:
 class NexusOperationExecutionCancellationInfo:
     """Cancellation information for a Nexus Operation.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     raw: temporalio.api.nexus.v1.NexusOperationExecutionCancellationInfo
@@ -116,9 +115,8 @@ class NexusOperationExecutionCancellationInfo:
 class NexusOperationExecution:
     """Info for a standalone Nexus operation execution, from list response.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     operation_id: str
@@ -203,9 +201,8 @@ class NexusOperationExecution:
 class NexusOperationExecutionDescription(NexusOperationExecution):
     """Detailed information about a standalone Nexus operation execution.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     raw_description: temporalio.api.nexus.v1.NexusOperationExecutionInfo
@@ -391,9 +388,8 @@ class NexusOperationExecutionDescription(NexusOperationExecution):
 class NexusOperationExecutionCountAggregationGroup:
     """A single aggregation group from a count nexus operations call.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     count: int
@@ -421,9 +417,8 @@ class NexusOperationExecutionCountAggregationGroup:
 class NexusOperationExecutionCount:
     """Representation of a count from a count nexus operations call.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     count: int
@@ -453,9 +448,8 @@ class NexusOperationExecutionCount:
 class NexusOperationFailureError(temporalio.exceptions.TemporalError):
     """Error that occurs when a Nexus operation is unsuccessful.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     def __init__(self, *, cause: BaseException) -> None:
@@ -473,9 +467,8 @@ class NexusOperationFailureError(temporalio.exceptions.TemporalError):
 class NexusClient(ABC, Generic[NexusServiceType]):
     """Client for starting standalone Nexus operations.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
 
     Use :py:meth:`Client.create_nexus_client` to create a client.
     """
@@ -668,9 +661,8 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     ) -> NexusOperationHandle[Any]:
         """Start a Nexus operation and return a handle.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             operation: The operation to start. Can be a ``nexusrpc.Operation``,
@@ -891,9 +883,8 @@ class NexusClient(ABC, Generic[NexusServiceType]):
     ) -> Any:
         """Start a Nexus operation and wait for its result.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         This is a shortcut for ``await (await nexus_client.start_operation(...)).result()``.
 
@@ -988,9 +979,8 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
     ) -> NexusOperationHandle[Any]:
         """Start a Nexus operation and return a handle.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
         """
         op_name, output_type = self._resolve_operation(operation)
         final_result_type: type | None = (
@@ -1038,9 +1028,8 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
     ) -> Any:
         """Start a Nexus operation and wait for its result.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
         """
         handle = await self.start_operation(
             operation,
@@ -1064,9 +1053,8 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
 class NexusOperationHandle(Generic[ReturnType]):
     """Handle representing a standalone Nexus operation execution.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     def __init__(
@@ -1121,9 +1109,8 @@ class NexusOperationHandle(Generic[ReturnType]):
     ) -> ReturnType:
         """Wait for result of the Nexus operation.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         The result may already be known if this method has been called before,
         in which case no network call is made. Otherwise the result will be
@@ -1177,9 +1164,8 @@ class NexusOperationHandle(Generic[ReturnType]):
     ) -> NexusOperationExecutionDescription:
         """Describe the Nexus operation execution.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             rpc_metadata: Headers used on the RPC call.
@@ -1206,9 +1192,8 @@ class NexusOperationHandle(Generic[ReturnType]):
     ) -> None:
         """Request cancellation of the Nexus operation.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             reason: Reason for the cancellation.
@@ -1234,9 +1219,8 @@ class NexusOperationHandle(Generic[ReturnType]):
     ) -> None:
         """Terminate the Nexus operation execution immediately.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             reason: Reason for the termination.
@@ -1259,9 +1243,8 @@ class NexusOperationExecutionAsyncIterator:
 
     You should typically use ``async for`` on this iterator and not call any of its methods.
 
-    .. note::
-       Standalone Nexus Operations are in Public Preview.
-       We aim to preserve backward compatibility and avoid breaking changes.
+    .. warning::
+       This API is experimental and unstable.
     """
 
     def __init__(

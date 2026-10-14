@@ -2859,9 +2859,8 @@ class Client:
     ) -> NexusClient[NexusServiceType]:
         """Create a client for starting standalone Nexus operations.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             service: The Nexus service type or service name string.
@@ -2885,9 +2884,8 @@ class Client:
     ) -> NexusOperationExecutionAsyncIterator:
         """List standalone Nexus operations.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         This does not make a request until the first iteration is attempted.
         Therefore any errors will not occur until then.
@@ -2929,9 +2927,8 @@ class Client:
     ) -> NexusOperationExecutionCount:
         """Count standalone Nexus operations.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             query: A Temporal visibility filter for nexus operations.
@@ -2984,9 +2981,8 @@ class Client:
     ) -> NexusOperationHandle[Any]:
         """Get a handle to an existing standalone Nexus operation.
 
-        .. note::
-           Standalone Nexus Operations are in Public Preview.
-           We aim to preserve backward compatibility and avoid breaking changes.
+        .. warning::
+           This API is experimental and unstable.
 
         Args:
             operation_id: The operation ID.
