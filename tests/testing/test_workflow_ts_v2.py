@@ -82,7 +82,9 @@ async def test_workflow_env_time_skipping_disabled_v2(ts_env: WorkflowEnvironmen
         await assert_time_was_not_skipped(handle)
 
 
-async def test_workflow_env_time_skipping_basic_via_update_v2(ts_env: WorkflowEnvironment):
+async def test_workflow_env_time_skipping_basic_via_update_v2(
+    ts_env: WorkflowEnvironment,
+):
     """Start a very long sleep with time skipping off, then enable it
     and run to completion."""
     async with new_worker(ts_env.client, SleepWorkflow) as worker:
