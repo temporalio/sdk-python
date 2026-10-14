@@ -499,10 +499,9 @@ class WorkflowEnvironment:
         .. warning::
            This API is experimental and unstable.
 
-        Workflows started via :py:attr:`client` during the block do not
-        receive a ``time_skipping_config`` on their start request. Existing
-        workflows and V1 auto-behavior are unaffected. No-op on non-V2
-        environments.
+        Workflows started via :py:attr:`client` during the block do not receive
+        a ``time_skipping_config`` on their start request. Existing workflows
+        are unaffected. No-op on non-V2 environments.
         """
         yield None
 
