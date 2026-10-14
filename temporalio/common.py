@@ -188,8 +188,9 @@ class ActivityIDConflictPolicy(IntEnum):
 class NexusOperationIDReusePolicy(IntEnum):
     """How already-closed Nexus operation IDs are handled on start.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
 
     See :py:class:`temporalio.api.enums.v1.NexusOperationIdReusePolicy`.
     """
@@ -211,8 +212,9 @@ class NexusOperationIDReusePolicy(IntEnum):
 class NexusOperationIDConflictPolicy(IntEnum):
     """How already-running Nexus operation IDs are handled on start.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
 
     See :py:class:`temporalio.api.enums.v1.NexusOperationIdConflictPolicy`.
     """
@@ -231,8 +233,9 @@ class NexusOperationIDConflictPolicy(IntEnum):
 class NexusOperationExecutionStatus(IntEnum):
     """Status of a standalone Nexus operation execution.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
 
     See :py:class:`temporalio.api.enums.v1.NexusOperationExecutionStatus`.
     """
@@ -263,8 +266,9 @@ class NexusOperationExecutionStatus(IntEnum):
 class PendingNexusOperationExecutionState(IntEnum):
     """More detailed breakdown of :py:attr:`NexusOperationExecutionStatus.RUNNING`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
 
     See :py:class:`temporalio.api.enums.v1.PendingNexusOperationState`.
     """
@@ -289,8 +293,9 @@ class PendingNexusOperationExecutionState(IntEnum):
 class NexusOperationCancellationState(IntEnum):
     """State of a Nexus operation cancellation.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     UNSPECIFIED = int(

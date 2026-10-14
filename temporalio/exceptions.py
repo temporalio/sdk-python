@@ -111,8 +111,9 @@ class ActivityAlreadyStartedError(FailureError):
 class NexusOperationAlreadyStartedError(FailureError):
     """Thrown by a client when a Nexus operation execution has already started.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
 
     Attributes:
         operation_id: ID of the already-started operation.

@@ -585,8 +585,9 @@ class GetWorkerTaskReachabilityInput:
 class StartNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.start_nexus_operation`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     operation: str
@@ -611,8 +612,9 @@ class StartNexusOperationInput:
 class DescribeNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.describe_nexus_operation`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     operation_id: str
@@ -625,8 +627,9 @@ class DescribeNexusOperationInput:
 class GetNexusOperationResultInput:
     """Input for :py:meth:`OutboundInterceptor.get_nexus_operation_result`.
 
-    .. warning::
-        This API is experimental and unstable.
+    .. note::
+        Standalone Nexus Operations are in Public Preview.
+        We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     operation_id: str
@@ -643,8 +646,9 @@ class GetNexusOperationResultInput:
 class CancelNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.cancel_nexus_operation`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     operation_id: str
@@ -658,8 +662,9 @@ class CancelNexusOperationInput:
 class TerminateNexusOperationInput:
     """Input for :py:meth:`OutboundInterceptor.terminate_nexus_operation`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     operation_id: str
@@ -673,8 +678,9 @@ class TerminateNexusOperationInput:
 class ListNexusOperationsInput:
     """Input for :py:meth:`OutboundInterceptor.list_nexus_operations`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     query: str | None
@@ -689,8 +695,9 @@ class ListNexusOperationsInput:
 class CountNexusOperationsInput:
     """Input for :py:meth:`OutboundInterceptor.count_nexus_operations`.
 
-    .. warning::
-       This API is experimental and unstable.
+    .. note::
+       Standalone Nexus Operations are in Public Preview.
+       We aim to preserve backward compatibility and avoid breaking changes.
     """
 
     query: str | None
@@ -939,8 +946,9 @@ class OutboundInterceptor:
     ) -> NexusOperationHandle[Any]:
         """Called for every :py:meth:`NexusClient.start_operation` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         return await self.next.start_nexus_operation(input)
 
@@ -949,8 +957,9 @@ class OutboundInterceptor:
     ) -> NexusOperationExecutionDescription:
         """Called for every :py:meth:`NexusOperationHandle.describe` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         return await self.next.describe_nexus_operation(input)
 
@@ -959,16 +968,18 @@ class OutboundInterceptor:
     ) -> Any:
         """Called for every :py:meth:`NexusOperationHandle.result` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         return await self.next.get_nexus_operation_result(input)
 
     async def cancel_nexus_operation(self, input: CancelNexusOperationInput) -> None:
         """Called for every :py:meth:`NexusOperationHandle.cancel` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         await self.next.cancel_nexus_operation(input)
 
@@ -977,8 +988,9 @@ class OutboundInterceptor:
     ) -> None:
         """Called for every :py:meth:`NexusOperationHandle.terminate` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         await self.next.terminate_nexus_operation(input)
 
@@ -987,8 +999,9 @@ class OutboundInterceptor:
     ) -> NexusOperationExecutionAsyncIterator:
         """Called for every :py:meth:`Client.list_nexus_operations` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         return self.next.list_nexus_operations(input)
 
@@ -997,7 +1010,8 @@ class OutboundInterceptor:
     ) -> NexusOperationExecutionCount:
         """Called for every :py:meth:`Client.count_nexus_operations` call.
 
-        .. warning::
-           This API is experimental and unstable.
+        .. note::
+           Standalone Nexus Operations are in Public Preview.
+           We aim to preserve backward compatibility and avoid breaking changes.
         """
         return await self.next.count_nexus_operations(input)
