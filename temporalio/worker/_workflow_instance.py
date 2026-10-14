@@ -3781,7 +3781,9 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._instance = instance
         self._seq = seq
         self._input = input
-        self._task = asyncio.Task(fn)
+        self._task = instance.create_task(
+            fn, name=f"nexus: {input.service}/{input.operation_name}"
+        )
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
         self._payload_converter = payload_converter
