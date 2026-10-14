@@ -9,7 +9,7 @@ from tests import DEV_SERVER_DOWNLOAD_VERSION
 
 
 @pytest_asyncio.fixture(scope="module")  # type: ignore[reportUntypedFunctionDecorator]
-async def env() -> AsyncGenerator[WorkflowEnvironment, None]:
+async def ts_env() -> AsyncGenerator[WorkflowEnvironment, None]:
     """Module-scoped time-skipping V2 dev server, shared across tests in a file."""
     async with await WorkflowEnvironment.start_time_skipping_v2(
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,

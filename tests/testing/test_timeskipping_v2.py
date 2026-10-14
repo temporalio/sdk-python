@@ -51,11 +51,11 @@ class InteractionWorkflow:
         return self.signals_received
 
 
-async def test_skip_full_run(env: WorkflowEnvironment) -> None:
+async def test_skip_full_run(ts_env: WorkflowEnvironment) -> None:
     """Enable time skipping, let workflow run to completion."""
-    async with new_worker(env.client, SleepWorkflow) as worker:
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
         wall_start = monotonic()
-        handle = await env.client.start_workflow(
+        handle = await ts_env.client.start_workflow(
             SleepWorkflow.run,
             3600.0,
             id=f"wf-{uuid.uuid4()}",
@@ -76,12 +76,12 @@ async def test_skip_full_run(env: WorkflowEnvironment) -> None:
 
 
 async def test_with_time_skipping_disabled(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """Without time skipping, the 1h timer does not complete in 3s."""
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 3600.0,
                 id=f"wf-{uuid.uuid4()}",
@@ -91,35 +91,35 @@ async def test_with_time_skipping_disabled(
             await asyncio.wait_for(handle.result(), timeout=3)
 
 
-async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
+async def test_fast_forward_with_resume(ts_env: WorkflowEnvironment) -> None:
     """Fast-forward 1h, signal, resume +1h, signal, workflow completes."""
-    async with new_worker(env.client, InteractionWorkflow) as worker:
+    async with new_worker(ts_env.client, InteractionWorkflow) as worker:
         wall_start = monotonic()
         # Start the workflow with time-skipping stamping suspended, then issue an
         # explicit fast-forward. Uses signals to move the workflow along.
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 InteractionWorkflow.run,
                 2,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
 
-        t0 = await env.get_current_time(handle)
+        t0 = await ts_env.get_current_time(handle)
 
-        assert await env.fast_forward(handle, timedelta(hours=1)), (
+        assert await ts_env.fast_forward(handle, timedelta(hours=1)), (
             "expected first fast-forward to complete at 1h"
         )
         await handle.signal(InteractionWorkflow.proceed)
         assert await handle.query(InteractionWorkflow.get_signal_count) == 1
-        t1 = await env.get_current_time(handle)
+        t1 = await ts_env.get_current_time(handle)
         assert_duration_same(3600, (t1 - t0).total_seconds(), tolerance=10)
 
-        assert await env.fast_forward(handle, timedelta(hours=1)), (
+        assert await ts_env.fast_forward(handle, timedelta(hours=1)), (
             "expected second fast-forward to complete at 2h total"
         )
         await handle.signal(InteractionWorkflow.proceed)
-        t2 = await env.get_current_time(handle)
+        t2 = await ts_env.get_current_time(handle)
         assert_duration_same(7200, (t2 - t0).total_seconds(), tolerance=10)
 
         result = await handle.result()
@@ -133,29 +133,29 @@ async def test_fast_forward_with_resume(env: WorkflowEnvironment) -> None:
 
 
 async def test_partial_fast_forward_then_unbounded(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """30m fast-forward, verify +30m, then unbounded resume to completion at +1h."""
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 3600.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
 
-        t0 = await env.get_current_time(handle)
+        t0 = await ts_env.get_current_time(handle)
 
-        assert await env.fast_forward(handle, timedelta(minutes=30))
-        t1 = await env.get_current_time(handle)
+        assert await ts_env.fast_forward(handle, timedelta(minutes=30))
+        t1 = await ts_env.get_current_time(handle)
         assert_duration_same(30 * 60, (t1 - t0).total_seconds(), tolerance=10)
 
-        assert not await env.fast_forward(handle, None)
+        assert not await ts_env.fast_forward(handle, None)
         result = await handle.result()
         assert result["message"] == "all done"
 
-        t_end = await env.get_current_time(handle)
+        t_end = await ts_env.get_current_time(handle)
         assert_duration_same(3600, (t_end - t0).total_seconds(), tolerance=10)
 
         await assert_time_was_skipped(handle)
@@ -197,17 +197,17 @@ class ParentTimeSkippingWorkflow:
 
 
 async def test_child_workflow_propagates_time_skipping(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """Parent 1h + child 1h + parent 1h all auto-skip; child inherits time skipping from parent."""
     async with new_worker(
-        env.client, ParentTimeSkippingWorkflow, SleepWorkflow
+        ts_env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:
         child_id = f"child-{uuid.uuid4()}"
         parent_id = f"parent-{uuid.uuid4()}"
 
         wall_start = monotonic()
-        parent_handle = await env.client.start_workflow(
+        parent_handle = await ts_env.client.start_workflow(
             ParentTimeSkippingWorkflow.run,
             args=[child_id, worker.task_queue, 3600.0],
             id=parent_id,
@@ -242,7 +242,7 @@ async def test_child_workflow_propagates_time_skipping(
 
     # Time skipping engaged on both workflows.
     await assert_time_was_skipped(parent_handle)
-    child_handle = env.client.get_workflow_handle(child_id)
+    child_handle = ts_env.client.get_workflow_handle(child_id)
     await assert_time_was_skipped(child_handle)
 
 
@@ -321,35 +321,35 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
 
 
 async def test_fast_forward_returns_false_when_workflow_terminates_first(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """Workflow's own 1h timer fires before FF's 2h target → FF returns False."""
 
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 3600.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        assert (await env.fast_forward(handle, timedelta(hours=2))) is False
+        assert (await ts_env.fast_forward(handle, timedelta(hours=2))) is False
 
 
 async def test_fast_forward_accepts_float_duration(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 3600.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        t0 = await env.get_current_time(handle)
-        assert await env.fast_forward(handle, 1800.0)
-        t1 = await env.get_current_time(handle)
+        t0 = await ts_env.get_current_time(handle)
+        assert await ts_env.fast_forward(handle, 1800.0)
+        t1 = await ts_env.get_current_time(handle)
         assert_duration_same(1800, (t1 - t0).total_seconds(), tolerance=10)
         await handle.cancel()
         await assert_time_was_skipped(handle)
@@ -371,11 +371,11 @@ class FailOnceThenSleepWorkflow:
         return workflow.info().attempt
 
 
-async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
+async def test_fast_forward_spans_retries(ts_env: WorkflowEnvironment) -> None:
     """FF spans across retry: attempt 1 fails, backoff elapses, attempt 2 runs."""
-    async with new_worker(env.client, FailOnceThenSleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, FailOnceThenSleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 FailOnceThenSleepWorkflow.run,
                 3600.0,
                 id=f"wf-{uuid.uuid4()}",
@@ -388,14 +388,14 @@ async def test_fast_forward_spans_retries(env: WorkflowEnvironment) -> None:
             )
 
         # Fast forward into the second sleep.
-        assert await env.fast_forward(handle, timedelta(hours=2, minutes=30))
+        assert await ts_env.fast_forward(handle, timedelta(hours=2, minutes=30))
 
         async def _in_attempt_2() -> None:
             assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
 
         await assert_eventually(_in_attempt_2)
 
-        await env.fast_forward(handle)
+        await ts_env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(FailOnceThenSleepWorkflow.attempt)) == 2
         await assert_time_was_skipped(handle)
@@ -425,37 +425,37 @@ class ContinueAsNewSleepWorkflow:
         return self._current_run
 
 
-async def test_fast_forward_spans_continue_as_new(env: WorkflowEnvironment) -> None:
+async def test_fast_forward_spans_continue_as_new(ts_env: WorkflowEnvironment) -> None:
     """Fast forward spans multiple continue-as-new runs."""
-    async with new_worker(env.client, ContinueAsNewSleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, ContinueAsNewSleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 ContinueAsNewSleepWorkflow.run,
                 args=[3600.0, 3, 1],
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        assert await env.fast_forward(handle, timedelta(hours=2))
+        assert await ts_env.fast_forward(handle, timedelta(hours=2))
 
         async def _in_run_3() -> None:
             assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
 
         await assert_eventually(_in_run_3)
 
-        await env.fast_forward(handle)
+        await ts_env.fast_forward(handle)
         assert (await handle.result()) == "done"
         assert (await handle.query(ContinueAsNewSleepWorkflow.current_run)) == 3
         await assert_time_was_skipped(handle)
 
 
 async def test_fast_forward_spans_cron_restarts(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """Fast forward over multiple cron firings."""
     workflow_id = f"wf-{uuid.uuid4()}"
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 60.0,
                 id=workflow_id,
@@ -463,11 +463,11 @@ async def test_fast_forward_spans_cron_restarts(
                 cron_schedule="@every 1h",
             )
         try:
-            assert await env.fast_forward(handle, timedelta(hours=3))
+            assert await ts_env.fast_forward(handle, timedelta(hours=3))
 
             async def _at_least_three_cron_runs() -> None:
                 run_count = 0
-                async for _ in env.client.list_workflows(
+                async for _ in ts_env.client.list_workflows(
                     query=f"WorkflowId = '{workflow_id}'"
                 ):
                     run_count += 1
@@ -501,12 +501,12 @@ class SignalWithStartTargetWorkflow:
 
 
 async def test_signal_with_start_stamps_time_skipping_config(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """Timeskip a signal-with-start workflow."""
-    async with new_worker(env.client, SignalWithStartTargetWorkflow) as worker:
+    async with new_worker(ts_env.client, SignalWithStartTargetWorkflow) as worker:
         wall_start = monotonic()
-        handle = await env.client.start_workflow(
+        handle = await ts_env.client.start_workflow(
             SignalWithStartTargetWorkflow.run,
             3600.0,
             id=f"wf-{uuid.uuid4()}",
@@ -523,17 +523,17 @@ async def test_signal_with_start_stamps_time_skipping_config(
 
 
 async def test_get_time_skipping_info_during_workflow(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
-    async with new_worker(env.client, InteractionWorkflow) as worker:
-        handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, InteractionWorkflow) as worker:
+        handle = await ts_env.client.start_workflow(
             InteractionWorkflow.run,
             1,
             id=f"wf-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         try:
-            tsi = await env.get_time_skipping_info(handle)
+            tsi = await ts_env.get_time_skipping_info(handle)
             assert tsi is not None
             assert tsi.effective_config.enabled, (
                 "expected time skipping to be enabled (env-stamped)"
@@ -550,18 +550,18 @@ async def test_get_time_skipping_info_during_workflow(
 
 
 async def test_get_time_skipping_info_returns_none_when_ts_never_enabled(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
-    async with new_worker(env.client, InteractionWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, InteractionWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 InteractionWorkflow.run,
                 1,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
         try:
-            assert await env.get_time_skipping_info(handle) is None
+            assert await ts_env.get_time_skipping_info(handle) is None
         finally:
             await handle.signal(InteractionWorkflow.proceed)
             await handle.result()
@@ -603,19 +603,19 @@ async def test_max_session_skip_count_stamped_by_env() -> None:
                 await handle.result()
 
 
-async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
+async def test_transition_event_payload(ts_env: WorkflowEnvironment) -> None:
     """The disabled-after-fast-forward transition event's payload is populated,
     specifically ``target_time`` and ``wall_clock_time``."""
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 100000.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
         wall_before_ff = datetime.now(tz=timezone.utc)
-        assert await env.fast_forward(handle, timedelta(minutes=30))
+        assert await ts_env.fast_forward(handle, timedelta(minutes=30))
         wall_after_ff = datetime.now(tz=timezone.utc)
 
         event = await find_history_event(
@@ -646,15 +646,15 @@ async def test_transition_event_payload(env: WorkflowEnvironment) -> None:
 
 
 async def test_child_workflow_started_event_has_state_propagation(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     """A child workflow spawned under time skipping carries TimeSkippingStatePropagation."""
     async with new_worker(
-        env.client, ParentTimeSkippingWorkflow, SleepWorkflow
+        ts_env.client, ParentTimeSkippingWorkflow, SleepWorkflow
     ) as worker:
         child_id = f"child-{uuid.uuid4()}"
         parent_id = f"parent-{uuid.uuid4()}"
-        parent_handle = await env.client.start_workflow(
+        parent_handle = await ts_env.client.start_workflow(
             ParentTimeSkippingWorkflow.run,
             args=[child_id, worker.task_queue, 60.0],
             id=parent_id,
@@ -662,7 +662,7 @@ async def test_child_workflow_started_event_has_state_propagation(
         )
         await parent_handle.result()
 
-        child_handle = env.client.get_workflow_handle(child_id)
+        child_handle = ts_env.client.get_workflow_handle(child_id)
         event = await find_history_event(
             child_handle,
             lambda e: e.event_type == _event_type.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
@@ -675,18 +675,18 @@ async def test_child_workflow_started_event_has_state_propagation(
 
 
 async def test_fast_forward_exceeds_execution_timeout(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
-    async with new_worker(env.client, SleepWorkflow) as worker:
-        with env.with_time_skipping_disabled():
-            handle = await env.client.start_workflow(
+    async with new_worker(ts_env.client, SleepWorkflow) as worker:
+        with ts_env.with_time_skipping_disabled():
+            handle = await ts_env.client.start_workflow(
                 SleepWorkflow.run,
                 100000.0,
                 id=f"wf-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
                 execution_timeout=timedelta(minutes=30),
             )
-        assert (await env.fast_forward(handle, timedelta(hours=1))) is False
+        assert (await ts_env.fast_forward(handle, timedelta(hours=1))) is False
 
         timed_out = await find_history_event(
             handle,
@@ -698,11 +698,11 @@ async def test_fast_forward_exceeds_execution_timeout(
 
 
 async def test_overriding_fast_forward_raises_on_original(
-    env: WorkflowEnvironment,
+    ts_env: WorkflowEnvironment,
 ) -> None:
     task_queue = f"tq-{uuid.uuid4()}"
-    with env.with_time_skipping_disabled():
-        handle = await env.client.start_workflow(
+    with ts_env.with_time_skipping_disabled():
+        handle = await ts_env.client.start_workflow(
             SleepWorkflow.run,
             100000.0,
             id=f"wf-{uuid.uuid4()}",
@@ -710,7 +710,7 @@ async def test_overriding_fast_forward_raises_on_original(
         )
     # No worker yet, to keep fast forwards from finishing.
 
-    original = asyncio.create_task(env.fast_forward(handle, timedelta(hours=2)))
+    original = asyncio.create_task(ts_env.fast_forward(handle, timedelta(hours=2)))
 
     async def _wait_for_ff_id(
         expect_change_from: str | None,
@@ -724,7 +724,7 @@ async def test_overriding_fast_forward_raises_on_original(
                 raise AssertionError(
                     f"first completed before second ran (returned {val!r})"
                 )
-            tsi = await env.get_time_skipping_info(handle)
+            tsi = await ts_env.get_time_skipping_info(handle)
             ffi = tsi.fast_forward_info if tsi is not None else None
             if (
                 ffi
@@ -737,15 +737,15 @@ async def test_overriding_fast_forward_raises_on_original(
 
     first_ff = await _wait_for_ff_id(expect_change_from=None)
 
-    second_ff = asyncio.create_task(env.fast_forward(handle, timedelta(minutes=30)))
+    second_ff = asyncio.create_task(ts_env.fast_forward(handle, timedelta(minutes=30)))
     await _wait_for_ff_id(expect_change_from=first_ff)
 
     with pytest.raises(RuntimeError, match=r"does not match"):
         await original
 
     # Attach a worker so the workflow can complete and the second fast-forward can happen.
-    async with new_worker(env.client, SleepWorkflow, task_queue=task_queue):
+    async with new_worker(ts_env.client, SleepWorkflow, task_queue=task_queue):
         assert await second_ff
-        await env.fast_forward(handle)
+        await ts_env.fast_forward(handle)
         await handle.result()
         await assert_time_was_skipped(handle)
