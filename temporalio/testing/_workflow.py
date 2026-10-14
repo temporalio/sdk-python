@@ -38,6 +38,7 @@ class WorkflowEnvironment:
     """Workflow environment for testing workflows.
 
     Most developers will want to use one of these static methods:
+
     - :py:meth:`start_local`: start a local, full-featured Temporal server
     - :py:meth:`start_time_skipping_v2`: start a local, full-featured Temporal
       server with time-skipping enabled
