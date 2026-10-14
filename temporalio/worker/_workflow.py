@@ -94,6 +94,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
     def __init__(
         self,
         *,
+        driver_operation_semaphore: asyncio.Semaphore | None = None,
         bridge_worker: Callable[[], temporalio.bridge.worker.Worker],
         namespace: str,
         task_queue: str,
@@ -160,6 +161,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         self._unsandboxed_workflow_runner = unsandboxed_workflow_runner
         self._data_converter = data_converter
+        self._driver_operation_semaphore = driver_operation_semaphore
         # Build the interceptor classes and collect extern functions
         self._extern_functions: MutableMapping[str, Callable] = {}
         self._interceptor_classes: list[type[WorkflowInboundInterceptor]] = []
@@ -410,6 +412,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
+                driver_operation_semaphore=self._driver_operation_semaphore,
             )
             if init_job and previous_run_outcome:
                 await self._decode_nexus_previous_run_outcome(
@@ -528,6 +531,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 completion,
                 data_converter,
                 encode_headers=self._encode_headers,
+                driver_operation_semaphore=self._driver_operation_semaphore,
             )
         except Exception as err:
             logger.exception(

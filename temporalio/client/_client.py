@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import (
     Awaitable,
     Callable,
@@ -25,6 +26,7 @@ import temporalio.activity
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._extstore
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -298,6 +300,17 @@ class Client:
         self._init_from_config(config)
 
     def _init_from_config(self, config: ClientConfig):
+        converter = config["data_converter"]
+        if (
+            converter.external_storage is not None
+            and converter._driver_operation_semaphore is None
+        ):
+            config["data_converter"] = dataclasses.replace(
+                converter,
+                _driver_operation_semaphore=temporalio.converter._extstore.new_driver_operation_semaphore(
+                    converter.external_storage
+                ),
+            )
         self._config = config
 
         # Iterate over interceptors in reverse building the impl
