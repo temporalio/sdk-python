@@ -14,6 +14,7 @@ import google.protobuf.message
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -188,6 +189,7 @@ class Request(google.protobuf.message.Message):
     REQUEST_ID_FIELD_NUMBER: builtins.int
     COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     @property
     def meta(self) -> global___Meta: ...
     @property
@@ -208,6 +210,11 @@ class Request(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.Link
     ]:
         """Links to be associated with this update."""
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this update."""
     def __init__(
         self,
         *,
@@ -220,9 +227,19 @@ class Request(google.protobuf.message.Message):
         | None = ...,
         links: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Link]
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["input", b"input", "meta", b"meta"]
+        self,
+        field_name: typing_extensions.Literal[
+            "input",
+            b"input",
+            "meta",
+            b"meta",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -235,6 +252,8 @@ class Request(google.protobuf.message.Message):
             b"links",
             "meta",
             b"meta",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "request_id",
             b"request_id",
         ],
