@@ -26,6 +26,7 @@ from temporalio.converter._extstore import (
     StorageOperationMetrics,
     _StorageReference,
     message_scope,
+    new_driver_operation_semaphore,
 )
 from temporalio.converter._payload_converter import JSONProtoPayloadConverter
 from temporalio.exceptions import ApplicationError
@@ -1013,8 +1014,33 @@ class TestExternalStorageConcurrency:
         gate.release()
         await asyncio.gather(first, second)
 
+    async def test_separate_owners_do_not_share_max_driver_operations(self):
+        """Two owners of one ExternalStorage each get their own limit."""
+        gate = _Gate()
+        storage = ExternalStorage(
+            drivers=[_PermittingDriver(gate)],
+            payload_size_threshold=0,
+            concurrency=ExternalStorageConcurrency(
+                max_driver_operations=2, max_operations_per_message=10
+            ),
+        )
+
+        async def one_owner() -> None:
+            with message_scope(storage, new_driver_operation_semaphore(storage)):
+                await storage._store_payload_sequence(
+                    [_payload(), _payload(), _payload()]
+                )
+
+        first = asyncio.create_task(one_owner())
+        second = asyncio.create_task(one_owner())
+        await _settle()
+        assert gate.peak == 4, "each owner allows 2, so two owners allow 4"
+
+        gate.release()
+        await asyncio.gather(first, second)
+
     async def test_max_driver_operations_shared_across_messages(self):
-        """The instance-wide budget spans every message using the instance."""
+        """One owner's driver operation limit spans every message it runs."""
         gate = _Gate()
         storage = ExternalStorage(
             drivers=[_PermittingDriver(gate)],
@@ -1024,8 +1050,10 @@ class TestExternalStorageConcurrency:
             ),
         )
 
+        driver_operations = new_driver_operation_semaphore(storage)
+
         async def one_message() -> None:
-            with message_scope(storage):
+            with message_scope(storage, driver_operations):
                 await storage._store_payload_sequence(
                     [_payload(), _payload(), _payload()]
                 )
@@ -1050,9 +1078,11 @@ class TestExternalStorageConcurrency:
             ),
         )
 
+        driver_operations = new_driver_operation_semaphore(storage)
+
         async def one_message() -> None:
             copy = storage._with_store_context(StorageDriverStoreContext(target=None))
-            with message_scope(copy):
+            with message_scope(copy, driver_operations):
                 await copy._store_payload_sequence([_payload(), _payload(), _payload()])
 
         first = asyncio.create_task(one_message())
@@ -1077,12 +1107,17 @@ class TestExternalStorageConcurrency:
             )
         )
 
+        assert data_converter.external_storage is not None
+        driver_operations = new_driver_operation_semaphore(
+            data_converter.external_storage
+        )
+
         async def one_message() -> None:
             copy = data_converter._with_store_context(
                 StorageDriverStoreContext(target=None)
             )
             assert copy.external_storage is not None
-            with message_scope(copy.external_storage):
+            with message_scope(copy.external_storage, driver_operations):
                 await copy._external_store_payload_sequence(
                     [_payload(), _payload(), _payload()]
                 )

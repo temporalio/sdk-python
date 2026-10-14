@@ -22,6 +22,7 @@ from typing_extensions import TypedDict
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
+import temporalio.converter._extstore
 import temporalio.runtime
 import temporalio.service
 from temporalio.common import (
@@ -458,6 +459,11 @@ class Worker:
         # Extract storage drivers from the client's data converter
         _ext_storage = client_config["data_converter"].external_storage
         self._storage_drivers = list(_ext_storage.drivers) if _ext_storage else []
+        self._driver_operation_semaphore = (
+            temporalio.converter._extstore.new_driver_operation_semaphore(_ext_storage)
+            if _ext_storage
+            else None
+        )
 
         # Extract the bridge service client
         bridge_client = _extract_bridge_client_for_worker(config["client"])  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -525,6 +531,7 @@ class Worker:
                 self._activity_worker.assert_activity_valid(activity)
 
             self._workflow_worker = _WorkflowWorker(
+                driver_operation_semaphore=self._driver_operation_semaphore,
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=config["client"].namespace,  # type: ignore[reportTypedDictNotRequiredAccess]
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]

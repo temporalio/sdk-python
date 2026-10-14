@@ -9,7 +9,6 @@ import contextlib
 import contextvars
 import dataclasses
 import time
-import weakref
 from abc import ABC, abstractmethod
 from collections.abc import (
     AsyncIterator,
@@ -17,7 +16,6 @@ from collections.abc import (
     Coroutine,
     Generator,
     Mapping,
-    MutableMapping,
     Sequence,
 )
 from dataclasses import dataclass
@@ -343,8 +341,8 @@ class ExternalStorageConcurrency:
 
     max_driver_operations: int = 64
     """The maximum number of concurrent external storage operations that drivers
-    can execute for a single :class:`ExternalStorage`. All drivers on that
-    instance share this limit. Defaults to 64.
+    can execute for a single client or worker. Each client and each worker gets
+    its own limit of this size. Defaults to 64.
     """
 
     max_operations_per_message: int = 8
@@ -361,10 +359,10 @@ class _SemaphoreLimiter(StorageDriverLimiter):
     def __init__(
         self,
         per_message_semaphore: asyncio.Semaphore,
-        per_instance_semaphore: asyncio.Semaphore,
+        per_driver_operation_semaphore: asyncio.Semaphore,
     ) -> None:
         self._per_message_semaphore = per_message_semaphore
-        self._per_instance_semaphore = per_instance_semaphore
+        self._per_driver_operation_semaphore = per_driver_operation_semaphore
         self.permit_taken = False
 
     @contextlib.asynccontextmanager
@@ -373,7 +371,7 @@ class _SemaphoreLimiter(StorageDriverLimiter):
     ) -> AsyncIterator[None]:
         self.permit_taken = True
         async with self._per_message_semaphore:
-            async with self._per_instance_semaphore:
+            async with self._per_driver_operation_semaphore:
                 yield
 
 
@@ -383,16 +381,61 @@ _current_per_message_semaphore: contextvars.ContextVar[asyncio.Semaphore | None]
 """The limit for the message being processed."""
 
 
+_current_driver_operation_semaphore: contextvars.ContextVar[
+    asyncio.Semaphore | None
+] = contextvars.ContextVar(
+    "_temporal_extstore_driver_operation_semaphore", default=None
+)
+"""The driver operation limit of the client or worker running the operation."""
+
+
 @contextlib.contextmanager
-def message_scope(storage: ExternalStorage) -> Generator[None, Any, None]:
-    """Gives everything in this block one shared per-message limit."""
-    token = _current_per_message_semaphore.set(
+def message_scope(
+    storage: ExternalStorage,
+    driver_operation_semaphore: asyncio.Semaphore | None = None,
+) -> Generator[None, Any, None]:
+    """Gives everything in this block one shared per-message limit.
+
+    ``driver_operation_semaphore`` is the limit of the client or worker running
+    the message. Pass None to leave the current one in place.
+    """
+    message_token = _current_per_message_semaphore.set(
         asyncio.Semaphore(storage.concurrency.max_operations_per_message)
+    )
+    instance_token = (
+        None
+        if driver_operation_semaphore is None
+        else _current_driver_operation_semaphore.set(driver_operation_semaphore)
     )
     try:
         yield
     finally:
-        _current_per_message_semaphore.reset(token)
+        if instance_token is not None:
+            _current_driver_operation_semaphore.reset(instance_token)
+        _current_per_message_semaphore.reset(message_token)
+
+
+def new_driver_operation_semaphore(storage: ExternalStorage) -> asyncio.Semaphore:
+    """Builds a driver operation limit for one client or worker."""
+    return asyncio.Semaphore(storage.concurrency.max_driver_operations)
+
+
+@contextlib.contextmanager
+def default_driver_operation_scope(
+    driver_operation_semaphore: asyncio.Semaphore | None,
+) -> Generator[None, Any, None]:
+    """Uses driver_operation_semaphore only when none is already in scope."""
+    if (
+        driver_operation_semaphore is None
+        or _current_driver_operation_semaphore.get() is not None
+    ):
+        yield
+        return
+    token = _current_driver_operation_semaphore.set(driver_operation_semaphore)
+    try:
+        yield
+    finally:
+        _current_driver_operation_semaphore.reset(token)
 
 
 @dataclass(frozen=True)
@@ -455,11 +498,6 @@ class ExternalStorage:
     )
     """Selector context derived from :attr:`_store_context`."""
 
-    _per_instance_semaphores: MutableMapping[
-        asyncio.AbstractEventLoop, asyncio.Semaphore
-    ] = dataclasses.field(init=False, repr=False, compare=False)
-    """The limit shared by every message using this ExternalStorage."""
-
     _claim_converter: ClassVar[JSONProtoPayloadConverter] = JSONProtoPayloadConverter()
     _legacy_claim_converter: ClassVar[JSONPlainPayloadConverter] = (
         JSONPlainPayloadConverter(encoding=_REFERENCE_ENCODING.decode())
@@ -506,25 +544,20 @@ class ExternalStorage:
                     f"ExternalStorage.concurrency.{name} must be a positive integer, got {value!r}."
                 )
         object.__setattr__(self, "_driver_map", driver_map)
-        object.__setattr__(
-            self, "_per_instance_semaphores", weakref.WeakKeyDictionary()
-        )
 
     def _make_limiter(self) -> _SemaphoreLimiter:
         """Builds the limiter for one driver call."""
-        loop = asyncio.get_running_loop()
-        per_instance_semaphore = self._per_instance_semaphores.get(loop)
-        if per_instance_semaphore is None:
-            per_instance_semaphore = asyncio.Semaphore(
+        per_driver_operation_semaphore = _current_driver_operation_semaphore.get()
+        if per_driver_operation_semaphore is None:
+            per_driver_operation_semaphore = asyncio.Semaphore(
                 self.concurrency.max_driver_operations
             )
-            self._per_instance_semaphores[loop] = per_instance_semaphore
         per_message_semaphore = _current_per_message_semaphore.get()
         if per_message_semaphore is None:
             per_message_semaphore = asyncio.Semaphore(
                 self.concurrency.max_operations_per_message
             )
-        return _SemaphoreLimiter(per_message_semaphore, per_instance_semaphore)
+        return _SemaphoreLimiter(per_message_semaphore, per_driver_operation_semaphore)
 
     @staticmethod
     def _warn_if_limiter_unused(
@@ -569,9 +602,6 @@ class ExternalStorage:
     def _with_store_context(self, ctx: StorageDriverStoreContext) -> ExternalStorage:
         """Return a copy of this instance with ``ctx`` bound as the store context."""
         result = dataclasses.replace(self)
-        object.__setattr__(
-            result, "_per_instance_semaphores", self._per_instance_semaphores
-        )
         object.__setattr__(result, "_store_context", ctx)
         object.__setattr__(
             result, "_select_context", StorageDriverSelectContext(target=ctx.target)

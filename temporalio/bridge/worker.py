@@ -13,6 +13,8 @@ from typing import (
 )
 
 import temporalio.bridge.client
+import asyncio
+
 import temporalio.bridge.proto
 import temporalio.bridge.proto.activity_task
 import temporalio.bridge.proto.nexus
@@ -308,6 +310,7 @@ class _Visitor(VisitorFunctions):
 @contextlib.contextmanager
 def _external_storage_message(
     data_converter: temporalio.converter.DataConverter,
+    driver_operation_semaphore: asyncio.Semaphore | None = None,
 ) -> Iterator[tuple[temporalio.converter._extstore.StorageOperationMetrics, int]]:
     """Yields one message's external storage metrics and payload visit limit."""
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
@@ -317,7 +320,12 @@ def _external_storage_message(
             yield metrics, 1
         return
     visit_limit = storage.concurrency.max_operations_per_message
-    with metrics.track(), temporalio.converter._extstore.message_scope(storage):
+    with (
+        metrics.track(),
+        temporalio.converter._extstore.message_scope(
+            storage, driver_operation_semaphore
+        ),
+    ):
         yield metrics, visit_limit
 
 
@@ -325,13 +333,17 @@ async def decode_activation(
     activation: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
     data_converter: temporalio.converter.DataConverter,
     decode_headers: bool,
+    driver_operation_semaphore: asyncio.Semaphore | None = None,
 ) -> temporalio.converter._extstore.StorageOperationMetrics:
     """Decode all payloads in the activation.
 
     Returns:
         Metrics from any external storage retrieval operations that occurred.
     """
-    with _external_storage_message(data_converter) as (metrics, visit_limit):
+    with _external_storage_message(data_converter, driver_operation_semaphore) as (
+        metrics,
+        visit_limit,
+    ):
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not decode_headers,
@@ -352,6 +364,7 @@ async def encode_completion(
     completion: temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion,
     data_converter: temporalio.converter.DataConverter,
     encode_headers: bool,
+    driver_operation_semaphore: asyncio.Semaphore | None = None,
 ) -> temporalio.converter._extstore.StorageOperationMetrics:
     """Encode all payloads in the completion.
 
@@ -366,7 +379,10 @@ async def encode_completion(
         completion,
     )
 
-    with _external_storage_message(data_converter) as (metrics, visit_limit):
+    with _external_storage_message(data_converter, driver_operation_semaphore) as (
+        metrics,
+        visit_limit,
+    ):
         await CommandAwarePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not encode_headers,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from temporalio.converter._extstore import (
     _REFERENCE_MESSAGE_TYPE,
     ExternalStorage,
     StorageDriverStoreContext,
+    default_driver_operation_scope,
 )
 from temporalio.converter._failure_converter import (
     FailureConverter,
@@ -86,6 +88,11 @@ class DataConverter(WithSerializationContext):
     .. warning::
         This API is experimental.
     """
+
+    _driver_operation_semaphore: asyncio.Semaphore | None = dataclasses.field(
+        default=None, repr=False, compare=False
+    )
+    """The driver operation limit of the client that owns this converter."""
 
     default: ClassVar[DataConverter]
     """Singleton default data converter."""
@@ -316,9 +323,10 @@ class DataConverter(WithSerializationContext):
         """External storage store, then validate payload limits."""
         stored_payloads = list(payloads)
         if self.external_storage:
-            stored_payloads = await self.external_storage._store_payload_sequence(
-                stored_payloads
-            )
+            with default_driver_operation_scope(self._driver_operation_semaphore):
+                stored_payloads = await self.external_storage._store_payload_sequence(
+                    stored_payloads
+                )
         return stored_payloads
 
     async def _external_retrieve_payload_sequence(
@@ -327,9 +335,12 @@ class DataConverter(WithSerializationContext):
         """External storage retrieve only."""
         retrieved_payloads = list(payloads)
         if self.external_storage:
-            retrieved_payloads = await self.external_storage._retrieve_payload_sequence(
-                retrieved_payloads
-            )
+            with default_driver_operation_scope(self._driver_operation_semaphore):
+                retrieved_payloads = (
+                    await self.external_storage._retrieve_payload_sequence(
+                        retrieved_payloads
+                    )
+                )
         else:
             if any(_is_reference_payload(p) for p in retrieved_payloads):
                 raise RuntimeError(
