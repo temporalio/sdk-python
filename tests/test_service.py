@@ -1,5 +1,4 @@
 import asyncio
-import dataclasses
 import inspect
 import os
 import re
@@ -382,13 +381,10 @@ async def test_connect_timeout_bounds_tcp_connection():
 
 
 async def test_connect_timeout_allows_healthy_connection(client: Client):
-    connected = await temporalio.service.ServiceClient.connect(
-        dataclasses.replace(
-            client.service_client.config,
-            connect_timeout=timedelta(seconds=5),
-            lazy=False,
-        )
-    )
+    connect_args = vars(client.service_client.config).copy()
+    connect_args["connect_timeout"] = timedelta(seconds=5)
+    connect_args["lazy"] = False
+    connected = await Client.connect(**connect_args)
     await connected.workflow_service.get_system_info(
         temporalio.api.workflowservice.v1.GetSystemInfoRequest()
     )
