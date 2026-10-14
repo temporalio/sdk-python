@@ -239,6 +239,7 @@ class ConnectConfig:
     dns_load_balancing_config: DnsLoadBalancingConfig | None = None
     grpc_compression: GrpcCompression = GrpcCompression.GZIP
     payload_limits: PayloadLimitsConfig = field(default_factory=PayloadLimitsConfig)
+    connect_timeout: timedelta | None = None
 
     def __post_init__(self) -> None:
         """Set extra defaults on unset properties."""
@@ -285,6 +286,11 @@ class ConnectConfig:
             keep_alive_config=(
                 self.keep_alive_config._to_bridge_config()
                 if self.keep_alive_config
+                else None
+            ),
+            connect_timeout_millis=(
+                int(self.connect_timeout.total_seconds() * 1000)
+                if self.connect_timeout is not None
                 else None
             ),
             metadata=self.rpc_metadata,
