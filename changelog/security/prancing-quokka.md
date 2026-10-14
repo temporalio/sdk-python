@@ -1,0 +1,1 @@
+Refresh the bridge's Rust dependency lockfile, retaining `quinn-proto` 0.11.19 so the next release's bundled lockfile is unaffected by RUSTSEC-2026-0340 and RUSTSEC-2026-0341 ([#1965](https://github.com/temporalio/sdk-python/issues/1965)).
