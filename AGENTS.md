@@ -24,7 +24,7 @@ document as a quick reference when submitting pull requests.
 * Time-skipping V1 tests are run with `poe test -s --workflow-environment
   time-skipping-v1`. Time-skipping V1 does not work on Linux ARM or Windows ARM.
 * Time-skipping V2 tests are run with `poe test -s --workflow-environment
-  time-skipping-v2`. Time-skipping V1 works on both Linux ARM and Windows ARM.
+  time-skipping-v2`. Time-skipping V2 works on both Linux ARM and Windows ARM.
 * It is extremely important that comments explain why something is necessary,
   not what the code already says. Avoid comments unless they clarify nonobvious
   behavior.
