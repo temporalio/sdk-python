@@ -297,6 +297,9 @@ class WorkflowEnvironment:
     ) -> WorkflowEnvironment:
         """Start a local Temporal server with per-workflow time skipping enabled.
 
+        .. warning::
+           This API is experimental and unstable.
+
         This environment is good for testing full server capabilities, and
         supports time skipping.
 
@@ -392,7 +395,11 @@ class WorkflowEnvironment:
 
     @property
     def supports_time_skipping_v2(self) -> bool:
-        """True if this environment uses the V2 time-skipping server."""
+        """True if this environment uses the V2 time-skipping server.
+
+        .. warning::
+           This API is experimental and unstable.
+        """
         return False
 
     @property
@@ -461,6 +468,9 @@ class WorkflowEnvironment:
     ) -> bool:
         """Fast-forward this workflow's virtual clock by ``duration``, and wait for it to complete.
 
+        .. warning::
+           This API is experimental and unstable.
+
         Only supported on time-skipping V2 environments (created via
         :py:meth:`start_time_skipping_v2`).
 
@@ -486,6 +496,9 @@ class WorkflowEnvironment:
     def with_time_skipping_disabled(self) -> Iterator[None]:
         """Suspend V2 time-skipping config stamping on newly-started workflows within the block.
 
+        .. warning::
+           This API is experimental and unstable.
+
         Workflows started via :py:attr:`client` during the block do not
         receive a ``time_skipping_config`` on their start request. Existing
         workflows and V1 auto-behavior are unaffected. No-op on non-V2
@@ -498,6 +511,9 @@ class WorkflowEnvironment:
         handle: temporalio.client.WorkflowHandle[Any, Any],  # pyright: ignore[reportUnusedParameter]
     ) -> temporalio.api.common.v1.TimeSkippingInfo | None:
         """Fetch a workflow's ``TimeSkippingInfo`` via ``DescribeWorkflowExecution``.
+
+        .. warning::
+           This API is experimental and unstable.
 
         Returns ``None`` if time skipping has never been enabled on the
         workflow.

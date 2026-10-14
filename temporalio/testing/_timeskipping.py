@@ -21,7 +21,11 @@ from temporalio.api.enums.v1.time_skipping_pb2 import FastForwardPollingResult
 
 @dataclass(frozen=True)
 class FastForwardConfig:
-    """One-shot fast-forward within a :py:class:`TimeSkippingConfig`."""
+    """One-shot fast-forward within a :py:class:`TimeSkippingConfig`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     id: str
     """Identifies this fast-forward for ``PollWorkflowExecutionTimeSkipping``."""
@@ -38,7 +42,11 @@ class FastForwardConfig:
 
 @dataclass(frozen=True)
 class TimeSkippingConfig:
-    """Per-workflow time skipping configuration."""
+    """Per-workflow time skipping configuration.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     enabled: bool = True
     """Whether time skipping is enabled for the workflow."""
@@ -86,6 +94,9 @@ _TERMINAL_EVENT_TYPES = frozenset(
 
 class TimeSkipper:
     """Client wrapper for per-workflow time skipping.
+
+    .. warning::
+       This API is experimental and unstable.
 
     Wraps a client with an interceptor that stamps a ``TimeSkippingConfig``
     on every workflow started through :py:attr:`client`. Use
