@@ -26,6 +26,7 @@ from temporalio.contrib.modal.worker._defaults import (
     DEFAULT_SHUTDOWN_HOOK_BUFFER,
     ENV_MODAL_TASK_ID,
     ENV_TASK_QUEUE,
+    MIN_FUNCTION_TIMEOUT_HEADROOM,
     apply_modal_worker_defaults,
     build_modal_identity,
     modal_default_config_file_path,
@@ -102,9 +103,50 @@ def _work_time(
     return config.execution_timeout - elapsed - config.shutdown_deadline_buffer
 
 
+def _validate_function_timeout(
+    config: ModalWorkerConfig, modal_function_timeout: timedelta
+) -> None:
+    if modal_function_timeout <= timedelta(0):
+        raise ValueError("modal_function_timeout must be greater than zero")
+    minimum_function_timeout = config.execution_timeout + MIN_FUNCTION_TIMEOUT_HEADROOM
+    if modal_function_timeout < minimum_function_timeout:
+        raise ValueError(
+            "modal_function_timeout must be at least execution_timeout + "
+            f"{MIN_FUNCTION_TIMEOUT_HEADROOM.total_seconds():.0f}s "
+            f"({minimum_function_timeout.total_seconds():.1f}s required, "
+            f"{modal_function_timeout.total_seconds():.1f}s configured)"
+        )
+
+
+async def _run_worker_until_timeout(
+    worker: temporalio.worker.Worker, timeout: float
+) -> None:
+    """Run a worker, suppressing only the timeout imposed by this function."""
+    worker_raised_timeout = False
+
+    async def tracked_run() -> None:
+        nonlocal worker_raised_timeout
+        try:
+            await worker.run()
+        except asyncio.TimeoutError:
+            # On Python 3.11+, asyncio.TimeoutError aliases the built-in
+            # TimeoutError, so the exception type alone does not identify
+            # whether wait_for or the worker raised it.
+            worker_raised_timeout = True
+            raise
+
+    try:
+        await asyncio.wait_for(tracked_run(), timeout=timeout)
+    except asyncio.TimeoutError:
+        if worker_raised_timeout:
+            raise
+
+
 async def run_worker(
     version: WorkerDeploymentVersion,
     configure: ConfigureCallback,
+    *,
+    modal_function_timeout: timedelta,
 ) -> None:
     """Run a Temporal worker for one Modal Function invocation.
 
@@ -118,32 +160,45 @@ async def run_worker(
     connects; its teardown runs after the worker and shutdown hooks stop.
 
     Worker Deployment Versioning is always enabled. Modal does not expose a
-    remaining-time API inside a running Function, so
-    :py:attr:`ModalWorkerConfig.execution_timeout` supplies this lifecycle's
-    budget. It must not exceed the function's Modal ``timeout`` and may be
-    shorter when workers should exit before the outer Function deadline.
+    remaining-time API inside a running Function, so *modal_function_timeout*
+    must declare the timeout configured on ``@app.function``. The declared
+    timeout must be at least
+    :py:attr:`ModalWorkerConfig.execution_timeout` plus
+    :py:const:`MIN_FUNCTION_TIMEOUT_HEADROOM`. The SDK validates that
+    relationship but cannot verify the decorator configuration itself.
 
     Args:
         version: Required worker deployment version.
         configure: Per-invocation callback that registers workflows and
             activities and may override client or worker options.
+        modal_function_timeout: Timeout configured on the enclosing Modal
+            Function. The deployment and this argument must use the same value.
 
     Example::
 
-        import modal
         from datetime import timedelta
+
+        import modal
         from temporalio.common import WorkerDeploymentVersion
-        from temporalio.contrib.modal.worker import ModalWorkerConfig, run_worker
+        from temporalio.contrib.modal.worker import (
+            MIN_FUNCTION_TIMEOUT_HEADROOM,
+            ModalWorkerConfig,
+            run_worker,
+        )
 
         app = modal.App("temporal-worker")
+        worker_execution_timeout = timedelta(minutes=5)
+        modal_function_timeout = (
+            worker_execution_timeout + MIN_FUNCTION_TIMEOUT_HEADROOM
+        )
 
         def configure(config: ModalWorkerConfig) -> None:
             config.worker_config["task_queue"] = "my-task-queue"
             config.worker_config["workflows"] = [MyWorkflow]
             config.worker_config["activities"] = [my_activity]
-            config.execution_timeout = timedelta(minutes=5)
+            config.execution_timeout = worker_execution_timeout
 
-        @app.function(timeout=315)
+        @app.function(timeout=int(modal_function_timeout.total_seconds()))
         async def temporal_worker() -> None:
             await run_worker(
                 WorkerDeploymentVersion(
@@ -151,14 +206,21 @@ async def run_worker(
                     build_id="v1.0",
                 ),
                 configure,
+                modal_function_timeout=modal_function_timeout,
             )
     """
-    await _run_worker_internal(version, configure, _WorkerDeps())
+    await _run_worker_internal(
+        version,
+        configure,
+        modal_function_timeout,
+        _WorkerDeps(),
+    )
 
 
 async def _run_worker_internal(
     version: WorkerDeploymentVersion,
     configure: ConfigureCallback,
+    modal_function_timeout: timedelta,
     deps: _WorkerDeps,
 ) -> None:
     """Run one invocation with injected dependencies."""
@@ -193,6 +255,7 @@ async def _run_worker_internal(
     async with _invocation_config_scope(configure, config):
         try:
             work_time = _work_time(config, invocation_started, deps.monotonic)
+            _validate_function_timeout(config, modal_function_timeout)
             if work_time <= timedelta(seconds=1):
                 raise RuntimeError(
                     "Modal execution timeout is too short: "
@@ -231,10 +294,7 @@ async def _run_worker_internal(
                 raise RuntimeError(
                     "Modal execution budget was exhausted before the worker started"
                 )
-            try:
-                await asyncio.wait_for(worker.run(), timeout=work_time.total_seconds())
-            except asyncio.TimeoutError:
-                pass
+            await _run_worker_until_timeout(worker, work_time.total_seconds())
         finally:
             await _run_shutdown_hooks(config)
 

@@ -14,12 +14,19 @@ from datetime import timedelta
 import modal
 
 from temporalio.common import WorkerDeploymentVersion
-from temporalio.contrib.modal.worker import ModalWorkerConfig, run_worker
+from temporalio.contrib.modal.worker import (
+    MIN_FUNCTION_TIMEOUT_HEADROOM,
+    ModalWorkerConfig,
+    run_worker,
+)
 
 from my_activities import my_activity
 from my_workflows import MyWorkflow
 
-WORKER_EXECUTION_TIMEOUT_SECONDS = 300
+WORKER_EXECUTION_TIMEOUT = timedelta(minutes=5)
+MODAL_FUNCTION_TIMEOUT = (
+    WORKER_EXECUTION_TIMEOUT + MIN_FUNCTION_TIMEOUT_HEADROOM
+)
 
 app = modal.App("temporal-worker")
 
@@ -28,10 +35,10 @@ def configure(config: ModalWorkerConfig) -> None:
     config.worker_config["task_queue"] = "my-task-queue"
     config.worker_config["workflows"] = [MyWorkflow]
     config.worker_config["activities"] = [my_activity]
-    config.execution_timeout = timedelta(seconds=WORKER_EXECUTION_TIMEOUT_SECONDS)
+    config.execution_timeout = WORKER_EXECUTION_TIMEOUT
 
 
-@app.function(timeout=WORKER_EXECUTION_TIMEOUT_SECONDS + 15)
+@app.function(timeout=int(MODAL_FUNCTION_TIMEOUT.total_seconds()))
 async def temporal_worker() -> None:
     await run_worker(
         WorkerDeploymentVersion(
@@ -39,6 +46,7 @@ async def temporal_worker() -> None:
             build_id="v1.0",
         ),
         configure,
+        modal_function_timeout=MODAL_FUNCTION_TIMEOUT,
     )
 ```
 
@@ -53,26 +61,38 @@ fresh SDK objects.
 Modal Functions default to a five-minute input timeout. Modal does not expose a
 remaining-time API inside a running Function, so `ModalWorkerConfig` uses an
 explicit five-minute lifecycle budget and measures it from entry into
-`run_worker`. The SDK budget may be shorter than the outer Function timeout; it
-must not be longer. Leave enough outer timeout headroom for application code
-that runs before or after `run_worker`:
+`run_worker`. `run_worker` requires the Modal Function timeout as an argument
+and verifies that it is at least 15 seconds longer than the SDK lifecycle
+budget:
 
 ```python
 from datetime import timedelta
 
-WORKER_EXECUTION_TIMEOUT_SECONDS = 120
-FUNCTION_TIMEOUT_SECONDS = 135
+WORKER_EXECUTION_TIMEOUT = timedelta(minutes=2)
+MODAL_FUNCTION_TIMEOUT = (
+    WORKER_EXECUTION_TIMEOUT + MIN_FUNCTION_TIMEOUT_HEADROOM
+)
 
 
 def configure(config: ModalWorkerConfig) -> None:
-    config.execution_timeout = timedelta(seconds=WORKER_EXECUTION_TIMEOUT_SECONDS)
+    config.execution_timeout = WORKER_EXECUTION_TIMEOUT
     # Configure task queue, workflows, and activities here.
 
 
-@app.function(timeout=FUNCTION_TIMEOUT_SECONDS)
+@app.function(timeout=int(MODAL_FUNCTION_TIMEOUT.total_seconds()))
 async def temporal_worker() -> None:
-    await run_worker(VERSION, configure)
+    await run_worker(
+        VERSION,
+        configure,
+        modal_function_timeout=MODAL_FUNCTION_TIMEOUT,
+    )
 ```
+
+The value passed as `modal_function_timeout` must be the same value configured
+on `@app.function`. The SDK can validate the relationship between the declared
+timeouts, but only the application deployment can apply the outer timeout to
+Modal. Increase the headroom beyond 15 seconds when application code runs
+before or after `run_worker`.
 
 The default shutdown buffer is seven seconds: five seconds for graceful worker
 shutdown and two seconds for hooks. Increase it when shutdown hooks or worker
@@ -116,9 +136,12 @@ WCI may provide namespace, deployment name, build ID, task queue, and worker
 lifetime as arguments when it invokes the Modal Function. Keep that invocation
 signature at the application boundary: map those values into
 `WorkerDeploymentVersion`, `client_connect_config`, `worker_config`, and
-`execution_timeout` before calling `run_worker`. The SDK intentionally does not
-define those argument names or their wire format while the WCI/Modal invocation
-protocol is still evolving.
+`execution_timeout` before calling `run_worker`. The Modal deployment must set
+its Function timeout to at least the maximum worker lifetime plus
+`MIN_FUNCTION_TIMEOUT_HEADROOM`, and the application must pass that deployed
+timeout as `modal_function_timeout`. The SDK intentionally does not define the
+WCI argument names or wire format while the WCI/Modal invocation protocol is
+still evolving.
 
 ## Integration boundary
 

@@ -25,12 +25,14 @@ from temporalio.contrib.modal.worker._defaults import (
     DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITIES,
     DEFAULT_MAX_CONCURRENT_NEXUS_TASKS,
     DEFAULT_MAX_CONCURRENT_WORKFLOW_TASKS,
+    MIN_FUNCTION_TIMEOUT_HEADROOM,
     apply_modal_worker_defaults,
     build_modal_identity,
     modal_default_config_file_path,
 )
 from temporalio.contrib.modal.worker._run_worker import (
     _run_worker_internal,
+    _run_worker_until_timeout,
     _WorkerDeps,
 )
 from temporalio.envconfig import ClientConfigProfile
@@ -40,6 +42,7 @@ TEST_VERSION = WorkerDeploymentVersion(
     deployment_name="test-deployment",
     build_id="test-build",
 )
+TEST_MODAL_FUNCTION_TIMEOUT = DEFAULT_EXECUTION_TIMEOUT + MIN_FUNCTION_TIMEOUT_HEADROOM
 
 
 def _make_test_deps(
@@ -166,13 +169,53 @@ class TestDefaults:
         )
 
 
+class TestRunWorkerUntilTimeout:
+    @pytest.mark.asyncio
+    async def test_budget_timeout_is_suppressed(self) -> None:
+        worker = MagicMock()
+        worker_cancelled = False
+
+        async def run() -> None:
+            nonlocal worker_cancelled
+            try:
+                await asyncio.Event().wait()
+            finally:
+                worker_cancelled = True
+
+        worker.run = run
+
+        await _run_worker_until_timeout(worker, 0.001)
+
+        assert worker_cancelled
+
+    @pytest.mark.asyncio
+    async def test_worker_timeout_is_propagated(self) -> None:
+        worker = MagicMock()
+        worker_error = TimeoutError("worker failed")
+
+        async def run() -> None:
+            raise worker_error
+
+        worker.run = run
+
+        with pytest.raises(TimeoutError) as err:
+            await _run_worker_until_timeout(worker, 1)
+
+        assert err.value is worker_error
+
+
 class TestRunWorkerInternal:
     @pytest.mark.asyncio
     async def test_success_applies_defaults_and_versioning(self) -> None:
         worker_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(worker_kwargs_capture=worker_capture)
 
-        await _run_worker_internal(TEST_VERSION, lambda config: None, deps)
+        await _run_worker_internal(
+            TEST_VERSION,
+            lambda config: None,
+            TEST_MODAL_FUNCTION_TIMEOUT,
+            deps,
+        )
 
         worker_config = worker_capture[0]
         assert worker_config["task_queue"] == "test-queue"
@@ -204,7 +247,9 @@ class TestRunWorkerInternal:
             config.worker_config["task_queue"] = "custom-queue"
             config.worker_config["max_concurrent_activities"] = 42
 
-        await _run_worker_internal(TEST_VERSION, configure, deps)
+        await _run_worker_internal(
+            TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+        )
 
         assert connect_capture[0]["namespace"] == "custom-ns"
         assert worker_capture[0]["task_queue"] == "custom-queue"
@@ -215,7 +260,12 @@ class TestRunWorkerInternal:
         connect_capture: list[dict[str, Any]] = []
         deps = _make_test_deps(connect_kwargs_capture=connect_capture)
 
-        await _run_worker_internal(TEST_VERSION, lambda config: None, deps)
+        await _run_worker_internal(
+            TEST_VERSION,
+            lambda config: None,
+            TEST_MODAL_FUNCTION_TIMEOUT,
+            deps,
+        )
 
         assert connect_capture[0]["identity"] == "fc-call@ta-container"
 
@@ -229,7 +279,9 @@ class TestRunWorkerInternal:
         def configure(config: ModalWorkerConfig) -> None:
             config.client_connect_config["identity"] = "custom-worker"
 
-        await _run_worker_internal(TEST_VERSION, configure, deps)
+        await _run_worker_internal(
+            TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+        )
 
         assert connect_capture[0]["identity"] == "custom-worker"
         get_function_call_id.assert_not_called()
@@ -240,7 +292,12 @@ class TestRunWorkerInternal:
         deps.getenv = lambda _name: None
 
         with pytest.raises(ValueError, match="task queue not configured"):
-            await _run_worker_internal(TEST_VERSION, lambda config: None, deps)
+            await _run_worker_internal(
+                TEST_VERSION,
+                lambda config: None,
+                TEST_MODAL_FUNCTION_TIMEOUT,
+                deps,
+            )
 
     @pytest.mark.asyncio
     async def test_missing_version(self) -> None:
@@ -249,6 +306,45 @@ class TestRunWorkerInternal:
             await _run_worker_internal(
                 WorkerDeploymentVersion(deployment_name="", build_id=""),
                 lambda config: None,
+                TEST_MODAL_FUNCTION_TIMEOUT,
+                deps,
+            )
+
+    @pytest.mark.asyncio
+    async def test_function_timeout_requires_headroom(self) -> None:
+        connect_capture: list[dict[str, Any]] = []
+        worker_capture: list[dict[str, Any]] = []
+        deps = _make_test_deps(
+            connect_kwargs_capture=connect_capture,
+            worker_kwargs_capture=worker_capture,
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=("modal_function_timeout must be at least execution_timeout \\+ 15s"),
+        ):
+            await _run_worker_internal(
+                TEST_VERSION,
+                lambda config: None,
+                DEFAULT_EXECUTION_TIMEOUT,
+                deps,
+            )
+
+        assert not connect_capture
+        assert not worker_capture
+
+    @pytest.mark.asyncio
+    async def test_function_timeout_uses_configured_execution_timeout(self) -> None:
+        deps = _make_test_deps()
+
+        def configure(config: ModalWorkerConfig) -> None:
+            config.execution_timeout = DEFAULT_EXECUTION_TIMEOUT + timedelta(seconds=1)
+
+        with pytest.raises(ValueError, match="316.0s required, 315.0s configured"):
+            await _run_worker_internal(
+                TEST_VERSION,
+                configure,
+                TEST_MODAL_FUNCTION_TIMEOUT,
                 deps,
             )
 
@@ -267,7 +363,9 @@ class TestRunWorkerInternal:
             shutdown_called = True
 
         with pytest.raises(RuntimeError, match="execution timeout is too short"):
-            await _run_worker_internal(TEST_VERSION, configure, deps)
+            await _run_worker_internal(
+                TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+            )
         assert shutdown_called
 
     @pytest.mark.asyncio
@@ -279,7 +377,9 @@ class TestRunWorkerInternal:
             config.shutdown_deadline_buffer = timedelta(seconds=7)
 
         with patch("temporalio.contrib.modal.worker._run_worker.logger") as mock_logger:
-            await _run_worker_internal(TEST_VERSION, configure, deps)
+            await _run_worker_internal(
+                TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+            )
 
         mock_logger.warning.assert_called_once()
         assert "less than 5s" in mock_logger.warning.call_args[0][0]
@@ -303,7 +403,9 @@ class TestRunWorkerInternal:
             "temporalio.contrib.modal.worker._run_worker.asyncio.wait_for",
             fake_wait_for,
         ):
-            await _run_worker_internal(TEST_VERSION, configure, deps)
+            await _run_worker_internal(
+                TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+            )
 
         assert captured_timeout == [8.0]
 
@@ -330,7 +432,9 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(shutdown)
 
         with pytest.raises(RuntimeError, match="worker failed"):
-            await _run_worker_internal(TEST_VERSION, configure, deps)
+            await _run_worker_internal(
+                TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+            )
         assert shutdown_called
 
     @pytest.mark.asyncio
@@ -356,7 +460,9 @@ class TestRunWorkerInternal:
             config.shutdown_hooks.append(shutdown)
 
         with pytest.raises(asyncio.CancelledError):
-            await _run_worker_internal(TEST_VERSION, configure, deps)
+            await _run_worker_internal(
+                TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+            )
         assert shutdown_called
 
     @pytest.mark.asyncio
@@ -378,7 +484,9 @@ class TestRunWorkerInternal:
             yield
             events.append("teardown")
 
-        await _run_worker_internal(TEST_VERSION, configure, deps)
+        await _run_worker_internal(
+            TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+        )
 
         assert events == ["setup", "connect", "shutdown", "teardown"]
 
@@ -393,6 +501,8 @@ class TestRunWorkerInternal:
             yield
             events.append("teardown")
 
-        await _run_worker_internal(TEST_VERSION, configure, deps)
+        await _run_worker_internal(
+            TEST_VERSION, configure, TEST_MODAL_FUNCTION_TIMEOUT, deps
+        )
 
         assert events == ["setup", "teardown"]

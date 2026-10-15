@@ -30,9 +30,8 @@ class ModalWorkerConfig:
             ``TEMPORAL_TASK_QUEUE`` when present.
         execution_timeout: Total time budget for this invocation, including
             configuration and connection setup. It defaults to five minutes
-            and must not exceed the ``timeout`` configured on
-            ``@app.function``. Leave additional Modal timeout headroom for code
-            that runs before or after :py:func:`run_worker`.
+            and must be at least fifteen seconds shorter than the
+            ``modal_function_timeout`` passed to :py:func:`run_worker`.
         shutdown_deadline_buffer: Time reserved at the end of the invocation
             for worker drain and shutdown hooks. If ``graceful_shutdown_timeout``
             changes, adjust this value accordingly.
