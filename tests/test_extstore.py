@@ -583,26 +583,33 @@ class TestPayloadCodecWithExternalStorage:
 
     async def test_multiple_stored_payloads_encode_each_reference(self):
         """When several payloads are stored together, every reference payload
-        is encoded and marked, and all round-trip."""
+        is encoded and marked, an inline payload between them is not marked,
+        and all round-trip."""
         driver = InMemoryTestDriver()
         converter = DataConverter(
             payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
             external_storage=ExternalStorage(
                 drivers=[driver],
-                payload_size_threshold=50,
+                # The codec-encoded "inline" value is ~67 bytes, below this.
+                payload_size_threshold=100,
             ),
         )
-        values = ["a" * 200, "b" * 200, "c" * 200]
+        values = ["a" * 200, "inline", "c" * 200]
 
         encoded = await converter.encode(values)
 
         assert driver._store_calls == 1
         for payload in encoded:
             assert payload.metadata.get("encoding") == b"binary/dc-encoded"
+        for reference in (encoded[0], encoded[2]):
             assert (
-                payload.metadata.get("__temporal_external_storage_reference") == b"true"
+                reference.metadata.get("__temporal_external_storage_reference")
+                == b"true"
             )
-            assert payload.external_payloads
+            assert reference.external_payloads
+        inline = encoded[1]
+        assert "__temporal_external_storage_reference" not in inline.metadata
+        assert not inline.external_payloads
         assert await converter.decode(encoded, [str, str, str]) == values
 
     async def test_marked_reference_without_external_storage_fails(self):
