@@ -365,6 +365,10 @@ class DataConverter(WithSerializationContext):
         for i, payload in enumerate(decoded_payloads):
             if not _has_reference_marker(payload):
                 continue
+            if not self.external_storage:
+                raise RuntimeError(
+                    "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
+                )
             reference = payload
             if self.payload_codec:
                 encoded_reference = temporalio.api.common.v1.Payload()
@@ -373,10 +377,6 @@ class DataConverter(WithSerializationContext):
                 del encoded_reference.external_payloads[:]
                 [reference] = await self.payload_codec.decode([encoded_reference])
             if not _is_reference_payload(reference):
-                if not self.external_storage:
-                    raise RuntimeError(
-                        "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
-                    )
                 raise RuntimeError(
                     "[TMPRL1106] Encountered an encoded external storage reference that could not be decoded. "
                     "Check that the payload codec used to write it is configured."
