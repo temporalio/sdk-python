@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import dataclasses
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -346,22 +345,14 @@ class DataConverter(WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         """Codec encode external storage reference payloads only."""
         encoded_payloads = list(payloads)
-        payload_codec = self.payload_codec
-        if not payload_codec:
+        if not self.payload_codec:
             return encoded_payloads
-        reference_indices = [
-            i for i, p in enumerate(encoded_payloads) if _is_reference_payload(p)
-        ]
-        if not reference_indices:
-            return encoded_payloads
-        encoded_references = await asyncio.gather(
-            *(payload_codec.encode([encoded_payloads[i]]) for i in reference_indices)
-        )
-        for i, [encoded_reference] in zip(reference_indices, encoded_references):
+        for i, payload in enumerate(encoded_payloads):
+            if not _is_reference_payload(payload):
+                continue
+            [encoded_reference] = await self.payload_codec.encode([payload])
             if not encoded_reference.external_payloads:
-                encoded_reference.external_payloads.extend(
-                    encoded_payloads[i].external_payloads
-                )
+                encoded_reference.external_payloads.extend(payload.external_payloads)
             encoded_reference.metadata[_REFERENCE_MARKER_KEY] = b"true"
             encoded_payloads[i] = encoded_reference
         return encoded_payloads
@@ -371,37 +362,28 @@ class DataConverter(WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         """Codec decode marked external storage reference payloads only."""
         decoded_payloads = list(payloads)
-        marked_indices = [
-            i for i, p in enumerate(decoded_payloads) if _has_reference_marker(p)
-        ]
-        if not marked_indices:
-            return decoded_payloads
-        payload_codec = self.payload_codec
-        if payload_codec:
-            encoded_references = []
-            for i in marked_indices:
+        for i, payload in enumerate(decoded_payloads):
+            if not _has_reference_marker(payload):
+                continue
+            reference = payload
+            if self.payload_codec:
                 encoded_reference = temporalio.api.common.v1.Payload()
-                encoded_reference.CopyFrom(decoded_payloads[i])
+                encoded_reference.CopyFrom(payload)
                 del encoded_reference.metadata[_REFERENCE_MARKER_KEY]
                 del encoded_reference.external_payloads[:]
-                encoded_references.append(encoded_reference)
-            decoded = await asyncio.gather(
-                *(payload_codec.decode([r]) for r in encoded_references)
-            )
-            references = [reference for [reference] in decoded]
-        else:
-            references = [decoded_payloads[i] for i in marked_indices]
-        for i, decoded_reference in zip(marked_indices, references):
-            if not _is_reference_payload(decoded_reference):
+                [reference] = await self.payload_codec.decode([encoded_reference])
+            if not _is_reference_payload(reference):
+                if not self.external_storage:
+                    raise RuntimeError(
+                        "[TMPRL1105] Detected externally stored payload(s) but external storage is not configured."
+                    )
                 raise RuntimeError(
                     "[TMPRL1106] Encountered an encoded external storage reference that could not be decoded. "
                     "Check that the payload codec used to write it is configured."
                 )
-            if not decoded_reference.external_payloads:
-                decoded_reference.external_payloads.extend(
-                    decoded_payloads[i].external_payloads
-                )
-            decoded_payloads[i] = decoded_reference
+            if not reference.external_payloads:
+                reference.external_payloads.extend(payload.external_payloads)
+            decoded_payloads[i] = reference
         return decoded_payloads
 
     async def _external_retrieve_payload_sequence(

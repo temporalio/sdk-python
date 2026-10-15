@@ -21,6 +21,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.client
 import temporalio.converter
 from temporalio.api.common.v1 import Payload
+from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.client import (
     Client,
     Schedule,
@@ -29,7 +30,11 @@ from temporalio.client import (
     WorkflowFailureError,
 )
 from temporalio.common import HeaderCodecBehavior
-from temporalio.converter import DataConverter, ExternalStorage
+from temporalio.converter import (
+    DataConverter,
+    ExternalStorage,
+    JSONProtoPayloadConverter,
+)
 from temporalio.exceptions import ApplicationError
 from temporalio.service import ServiceClient
 from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
@@ -80,15 +85,22 @@ def _client(
     )
 
 
-def _assert_encoded_reference(payload: Payload) -> None:
+async def _assert_encoded_reference(
+    data_converter: DataConverter, payload: Payload
+) -> None:
     assert payload.metadata["encoding"] == CODEC_ENCODING
     assert payload.metadata["__temporal_external_storage_reference"] == b"true"
     assert payload.external_payloads
+    [reference] = await data_converter._decode_reference_payload_sequence([payload])
+    assert isinstance(
+        JSONProtoPayloadConverter().from_payload(reference, ExternalStorageReference),
+        ExternalStorageReference,
+    )
 
 
 async def _encoded_reference(data_converter: DataConverter, value: Any) -> Payload:
     [payload] = await data_converter.encode([value])
-    _assert_encoded_reference(payload)
+    await _assert_encoded_reference(data_converter, payload)
     return payload
 
 
@@ -115,8 +127,8 @@ async def test_start_workflow_encodes_input_and_memo_references() -> None:
     )
 
     req = service.requests["start_workflow_execution"]
-    _assert_encoded_reference(req.input.payloads[0])
-    _assert_encoded_reference(req.memo.fields["key"])
+    await _assert_encoded_reference(client.data_converter, req.input.payloads[0])
+    await _assert_encoded_reference(client.data_converter, req.memo.fields["key"])
 
 
 async def test_signal_encodes_input_reference() -> None:
@@ -129,8 +141,9 @@ async def test_signal_encodes_input_reference() -> None:
 
     await client.get_workflow_handle("wf").signal("signal", LARGE)
 
-    _assert_encoded_reference(
-        service.requests["signal_workflow_execution"].input.payloads[0]
+    await _assert_encoded_reference(
+        client.data_converter,
+        service.requests["signal_workflow_execution"].input.payloads[0],
     )
 
 
@@ -154,8 +167,8 @@ async def test_signal_with_start_encodes_input_references() -> None:
     )
 
     req = service.requests["signal_with_start_workflow_execution"]
-    _assert_encoded_reference(req.input.payloads[0])
-    _assert_encoded_reference(req.signal_input.payloads[0])
+    await _assert_encoded_reference(client.data_converter, req.input.payloads[0])
+    await _assert_encoded_reference(client.data_converter, req.signal_input.payloads[0])
 
 
 async def test_update_encodes_args_and_decodes_result_references() -> None:
@@ -179,7 +192,9 @@ async def test_update_encodes_args_and_decodes_result_references() -> None:
 
     assert value == "update-result" * 20
     req = service.requests["update_workflow_execution"]
-    _assert_encoded_reference(req.request.input.args.payloads[0])
+    await _assert_encoded_reference(
+        client.data_converter, req.request.input.args.payloads[0]
+    )
 
 
 async def test_query_encodes_args_and_decodes_result_references() -> None:
@@ -199,8 +214,9 @@ async def test_query_encodes_args_and_decodes_result_references() -> None:
     )
 
     assert value == "query-result" * 20
-    _assert_encoded_reference(
-        service.requests["query_workflow"].query.query_args.payloads[0]
+    await _assert_encoded_reference(
+        client.data_converter,
+        service.requests["query_workflow"].query.query_args.payloads[0],
     )
 
 
@@ -221,7 +237,9 @@ async def test_create_schedule_encodes_action_input_reference() -> None:
     )
 
     req = service.requests["create_schedule"]
-    _assert_encoded_reference(req.schedule.action.start_workflow.input.payloads[0])
+    await _assert_encoded_reference(
+        client.data_converter, req.schedule.action.start_workflow.input.payloads[0]
+    )
 
 
 async def test_async_activity_completion_encodes_references() -> None:
@@ -241,14 +259,18 @@ async def test_async_activity_completion_encodes_references() -> None:
     await handle.complete(LARGE)
     await handle.fail(ApplicationError("failed", LARGE))
 
-    _assert_encoded_reference(
-        service.requests["record_activity_task_heartbeat_by_id"].details.payloads[0]
+    await _assert_encoded_reference(
+        client.data_converter,
+        service.requests["record_activity_task_heartbeat_by_id"].details.payloads[0],
     )
-    _assert_encoded_reference(
-        service.requests["respond_activity_task_completed_by_id"].result.payloads[0]
+    await _assert_encoded_reference(
+        client.data_converter,
+        service.requests["respond_activity_task_completed_by_id"].result.payloads[0],
     )
     failure = service.requests["respond_activity_task_failed_by_id"].failure
-    _assert_encoded_reference(failure.application_failure_info.details.payloads[0])
+    await _assert_encoded_reference(
+        client.data_converter, failure.application_failure_info.details.payloads[0]
+    )
 
 
 class _LargeHeaderInterceptor(temporalio.client.Interceptor):
@@ -285,7 +307,7 @@ async def test_start_workflow_encodes_header_reference_when_headers_use_codec() 
     await client.start_workflow("Workflow", id="wf", task_queue="tq")
 
     req = service.requests["start_workflow_execution"]
-    _assert_encoded_reference(req.header.fields["large"])
+    await _assert_encoded_reference(client.data_converter, req.header.fields["large"])
 
 
 async def test_workflow_result_decodes_reference() -> None:
@@ -314,7 +336,9 @@ async def test_workflow_failure_decodes_detail_reference() -> None:
     data_converter = _data_converter()
     failure = temporalio.api.failure.v1.Failure()
     await data_converter.encode_failure(ApplicationError("failed", LARGE), failure)
-    _assert_encoded_reference(failure.application_failure_info.details.payloads[0])
+    await _assert_encoded_reference(
+        data_converter, failure.application_failure_info.details.payloads[0]
+    )
     service = _FakeWorkflowService(
         {
             "get_workflow_execution_history": _history_response(

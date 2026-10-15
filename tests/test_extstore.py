@@ -581,6 +581,43 @@ class TestPayloadCodecWithExternalStorage:
         assert isinstance(error, ApplicationError)
         assert error.details == ("x" * 200,)
 
+    async def test_multiple_stored_payloads_encode_each_reference(self):
+        """When several payloads are stored together, every reference payload
+        is encoded and marked, and all round-trip."""
+        driver = InMemoryTestDriver()
+        converter = DataConverter(
+            payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=50,
+            ),
+        )
+        values = ["a" * 200, "b" * 200, "c" * 200]
+
+        encoded = await converter.encode(values)
+
+        assert driver._store_calls == 1
+        for payload in encoded:
+            assert payload.metadata.get("encoding") == b"binary/dc-encoded"
+            assert (
+                payload.metadata.get("__temporal_external_storage_reference") == b"true"
+            )
+            assert payload.external_payloads
+        assert await converter.decode(encoded, [str, str, str]) == values
+
+    async def test_marked_reference_without_external_storage_fails(self):
+        """A marked reference read by a converter without external storage
+        reports that external storage is not configured."""
+        encoded = await DataConverter(
+            payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+            external_storage=ExternalStorage(
+                drivers=[InMemoryTestDriver()], payload_size_threshold=50
+            ),
+        ).encode(["x" * 200])
+
+        with pytest.raises(RuntimeError, match=r"\[TMPRL1105\]"):
+            await DataConverter().decode(encoded, [str])
+
 
 class TestMultiDriver:
     """Tests for ExternalStorage with multiple drivers."""

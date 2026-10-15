@@ -575,6 +575,63 @@ async def test_extstore_reference_payloads_use_payload_serialization_context(
     assert len(reference_contexts) == 4
 
 
+async def test_replay_history_with_references_written_before_encoding(
+    env: WorkflowEnvironment,
+) -> None:
+    """A history whose references were written unencoded and unmarked, as by
+    earlier SDK versions, still replays with a codec configured."""
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            payload_size_threshold=512,
+        ),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,
+                activity_input_size=1024,
+                activity_output_size=1024,
+                output_size=1024,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+    history = await handle.fetch_history()
+
+    # Rewrite each reference into the earlier format. The stored payloads are
+    # unchanged, so the rewritten references still resolve.
+    rewritten = 0
+    for event in history.events:
+        for payloads in (
+            event.workflow_execution_started_event_attributes.input.payloads,
+            event.activity_task_scheduled_event_attributes.input.payloads,
+            event.activity_task_completed_event_attributes.result.payloads,
+            event.workflow_execution_completed_event_attributes.result.payloads,
+        ):
+            for payload in payloads:
+                if "__temporal_external_storage_reference" not in payload.metadata:
+                    continue
+                [reference] = await data_converter._decode_reference_payload_sequence(
+                    [payload]
+                )
+                del reference.metadata["__temporal_external_storage_reference"]
+                payload.CopyFrom(reference)
+                rewritten += 1
+    assert rewritten == 4
+
+    await Replayer(
+        workflows=[ExtStoreWorkflow], data_converter=data_converter
+    ).replay_workflow(history)
+
+
 async def test_replay_extstore_history_fails_with_empty_driver(
     env: WorkflowEnvironment,
 ) -> None:
