@@ -129,9 +129,8 @@ async def _run_worker_until_timeout(
         try:
             await worker.run()
         except asyncio.TimeoutError:
-            # On Python 3.11+, asyncio.TimeoutError aliases the built-in
-            # TimeoutError, so the exception type alone does not identify
-            # whether wait_for or the worker raised it.
+            # Python 3.11 aliases asyncio.TimeoutError to TimeoutError, so track
+            # whether the worker or wait_for raised it.
             worker_raised_timeout = True
             raise
 
