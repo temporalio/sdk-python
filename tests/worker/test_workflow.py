@@ -3487,6 +3487,72 @@ async def test_workflow_local_activity_backoff(client: Client):
     )
 
 
+@activity.defn
+async def retry_later_activity() -> None:
+    # A delay above the default 60s local_retry_threshold makes Core back off
+    # with a workflow timer instead of retrying in memory
+    raise ApplicationError("Retry later", next_retry_delay=timedelta(seconds=90))
+
+
+@workflow.defn
+class LocalActivityBackoffCancelWorkflow:
+    def __init__(self) -> None:
+        self._cancel_activity = False
+
+    @workflow.run
+    async def run(self, cancel_from_workflow: bool) -> str:
+        handle = workflow.start_local_activity(
+            retry_later_activity, start_to_close_timeout=timedelta(seconds=10)
+        )
+        if cancel_from_workflow:
+            await workflow.wait_condition(lambda: self._cancel_activity)
+            handle.cancel()
+            try:
+                await handle
+            except asyncio.CancelledError:
+                return "activity cancelled"
+        await handle
+        return "activity completed"
+
+    @workflow.signal
+    def cancel_activity(self) -> None:
+        self._cancel_activity = True
+
+
+@pytest.mark.parametrize("cancel_from_workflow", [False, True])
+async def test_workflow_local_activity_cancel_during_backoff(
+    client: Client, cancel_from_workflow: bool
+):
+    async with new_worker(
+        client, LocalActivityBackoffCancelWorkflow, activities=[retry_later_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            LocalActivityBackoffCancelWorkflow.run,
+            cancel_from_workflow,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def backoff_timer_started() -> None:
+            async for e in handle.fetch_history_events():
+                if e.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
+                    return
+            assert False, "Backoff timer not started"
+
+        await assert_eventually(backoff_timer_started)
+        if cancel_from_workflow:
+            await handle.signal(LocalActivityBackoffCancelWorkflow.cancel_activity)
+            assert "activity cancelled" == await handle.result()
+        else:
+            await handle.cancel()
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, CancelledError)
+        event_types = [e.event_type async for e in handle.fetch_history_events()]
+        assert EventType.EVENT_TYPE_TIMER_CANCELED in event_types
+        assert EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED not in event_types
+
+
 deadlock_thread_event = threading.Event()
 
 
