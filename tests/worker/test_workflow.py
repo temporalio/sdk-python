@@ -7245,7 +7245,7 @@ class _UnfinishedHandlersOnWorkflowTerminationTest:
     async def _run_workflow_and_get_warning(self) -> bool:
         workflow_id = f"wf-{uuid.uuid4()}"
         update_id = "update-id"
-        task_queue = "tq"
+        task_queue = str(uuid.uuid4())
 
         # We require a startWorkflow, an update, and maybe a cancellation request, to be delivered
         # in the same WFT. To do this we start the worker after they've all been accepted by the
