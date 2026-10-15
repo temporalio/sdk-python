@@ -199,7 +199,7 @@ async def test_s3_driver_workflow_activity_output_key(
 async def test_s3_driver_standalone_activity_input_key(
     env: WorkflowEnvironment, tmprl_client: Client, aioboto3_client: S3Client
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
         )
@@ -233,7 +233,7 @@ async def test_s3_driver_standalone_activity_input_key(
 async def test_s3_driver_standalone_activity_output_key(
     env: WorkflowEnvironment, tmprl_client: Client, aioboto3_client: S3Client
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
         )

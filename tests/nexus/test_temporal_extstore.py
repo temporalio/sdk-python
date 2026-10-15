@@ -187,7 +187,7 @@ def _cause_chain(err: BaseException) -> list[BaseException]:
 
 async def test_nexus_operation_input_offloaded_and_retrieved(env: WorkflowEnvironment):
     """The offloaded operation input is retrieved before the handler runs."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
@@ -202,7 +202,7 @@ async def test_nexus_operation_sync_result_offloaded_and_retrieved(
     env: WorkflowEnvironment,
 ):
     """A large synchronous result is offloaded and retrieved by the caller."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = InMemoryTestDriver()
@@ -217,7 +217,7 @@ async def test_nexus_operation_transient_retrieve_failure_recovers(
     env: WorkflowEnvironment,
 ):
     """A transient retrieve failure fails the task retryably; it then recovers."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_retrieve=True)
@@ -231,7 +231,7 @@ async def test_nexus_operation_transient_store_failure_recovers(
     env: WorkflowEnvironment,
 ):
     """A transient store failure fails the task retryably; it then recovers."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = TransientFailureDriver(fail_first_store=True)
@@ -257,7 +257,7 @@ async def test_nexus_operation_store_failure_fails_operation(
 ):
     """A non-retryable store failure fails the operation and surfaces the driver
     error to the caller (deterministically, with no retries)."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     driver = PermanentFailStoreDriver()

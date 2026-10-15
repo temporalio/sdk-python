@@ -79,7 +79,7 @@ async def heartbeat_once_activity() -> None:
 
 
 def _skip_if_unsupported(env: WorkflowEnvironment) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not support standalone activities")
 
 
