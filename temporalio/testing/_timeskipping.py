@@ -186,6 +186,7 @@ class TimeSkipper:
                     id=fast_forward_id, duration=duration
                 ),
                 disable_propagation=self._config.disable_propagation,
+                max_session_skip_count=self._config.max_session_skip_count,
             ),
         )
         return await self._poll_fast_forward_completion(handle, fast_forward_id)
@@ -206,6 +207,7 @@ class TimeSkipper:
             TimeSkippingConfig(
                 enabled=True,
                 disable_propagation=self._config.disable_propagation,
+                max_session_skip_count=self._config.max_session_skip_count,
             ),
         )
         async for event in handle.fetch_history_events(wait_new_event=True):
