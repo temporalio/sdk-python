@@ -2046,6 +2046,122 @@ async def test_workflow_cancel_external(client: Client):
         assert isinstance(err.value.cause, CancelledError)
 
 
+@workflow.defn
+class CancelExternalStopWaitingWorkflow:
+    def __init__(self) -> None:
+        self._finish = False
+
+    @workflow.run
+    async def run(self, external_workflow_id: str) -> None:
+        cancel_task = asyncio.create_task(
+            workflow.get_external_workflow_handle(external_workflow_id).cancel()
+        )
+        # Let the task send the request, then stop waiting on it the way
+        # asyncio.timeout or a failing TaskGroup sibling would
+        await asyncio.sleep(0)
+        cancel_task.cancel()
+        try:
+            await cancel_task
+        except asyncio.CancelledError:
+            pass
+        await workflow.wait_condition(lambda: self._finish)
+
+    @workflow.signal
+    def finish(self) -> None:
+        self._finish = True
+
+
+@workflow.defn
+class CancelExternalThenCleanUpWorkflow:
+    def __init__(self) -> None:
+        self._finish = False
+
+    @workflow.run
+    async def run(self, external_workflow_id: str) -> None:
+        try:
+            await workflow.get_external_workflow_handle(external_workflow_id).cancel()
+        except asyncio.CancelledError:
+            await workflow.wait_condition(lambda: self._finish)
+            raise
+
+    @workflow.signal
+    def finish(self) -> None:
+        self._finish = True
+
+
+@pytest.mark.parametrize(
+    "scenario", ["stop_waiting", "stop_waiting_target_missing", "workflow_cancelled"]
+)
+async def test_workflow_cancel_external_wait_cancelled(
+    client: Client, env: WorkflowEnvironment, scenario: str
+):
+    if scenario == "stop_waiting_target_missing" and env.supports_time_skipping_v1:
+        pytest.skip(
+            "Java test server does not resolve a cancel request for a missing workflow"
+        )
+    task_queue = str(uuid.uuid4())
+    target: WorkflowHandle[Any, str] | None = None
+    if scenario == "stop_waiting_target_missing":
+        target_id = f"workflow-{uuid.uuid4()}"
+    else:
+        # No timer, so time-skipping V2 cannot finish it before the cancel
+        target = await client.start_workflow(
+            TrapCancelWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        target_id = target.id
+    handle: WorkflowHandle[Any, None]
+    if scenario == "workflow_cancelled":
+        handle = await client.start_workflow(
+            CancelExternalThenCleanUpWorkflow.run,
+            target_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        # Cancelling before the first workflow task means the cancellation
+        # arrives in the same activation that sends the external cancel
+        await handle.cancel()
+    else:
+        handle = await client.start_workflow(
+            CancelExternalStopWaitingWorkflow.run,
+            target_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+    async with new_worker(
+        client,
+        CancelExternalStopWaitingWorkflow,
+        CancelExternalThenCleanUpWorkflow,
+        TrapCancelWorkflow,
+        task_queue=task_queue,
+    ):
+
+        async def cancel_request_resolved() -> None:
+            async for e in handle.fetch_history_events():
+                if e.event_type in (
+                    EventType.EVENT_TYPE_EXTERNAL_WORKFLOW_EXECUTION_CANCEL_REQUESTED,
+                    EventType.EVENT_TYPE_REQUEST_CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED,
+                ):
+                    return
+            assert False, "External cancel request not resolved"
+
+        # Finishing any earlier could complete the workflow before Core
+        # delivers the resolution
+        await assert_eventually(cancel_request_resolved)
+        await handle.signal("finish")
+        if scenario == "workflow_cancelled":
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, CancelledError)
+        else:
+            await handle.result()
+        event_types = [e.event_type async for e in handle.fetch_history_events()]
+        assert EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED not in event_types
+        if target:
+            assert "cancelled" == await target.result()
+
+
 @dataclass
 class SignalExternalWorkflowArgs:
     external_workflow_id: str

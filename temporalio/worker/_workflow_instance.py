@@ -1108,6 +1108,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 f"Failed finding pending external cancel for sequence {job.seq}"
             )
         fut, external_workflow_id = pending
+        # Cancelling the task that awaits the request also cancels this future,
+        # but the request was already sent and Core still resolves it
+        if fut.cancelled():
+            return
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
             workflow_context = temporalio.converter.WorkflowSerializationContext(
