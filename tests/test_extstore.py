@@ -967,7 +967,7 @@ class TestExternalStorageConcurrency:
             ExternalStorage(drivers=[InMemoryTestDriver()], concurrency=concurrency)
 
     async def test_max_operations_per_message_bounds_operations(self):
-        """One message may not exceed its own budget, however many sites it has."""
+        """One message may not exceed its own limit, however many sites it has."""
         gate = _Gate()
         storage = ExternalStorage(
             drivers=[_PermittingDriver(gate)],
@@ -1068,7 +1068,7 @@ class TestExternalStorageConcurrency:
 
     async def test_store_context_copies_share_max_driver_operations(self):
         """Workers bind a store context per message by copying the instance.
-        Those copies must still draw from the original's budget."""
+        Those copies must still draw from the original's limit."""
         gate = _Gate()
         storage = ExternalStorage(
             drivers=[_PermittingDriver(gate)],
