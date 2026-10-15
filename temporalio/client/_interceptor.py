@@ -96,6 +96,7 @@ class StartWorkflowInput:
     request_eager_start: bool
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
+    time_skipping_config: temporalio.api.common.v1.TimeSkippingConfig | None = None
 
 
 @dataclass
@@ -386,6 +387,7 @@ class UpdateWithStartStartWorkflowInput:
     ret_type: type | None
     priority: temporalio.common.Priority
     versioning_override: temporalio.common.VersioningOverride | None = None
+    time_skipping_config: temporalio.api.common.v1.TimeSkippingConfig | None = None
 
 
 @dataclass

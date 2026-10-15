@@ -272,7 +272,7 @@ class InterceptedWorkflow:
 @pytest.mark.requires_local_server
 async def test_worker_interceptor(client: Client, env: WorkflowEnvironment):
     # TODO(cretz): Fix
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
         )

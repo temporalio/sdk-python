@@ -127,7 +127,7 @@ class TestUpdateWithStart:
         env: WorkflowEnvironment,
         wait_for_stage: WorkflowUpdateStage,
     ):
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip(
                 "TODO: make update_with_start_tests pass under Java test server"
             )
@@ -150,7 +150,7 @@ class TestUpdateWithStart:
         env: WorkflowEnvironment,
         wait_for_stage: WorkflowUpdateStage,
     ):
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip(
                 "TODO: make update_with_start_tests pass under Java test server"
             )
@@ -173,7 +173,7 @@ class TestUpdateWithStart:
         env: WorkflowEnvironment,
         wait_for_stage: WorkflowUpdateStage,
     ):
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip(
                 "TODO: make update_with_start_tests pass under Java test server"
             )
@@ -333,7 +333,7 @@ class TestUpdateWithStart:
 async def test_update_with_start_sets_first_execution_run_id(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     async with new_worker(
         client,
@@ -417,7 +417,7 @@ async def test_update_with_start_workflow_already_started_error(
     gRPC error, and the start_workflow_operation promise should be rejected with the same
     error.
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     async with new_worker(
         client,
@@ -558,7 +558,7 @@ class UpdateWithStartInterceptorWorkflow:
 async def test_update_with_start_client_outbound_interceptor(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     interceptor = SimpleClientInterceptor()
     client = Client(**{**client.config(), "interceptors": [interceptor]})  # type: ignore
@@ -590,7 +590,7 @@ async def test_update_with_start_does_not_encode_shared_interceptor_header_twice
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start_tests pass under Java test server")
     codec = HeaderSharingCodec()
     intercepted_client = Client(
@@ -1012,7 +1012,7 @@ async def test_update_with_start_always_attaches_to_completed_update(
     the update is completed. The behavior is unaffected by the conflict policy or id reuse policy (so, for
     example, we attach to an update in an existing workflow even if the conflict policy is FAIL).
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start tests pass under Java test server")
     client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
@@ -1086,7 +1086,7 @@ async def test_update_with_start_attaches_to_non_completed_update_in_running_wor
     or id reuse policy (so, for example, we attach to the update in an existing workflow even if the conflict
     policy is FAIL).
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start tests pass under Java test server")
     client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
@@ -1157,7 +1157,7 @@ async def test_update_with_start_does_not_attach_to_non_completed_update_in_clos
     ID and that update ID does not attach to the update. If the id reuse policy is ALLOW_DUPLICATE then a new
     workflow is started and the update is issued.
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("TODO: make update_with_start tests pass under Java test server")
     client = env.client
     id_conflict_policy = WorkflowIDConflictPolicy[id_conflict_policy_name]
