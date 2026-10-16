@@ -246,9 +246,13 @@ class _ActivityWorker:
         logger = temporalio.activity.logger
         activity = self._running_activities.get(task_token)
         if activity and not activity.done:
+            # Only the newest heartbeat gets sent, so drop an older one that
+            # hasn't been picked up yet
             while not activity.pending_heartbeats.empty():
                 activity.pending_heartbeats.get_nowait()
             activity.pending_heartbeats.put_nowait(details)
+            # Heartbeats are sent one at a time so a slow encode can't let an
+            # older heartbeat reach core after a newer one
             if (
                 activity.last_heartbeat_task is None
                 or activity.last_heartbeat_task.done()
