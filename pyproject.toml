@@ -51,6 +51,7 @@ cloud-run-worker-otel = [
   "protobuf<7",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
+gcloud-aio-storage = ["gcloud-aio-storage>=9.6.4,<10"]
 google-genai = ["temporalio-google-genai[mcp]>=0.1.0"]
 strands-agents = ["temporalio-strands-agents>=0.1.0"]
 
