@@ -585,10 +585,11 @@ async def test_extstore_reference_payloads_use_payload_serialization_context(
     assert len(reference_contexts) == 4
 
 
-@workflow.defn
-class ReferencesBeforeEncodingWorkflow:
-    """Replays the committed history in
-    test_extstore_references_before_encoding_history.json."""
+# The committed histories record these workflow and activity names, so they
+# must not change.
+@workflow.defn(name="ReferencesBeforeEncodingWorkflow")
+class ExtstoreReplayWorkflow:
+    """Replays the committed histories loaded by _load_recorded_history."""
 
     @workflow.run
     async def run(self, _input: str) -> str:
@@ -600,26 +601,24 @@ class ReferencesBeforeEncodingWorkflow:
         return "wo" * 512
 
 
-async def test_replay_history_with_references_written_before_encoding() -> None:
-    """A history recorded with temporalio 1.34.0, whose references were written
-    unencoded and unmarked, still replays with a codec configured.
+def _load_recorded_history(
+    name: str,
+) -> tuple[WorkflowHistory, InMemoryTestDriver, list[Payload]]:
+    """Load a committed history, a driver holding the payloads its references
+    point to, and its four reference payloads.
 
-    The history and the payloads its references point to were recorded with
-    ReferencesBeforeEncodingWorkflow, a payload codec matching
-    RecordingPayloadCodec("binary/test-encoded"), and a driver storing claims the
-    same way as InMemoryTestDriver, with a 512-byte storage threshold.
+    Each history was recorded with ExtstoreReplayWorkflow, a payload codec
+    matching RecordingPayloadCodec("binary/test-encoded"), and a driver storing
+    claims the same way as InMemoryTestDriver, with a 512-byte storage threshold.
+    The codec always encoded the stored payloads. Whether it also encoded the
+    references depends on the recording.
     """
     fixtures = Path(__file__).parent
     history = WorkflowHistory.from_json(
-        "references-before-encoding",
-        (
-            fixtures / "test_extstore_references_before_encoding_history.json"
-        ).read_text(),
+        name, (fixtures / f"test_extstore_{name}_history.json").read_text()
     )
     stored_payloads = json.loads(
-        (
-            fixtures / "test_extstore_references_before_encoding_stored_payloads.json"
-        ).read_text()
+        (fixtures / f"test_extstore_{name}_stored_payloads.json").read_text()
     )
     driver = InMemoryTestDriver()
     for key, payload_json in stored_payloads.items():
@@ -638,12 +637,14 @@ async def test_replay_history_with_references_written_before_encoding() -> None:
         )
     ]
     assert len(references) == 4
-    for reference in references:
-        assert reference.metadata["encoding"] == b"json/protobuf"
-        assert "__temporal_external_storage_reference" not in reference.metadata
+    return history, driver, references
 
+
+async def _replay_recorded_history(
+    history: WorkflowHistory, driver: InMemoryTestDriver
+) -> None:
     await Replayer(
-        workflows=[ReferencesBeforeEncodingWorkflow],
+        workflows=[ExtstoreReplayWorkflow],
         data_converter=dataclasses.replace(
             temporalio.converter.default(),
             payload_codec=RecordingPayloadCodec("binary/test-encoded"),
@@ -654,6 +655,29 @@ async def test_replay_history_with_references_written_before_encoding() -> None:
         ),
     ).replay_workflow(history)
     assert driver._retrieve_calls > 0
+
+
+async def test_replay_decodes_unencoded_references() -> None:
+    """A history recorded with temporalio 1.34.0 replays. That release wrote
+    references unencoded and unmarked, even with a codec configured."""
+    history, driver, references = _load_recorded_history("unencoded_references")
+    for reference in references:
+        assert reference.metadata["encoding"] == b"json/protobuf"
+        assert "__temporal_external_storage_reference" not in reference.metadata
+
+    await _replay_recorded_history(history, driver)
+
+
+async def test_replay_decodes_encoded_references_while_writing_them_is_off() -> None:
+    """A history whose references were codec-encoded and marked replays while
+    writing encoded references is off. It was recorded from this branch with
+    writing turned on, as a later release will write them."""
+    history, driver, references = _load_recorded_history("encoded_references")
+    for reference in references:
+        assert reference.metadata["encoding"] == b"binary/test-encoded"
+        assert reference.metadata["__temporal_external_storage_reference"] == b"true"
+
+    await _replay_recorded_history(history, driver)
 
 
 async def test_replay_extstore_history_fails_with_empty_driver(
