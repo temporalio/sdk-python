@@ -85,6 +85,7 @@ class ClientConfig:
     grpc_compression: str
     payloads_warn_size: int
     memo_warn_size: int
+    connect_timeout_millis: int | None = None
 
 
 @dataclass

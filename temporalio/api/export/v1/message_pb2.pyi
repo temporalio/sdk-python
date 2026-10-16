@@ -12,6 +12,7 @@ import google.protobuf.internal.containers
 import google.protobuf.message
 
 import temporalio.api.history.v1.message_pb2
+import temporalio.api.workflowservice.v1.request_response_pb2
 
 if sys.version_info >= (3, 8):
     import typing as typing_extensions
@@ -41,8 +42,8 @@ class WorkflowExecution(google.protobuf.message.Message):
 global___WorkflowExecution = WorkflowExecution
 
 class WorkflowExecutions(google.protobuf.message.Message):
-    """WorkflowExecutions is used by the Cloud Export feature to deserialize
-    the exported file. It encapsulates a collection of workflow execution information.
+    """WorkflowExecutions is the legacy Cloud Export file format containing only workflow executions.
+    New exporters should use ExportedExecutions.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -64,3 +65,62 @@ class WorkflowExecutions(google.protobuf.message.Message):
     ) -> None: ...
 
 global___WorkflowExecutions = WorkflowExecutions
+
+class ActivityExecution(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ACTIVITY_FIELD_NUMBER: builtins.int
+    @property
+    def activity(
+        self,
+    ) -> temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse: ...
+    def __init__(
+        self,
+        *,
+        activity: temporalio.api.workflowservice.v1.request_response_pb2.DescribeActivityExecutionResponse
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing_extensions.Literal["activity", b"activity"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing_extensions.Literal["activity", b"activity"]
+    ) -> None: ...
+
+global___ActivityExecution = ActivityExecution
+
+class ExportedExecutions(google.protobuf.message.Message):
+    """ExportedExecutions is used by the Cloud Export feature to deserialize the exported file.
+    It encapsulates workflow execution information and contains other execution types.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    WORKFLOWS_FIELD_NUMBER: builtins.int
+    ACTIVITIES_FIELD_NUMBER: builtins.int
+    @property
+    def workflows(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___WorkflowExecution
+    ]: ...
+    @property
+    def activities(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___ActivityExecution
+    ]: ...
+    def __init__(
+        self,
+        *,
+        workflows: collections.abc.Iterable[global___WorkflowExecution] | None = ...,
+        activities: collections.abc.Iterable[global___ActivityExecution] | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "activities", b"activities", "workflows", b"workflows"
+        ],
+    ) -> None: ...
+
+global___ExportedExecutions = ExportedExecutions

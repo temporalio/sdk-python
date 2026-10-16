@@ -44,6 +44,7 @@ pub struct ClientConfig {
     tls_config: Option<ClientTlsConfig>,
     retry_config: Option<ClientRetryConfig>,
     keep_alive_config: Option<ClientKeepAliveConfig>,
+    connect_timeout_millis: Option<u64>,
     http_connect_proxy_config: Option<ClientHttpConnectProxyConfig>,
     dns_load_balancing_config: Option<ClientDnsLoadBalancingConfig>,
     grpc_compression: String,
@@ -277,6 +278,7 @@ impl ClientConfig {
                 .map_or(RetryOptions::default(), |c| c.into()),
         )
         .keep_alive(self.keep_alive_config.map(Into::into))
+        .maybe_connect_timeout(self.connect_timeout_millis.map(Duration::from_millis))
         .maybe_http_connect_proxy(self.http_connect_proxy_config.map(Into::into))
         .dns_load_balancing(dns_load_balancing)
         .grpc_compression(grpc_compression_from_str(&self.grpc_compression)?)

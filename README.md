@@ -1611,8 +1611,10 @@ code](https://github.com/temporalio/samples-python/blob/main/context_propagation
 [Nexus](https://github.com/nexus-rpc/) is a synchronous RPC protocol. Arbitrary duration operations that can respond
 asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
 
-Temporal supports calling Nexus operations **from a workflow**. See https://docs.temporal.io/nexus. There is no support
-currently for calling a Nexus operation from non-workflow code.
+Temporal supports calling Nexus operations **from a workflow** or directly from a client using
+[Standalone Nexus Operations](https://docs.temporal.io/develop/python/nexus/standalone-operations).
+Standalone Nexus Operations are in [Public Preview](https://docs.temporal.io/evaluate/development-production-features/release-stages#public-preview).
+We aim to preserve backward compatibility and avoid breaking changes. See https://docs.temporal.io/nexus.
 
 To get started quickly using Nexus with Temporal, see the Python Nexus sample:
 https://github.com/temporalio/samples-python/tree/nexus/hello_nexus.

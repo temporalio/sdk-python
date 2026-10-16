@@ -20,6 +20,7 @@ import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.update_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
@@ -80,6 +81,7 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     DECLINED_TARGET_VERSION_UPGRADE_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
     parent_workflow_namespace: builtins.str
@@ -321,6 +323,11 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         """The time-skipping state propagated from a previous run of this workflow. This can be nil
         if no time skipping has occurred or there is no previous run.
         """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context propagated from the Nexus caller that started this workflow."""
     def __init__(
         self,
         *,
@@ -381,6 +388,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
         | None = ...,
         time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
         | None = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -409,6 +418,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"prev_auto_reset_points",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "root_workflow_execution",
@@ -494,6 +505,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
             b"prev_auto_reset_points",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "root_workflow_execution",

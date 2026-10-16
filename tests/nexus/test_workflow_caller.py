@@ -743,7 +743,7 @@ async def test_nexus_info_includes_namespace(client: Client, env: WorkflowEnviro
             id=str(uuid.uuid4()),
             task_queue=task_queue,
         )
-        if not env.supports_time_skipping:
+        if not env.supports_time_skipping_v1:
             # Time-skipping server doesn't send the endpoint yet.
             assert result["endpoint"] == endpoint_name
         assert result["namespace"] == client.namespace
@@ -906,7 +906,7 @@ async def test_start_operation_headers(
     env: WorkflowEnvironment,
 ):
     """Test headers from workflow and interceptors are propagated to start operation handler."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -983,7 +983,7 @@ async def test_cancel_operation_headers(
     env: WorkflowEnvironment,
 ):
     """Test headers from workflow and interceptor are propagated to cancel operation handler."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -1042,7 +1042,7 @@ async def test_sync_response(
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -1116,7 +1116,7 @@ async def test_async_response(
     op_definition_type: OpDefinitionType,
     caller_reference: CallerReference,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -1280,7 +1280,7 @@ async def test_untyped_caller(
     caller_reference: CallerReference,
     response_type: ResponseType,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -1565,7 +1565,7 @@ async def test_workflow_run_operation_can_execute_workflow_before_starting_backi
     client: Client,
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())
@@ -2222,7 +2222,7 @@ class TestAsyncAndNonAsyncCancel:
         self, client: Client, env: WorkflowEnvironment, use_async_cancel: bool
     ):
         """Test that both async and non-async cancel methods work for TaskExecutor-based operations."""
-        if env.supports_time_skipping:
+        if env.supports_time_skipping_v1:
             pytest.skip("Nexus tests don't work with time-skipping server")
 
         task_queue = str(uuid.uuid4())
@@ -2270,7 +2270,7 @@ async def test_request_deadline_is_accessible_in_operation(
     env: WorkflowEnvironment,
 ):
     """Test that request_deadline is accessible in StartOperationContext."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with time-skipping server")
 
     task_queue = str(uuid.uuid4())

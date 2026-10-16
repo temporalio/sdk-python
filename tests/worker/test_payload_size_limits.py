@@ -83,7 +83,7 @@ def _forwarding_runtime(logger: logging.Logger) -> Runtime:
 
 async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironment):
     """An oversized workflow completion is proactively failed by worker, which logs [TMPRL1103]."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(
@@ -142,7 +142,7 @@ async def test_oversized_payload_fails_task_with_error_log(env: WorkflowEnvironm
 async def test_disable_payload_error_limit_sends_to_server(env: WorkflowEnvironment):
     """With the opt-out, worker does not pre-fail; the oversized payload reaches (and is rejected by)
     the server."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Time-skipping server does not report payload limits.")
 
     async with await WorkflowEnvironment.start_local(

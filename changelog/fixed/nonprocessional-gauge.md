@@ -1,0 +1,1 @@
+Core: A workflow task that arrives while a workflow waits on a local activity, such as a legacy query, now waits until the current workflow task is reported. Previously it replaced that workflow task ("Trying to send a new WFT for a run which already has one!"), which then timed out on the server and could leave the workflow stuck on a nondeterminism error.

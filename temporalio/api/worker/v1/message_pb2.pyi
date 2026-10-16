@@ -663,6 +663,10 @@ class EnvironmentInfo(google.protobuf.message.Message):
             RUNTIME_TYPE_ROADRUNNER: (
                 EnvironmentInfo.Runtime._RuntimeType.ValueType
             )  # 10
+            RUNTIME_TYPE_GRAAL_AOT: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 11
+            """Report when the application is compiled ahead-of-time as a GraalVM native image."""
+            RUNTIME_TYPE_KOTLIN: EnvironmentInfo.Runtime._RuntimeType.ValueType  # 12
+            """Report when any registered Workflow or Activity implementation is a Kotlin class."""
 
         class RuntimeType(_RuntimeType, metaclass=_RuntimeTypeEnumTypeWrapper): ...
         RUNTIME_TYPE_UNSPECIFIED: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 0
@@ -681,6 +685,10 @@ class EnvironmentInfo(google.protobuf.message.Message):
         RUNTIME_TYPE_DOTNET_CORE: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 8
         RUNTIME_TYPE_NATIVE: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 9
         RUNTIME_TYPE_ROADRUNNER: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 10
+        RUNTIME_TYPE_GRAAL_AOT: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 11
+        """Report when the application is compiled ahead-of-time as a GraalVM native image."""
+        RUNTIME_TYPE_KOTLIN: EnvironmentInfo.Runtime.RuntimeType.ValueType  # 12
+        """Report when any registered Workflow or Activity implementation is a Kotlin class."""
 
         TYPE_FIELD_NUMBER: builtins.int
         VERSION_FIELD_NUMBER: builtins.int

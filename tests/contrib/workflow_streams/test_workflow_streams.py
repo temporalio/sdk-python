@@ -2583,7 +2583,7 @@ async def test_standalone_activity_publish(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     """Activity started directly via Client.start_activity publishes via create()."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server does not support Client.start_activity: "
             "https://github.com/temporalio/sdk-java/issues/2741"
@@ -2627,7 +2627,7 @@ async def test_standalone_activity_subscribe(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     """Standalone activity subscribes to a broker workflow via create()."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server does not support Client.start_activity: "
             "https://github.com/temporalio/sdk-java/issues/2741"
@@ -2672,7 +2672,7 @@ async def test_from_within_activity_in_standalone_activity_raises(
 ) -> None:
     """from_within_activity() raises a clear error pointing at create() when used in a
     standalone activity (one without a parent workflow)."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server does not support Client.start_activity: "
             "https://github.com/temporalio/sdk-java/issues/2741"
@@ -2880,7 +2880,7 @@ async def test_cross_namespace_nexus_stream(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     """Nexus operation starts a workflow stream broker in another namespace; test subscribes."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus not supported with time-skipping server")
 
     count = 5
