@@ -1888,7 +1888,7 @@ async def test_workflow_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
     """Nexus payload codecs get context for workflow inputs, summaries, and results."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "workflow-nexus-context-codec-task-queue"
@@ -2009,7 +2009,7 @@ async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
     build a context from. The result was still encoded by the handler under the operation's
     context, so this is the one asymmetry the strict codec has to tolerate.
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "standalone-nexus-detached-handle-task-queue"
@@ -2057,7 +2057,7 @@ async def test_standalone_nexus_payload_codec_receives_context(
     env: WorkflowEnvironment,
 ):
     """Nexus payload codecs get context for standalone inputs and results."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "standalone-nexus-context-codec-task-queue"
@@ -2126,7 +2126,7 @@ async def test_workflow_nexus_failure_converter_has_context(
     env: WorkflowEnvironment,
 ):
     """Workflow Nexus callers and handlers use context for failures."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     nexus_failure_context_traces.clear()
@@ -2239,7 +2239,7 @@ async def test_standalone_nexus_describe_reads_metadata_with_context(
     workflow and activity user metadata is serialized with theirs. Encoding and decoding it under
     different contexts does not round-trip for a converter that varies by context.
     """
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     task_queue = "standalone-nexus-describe-metadata-task-queue"
@@ -2279,7 +2279,7 @@ async def test_standalone_nexus_failure_converter_has_context(
     env: WorkflowEnvironment,
 ):
     """Standalone Nexus callers and handlers use context for failures."""
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     nexus_failure_context_traces.clear()

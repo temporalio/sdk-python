@@ -1108,6 +1108,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 f"Failed finding pending external cancel for sequence {job.seq}"
             )
         fut, external_workflow_id = pending
+        # Cancelling the task that awaits the request also cancels this future,
+        # but the request was already sent and Core still resolves it
+        if fut.cancelled():
+            return
         # We intentionally let this error if future is already done
         if job.HasField("failure"):
             workflow_context = temporalio.converter.WorkflowSerializationContext(
@@ -2087,10 +2091,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         # Function that runs in the handle
         async def run_activity() -> Any:
+            handle._started = True
             while True:
-                # Mark it as started each loop because backoff could cause it to
-                # be marked as unstarted
-                handle._started = True
                 try:
                     return await self._await_temporal_operation(
                         handle._result_fut,
@@ -3455,8 +3457,8 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         self._result_fut.set_exception(_ActivityDoBackoffError(backoff))
         # Replace the result future since that one is resolved now
         self._result_fut = self._instance.create_future()
-        # Mark this as not started since it's a new future
-        self._started = False
+        # Leave _started set: run_activity is running and traps a cancel in its
+        # backoff sleep, and Core has no command for the new seq to cancel yet
 
     def _apply_schedule_command(
         self,

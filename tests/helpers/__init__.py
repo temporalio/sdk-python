@@ -161,6 +161,24 @@ async def ensure_search_attributes_present(
         assert {key.name for key in keys}.issubset(resp.custom_attributes.keys())
 
 
+def assert_duration_same(expected: float, actual: float, tolerance: float) -> None:
+    """Assert two durations (in seconds) are the same within ``tolerance``."""
+    delta = abs(actual - expected)
+    assert delta <= tolerance, (
+        f"expected {expected}s ± {tolerance}s, got {actual}s (delta {delta:.3f}s)"
+    )
+
+
+async def find_history_event(
+    handle: WorkflowHandle, predicate: Callable[[HistoryEvent], bool]
+) -> HistoryEvent | None:
+    """Return the first history event matching ``predicate``, or ``None``."""
+    async for event in handle.fetch_history_events():
+        if predicate(event):
+            return event
+    return None
+
+
 def find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
         s.bind(("", 0))

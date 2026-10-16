@@ -53,7 +53,7 @@ _ACT_TIMEOUT = timedelta(seconds=10)
 # These tests need a server that transcribes Event Group markers onto history.
 # Time-skipping (the Java test server) does not.
 def _require_event_groups_server(env: WorkflowEnvironment) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Event Groups require a server that transcribes markers")
 
 
@@ -1459,7 +1459,7 @@ class NexusCommandsWorkflow:
 async def test_nexus_operation_commands_carry_markers(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the time-skipping server")
 
     task_queue = str(uuid.uuid4())
