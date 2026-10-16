@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import dataclasses
 import hashlib
 import logging
 import sys
@@ -22,6 +23,7 @@ from typing_extensions import TypedDict
 import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
+import temporalio.converter._extstore
 import temporalio.runtime
 import temporalio.service
 from temporalio.common import (
@@ -35,10 +37,7 @@ from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._tuning import WorkerTuner
-from ._workflow import (
-    _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
-    _WorkflowWorker,
-)
+from ._workflow import _WorkflowWorker
 from ._workflow_instance import (
     PatchActivationInput,
     UnsandboxedWorkflowRunner,
@@ -151,7 +150,6 @@ class Worker:
             maximum=5
         ),
         disable_payload_error_limit: bool = False,
-        max_workflow_task_external_storage_concurrency: int = _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -338,13 +336,6 @@ class Worker:
                 and cause a task failure if the size limit is exceeded. The default is False.
                 See https://docs.temporal.io/troubleshooting/blob-size-limit-error for more
                 details.
-            max_workflow_task_external_storage_concurrency: Maximum number of
-                external storage payload operations (store/retrieve) that may run
-                concurrently within a single workflow task activation.
-                Defaults to 3. Adjust this value based on your workload's needs.
-                Please report any issues you encounter with this setting or if you
-                feel the default should be changed.
-                WARNING: This setting is experimental.
 
         """
         config = WorkerConfig(
@@ -392,7 +383,6 @@ class Worker:
             activity_task_poller_behavior=activity_task_poller_behavior,
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
-            max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
         )
 
         plugins_from_client = cast(
@@ -453,14 +443,6 @@ class Worker:
             raise ValueError(
                 "default_versioning_behavior must be UNSPECIFIED when use_worker_versioning is False"
             )
-        max_workflow_task_external_storage_concurrency = config.get(
-            "max_workflow_task_external_storage_concurrency",
-            _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
-        )
-        if max_workflow_task_external_storage_concurrency < 1:
-            raise ValueError(
-                "max_workflow_task_external_storage_concurrency must be positive"
-            )
         if config.get("max_eager_activity_reservations_per_workflow_task", 3) < 1:
             raise ValueError(
                 "max_eager_activity_reservations_per_workflow_task must be positive; "
@@ -478,6 +460,21 @@ class Worker:
         # Extract storage drivers from the client's data converter
         _ext_storage = client_config["data_converter"].external_storage
         self._storage_drivers = list(_ext_storage.drivers) if _ext_storage else []
+        self._driver_operation_semaphore = (
+            temporalio.converter._extstore.new_driver_operation_semaphore(_ext_storage)
+            if _ext_storage
+            else None
+        )
+        # Every worker operation draws on the worker's limit, not the client's,
+        # so the worker carries its own copy of the converter.
+        worker_data_converter = (
+            dataclasses.replace(
+                client_config["data_converter"],
+                _driver_operation_semaphore=self._driver_operation_semaphore,
+            )
+            if self._driver_operation_semaphore is not None
+            else client_config["data_converter"]
+        )
 
         # Extract the bridge service client
         bridge_client = _extract_bridge_client_for_worker(config["client"])  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -504,7 +501,7 @@ class Worker:
                 activities=activities,
                 activity_executor=config.get("activity_executor"),
                 shared_state_manager=config.get("shared_state_manager"),
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
                 client=client,
@@ -522,7 +519,7 @@ class Worker:
                 namespace=client_config["namespace"],
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 service_handlers=nexus_service_handlers,
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
                 executor=config.get("nexus_task_executor"),
@@ -557,7 +554,7 @@ class Worker:
                 ),
                 workflow_runner=config["workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 unsandboxed_workflow_runner=config["unsandboxed_workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 workflow_failure_exception_types=config[
                     "workflow_failure_exception_types"
@@ -574,7 +571,6 @@ class Worker:
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
-                max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
             )
 
         tuner = config.get("tuner")
@@ -1029,7 +1025,6 @@ class WorkerConfig(TypedDict, total=False):
     activity_task_poller_behavior: PollerBehavior
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
-    max_workflow_task_external_storage_concurrency: int
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(
