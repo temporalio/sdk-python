@@ -217,7 +217,7 @@ async def test_batch_cancellation(retrieving: bool, cancel_parent: bool) -> None
     started = 0
     cancelled = 0
 
-    async def transfer(**_kwargs: object) -> bytes:
+    async def transfer(**_kwargs: object) -> None:
         nonlocal started, cancelled
         started += 1
         index = started
@@ -231,7 +231,6 @@ async def test_batch_cancellation(retrieving: bool, cancel_parent: bool) -> None
         except asyncio.CancelledError:
             cancelled += 1
             raise
-        return b""
 
     client.get_object.side_effect = transfer
     client.put_object.side_effect = transfer
@@ -336,7 +335,7 @@ async def test_adapter_conditional_upload(status: int | None) -> None:
     storage = AsyncMock(spec=Storage)
     if status:
         storage.upload.side_effect = response_error(status)
-    storage.download_metadata.side_effect = response_error(404)
+    storage.download_metadata.return_value = {"name": "key"}
     client = new_gcloud_aio_client(storage)
     if status in (403, 404, 500):
         with pytest.raises(ClientResponseError):
@@ -351,16 +350,6 @@ async def test_adapter_conditional_upload(status: int | None) -> None:
         parameters={"ifGenerationMatch": "0"},
         force_resumable_upload=False,
     )
-
-
-async def test_adapter_upload_404_propagates_when_object_exists() -> None:
-    storage = AsyncMock(spec=Storage)
-    storage.upload.side_effect = response_error(404)
-    storage.download_metadata.return_value = {"name": "key"}
-    with pytest.raises(ClientResponseError):
-        await new_gcloud_aio_client(storage).put_object(
-            bucket="bucket", key="key", data=b"data"
-        )
     storage.download_metadata.assert_not_awaited()
 
 
