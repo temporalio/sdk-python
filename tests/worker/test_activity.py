@@ -879,6 +879,56 @@ async def test_activity_heartbeat_details_timeout(
     assert list(timeout.last_heartbeat_details) == ["some details!"]
 
 
+class _SlowFirstHeartbeatCodec(PayloadCodec):
+    """Encodes the first heartbeat slower than later ones, like a codec waiting on a remote KMS."""
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        if any(p.data == b'"first"' for p in payloads):
+            await asyncio.sleep(0.5)
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
+async def test_activity_heartbeat_details_keep_order_with_slow_codec(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
+    @activity.defn
+    async def some_activity() -> str:
+        info = activity.info()
+        if info.heartbeat_details:
+            return f"resumed from: {next(iter(info.heartbeat_details))}"
+        activity.heartbeat("first")
+        await asyncio.sleep(0.1)
+        activity.heartbeat("second")
+        await asyncio.sleep(1)
+        raise RuntimeError("Try again!")
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        client.data_converter, payload_codec=_SlowFirstHeartbeatCodec()
+    )
+    result = await _execute_workflow_with_activity(
+        Client(**config),
+        worker,
+        some_activity,
+        retry_max_attempts=2,
+        shared_state_manager=shared_state_manager,
+    )
+    assert result.result == "resumed from: second"
+
+
 @activity.defn
 def picklable_heartbeat_details_activity() -> str:
     info = activity.info()
