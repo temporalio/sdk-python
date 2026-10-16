@@ -442,6 +442,7 @@ async def test_replay_extstore_history_succeeds_with_correct_extstore(
     ).replay_workflow(history)
 
 
+@pytest.mark.usefixtures("encode_storage_references")
 async def test_extstore_reference_payloads_codec_encoded_in_history(
     env: WorkflowEnvironment,
 ) -> None:
@@ -534,6 +535,7 @@ class ReferenceContextRecordingCodec(PayloadCodec, WithSerializationContext):
         return await self._codec.decode(payloads)
 
 
+@pytest.mark.usefixtures("encode_storage_references")
 async def test_extstore_reference_payloads_use_payload_serialization_context(
     env: WorkflowEnvironment,
 ) -> None:

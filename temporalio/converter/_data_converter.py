@@ -13,6 +13,7 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.common
+import temporalio.converter._extstore
 from temporalio.converter._extstore import (
     _REFERENCE_ENCODING,
     _REFERENCE_MARKER_KEY,
@@ -345,7 +346,10 @@ class DataConverter(WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         """Codec encode external storage reference payloads only."""
         encoded_payloads = list(payloads)
-        if not self.payload_codec:
+        if (
+            not temporalio.converter._extstore._ENCODE_STORAGE_REFERENCES
+            or not self.payload_codec
+        ):
             return encoded_payloads
         for i, payload in enumerate(encoded_payloads):
             if not _is_reference_payload(payload):

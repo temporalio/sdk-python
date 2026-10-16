@@ -39,6 +39,8 @@ from temporalio.exceptions import ApplicationError
 from temporalio.service import ServiceClient
 from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
 
+pytestmark = pytest.mark.usefixtures("encode_storage_references")
+
 # Larger than the storage threshold below, so it is always stored externally.
 LARGE = "x" * 200
 CODEC_ENCODING = b"binary/test-encoded"

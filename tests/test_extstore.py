@@ -6,6 +6,7 @@ from datetime import timedelta
 
 import pytest
 
+import temporalio.converter._extstore
 from temporalio.api.common.v1 import Payload
 from temporalio.api.failure.v1 import Failure
 from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
@@ -406,6 +407,7 @@ class RecordingPayloadCodec(PayloadCodec):
         return results
 
 
+@pytest.mark.usefixtures("encode_storage_references")
 class TestPayloadCodecWithExternalStorage:
     """Tests for interaction between DataConverter.payload_codec and external storage."""
 
@@ -624,6 +626,47 @@ class TestPayloadCodecWithExternalStorage:
 
         with pytest.raises(RuntimeError, match=r"\[TMPRL1105\]"):
             await DataConverter().decode(encoded, [str])
+
+
+async def test_references_written_unencoded_and_unmarked_by_default():
+    """Until writing encoded references is turned on, references are written as
+    in earlier releases: unencoded and unmarked, even with a codec configured."""
+    driver = InMemoryTestDriver()
+    converter = DataConverter(
+        payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+        external_storage=ExternalStorage(drivers=[driver], payload_size_threshold=50),
+    )
+
+    encoded = await converter.encode(["x" * 200])
+
+    assert encoded[0].metadata.get("encoding") == b"json/protobuf"
+    assert "__temporal_external_storage_reference" not in encoded[0].metadata
+    assert await converter.decode(encoded, [str]) == ["x" * 200]
+
+
+async def test_encoded_references_read_while_writing_them_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Encoded references written by a later release can be read before writing
+    them is turned on."""
+    converter = DataConverter(
+        payload_codec=RecordingPayloadCodec("binary/dc-encoded"),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()], payload_size_threshold=50
+        ),
+    )
+    monkeypatch.setattr(
+        temporalio.converter._extstore, "_ENCODE_STORAGE_REFERENCES", True
+    )
+    encoded = await converter.encode(["x" * 200])
+    assert encoded[0].metadata.get("encoding") == b"binary/dc-encoded"
+    assert encoded[0].metadata["__temporal_external_storage_reference"] == b"true"
+
+    monkeypatch.setattr(
+        temporalio.converter._extstore, "_ENCODE_STORAGE_REFERENCES", False
+    )
+
+    assert await converter.decode(encoded, [str]) == ["x" * 200]
 
 
 class TestMultiDriver:

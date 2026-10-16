@@ -225,6 +225,7 @@ def _assert_encoded_reference(payload: Payload) -> None:
     assert payload.metadata["__temporal_external_storage_reference"] == b"true"
 
 
+@pytest.mark.usefixtures("encode_storage_references")
 async def test_nexus_operation_input_reference_encoded_with_codec(
     env: WorkflowEnvironment,
 ):
@@ -253,6 +254,7 @@ async def test_nexus_operation_input_reference_encoded_with_codec(
     _assert_encoded_reference(scheduled.input)
 
 
+@pytest.mark.usefixtures("encode_storage_references")
 async def test_nexus_operation_result_reference_encoded_with_codec(
     env: WorkflowEnvironment,
 ):
