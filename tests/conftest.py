@@ -14,6 +14,7 @@ import pytest_asyncio
 from opentelemetry.metrics import NoOpMeterProvider
 from opentelemetry.util._once import Once
 
+import temporalio.converter._extstore
 from temporalio.client import Client
 from temporalio.envconfig import ClientConfigProfile
 from temporalio.testing import WorkflowEnvironment
@@ -351,3 +352,12 @@ def reset_otel_logger_provider():
     yield
     opentelemetry._logs._internal._LOGGER_PROVIDER_SET_ONCE = Once()
     opentelemetry._logs._internal._LOGGER_PROVIDER = None
+
+
+@pytest.fixture
+def encode_storage_references(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Turn on writing marked, codec-encoded external storage references, which
+    is off by default until a later release."""
+    monkeypatch.setattr(
+        temporalio.converter._extstore, "_ENCODE_STORAGE_REFERENCES", True
+    )

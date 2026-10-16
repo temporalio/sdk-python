@@ -30,6 +30,7 @@ from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, WorkflowFailureError
 from temporalio.converter import (
     ExternalStorage,
+    PayloadCodec,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
@@ -39,7 +40,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.types import MethodAsyncSingleParam
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 from tests.helpers.nexus import make_nexus_endpoint_name
-from tests.test_extstore import InMemoryTestDriver
+from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
 
 # Cloud CI's namespace credentials cannot manage Nexus endpoints.
 # See https://github.com/temporalio/sdk-python/issues/1704.
@@ -137,11 +138,14 @@ class TransientFailureDriver(InMemoryTestDriver):
 
 
 def _client_with_extstore(
-    env: WorkflowEnvironment, driver: InMemoryTestDriver
+    env: WorkflowEnvironment,
+    driver: InMemoryTestDriver,
+    payload_codec: PayloadCodec | None = None,
 ) -> Client:
     config = env.client.config()
     config["data_converter"] = dataclasses.replace(
         temporalio.converter.default(),
+        payload_codec=payload_codec,
         external_storage=ExternalStorage(
             drivers=[driver],
             payload_size_threshold=PAYLOAD_SIZE_THRESHOLD,
@@ -154,8 +158,11 @@ async def _run_caller(
     env: WorkflowEnvironment,
     driver: InMemoryTestDriver,
     workflow_run: MethodAsyncSingleParam[Any, str, int],
+    *,
+    payload_codec: PayloadCodec | None = None,
+    workflow_id: str | None = None,
 ) -> int:
-    client = _client_with_extstore(env, driver)
+    client = _client_with_extstore(env, driver, payload_codec)
     task_queue = str(uuid.uuid4())
     async with Worker(
         client,
@@ -170,7 +177,7 @@ async def _run_caller(
         return await client.execute_workflow(
             workflow_run,
             task_queue,
-            id=str(uuid.uuid4()),
+            id=workflow_id or str(uuid.uuid4()),
             task_queue=task_queue,
             execution_timeout=timedelta(seconds=30),
         )
@@ -211,6 +218,69 @@ async def test_nexus_operation_sync_result_offloaded_and_retrieved(
     assert result == PAYLOAD_SIZE
     assert driver._store_calls >= 1
     assert driver._retrieve_calls >= 1
+
+
+def _assert_encoded_reference(payload: Payload) -> None:
+    assert payload.metadata["encoding"] == b"binary/test-encoded"
+    assert payload.metadata["__temporal_external_storage_reference"] == b"true"
+
+
+@pytest.mark.usefixtures("encode_storage_references")
+async def test_nexus_operation_input_reference_encoded_with_codec(
+    env: WorkflowEnvironment,
+):
+    """With a codec, the operation input reference is encoded, and the Nexus
+    worker decodes it before retrieving the input."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    driver = InMemoryTestDriver()
+    workflow_id = str(uuid.uuid4())
+    result = await _run_caller(
+        env,
+        driver,
+        SizeOpCallerWorkflow.run,
+        payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+        workflow_id=workflow_id,
+    )
+
+    assert result == PAYLOAD_SIZE
+    history = await env.client.get_workflow_handle(workflow_id).fetch_history()
+    [scheduled] = [
+        e.nexus_operation_scheduled_event_attributes
+        for e in history.events
+        if e.HasField("nexus_operation_scheduled_event_attributes")
+    ]
+    _assert_encoded_reference(scheduled.input)
+
+
+@pytest.mark.usefixtures("encode_storage_references")
+async def test_nexus_operation_result_reference_encoded_with_codec(
+    env: WorkflowEnvironment,
+):
+    """With a codec, the Nexus worker encodes the reference to an offloaded
+    operation result, and the caller decodes it."""
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    driver = InMemoryTestDriver()
+    workflow_id = str(uuid.uuid4())
+    result = await _run_caller(
+        env,
+        driver,
+        BigResultOpCallerWorkflow.run,
+        payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+        workflow_id=workflow_id,
+    )
+
+    assert result == PAYLOAD_SIZE
+    history = await env.client.get_workflow_handle(workflow_id).fetch_history()
+    [completed] = [
+        e.nexus_operation_completed_event_attributes
+        for e in history.events
+        if e.HasField("nexus_operation_completed_event_attributes")
+    ]
+    _assert_encoded_reference(completed.result)
 
 
 async def test_nexus_operation_transient_retrieve_failure_recovers(

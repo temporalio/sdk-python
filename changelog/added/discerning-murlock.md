@@ -1,0 +1,1 @@
+Workers and clients can now read external storage reference payloads that were encoded with the configured payload codec and marked with `__temporal_external_storage_reference` metadata. This release does not write encoded references yet; a later release will, so upgrade all workers before then.

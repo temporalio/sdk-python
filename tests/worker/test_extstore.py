@@ -1,12 +1,15 @@
 import contextlib
 import dataclasses
+import json
 import uuid
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
+from pathlib import Path
 from unittest import mock
 
 import pytest
+from google.protobuf import json_format
 
 import temporalio
 import temporalio.bridge.client
@@ -16,22 +19,32 @@ import temporalio.client
 import temporalio.converter
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
-from temporalio.client import Client, WorkflowFailureError, WorkflowHandle
+from temporalio.client import (
+    Client,
+    WorkflowFailureError,
+    WorkflowHandle,
+    WorkflowHistory,
+)
 from temporalio.common import RetryPolicy
 from temporalio.converter import (
+    ActivitySerializationContext,
     ExternalStorage,
+    PayloadCodec,
+    SerializationContext,
     StorageDriver,
     StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
+    WithSerializationContext,
+    WorkflowSerializationContext,
 )
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
 from temporalio.worker import Replayer
 from tests.helpers import assert_task_fail_eventually, new_worker
-from tests.test_extstore import InMemoryTestDriver
+from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
 
 
 @dataclass(frozen=True)
@@ -427,6 +440,244 @@ async def test_replay_extstore_history_succeeds_with_correct_extstore(
             ),
         ),
     ).replay_workflow(history)
+
+
+@pytest.mark.usefixtures("encode_storage_references")
+async def test_extstore_reference_payloads_codec_encoded_in_history(
+    env: WorkflowEnvironment,
+) -> None:
+    """Every reference payload written to history by the client, workflow
+    worker, and activity worker is codec-encoded and marked, and the history
+    replays."""
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            payload_size_threshold=512,
+        ),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        handle = await client.start_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,
+                activity_input_size=1024,
+                activity_output_size=1024,
+                output_size=1024,
+            ),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == "wo" * 512
+
+    history = await handle.fetch_history()
+    reference_payloads = []
+    for event in history.events:
+        if event.HasField("workflow_execution_started_event_attributes"):
+            reference_payloads.append(
+                event.workflow_execution_started_event_attributes.input.payloads[0]
+            )
+        elif event.HasField("activity_task_scheduled_event_attributes"):
+            reference_payloads.append(
+                event.activity_task_scheduled_event_attributes.input.payloads[0]
+            )
+        elif event.HasField("activity_task_completed_event_attributes"):
+            reference_payloads.append(
+                event.activity_task_completed_event_attributes.result.payloads[0]
+            )
+        elif event.HasField("workflow_execution_completed_event_attributes"):
+            reference_payloads.append(
+                event.workflow_execution_completed_event_attributes.result.payloads[0]
+            )
+    assert len(reference_payloads) == 4
+    for payload in reference_payloads:
+        assert payload.metadata["encoding"] == b"binary/test-encoded"
+        assert payload.metadata["__temporal_external_storage_reference"] == b"true"
+        assert payload.external_payloads[0].size_bytes > 0
+
+    await Replayer(
+        workflows=[ExtStoreWorkflow], data_converter=data_converter
+    ).replay_workflow(history)
+
+
+class ReferenceContextRecordingCodec(PayloadCodec, WithSerializationContext):
+    """Encodes like RecordingPayloadCodec and records the serialization context
+    each storage reference payload is encoded with."""
+
+    def __init__(
+        self,
+        reference_contexts: list[SerializationContext | None],
+        context: SerializationContext | None = None,
+    ) -> None:
+        self._reference_contexts = reference_contexts
+        self._context = context
+        self._codec = RecordingPayloadCodec("binary/test-encoded")
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> "ReferenceContextRecordingCodec":
+        return ReferenceContextRecordingCodec(self._reference_contexts, context)
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        for p in payloads:
+            if (
+                p.metadata.get("messageType")
+                == b"temporal.api.sdk.v1.ExternalStorageReference"
+            ):
+                self._reference_contexts.append(self._context)
+        return await self._codec.encode(payloads)
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return await self._codec.decode(payloads)
+
+
+@pytest.mark.usefixtures("encode_storage_references")
+async def test_extstore_reference_payloads_use_payload_serialization_context(
+    env: WorkflowEnvironment,
+) -> None:
+    """Each reference payload is encoded with the serialization context of the
+    value it replaces: workflow context for workflow input and result, activity
+    context for activity input and result."""
+    reference_contexts: list[SerializationContext | None] = []
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=ReferenceContextRecordingCodec(reference_contexts),
+        external_storage=ExternalStorage(
+            drivers=[InMemoryTestDriver()],
+            payload_size_threshold=512,
+        ),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    async with new_worker(
+        client, ExtStoreWorkflow, activities=[ext_store_activity]
+    ) as worker:
+        await client.execute_workflow(
+            ExtStoreWorkflow.run,
+            ExtStoreWorkflowInput(
+                input_data="wi" * 512,
+                activity_input_size=1024,
+                activity_output_size=1024,
+                output_size=1024,
+            ),
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+    workflow_contexts = [
+        c for c in reference_contexts if isinstance(c, WorkflowSerializationContext)
+    ]
+    activity_contexts = [
+        c for c in reference_contexts if isinstance(c, ActivitySerializationContext)
+    ]
+    # Workflow input (client) and workflow result (workflow worker).
+    assert len(workflow_contexts) == 2
+    assert all(c.workflow_id == workflow_id for c in workflow_contexts)
+    # Activity input (workflow worker) and activity result (activity worker).
+    assert len(activity_contexts) == 2
+    assert all(
+        c.workflow_id == workflow_id and not c.is_local for c in activity_contexts
+    )
+    assert len(reference_contexts) == 4
+
+
+# The committed histories record these workflow and activity names, so they
+# must not change.
+@workflow.defn(name="ReferencesBeforeEncodingWorkflow")
+class ExtstoreReplayWorkflow:
+    """Replays the committed histories loaded by _load_recorded_history."""
+
+    @workflow.run
+    async def run(self, _input: str) -> str:
+        await workflow.execute_activity(
+            "references_before_encoding_activity",
+            "ai" * 512,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        return "wo" * 512
+
+
+def _load_recorded_history(
+    name: str,
+) -> tuple[WorkflowHistory, InMemoryTestDriver, list[Payload]]:
+    """Load a committed history, a driver holding the payloads its references
+    point to, and its four reference payloads.
+
+    Each history was recorded with ExtstoreReplayWorkflow, a payload codec
+    matching RecordingPayloadCodec("binary/test-encoded"), and a driver storing
+    claims the same way as InMemoryTestDriver, with a 512-byte storage threshold.
+    The codec always encoded the stored payloads. Whether it also encoded the
+    references depends on the recording.
+    """
+    fixtures = Path(__file__).parent
+    history = WorkflowHistory.from_json(
+        name, (fixtures / f"test_extstore_{name}_history.json").read_text()
+    )
+    stored_payloads = json.loads(
+        (fixtures / f"test_extstore_{name}_stored_payloads.json").read_text()
+    )
+    driver = InMemoryTestDriver()
+    for key, payload_json in stored_payloads.items():
+        driver._storage[key] = json_format.ParseDict(
+            payload_json, Payload()
+        ).SerializeToString()
+
+    references = [
+        payload
+        for event in history.events
+        for payload in (
+            *event.workflow_execution_started_event_attributes.input.payloads,
+            *event.activity_task_scheduled_event_attributes.input.payloads,
+            *event.activity_task_completed_event_attributes.result.payloads,
+            *event.workflow_execution_completed_event_attributes.result.payloads,
+        )
+    ]
+    assert len(references) == 4
+    return history, driver, references
+
+
+async def _replay_recorded_history(
+    history: WorkflowHistory, driver: InMemoryTestDriver
+) -> None:
+    await Replayer(
+        workflows=[ExtstoreReplayWorkflow],
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            payload_codec=RecordingPayloadCodec("binary/test-encoded"),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                payload_size_threshold=512,
+            ),
+        ),
+    ).replay_workflow(history)
+    assert driver._retrieve_calls > 0
+
+
+async def test_replay_decodes_unencoded_references() -> None:
+    """A history recorded with temporalio 1.34.0 replays. That release wrote
+    references unencoded and unmarked, even with a codec configured."""
+    history, driver, references = _load_recorded_history("unencoded_references")
+    for reference in references:
+        assert reference.metadata["encoding"] == b"json/protobuf"
+        assert "__temporal_external_storage_reference" not in reference.metadata
+
+    await _replay_recorded_history(history, driver)
+
+
+async def test_replay_decodes_encoded_references_while_writing_them_is_off() -> None:
+    """A history whose references were codec-encoded and marked replays while
+    writing encoded references is off. It was recorded from this branch with
+    writing turned on, as a later release will write them."""
+    history, driver, references = _load_recorded_history("encoded_references")
+    for reference in references:
+        assert reference.metadata["encoding"] == b"binary/test-encoded"
+        assert reference.metadata["__temporal_external_storage_reference"] == b"true"
+
+    await _replay_recorded_history(history, driver)
 
 
 async def test_replay_extstore_history_fails_with_empty_driver(
