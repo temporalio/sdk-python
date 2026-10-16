@@ -41,9 +41,10 @@ async def test_gcs_emulator_round_trip(
     assert await driver.store(context, [original]) == claims
     assert await driver.retrieve(StorageDriverRetrieveContext(), claims) == [original]
     key = claims[0].claim_data["key"]
+    replacement = b"must not overwrite" + original.data
     await asyncio.gather(
-        client.put_object(bucket=gcs_bucket, key=key, data=b"must not overwrite"),
-        client.put_object(bucket=gcs_bucket, key=key, data=b"must not overwrite"),
+        client.put_object(bucket=gcs_bucket, key=key, data=replacement),
+        client.put_object(bucket=gcs_bucket, key=key, data=replacement),
     )
     assert (
         await client.get_object(bucket=gcs_bucket, key=key)

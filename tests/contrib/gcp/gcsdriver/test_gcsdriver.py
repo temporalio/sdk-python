@@ -331,13 +331,14 @@ async def test_adapter_object_exists(status: int | None) -> None:
     storage.download_metadata.assert_awaited_once_with("bucket", "key")
 
 
-@pytest.mark.parametrize("status", [None, 412, 403, 500])
+@pytest.mark.parametrize("status", [None, 412, 403, 404, 500])
 async def test_adapter_conditional_upload(status: int | None) -> None:
     storage = AsyncMock(spec=Storage)
     if status:
         storage.upload.side_effect = response_error(status)
+    storage.download_metadata.side_effect = response_error(404)
     client = new_gcloud_aio_client(storage)
-    if status in (403, 500):
+    if status in (403, 404, 500):
         with pytest.raises(ClientResponseError):
             await client.put_object(bucket="bucket", key="key", data=b"data")
     else:
@@ -349,6 +350,16 @@ async def test_adapter_conditional_upload(status: int | None) -> None:
         content_type="application/octet-stream",
         parameters={"ifGenerationMatch": "0"},
     )
+
+
+async def test_adapter_resumable_conflict_with_missing_session() -> None:
+    storage = AsyncMock(spec=Storage)
+    storage.upload.side_effect = response_error(404)
+    storage.download_metadata.return_value = {"name": "key"}
+    await new_gcloud_aio_client(storage).put_object(
+        bucket="bucket", key="key", data=b"data"
+    )
+    storage.download_metadata.assert_awaited_once_with("bucket", "key")
 
 
 async def test_adapter_download() -> None:
