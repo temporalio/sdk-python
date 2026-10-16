@@ -25,6 +25,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.session.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -46,7 +47,7 @@ class _ActivityCancellationTypeEnumTypeWrapper(
         _ActivityCancellationType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TRY_CANCEL: _ActivityCancellationType.ValueType  # 0
     """Initiate a cancellation request and immediately report cancellation to the workflow."""
@@ -77,6 +78,7 @@ workflow
 """
 global___ActivityCancellationType = ActivityCancellationType
 
+@typing_extensions.final
 class WorkflowCommand(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -357,6 +359,7 @@ class WorkflowCommand(google.protobuf.message.Message):
 
 global___WorkflowCommand = WorkflowCommand
 
+@typing_extensions.final
 class StartTimer(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -387,6 +390,7 @@ class StartTimer(google.protobuf.message.Message):
 
 global___StartTimer = StartTimer
 
+@typing_extensions.final
 class CancelTimer(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -404,9 +408,11 @@ class CancelTimer(google.protobuf.message.Message):
 
 global___CancelTimer = CancelTimer
 
+@typing_extensions.final
 class ScheduleActivity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -444,6 +450,7 @@ class ScheduleActivity(google.protobuf.message.Message):
     DO_NOT_EAGERLY_EXECUTE_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -503,6 +510,10 @@ class ScheduleActivity(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """The Priority to use for this activity"""
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.ActivitySessionOptions: ...
     def __init__(
         self,
         *,
@@ -527,6 +538,8 @@ class ScheduleActivity(google.protobuf.message.Message):
         do_not_eagerly_execute: builtins.bool = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.ActivitySessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -541,6 +554,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
         ],
@@ -572,6 +587,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "seq",
             b"seq",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -583,9 +600,11 @@ class ScheduleActivity(google.protobuf.message.Message):
 
 global___ScheduleActivity = ScheduleActivity
 
+@typing_extensions.final
 class ScheduleLocalActivity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -768,6 +787,7 @@ class ScheduleLocalActivity(google.protobuf.message.Message):
 
 global___ScheduleLocalActivity = ScheduleLocalActivity
 
+@typing_extensions.final
 class RequestCancelActivity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -785,6 +805,7 @@ class RequestCancelActivity(google.protobuf.message.Message):
 
 global___RequestCancelActivity = RequestCancelActivity
 
+@typing_extensions.final
 class RequestCancelLocalActivity(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -802,6 +823,7 @@ class RequestCancelLocalActivity(google.protobuf.message.Message):
 
 global___RequestCancelLocalActivity = RequestCancelLocalActivity
 
+@typing_extensions.final
 class QueryResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -846,6 +868,7 @@ class QueryResult(google.protobuf.message.Message):
 
 global___QueryResult = QueryResult
 
+@typing_extensions.final
 class QuerySuccess(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -866,6 +889,7 @@ class QuerySuccess(google.protobuf.message.Message):
 
 global___QuerySuccess = QuerySuccess
 
+@typing_extensions.final
 class CompleteWorkflowExecution(google.protobuf.message.Message):
     """Issued when the workflow completes successfully"""
 
@@ -888,6 +912,7 @@ class CompleteWorkflowExecution(google.protobuf.message.Message):
 
 global___CompleteWorkflowExecution = CompleteWorkflowExecution
 
+@typing_extensions.final
 class FailWorkflowExecution(google.protobuf.message.Message):
     """Issued when the workflow errors out"""
 
@@ -910,11 +935,13 @@ class FailWorkflowExecution(google.protobuf.message.Message):
 
 global___FailWorkflowExecution = FailWorkflowExecution
 
+@typing_extensions.final
 class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
     """Continue the workflow as a new execution"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class MemoEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -937,6 +964,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1105,6 +1133,7 @@ class ContinueAsNewWorkflowExecution(google.protobuf.message.Message):
 
 global___ContinueAsNewWorkflowExecution = ContinueAsNewWorkflowExecution
 
+@typing_extensions.final
 class CancelWorkflowExecution(google.protobuf.message.Message):
     """Indicate a workflow has completed as cancelled. Generally sent as a response to an activation
     containing a cancellation job.
@@ -1129,6 +1158,7 @@ class CancelWorkflowExecution(google.protobuf.message.Message):
 
 global___CancelWorkflowExecution = CancelWorkflowExecution
 
+@typing_extensions.final
 class SetPatchMarker(google.protobuf.message.Message):
     """A request to set/check if a certain patch is present or not"""
 
@@ -1160,11 +1190,13 @@ class SetPatchMarker(google.protobuf.message.Message):
 
 global___SetPatchMarker = SetPatchMarker
 
+@typing_extensions.final
 class StartChildWorkflowExecution(google.protobuf.message.Message):
     """Start a child workflow execution"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1187,6 +1219,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    @typing_extensions.final
     class MemoEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1396,6 +1429,7 @@ class StartChildWorkflowExecution(google.protobuf.message.Message):
 
 global___StartChildWorkflowExecution = StartChildWorkflowExecution
 
+@typing_extensions.final
 class CancelChildWorkflowExecution(google.protobuf.message.Message):
     """Cancel a child workflow"""
 
@@ -1422,6 +1456,7 @@ class CancelChildWorkflowExecution(google.protobuf.message.Message):
 
 global___CancelChildWorkflowExecution = CancelChildWorkflowExecution
 
+@typing_extensions.final
 class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
     """Request cancellation of an external workflow execution. For cancellation of a child workflow,
     prefer `CancelChildWorkflowExecution` instead, as it guards against cancel-before-start issues.
@@ -1469,11 +1504,13 @@ class RequestCancelExternalWorkflowExecution(google.protobuf.message.Message):
 
 global___RequestCancelExternalWorkflowExecution = RequestCancelExternalWorkflowExecution
 
+@typing_extensions.final
 class SignalExternalWorkflowExecution(google.protobuf.message.Message):
     """Send a signal to an external or child workflow"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class HeadersEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1580,6 +1617,7 @@ class SignalExternalWorkflowExecution(google.protobuf.message.Message):
 
 global___SignalExternalWorkflowExecution = SignalExternalWorkflowExecution
 
+@typing_extensions.final
 class CancelSignalWorkflow(google.protobuf.message.Message):
     """Can be used to cancel not-already-sent `SignalExternalWorkflowExecution` commands"""
 
@@ -1599,6 +1637,7 @@ class CancelSignalWorkflow(google.protobuf.message.Message):
 
 global___CancelSignalWorkflow = CancelSignalWorkflow
 
+@typing_extensions.final
 class UpsertWorkflowSearchAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1631,6 +1670,7 @@ class UpsertWorkflowSearchAttributes(google.protobuf.message.Message):
 
 global___UpsertWorkflowSearchAttributes = UpsertWorkflowSearchAttributes
 
+@typing_extensions.final
 class ModifyWorkflowProperties(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1655,6 +1695,7 @@ class ModifyWorkflowProperties(google.protobuf.message.Message):
 
 global___ModifyWorkflowProperties = ModifyWorkflowProperties
 
+@typing_extensions.final
 class UpdateResponse(google.protobuf.message.Message):
     """A reply to a `DoUpdate` job - lang must run the update's validator if told to, and then
     immediately run the handler, if the update was accepted.
@@ -1731,11 +1772,13 @@ class UpdateResponse(google.protobuf.message.Message):
 
 global___UpdateResponse = UpdateResponse
 
+@typing_extensions.final
 class ScheduleNexusOperation(google.protobuf.message.Message):
     """A request to begin a Nexus operation"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class NexusHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1872,6 +1915,7 @@ class ScheduleNexusOperation(google.protobuf.message.Message):
 
 global___ScheduleNexusOperation = ScheduleNexusOperation
 
+@typing_extensions.final
 class RequestCancelNexusOperation(google.protobuf.message.Message):
     """Request cancellation of a nexus operation started via `ScheduleNexusOperation`"""
 

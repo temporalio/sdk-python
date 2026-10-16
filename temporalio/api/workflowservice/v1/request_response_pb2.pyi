@@ -60,9 +60,11 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class RegisterNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -187,6 +189,7 @@ class RegisterNamespaceRequest(google.protobuf.message.Message):
 
 global___RegisterNamespaceRequest = RegisterNamespaceRequest
 
+@typing_extensions.final
 class RegisterNamespaceResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -196,6 +199,7 @@ class RegisterNamespaceResponse(google.protobuf.message.Message):
 
 global___RegisterNamespaceResponse = RegisterNamespaceResponse
 
+@typing_extensions.final
 class ListNamespacesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -234,6 +238,7 @@ class ListNamespacesRequest(google.protobuf.message.Message):
 
 global___ListNamespacesRequest = ListNamespacesRequest
 
+@typing_extensions.final
 class ListNamespacesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -262,6 +267,7 @@ class ListNamespacesResponse(google.protobuf.message.Message):
 
 global___ListNamespacesResponse = ListNamespacesResponse
 
+@typing_extensions.final
 class DescribeNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -297,6 +303,7 @@ class DescribeNamespaceRequest(google.protobuf.message.Message):
 
 global___DescribeNamespaceRequest = DescribeNamespaceRequest
 
+@typing_extensions.final
 class DescribeNamespaceResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -407,6 +414,7 @@ class DescribeNamespaceResponse(google.protobuf.message.Message):
 
 global___DescribeNamespaceResponse = DescribeNamespaceResponse
 
+@typing_extensions.final
 class UpdateNamespaceRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -478,6 +486,7 @@ class UpdateNamespaceRequest(google.protobuf.message.Message):
 
 global___UpdateNamespaceRequest = UpdateNamespaceRequest
 
+@typing_extensions.final
 class UpdateNamespaceResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -538,6 +547,7 @@ class UpdateNamespaceResponse(google.protobuf.message.Message):
 
 global___UpdateNamespaceResponse = UpdateNamespaceResponse
 
+@typing_extensions.final
 class DeprecateNamespaceRequest(google.protobuf.message.Message):
     """Deprecated."""
 
@@ -562,6 +572,7 @@ class DeprecateNamespaceRequest(google.protobuf.message.Message):
 
 global___DeprecateNamespaceRequest = DeprecateNamespaceRequest
 
+@typing_extensions.final
 class DeprecateNamespaceResponse(google.protobuf.message.Message):
     """Deprecated."""
 
@@ -573,6 +584,7 @@ class DeprecateNamespaceResponse(google.protobuf.message.Message):
 
 global___DeprecateNamespaceResponse = DeprecateNamespaceResponse
 
+@typing_extensions.final
 class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -606,6 +618,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     EAGER_WORKER_DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -737,6 +750,14 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
         """Serialization context propagated from the Nexus caller that started this workflow."""
+    @property
+    def time_skipping_state_propagation(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
+        """Time-skipping state propagated by the execution that started this workflow.
+        This field is intended for use by the Temporal server, for example when a schedule
+        starts a workflow, and is not intended to be set by external clients.
+        """
     def __init__(
         self,
         *,
@@ -782,6 +803,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         | None = ...,
         propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
         | None = ...,
+        time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -812,6 +835,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -871,6 +896,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -896,6 +923,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___StartWorkflowExecutionRequest = StartWorkflowExecutionRequest
 
+@typing_extensions.final
 class StartWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -960,6 +988,7 @@ class StartWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___StartWorkflowExecutionResponse = StartWorkflowExecutionResponse
 
+@typing_extensions.final
 class GetWorkflowExecutionHistoryRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1025,6 +1054,7 @@ class GetWorkflowExecutionHistoryRequest(google.protobuf.message.Message):
 
 global___GetWorkflowExecutionHistoryRequest = GetWorkflowExecutionHistoryRequest
 
+@typing_extensions.final
 class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1095,6 +1125,7 @@ class GetWorkflowExecutionHistoryResponse(google.protobuf.message.Message):
 
 global___GetWorkflowExecutionHistoryResponse = GetWorkflowExecutionHistoryResponse
 
+@typing_extensions.final
 class GetWorkflowExecutionHistoryReverseRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1136,6 +1167,7 @@ global___GetWorkflowExecutionHistoryReverseRequest = (
     GetWorkflowExecutionHistoryReverseRequest
 )
 
+@typing_extensions.final
 class GetWorkflowExecutionHistoryReverseResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1165,6 +1197,7 @@ global___GetWorkflowExecutionHistoryReverseResponse = (
     GetWorkflowExecutionHistoryReverseResponse
 )
 
+@typing_extensions.final
 class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1177,6 +1210,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    SINGLE_WORKFLOW_MODE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1214,6 +1248,17 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    single_workflow_mode: builtins.bool
+    """EXPERIMENTAL. Subject to removal in the future.
+    This flag is only applicable to sticky polls. In this mode, server will forward the workflow task sticky polls
+    to the normal queue only once. The forwarding to normal queue will stop once a single task is dispatched from the
+    normal queue to pollers of this particular sticky queue.
+    Server persists the workflow ID of the first matched task in the sticky task queue's metadata. This will allow
+    system to enforce single-workflow mode even when the server crashes, or a worker with stable identity restarts
+    (when worker's sticky queue name remains the same after restart.)
+    For activity sticky polls, this mode will disable forwarding to normal queue completely.
+    (-- api-linter: core::0140::prepositions=disabled
+    """
     def __init__(
         self,
         *,
@@ -1228,6 +1273,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        single_workflow_mode: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1253,6 +1299,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "single_workflow_mode",
+            b"single_workflow_mode",
             "task_queue",
             b"task_queue",
             "worker_control_task_queue",
@@ -1266,9 +1314,11 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
 
 global___PollWorkflowTaskQueueRequest = PollWorkflowTaskQueueRequest
 
+@typing_extensions.final
 class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class QueriesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1529,9 +1579,11 @@ class PollWorkflowTaskQueueResponse(google.protobuf.message.Message):
 
 global___PollWorkflowTaskQueueResponse = PollWorkflowTaskQueueResponse
 
+@typing_extensions.final
 class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class QueryResultsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1554,6 +1606,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    @typing_extensions.final
     class Capabilities(google.protobuf.message.Message):
         """SDK capability details."""
 
@@ -1823,6 +1876,7 @@ class RespondWorkflowTaskCompletedRequest(google.protobuf.message.Message):
 
 global___RespondWorkflowTaskCompletedRequest = RespondWorkflowTaskCompletedRequest
 
+@typing_extensions.final
 class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1869,6 +1923,7 @@ class RespondWorkflowTaskCompletedResponse(google.protobuf.message.Message):
 
 global___RespondWorkflowTaskCompletedResponse = RespondWorkflowTaskCompletedResponse
 
+@typing_extensions.final
 class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1989,6 +2044,7 @@ class RespondWorkflowTaskFailedRequest(google.protobuf.message.Message):
 
 global___RespondWorkflowTaskFailedRequest = RespondWorkflowTaskFailedRequest
 
+@typing_extensions.final
 class RespondWorkflowTaskFailedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1998,6 +2054,7 @@ class RespondWorkflowTaskFailedResponse(google.protobuf.message.Message):
 
 global___RespondWorkflowTaskFailedResponse = RespondWorkflowTaskFailedResponse
 
+@typing_extensions.final
 class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2010,6 +2067,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    SINGLE_WORKFLOW_MODE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -2046,6 +2104,17 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    single_workflow_mode: builtins.bool
+    """EXPERIMENTAL. Subject to removal in the future.
+    This flag is only applicable to sticky polls. In this mode, server will forward the workflow task sticky polls
+    to the normal queue only once. The forwarding to normal queue will stop once a single task is dispatched from the
+    normal queue to pollers of this particular sticky queue.
+    Server persists the workflow ID of the first matched task in the sticky task queue's metadata. This will allow
+    system to enforce single-workflow mode even when the server crashes, or a worker with stable identity restarts
+    (when worker's sticky queue name remains the same after restart.)
+    For activity sticky polls, this mode will disable forwarding to normal queue completely.
+    (-- api-linter: core::0140::prepositions=disabled
+    """
     def __init__(
         self,
         *,
@@ -2061,6 +2130,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        single_workflow_mode: builtins.bool = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -2086,6 +2156,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "single_workflow_mode",
+            b"single_workflow_mode",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -2101,6 +2173,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
 
 global___PollActivityTaskQueueRequest = PollActivityTaskQueueRequest
 
+@typing_extensions.final
 class PollActivityTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2365,6 +2438,7 @@ class PollActivityTaskQueueResponse(google.protobuf.message.Message):
 
 global___PollActivityTaskQueueResponse = PollActivityTaskQueueResponse
 
+@typing_extensions.final
 class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2413,6 +2487,7 @@ class RecordActivityTaskHeartbeatRequest(google.protobuf.message.Message):
 
 global___RecordActivityTaskHeartbeatRequest = RecordActivityTaskHeartbeatRequest
 
+@typing_extensions.final
 class RecordActivityTaskHeartbeatResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2450,6 +2525,7 @@ class RecordActivityTaskHeartbeatResponse(google.protobuf.message.Message):
 
 global___RecordActivityTaskHeartbeatResponse = RecordActivityTaskHeartbeatResponse
 
+@typing_extensions.final
 class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2513,6 +2589,7 @@ class RecordActivityTaskHeartbeatByIdRequest(google.protobuf.message.Message):
 
 global___RecordActivityTaskHeartbeatByIdRequest = RecordActivityTaskHeartbeatByIdRequest
 
+@typing_extensions.final
 class RecordActivityTaskHeartbeatByIdResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2552,6 +2629,7 @@ global___RecordActivityTaskHeartbeatByIdResponse = (
     RecordActivityTaskHeartbeatByIdResponse
 )
 
+@typing_extensions.final
 class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2642,6 +2720,7 @@ class RespondActivityTaskCompletedRequest(google.protobuf.message.Message):
 
 global___RespondActivityTaskCompletedRequest = RespondActivityTaskCompletedRequest
 
+@typing_extensions.final
 class RespondActivityTaskCompletedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2651,6 +2730,7 @@ class RespondActivityTaskCompletedResponse(google.protobuf.message.Message):
 
 global___RespondActivityTaskCompletedResponse = RespondActivityTaskCompletedResponse
 
+@typing_extensions.final
 class RespondActivityTaskCompletedByIdRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2716,6 +2796,7 @@ global___RespondActivityTaskCompletedByIdRequest = (
     RespondActivityTaskCompletedByIdRequest
 )
 
+@typing_extensions.final
 class RespondActivityTaskCompletedByIdResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2727,6 +2808,7 @@ global___RespondActivityTaskCompletedByIdResponse = (
     RespondActivityTaskCompletedByIdResponse
 )
 
+@typing_extensions.final
 class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2833,6 +2915,7 @@ class RespondActivityTaskFailedRequest(google.protobuf.message.Message):
 
 global___RespondActivityTaskFailedRequest = RespondActivityTaskFailedRequest
 
+@typing_extensions.final
 class RespondActivityTaskFailedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2860,6 +2943,7 @@ class RespondActivityTaskFailedResponse(google.protobuf.message.Message):
 
 global___RespondActivityTaskFailedResponse = RespondActivityTaskFailedResponse
 
+@typing_extensions.final
 class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2942,6 +3026,7 @@ class RespondActivityTaskFailedByIdRequest(google.protobuf.message.Message):
 
 global___RespondActivityTaskFailedByIdRequest = RespondActivityTaskFailedByIdRequest
 
+@typing_extensions.final
 class RespondActivityTaskFailedByIdResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -2969,6 +3054,7 @@ class RespondActivityTaskFailedByIdResponse(google.protobuf.message.Message):
 
 global___RespondActivityTaskFailedByIdResponse = RespondActivityTaskFailedByIdResponse
 
+@typing_extensions.final
 class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3059,6 +3145,7 @@ class RespondActivityTaskCanceledRequest(google.protobuf.message.Message):
 
 global___RespondActivityTaskCanceledRequest = RespondActivityTaskCanceledRequest
 
+@typing_extensions.final
 class RespondActivityTaskCanceledResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3068,6 +3155,7 @@ class RespondActivityTaskCanceledResponse(google.protobuf.message.Message):
 
 global___RespondActivityTaskCanceledResponse = RespondActivityTaskCanceledResponse
 
+@typing_extensions.final
 class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3144,6 +3232,7 @@ class RespondActivityTaskCanceledByIdRequest(google.protobuf.message.Message):
 
 global___RespondActivityTaskCanceledByIdRequest = RespondActivityTaskCanceledByIdRequest
 
+@typing_extensions.final
 class RespondActivityTaskCanceledByIdResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3155,6 +3244,7 @@ global___RespondActivityTaskCanceledByIdResponse = (
     RespondActivityTaskCanceledByIdResponse
 )
 
+@typing_extensions.final
 class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3229,6 +3319,7 @@ class RequestCancelWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___RequestCancelWorkflowExecutionRequest = RequestCancelWorkflowExecutionRequest
 
+@typing_extensions.final
 class RequestCancelWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3238,6 +3329,7 @@ class RequestCancelWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___RequestCancelWorkflowExecutionResponse = RequestCancelWorkflowExecutionResponse
 
+@typing_extensions.final
 class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
     """Keep the parameters in sync with:
     - temporalio.api.batch.v1.BatchOperationSignal.
@@ -3335,6 +3427,7 @@ class SignalWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___SignalWorkflowExecutionRequest = SignalWorkflowExecutionRequest
 
+@typing_extensions.final
 class SignalWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3359,6 +3452,7 @@ class SignalWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___SignalWorkflowExecutionResponse = SignalWorkflowExecutionResponse
 
+@typing_extensions.final
 class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3618,6 +3712,7 @@ global___SignalWithStartWorkflowExecutionRequest = (
     SignalWithStartWorkflowExecutionRequest
 )
 
+@typing_extensions.final
 class SignalWithStartWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3666,6 +3761,7 @@ global___SignalWithStartWorkflowExecutionResponse = (
     SignalWithStartWorkflowExecutionResponse
 )
 
+@typing_extensions.final
 class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3769,6 +3865,7 @@ class ResetWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___ResetWorkflowExecutionRequest = ResetWorkflowExecutionRequest
 
+@typing_extensions.final
 class ResetWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3785,6 +3882,7 @@ class ResetWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___ResetWorkflowExecutionResponse = ResetWorkflowExecutionResponse
 
+@typing_extensions.final
 class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3859,6 +3957,7 @@ class TerminateWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___TerminateWorkflowExecutionRequest = TerminateWorkflowExecutionRequest
 
+@typing_extensions.final
 class TerminateWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3868,6 +3967,7 @@ class TerminateWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___TerminateWorkflowExecutionResponse = TerminateWorkflowExecutionResponse
 
+@typing_extensions.final
 class DeleteWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3901,6 +4001,7 @@ class DeleteWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___DeleteWorkflowExecutionRequest = DeleteWorkflowExecutionRequest
 
+@typing_extensions.final
 class DeleteWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3910,6 +4011,7 @@ class DeleteWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___DeleteWorkflowExecutionResponse = DeleteWorkflowExecutionResponse
 
+@typing_extensions.final
 class ListOpenWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -3985,6 +4087,7 @@ class ListOpenWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___ListOpenWorkflowExecutionsRequest = ListOpenWorkflowExecutionsRequest
 
+@typing_extensions.final
 class ListOpenWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4015,6 +4118,7 @@ class ListOpenWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___ListOpenWorkflowExecutionsResponse = ListOpenWorkflowExecutionsResponse
 
+@typing_extensions.final
 class ListClosedWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4101,6 +4205,7 @@ class ListClosedWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___ListClosedWorkflowExecutionsRequest = ListClosedWorkflowExecutionsRequest
 
+@typing_extensions.final
 class ListClosedWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4131,6 +4236,7 @@ class ListClosedWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___ListClosedWorkflowExecutionsResponse = ListClosedWorkflowExecutionsResponse
 
+@typing_extensions.final
 class ListWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4166,6 +4272,7 @@ class ListWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___ListWorkflowExecutionsRequest = ListWorkflowExecutionsRequest
 
+@typing_extensions.final
 class ListWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4196,6 +4303,7 @@ class ListWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___ListWorkflowExecutionsResponse = ListWorkflowExecutionsResponse
 
+@typing_extensions.final
 class ListArchivedWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4231,6 +4339,7 @@ class ListArchivedWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___ListArchivedWorkflowExecutionsRequest = ListArchivedWorkflowExecutionsRequest
 
+@typing_extensions.final
 class ListArchivedWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4261,6 +4370,7 @@ class ListArchivedWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___ListArchivedWorkflowExecutionsResponse = ListArchivedWorkflowExecutionsResponse
 
+@typing_extensions.final
 class ScanWorkflowExecutionsRequest(google.protobuf.message.Message):
     """Deprecated: Use with `ListWorkflowExecutions`."""
 
@@ -4298,6 +4408,7 @@ class ScanWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___ScanWorkflowExecutionsRequest = ScanWorkflowExecutionsRequest
 
+@typing_extensions.final
 class ScanWorkflowExecutionsResponse(google.protobuf.message.Message):
     """Deprecated: Use with `ListWorkflowExecutions`."""
 
@@ -4330,6 +4441,7 @@ class ScanWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___ScanWorkflowExecutionsResponse = ScanWorkflowExecutionsResponse
 
+@typing_extensions.final
 class CountWorkflowExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4352,9 +4464,11 @@ class CountWorkflowExecutionsRequest(google.protobuf.message.Message):
 
 global___CountWorkflowExecutionsRequest = CountWorkflowExecutionsRequest
 
+@typing_extensions.final
 class CountWorkflowExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class AggregationGroup(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4417,6 +4531,7 @@ class CountWorkflowExecutionsResponse(google.protobuf.message.Message):
 
 global___CountWorkflowExecutionsResponse = CountWorkflowExecutionsResponse
 
+@typing_extensions.final
 class GetSearchAttributesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4426,9 +4541,11 @@ class GetSearchAttributesRequest(google.protobuf.message.Message):
 
 global___GetSearchAttributesRequest = GetSearchAttributesRequest
 
+@typing_extensions.final
 class GetSearchAttributesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class KeysEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4468,6 +4585,7 @@ class GetSearchAttributesResponse(google.protobuf.message.Message):
 
 global___GetSearchAttributesResponse = GetSearchAttributesResponse
 
+@typing_extensions.final
 class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4553,6 +4671,7 @@ class RespondQueryTaskCompletedRequest(google.protobuf.message.Message):
 
 global___RespondQueryTaskCompletedRequest = RespondQueryTaskCompletedRequest
 
+@typing_extensions.final
 class RespondQueryTaskCompletedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4562,6 +4681,7 @@ class RespondQueryTaskCompletedResponse(google.protobuf.message.Message):
 
 global___RespondQueryTaskCompletedResponse = RespondQueryTaskCompletedResponse
 
+@typing_extensions.final
 class ResetStickyTaskQueueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4588,6 +4708,7 @@ class ResetStickyTaskQueueRequest(google.protobuf.message.Message):
 
 global___ResetStickyTaskQueueRequest = ResetStickyTaskQueueRequest
 
+@typing_extensions.final
 class ResetStickyTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4597,6 +4718,7 @@ class ResetStickyTaskQueueResponse(google.protobuf.message.Message):
 
 global___ResetStickyTaskQueueResponse = ResetStickyTaskQueueResponse
 
+@typing_extensions.final
 class ShutdownWorkerRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4683,6 +4805,7 @@ class ShutdownWorkerRequest(google.protobuf.message.Message):
 
 global___ShutdownWorkerRequest = ShutdownWorkerRequest
 
+@typing_extensions.final
 class ShutdownWorkerResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4692,6 +4815,7 @@ class ShutdownWorkerResponse(google.protobuf.message.Message):
 
 global___ShutdownWorkerResponse = ShutdownWorkerResponse
 
+@typing_extensions.final
 class QueryWorkflowRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4740,6 +4864,7 @@ class QueryWorkflowRequest(google.protobuf.message.Message):
 
 global___QueryWorkflowRequest = QueryWorkflowRequest
 
+@typing_extensions.final
 class QueryWorkflowResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4785,6 +4910,7 @@ class QueryWorkflowResponse(google.protobuf.message.Message):
 
 global___QueryWorkflowResponse = QueryWorkflowResponse
 
+@typing_extensions.final
 class DescribeWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4811,6 +4937,7 @@ class DescribeWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___DescribeWorkflowExecutionRequest = DescribeWorkflowExecutionRequest
 
+@typing_extensions.final
 class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -4927,6 +5054,7 @@ class DescribeWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___DescribeWorkflowExecutionResponse = DescribeWorkflowExecutionResponse
 
+@typing_extensions.final
 class DescribeTaskQueueRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0203::optional=disabled
     aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
@@ -5049,9 +5177,11 @@ class DescribeTaskQueueRequest(google.protobuf.message.Message):
 
 global___DescribeTaskQueueRequest = DescribeTaskQueueRequest
 
+@typing_extensions.final
 class DescribeTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class StatsByPriorityKeyEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5074,6 +5204,7 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
             field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
         ) -> None: ...
 
+    @typing_extensions.final
     class EffectiveRateLimit(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5105,6 +5236,7 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class VersionsInfoEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5261,6 +5393,7 @@ class DescribeTaskQueueResponse(google.protobuf.message.Message):
 
 global___DescribeTaskQueueResponse = DescribeTaskQueueResponse
 
+@typing_extensions.final
 class GetClusterInfoRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5270,11 +5403,13 @@ class GetClusterInfoRequest(google.protobuf.message.Message):
 
 global___GetClusterInfoRequest = GetClusterInfoRequest
 
+@typing_extensions.final
 class GetClusterInfoResponse(google.protobuf.message.Message):
     """GetClusterInfoResponse contains information about Temporal cluster."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class SupportedClientsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5366,6 +5501,7 @@ class GetClusterInfoResponse(google.protobuf.message.Message):
 
 global___GetClusterInfoResponse = GetClusterInfoResponse
 
+@typing_extensions.final
 class GetSystemInfoRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5375,9 +5511,11 @@ class GetSystemInfoRequest(google.protobuf.message.Message):
 
 global___GetSystemInfoRequest = GetSystemInfoRequest
 
+@typing_extensions.final
 class GetSystemInfoResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class Capabilities(google.protobuf.message.Message):
         """System capability details."""
 
@@ -5516,6 +5654,7 @@ class GetSystemInfoResponse(google.protobuf.message.Message):
 
 global___GetSystemInfoResponse = GetSystemInfoResponse
 
+@typing_extensions.final
 class ListTaskQueuePartitionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5542,6 +5681,7 @@ class ListTaskQueuePartitionsRequest(google.protobuf.message.Message):
 
 global___ListTaskQueuePartitionsRequest = ListTaskQueuePartitionsRequest
 
+@typing_extensions.final
 class ListTaskQueuePartitionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5583,6 +5723,7 @@ class ListTaskQueuePartitionsResponse(google.protobuf.message.Message):
 
 global___ListTaskQueuePartitionsResponse = ListTaskQueuePartitionsResponse
 
+@typing_extensions.final
 class CreateScheduleRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0203::optional=disabled
     aip.dev/not-precedent: field_behavior annotation not available in our gogo fork --)
@@ -5670,6 +5811,7 @@ class CreateScheduleRequest(google.protobuf.message.Message):
 
 global___CreateScheduleRequest = CreateScheduleRequest
 
+@typing_extensions.final
 class CreateScheduleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5686,6 +5828,7 @@ class CreateScheduleResponse(google.protobuf.message.Message):
 
 global___CreateScheduleResponse = CreateScheduleResponse
 
+@typing_extensions.final
 class DescribeScheduleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5710,6 +5853,7 @@ class DescribeScheduleRequest(google.protobuf.message.Message):
 
 global___DescribeScheduleRequest = DescribeScheduleRequest
 
+@typing_extensions.final
 class DescribeScheduleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5784,6 +5928,7 @@ class DescribeScheduleResponse(google.protobuf.message.Message):
 
 global___DescribeScheduleResponse = DescribeScheduleResponse
 
+@typing_extensions.final
 class UpdateScheduleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5878,6 +6023,7 @@ class UpdateScheduleRequest(google.protobuf.message.Message):
 
 global___UpdateScheduleRequest = UpdateScheduleRequest
 
+@typing_extensions.final
 class UpdateScheduleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5887,6 +6033,7 @@ class UpdateScheduleResponse(google.protobuf.message.Message):
 
 global___UpdateScheduleResponse = UpdateScheduleResponse
 
+@typing_extensions.final
 class PatchScheduleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5935,6 +6082,7 @@ class PatchScheduleRequest(google.protobuf.message.Message):
 
 global___PatchScheduleRequest = PatchScheduleRequest
 
+@typing_extensions.final
 class PatchScheduleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5944,6 +6092,7 @@ class PatchScheduleResponse(google.protobuf.message.Message):
 
 global___PatchScheduleResponse = PatchScheduleResponse
 
+@typing_extensions.final
 class ListScheduleMatchingTimesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -5990,6 +6139,7 @@ class ListScheduleMatchingTimesRequest(google.protobuf.message.Message):
 
 global___ListScheduleMatchingTimesRequest = ListScheduleMatchingTimesRequest
 
+@typing_extensions.final
 class ListScheduleMatchingTimesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6012,6 +6162,7 @@ class ListScheduleMatchingTimesResponse(google.protobuf.message.Message):
 
 global___ListScheduleMatchingTimesResponse = ListScheduleMatchingTimesResponse
 
+@typing_extensions.final
 class DeleteScheduleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6045,6 +6196,7 @@ class DeleteScheduleRequest(google.protobuf.message.Message):
 
 global___DeleteScheduleRequest = DeleteScheduleRequest
 
+@typing_extensions.final
 class DeleteScheduleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6054,6 +6206,7 @@ class DeleteScheduleResponse(google.protobuf.message.Message):
 
 global___DeleteScheduleResponse = DeleteScheduleResponse
 
+@typing_extensions.final
 class ListSchedulesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6093,6 +6246,7 @@ class ListSchedulesRequest(google.protobuf.message.Message):
 
 global___ListSchedulesRequest = ListSchedulesRequest
 
+@typing_extensions.final
 class ListSchedulesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6123,6 +6277,7 @@ class ListSchedulesResponse(google.protobuf.message.Message):
 
 global___ListSchedulesResponse = ListSchedulesResponse
 
+@typing_extensions.final
 class CountSchedulesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6146,9 +6301,11 @@ class CountSchedulesRequest(google.protobuf.message.Message):
 
 global___CountSchedulesRequest = CountSchedulesRequest
 
+@typing_extensions.final
 class CountSchedulesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class AggregationGroup(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6211,11 +6368,13 @@ class CountSchedulesResponse(google.protobuf.message.Message):
 
 global___CountSchedulesResponse = CountSchedulesResponse
 
+@typing_extensions.final
 class UpdateWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class AddNewCompatibleVersion(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6253,6 +6412,7 @@ class UpdateWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class MergeSets(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6393,6 +6553,7 @@ global___UpdateWorkerBuildIdCompatibilityRequest = (
     UpdateWorkerBuildIdCompatibilityRequest
 )
 
+@typing_extensions.final
 class UpdateWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6406,6 +6567,7 @@ global___UpdateWorkerBuildIdCompatibilityResponse = (
     UpdateWorkerBuildIdCompatibilityResponse
 )
 
+@typing_extensions.final
 class GetWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6442,6 +6604,7 @@ class GetWorkerBuildIdCompatibilityRequest(google.protobuf.message.Message):
 
 global___GetWorkerBuildIdCompatibilityRequest = GetWorkerBuildIdCompatibilityRequest
 
+@typing_extensions.final
 class GetWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6477,6 +6640,7 @@ class GetWorkerBuildIdCompatibilityResponse(google.protobuf.message.Message):
 
 global___GetWorkerBuildIdCompatibilityResponse = GetWorkerBuildIdCompatibilityResponse
 
+@typing_extensions.final
 class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134::request-mask-required=disabled
         aip.dev/not-precedent: UpdateNamespace RPC doesn't follow Google API format. --)
@@ -6487,6 +6651,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class InsertBuildIdAssignmentRule(google.protobuf.message.Message):
         """Inserts the rule to the list of assignment rules for this Task Queue.
         The rules are evaluated in order, starting from index 0. The first
@@ -6524,6 +6689,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class ReplaceBuildIdAssignmentRule(google.protobuf.message.Message):
         """Replaces the assignment rule at a given index."""
 
@@ -6562,6 +6728,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class DeleteBuildIdAssignmentRule(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6588,6 +6755,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class AddCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
         """Adds the rule to the list of redirect rules for this Task Queue. There
         can be at most one redirect rule for each distinct Source Build ID.
@@ -6613,6 +6781,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["rule", b"rule"]
         ) -> None: ...
 
+    @typing_extensions.final
     class ReplaceCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
         """Replaces the routing rule with the given source Build ID."""
 
@@ -6636,6 +6805,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             self, field_name: typing_extensions.Literal["rule", b"rule"]
         ) -> None: ...
 
+    @typing_extensions.final
     class DeleteCompatibleBuildIdRedirectRule(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -6653,6 +6823,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class CommitBuildId(google.protobuf.message.Message):
         """This command is intended to be used to complete the rollout of a Build
         ID and cleanup unnecessary rules possibly created during a gradual
@@ -6827,6 +6998,7 @@ class UpdateWorkerVersioningRulesRequest(google.protobuf.message.Message):
 
 global___UpdateWorkerVersioningRulesRequest = UpdateWorkerVersioningRulesRequest
 
+@typing_extensions.final
 class UpdateWorkerVersioningRulesResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6879,6 +7051,7 @@ class UpdateWorkerVersioningRulesResponse(google.protobuf.message.Message):
 
 global___UpdateWorkerVersioningRulesResponse = UpdateWorkerVersioningRulesResponse
 
+@typing_extensions.final
 class GetWorkerVersioningRulesRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6903,6 +7076,7 @@ class GetWorkerVersioningRulesRequest(google.protobuf.message.Message):
 
 global___GetWorkerVersioningRulesRequest = GetWorkerVersioningRulesRequest
 
+@typing_extensions.final
 class GetWorkerVersioningRulesResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]"""
 
@@ -6955,6 +7129,7 @@ class GetWorkerVersioningRulesResponse(google.protobuf.message.Message):
 
 global___GetWorkerVersioningRulesResponse = GetWorkerVersioningRulesResponse
 
+@typing_extensions.final
 class GetWorkerTaskReachabilityRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]
     Deprecated. Use `DescribeTaskQueue`.
@@ -7018,6 +7193,7 @@ class GetWorkerTaskReachabilityRequest(google.protobuf.message.Message):
 
 global___GetWorkerTaskReachabilityRequest = GetWorkerTaskReachabilityRequest
 
+@typing_extensions.final
 class GetWorkerTaskReachabilityResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release]
     Deprecated. Use `DescribeTaskQueue`.
@@ -7059,6 +7235,7 @@ class GetWorkerTaskReachabilityResponse(google.protobuf.message.Message):
 
 global___GetWorkerTaskReachabilityResponse = GetWorkerTaskReachabilityResponse
 
+@typing_extensions.final
 class UpdateWorkflowExecutionRequest(google.protobuf.message.Message):
     """(-- api-linter: core::0134=disabled
     aip.dev/not-precedent: Update RPCs don't follow Google API format. --)
@@ -7138,6 +7315,7 @@ class UpdateWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___UpdateWorkflowExecutionRequest = UpdateWorkflowExecutionRequest
 
+@typing_extensions.final
 class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7199,6 +7377,7 @@ class UpdateWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___UpdateWorkflowExecutionResponse = UpdateWorkflowExecutionResponse
 
+@typing_extensions.final
 class StartBatchOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7447,6 +7626,7 @@ class StartBatchOperationRequest(google.protobuf.message.Message):
 
 global___StartBatchOperationRequest = StartBatchOperationRequest
 
+@typing_extensions.final
 class StartBatchOperationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7456,6 +7636,7 @@ class StartBatchOperationResponse(google.protobuf.message.Message):
 
 global___StartBatchOperationResponse = StartBatchOperationResponse
 
+@typing_extensions.final
 class StopBatchOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7495,6 +7676,7 @@ class StopBatchOperationRequest(google.protobuf.message.Message):
 
 global___StopBatchOperationRequest = StopBatchOperationRequest
 
+@typing_extensions.final
 class StopBatchOperationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7504,6 +7686,7 @@ class StopBatchOperationResponse(google.protobuf.message.Message):
 
 global___StopBatchOperationResponse = StopBatchOperationResponse
 
+@typing_extensions.final
 class DescribeBatchOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7528,6 +7711,7 @@ class DescribeBatchOperationRequest(google.protobuf.message.Message):
 
 global___DescribeBatchOperationRequest = DescribeBatchOperationRequest
 
+@typing_extensions.final
 class DescribeBatchOperationResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7633,6 +7817,7 @@ class DescribeBatchOperationResponse(google.protobuf.message.Message):
 
 global___DescribeBatchOperationResponse = DescribeBatchOperationResponse
 
+@typing_extensions.final
 class ListBatchOperationsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7666,6 +7851,7 @@ class ListBatchOperationsRequest(google.protobuf.message.Message):
 
 global___ListBatchOperationsRequest = ListBatchOperationsRequest
 
+@typing_extensions.final
 class ListBatchOperationsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7697,6 +7883,7 @@ class ListBatchOperationsResponse(google.protobuf.message.Message):
 
 global___ListBatchOperationsResponse = ListBatchOperationsResponse
 
+@typing_extensions.final
 class PollWorkflowExecutionUpdateRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7748,6 +7935,7 @@ class PollWorkflowExecutionUpdateRequest(google.protobuf.message.Message):
 
 global___PollWorkflowExecutionUpdateRequest = PollWorkflowExecutionUpdateRequest
 
+@typing_extensions.final
 class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7799,6 +7987,7 @@ class PollWorkflowExecutionUpdateResponse(google.protobuf.message.Message):
 
 global___PollWorkflowExecutionUpdateResponse = PollWorkflowExecutionUpdateResponse
 
+@typing_extensions.final
 class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7897,6 +8086,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
 
 global___PollNexusTaskQueueRequest = PollNexusTaskQueueRequest
 
+@typing_extensions.final
 class PollNexusTaskQueueResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -7993,6 +8183,7 @@ class PollNexusTaskQueueResponse(google.protobuf.message.Message):
 
 global___PollNexusTaskQueueResponse = PollNexusTaskQueueResponse
 
+@typing_extensions.final
 class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8043,6 +8234,7 @@ class RespondNexusTaskCompletedRequest(google.protobuf.message.Message):
 
 global___RespondNexusTaskCompletedRequest = RespondNexusTaskCompletedRequest
 
+@typing_extensions.final
 class RespondNexusTaskCompletedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8052,6 +8244,7 @@ class RespondNexusTaskCompletedResponse(google.protobuf.message.Message):
 
 global___RespondNexusTaskCompletedResponse = RespondNexusTaskCompletedResponse
 
+@typing_extensions.final
 class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8110,6 +8303,7 @@ class RespondNexusTaskFailedRequest(google.protobuf.message.Message):
 
 global___RespondNexusTaskFailedRequest = RespondNexusTaskFailedRequest
 
+@typing_extensions.final
 class RespondNexusTaskFailedResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8119,9 +8313,11 @@ class RespondNexusTaskFailedResponse(google.protobuf.message.Message):
 
 global___RespondNexusTaskFailedResponse = RespondNexusTaskFailedResponse
 
+@typing_extensions.final
 class ExecuteMultiOperationRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class Operation(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8217,6 +8413,7 @@ class ExecuteMultiOperationRequest(google.protobuf.message.Message):
 
 global___ExecuteMultiOperationRequest = ExecuteMultiOperationRequest
 
+@typing_extensions.final
 class ExecuteMultiOperationResponse(google.protobuf.message.Message):
     """IMPORTANT: For [StartWorkflow, UpdateWorkflow] combination ("Update-with-Start") when both
       1. the workflow update for the requested update ID has already completed, and
@@ -8228,6 +8425,7 @@ class ExecuteMultiOperationResponse(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class Response(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8290,6 +8488,7 @@ class ExecuteMultiOperationResponse(google.protobuf.message.Message):
 
 global___ExecuteMultiOperationResponse = ExecuteMultiOperationResponse
 
+@typing_extensions.final
 class UpdateActivityOptionsRequest(google.protobuf.message.Message):
     """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationUpdateActivityOptions
     Deprecated. Use `UpdateActivityExecutionOptionsRequest`.
@@ -8398,6 +8597,7 @@ class UpdateActivityOptionsRequest(google.protobuf.message.Message):
 
 global___UpdateActivityOptionsRequest = UpdateActivityOptionsRequest
 
+@typing_extensions.final
 class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8491,6 +8691,7 @@ class UpdateActivityExecutionOptionsRequest(google.protobuf.message.Message):
 
 global___UpdateActivityExecutionOptionsRequest = UpdateActivityExecutionOptionsRequest
 
+@typing_extensions.final
 class UpdateActivityOptionsResponse(google.protobuf.message.Message):
     """Deprecated. Use `UpdateActivityExecutionOptionsResponse`."""
 
@@ -8519,6 +8720,7 @@ class UpdateActivityOptionsResponse(google.protobuf.message.Message):
 
 global___UpdateActivityOptionsResponse = UpdateActivityOptionsResponse
 
+@typing_extensions.final
 class UpdateActivityExecutionOptionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8545,6 +8747,7 @@ class UpdateActivityExecutionOptionsResponse(google.protobuf.message.Message):
 
 global___UpdateActivityExecutionOptionsResponse = UpdateActivityExecutionOptionsResponse
 
+@typing_extensions.final
 class PauseActivityRequest(google.protobuf.message.Message):
     """Deprecated. Use `PauseActivityExecutionRequest`."""
 
@@ -8625,6 +8828,7 @@ class PauseActivityRequest(google.protobuf.message.Message):
 
 global___PauseActivityRequest = PauseActivityRequest
 
+@typing_extensions.final
 class PauseActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8690,6 +8894,7 @@ class PauseActivityExecutionRequest(google.protobuf.message.Message):
 
 global___PauseActivityExecutionRequest = PauseActivityExecutionRequest
 
+@typing_extensions.final
 class PauseActivityResponse(google.protobuf.message.Message):
     """Deprecated. Use `PauseActivityExecutionResponse`."""
 
@@ -8701,6 +8906,7 @@ class PauseActivityResponse(google.protobuf.message.Message):
 
 global___PauseActivityResponse = PauseActivityResponse
 
+@typing_extensions.final
 class PauseActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8710,6 +8916,7 @@ class PauseActivityExecutionResponse(google.protobuf.message.Message):
 
 global___PauseActivityExecutionResponse = PauseActivityExecutionResponse
 
+@typing_extensions.final
 class UnpauseActivityRequest(google.protobuf.message.Message):
     """Deprecated. Use `UnpauseActivityExecutionRequest`."""
 
@@ -8805,6 +9012,7 @@ class UnpauseActivityRequest(google.protobuf.message.Message):
 
 global___UnpauseActivityRequest = UnpauseActivityRequest
 
+@typing_extensions.final
 class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8880,6 +9088,7 @@ class UnpauseActivityExecutionRequest(google.protobuf.message.Message):
 
 global___UnpauseActivityExecutionRequest = UnpauseActivityExecutionRequest
 
+@typing_extensions.final
 class UnpauseActivityResponse(google.protobuf.message.Message):
     """Deprecated. Use `UnpauseActivityExecutionResponse`."""
 
@@ -8891,6 +9100,7 @@ class UnpauseActivityResponse(google.protobuf.message.Message):
 
 global___UnpauseActivityResponse = UnpauseActivityResponse
 
+@typing_extensions.final
 class UnpauseActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -8900,6 +9110,7 @@ class UnpauseActivityExecutionResponse(google.protobuf.message.Message):
 
 global___UnpauseActivityExecutionResponse = UnpauseActivityExecutionResponse
 
+@typing_extensions.final
 class ResetActivityRequest(google.protobuf.message.Message):
     """NOTE: keep in sync with temporalio.api.batch.v1.BatchOperationResetActivities
     Deprecated. Use `ResetActivityExecutionRequest`.
@@ -9010,6 +9221,7 @@ class ResetActivityRequest(google.protobuf.message.Message):
 
 global___ResetActivityRequest = ResetActivityRequest
 
+@typing_extensions.final
 class ResetActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9105,6 +9317,7 @@ class ResetActivityExecutionRequest(google.protobuf.message.Message):
 
 global___ResetActivityExecutionRequest = ResetActivityExecutionRequest
 
+@typing_extensions.final
 class ResetActivityResponse(google.protobuf.message.Message):
     """Deprecated. Use `ResetActivityExecutionRequest`."""
 
@@ -9116,6 +9329,7 @@ class ResetActivityResponse(google.protobuf.message.Message):
 
 global___ResetActivityResponse = ResetActivityResponse
 
+@typing_extensions.final
 class ResetActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9125,6 +9339,7 @@ class ResetActivityExecutionResponse(google.protobuf.message.Message):
 
 global___ResetActivityExecutionResponse = ResetActivityExecutionResponse
 
+@typing_extensions.final
 class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
     """Keep the parameters in sync with:
     - temporalio.api.batch.v1.BatchOperationUpdateWorkflowExecutionOptions.
@@ -9200,6 +9415,7 @@ class UpdateWorkflowExecutionOptionsRequest(google.protobuf.message.Message):
 
 global___UpdateWorkflowExecutionOptionsRequest = UpdateWorkflowExecutionOptionsRequest
 
+@typing_extensions.final
 class UpdateWorkflowExecutionOptionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9246,6 +9462,7 @@ class UpdateWorkflowExecutionOptionsResponse(google.protobuf.message.Message):
 
 global___UpdateWorkflowExecutionOptionsResponse = UpdateWorkflowExecutionOptionsResponse
 
+@typing_extensions.final
 class DescribeDeploymentRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9274,6 +9491,7 @@ class DescribeDeploymentRequest(google.protobuf.message.Message):
 
 global___DescribeDeploymentRequest = DescribeDeploymentRequest
 
+@typing_extensions.final
 class DescribeDeploymentResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9301,6 +9519,7 @@ class DescribeDeploymentResponse(google.protobuf.message.Message):
 
 global___DescribeDeploymentResponse = DescribeDeploymentResponse
 
+@typing_extensions.final
 class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9349,14 +9568,17 @@ class DescribeWorkerDeploymentVersionRequest(google.protobuf.message.Message):
 
 global___DescribeWorkerDeploymentVersionRequest = DescribeWorkerDeploymentVersionRequest
 
+@typing_extensions.final
 class DescribeWorkerDeploymentVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class VersionTaskQueue(google.protobuf.message.Message):
         """(-- api-linter: core::0123::resource-annotation=disabled --)"""
 
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+        @typing_extensions.final
         class StatsByPriorityKeyEntry(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9473,6 +9695,7 @@ global___DescribeWorkerDeploymentVersionResponse = (
     DescribeWorkerDeploymentVersionResponse
 )
 
+@typing_extensions.final
 class DescribeWorkerDeploymentRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9495,6 +9718,7 @@ class DescribeWorkerDeploymentRequest(google.protobuf.message.Message):
 
 global___DescribeWorkerDeploymentRequest = DescribeWorkerDeploymentRequest
 
+@typing_extensions.final
 class DescribeWorkerDeploymentResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9534,6 +9758,7 @@ class DescribeWorkerDeploymentResponse(google.protobuf.message.Message):
 
 global___DescribeWorkerDeploymentResponse = DescribeWorkerDeploymentResponse
 
+@typing_extensions.final
 class ListDeploymentsRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9572,6 +9797,7 @@ class ListDeploymentsRequest(google.protobuf.message.Message):
 
 global___ListDeploymentsRequest = ListDeploymentsRequest
 
+@typing_extensions.final
 class ListDeploymentsResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9604,6 +9830,7 @@ class ListDeploymentsResponse(google.protobuf.message.Message):
 
 global___ListDeploymentsResponse = ListDeploymentsResponse
 
+@typing_extensions.final
 class SetCurrentDeploymentRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9657,6 +9884,7 @@ class SetCurrentDeploymentRequest(google.protobuf.message.Message):
 
 global___SetCurrentDeploymentRequest = SetCurrentDeploymentRequest
 
+@typing_extensions.final
 class SetCurrentDeploymentResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -9702,6 +9930,7 @@ class SetCurrentDeploymentResponse(google.protobuf.message.Message):
 
 global___SetCurrentDeploymentResponse = SetCurrentDeploymentResponse
 
+@typing_extensions.final
 class SetWorkerDeploymentCurrentVersionRequest(google.protobuf.message.Message):
     """Set/unset the Current Version of a Worker Deployment."""
 
@@ -9790,6 +10019,7 @@ global___SetWorkerDeploymentCurrentVersionRequest = (
     SetWorkerDeploymentCurrentVersionRequest
 )
 
+@typing_extensions.final
 class SetWorkerDeploymentCurrentVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -9843,6 +10073,7 @@ global___SetWorkerDeploymentCurrentVersionResponse = (
     SetWorkerDeploymentCurrentVersionResponse
 )
 
+@typing_extensions.final
 class SetWorkerDeploymentRampingVersionRequest(google.protobuf.message.Message):
     """Set/unset the Ramping Version of a Worker Deployment and its ramp percentage."""
 
@@ -9940,6 +10171,7 @@ global___SetWorkerDeploymentRampingVersionRequest = (
     SetWorkerDeploymentRampingVersionRequest
 )
 
+@typing_extensions.final
 class SetWorkerDeploymentRampingVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10004,6 +10236,7 @@ global___SetWorkerDeploymentRampingVersionResponse = (
     SetWorkerDeploymentRampingVersionResponse
 )
 
+@typing_extensions.final
 class CreateWorkerDeploymentRequest(google.protobuf.message.Message):
     """Creates a new WorkerDeployment."""
 
@@ -10046,6 +10279,7 @@ class CreateWorkerDeploymentRequest(google.protobuf.message.Message):
 
 global___CreateWorkerDeploymentRequest = CreateWorkerDeploymentRequest
 
+@typing_extensions.final
 class CreateWorkerDeploymentResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10066,6 +10300,7 @@ class CreateWorkerDeploymentResponse(google.protobuf.message.Message):
 
 global___CreateWorkerDeploymentResponse = CreateWorkerDeploymentResponse
 
+@typing_extensions.final
 class ListWorkerDeploymentsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10096,9 +10331,11 @@ class ListWorkerDeploymentsRequest(google.protobuf.message.Message):
 
 global___ListWorkerDeploymentsRequest = ListWorkerDeploymentsRequest
 
+@typing_extensions.final
 class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class WorkerDeploymentSummary(google.protobuf.message.Message):
         """(-- api-linter: core::0123::resource-annotation=disabled --)
         A subset of WorkerDeploymentInfo
@@ -10212,6 +10449,7 @@ class ListWorkerDeploymentsResponse(google.protobuf.message.Message):
 
 global___ListWorkerDeploymentsResponse = ListWorkerDeploymentsResponse
 
+@typing_extensions.final
 class CreateWorkerDeploymentVersionRequest(google.protobuf.message.Message):
     """Creates a new WorkerDeploymentVersion."""
 
@@ -10277,6 +10515,7 @@ class CreateWorkerDeploymentVersionRequest(google.protobuf.message.Message):
 
 global___CreateWorkerDeploymentVersionRequest = CreateWorkerDeploymentVersionRequest
 
+@typing_extensions.final
 class CreateWorkerDeploymentVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10286,6 +10525,7 @@ class CreateWorkerDeploymentVersionResponse(google.protobuf.message.Message):
 
 global___CreateWorkerDeploymentVersionResponse = CreateWorkerDeploymentVersionResponse
 
+@typing_extensions.final
 class DeleteWorkerDeploymentVersionRequest(google.protobuf.message.Message):
     """Used for manual deletion of Versions. User can delete a Version only when all the
     following conditions are met:
@@ -10350,6 +10590,7 @@ class DeleteWorkerDeploymentVersionRequest(google.protobuf.message.Message):
 
 global___DeleteWorkerDeploymentVersionRequest = DeleteWorkerDeploymentVersionRequest
 
+@typing_extensions.final
 class DeleteWorkerDeploymentVersionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10359,6 +10600,7 @@ class DeleteWorkerDeploymentVersionResponse(google.protobuf.message.Message):
 
 global___DeleteWorkerDeploymentVersionResponse = DeleteWorkerDeploymentVersionResponse
 
+@typing_extensions.final
 class DeleteWorkerDeploymentRequest(google.protobuf.message.Message):
     """Deletes records of (an old) Deployment. A deployment can only be deleted if
     it has no Version in it.
@@ -10394,6 +10636,7 @@ class DeleteWorkerDeploymentRequest(google.protobuf.message.Message):
 
 global___DeleteWorkerDeploymentRequest = DeleteWorkerDeploymentRequest
 
+@typing_extensions.final
 class DeleteWorkerDeploymentResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10403,6 +10646,7 @@ class DeleteWorkerDeploymentResponse(google.protobuf.message.Message):
 
 global___DeleteWorkerDeploymentResponse = DeleteWorkerDeploymentResponse
 
+@typing_extensions.final
 class UpdateWorkerDeploymentVersionComputeConfigRequest(
     google.protobuf.message.Message
 ):
@@ -10410,6 +10654,7 @@ class UpdateWorkerDeploymentVersionComputeConfigRequest(
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class ComputeConfigScalingGroupsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10513,6 +10758,7 @@ global___UpdateWorkerDeploymentVersionComputeConfigRequest = (
     UpdateWorkerDeploymentVersionComputeConfigRequest
 )
 
+@typing_extensions.final
 class UpdateWorkerDeploymentVersionComputeConfigResponse(
     google.protobuf.message.Message
 ):
@@ -10526,6 +10772,7 @@ global___UpdateWorkerDeploymentVersionComputeConfigResponse = (
     UpdateWorkerDeploymentVersionComputeConfigResponse
 )
 
+@typing_extensions.final
 class ValidateWorkerDeploymentVersionComputeConfigRequest(
     google.protobuf.message.Message
 ):
@@ -10533,6 +10780,7 @@ class ValidateWorkerDeploymentVersionComputeConfigRequest(
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class ComputeConfigScalingGroupsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10627,6 +10875,7 @@ global___ValidateWorkerDeploymentVersionComputeConfigRequest = (
     ValidateWorkerDeploymentVersionComputeConfigRequest
 )
 
+@typing_extensions.final
 class ValidateWorkerDeploymentVersionComputeConfigResponse(
     google.protobuf.message.Message
 ):
@@ -10640,11 +10889,13 @@ global___ValidateWorkerDeploymentVersionComputeConfigResponse = (
     ValidateWorkerDeploymentVersionComputeConfigResponse
 )
 
+@typing_extensions.final
 class UpdateWorkerDeploymentVersionMetadataRequest(google.protobuf.message.Message):
     """Used to update the user-defined metadata of a Worker Deployment Version."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class UpsertEntriesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10736,6 +10987,7 @@ global___UpdateWorkerDeploymentVersionMetadataRequest = (
     UpdateWorkerDeploymentVersionMetadataRequest
 )
 
+@typing_extensions.final
 class UpdateWorkerDeploymentVersionMetadataResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10759,6 +11011,7 @@ global___UpdateWorkerDeploymentVersionMetadataResponse = (
     UpdateWorkerDeploymentVersionMetadataResponse
 )
 
+@typing_extensions.final
 class SetWorkerDeploymentManagerRequest(google.protobuf.message.Message):
     """Update the ManagerIdentity of a Worker Deployment."""
 
@@ -10787,8 +11040,7 @@ class SetWorkerDeploymentManagerRequest(google.protobuf.message.Message):
     identity: builtins.str
     """Required. The identity of the client who initiated this request."""
     def __init__(
-        # pyright: reportSelfClsParameterName=false
-        self_,
+        self_,  # pyright: ignore[reportSelfClsParameterName]
         *,
         namespace: builtins.str = ...,
         deployment_name: builtins.str = ...,
@@ -10836,6 +11088,7 @@ class SetWorkerDeploymentManagerRequest(google.protobuf.message.Message):
 
 global___SetWorkerDeploymentManagerRequest = SetWorkerDeploymentManagerRequest
 
+@typing_extensions.final
 class SetWorkerDeploymentManagerResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -10871,6 +11124,7 @@ class SetWorkerDeploymentManagerResponse(google.protobuf.message.Message):
 
 global___SetWorkerDeploymentManagerResponse = SetWorkerDeploymentManagerResponse
 
+@typing_extensions.final
 class GetCurrentDeploymentRequest(google.protobuf.message.Message):
     """Returns the Current Deployment of a deployment series.
     [cleanup-wv-pre-release] Pre-release deployment APIs, clean up later
@@ -10897,6 +11151,7 @@ class GetCurrentDeploymentRequest(google.protobuf.message.Message):
 
 global___GetCurrentDeploymentRequest = GetCurrentDeploymentRequest
 
+@typing_extensions.final
 class GetCurrentDeploymentResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -10928,6 +11183,7 @@ class GetCurrentDeploymentResponse(google.protobuf.message.Message):
 
 global___GetCurrentDeploymentResponse = GetCurrentDeploymentResponse
 
+@typing_extensions.final
 class GetDeploymentReachabilityRequest(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -10956,6 +11212,7 @@ class GetDeploymentReachabilityRequest(google.protobuf.message.Message):
 
 global___GetDeploymentReachabilityRequest = GetDeploymentReachabilityRequest
 
+@typing_extensions.final
 class GetDeploymentReachabilityResponse(google.protobuf.message.Message):
     """[cleanup-wv-pre-release] Pre-release deployment APIs, clean up later"""
 
@@ -11007,6 +11264,7 @@ class GetDeploymentReachabilityResponse(google.protobuf.message.Message):
 
 global___GetDeploymentReachabilityResponse = GetDeploymentReachabilityResponse
 
+@typing_extensions.final
 class CreateWorkflowRuleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11064,6 +11322,7 @@ class CreateWorkflowRuleRequest(google.protobuf.message.Message):
 
 global___CreateWorkflowRuleRequest = CreateWorkflowRuleRequest
 
+@typing_extensions.final
 class CreateWorkflowRuleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11090,6 +11349,7 @@ class CreateWorkflowRuleResponse(google.protobuf.message.Message):
 
 global___CreateWorkflowRuleResponse = CreateWorkflowRuleResponse
 
+@typing_extensions.final
 class DescribeWorkflowRuleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11113,6 +11373,7 @@ class DescribeWorkflowRuleRequest(google.protobuf.message.Message):
 
 global___DescribeWorkflowRuleRequest = DescribeWorkflowRuleRequest
 
+@typing_extensions.final
 class DescribeWorkflowRuleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11134,6 +11395,7 @@ class DescribeWorkflowRuleResponse(google.protobuf.message.Message):
 
 global___DescribeWorkflowRuleResponse = DescribeWorkflowRuleResponse
 
+@typing_extensions.final
 class DeleteWorkflowRuleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11157,6 +11419,7 @@ class DeleteWorkflowRuleRequest(google.protobuf.message.Message):
 
 global___DeleteWorkflowRuleRequest = DeleteWorkflowRuleRequest
 
+@typing_extensions.final
 class DeleteWorkflowRuleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11166,6 +11429,7 @@ class DeleteWorkflowRuleResponse(google.protobuf.message.Message):
 
 global___DeleteWorkflowRuleResponse = DeleteWorkflowRuleResponse
 
+@typing_extensions.final
 class ListWorkflowRulesRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11188,6 +11452,7 @@ class ListWorkflowRulesRequest(google.protobuf.message.Message):
 
 global___ListWorkflowRulesRequest = ListWorkflowRulesRequest
 
+@typing_extensions.final
 class ListWorkflowRulesResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11218,6 +11483,7 @@ class ListWorkflowRulesResponse(google.protobuf.message.Message):
 
 global___ListWorkflowRulesResponse = ListWorkflowRulesResponse
 
+@typing_extensions.final
 class TriggerWorkflowRuleRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11274,6 +11540,7 @@ class TriggerWorkflowRuleRequest(google.protobuf.message.Message):
 
 global___TriggerWorkflowRuleRequest = TriggerWorkflowRuleRequest
 
+@typing_extensions.final
 class TriggerWorkflowRuleResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11291,6 +11558,7 @@ class TriggerWorkflowRuleResponse(google.protobuf.message.Message):
 
 global___TriggerWorkflowRuleResponse = TriggerWorkflowRuleResponse
 
+@typing_extensions.final
 class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11337,6 +11605,7 @@ class RecordWorkerHeartbeatRequest(google.protobuf.message.Message):
 
 global___RecordWorkerHeartbeatRequest = RecordWorkerHeartbeatRequest
 
+@typing_extensions.final
 class RecordWorkerHeartbeatResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11346,6 +11615,7 @@ class RecordWorkerHeartbeatResponse(google.protobuf.message.Message):
 
 global___RecordWorkerHeartbeatResponse = RecordWorkerHeartbeatResponse
 
+@typing_extensions.final
 class ListWorkersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11402,6 +11672,7 @@ class ListWorkersRequest(google.protobuf.message.Message):
 
 global___ListWorkersRequest = ListWorkersRequest
 
+@typing_extensions.final
 class ListWorkersResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11453,9 +11724,11 @@ class ListWorkersResponse(google.protobuf.message.Message):
 
 global___ListWorkersResponse = ListWorkersResponse
 
+@typing_extensions.final
 class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class RateLimitUpdate(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11482,6 +11755,7 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing_extensions.final
     class SetFairnessWeightOverridesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11596,6 +11870,7 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
 
 global___UpdateTaskQueueConfigRequest = UpdateTaskQueueConfigRequest
 
+@typing_extensions.final
 class UpdateTaskQueueConfigResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11616,6 +11891,7 @@ class UpdateTaskQueueConfigResponse(google.protobuf.message.Message):
 
 global___UpdateTaskQueueConfigResponse = UpdateTaskQueueConfigResponse
 
+@typing_extensions.final
 class FetchWorkerConfigRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11667,6 +11943,7 @@ class FetchWorkerConfigRequest(google.protobuf.message.Message):
 
 global___FetchWorkerConfigRequest = FetchWorkerConfigRequest
 
+@typing_extensions.final
 class FetchWorkerConfigResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11689,6 +11966,7 @@ class FetchWorkerConfigResponse(google.protobuf.message.Message):
 
 global___FetchWorkerConfigResponse = FetchWorkerConfigResponse
 
+@typing_extensions.final
 class UpdateWorkerConfigRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11763,6 +12041,7 @@ class UpdateWorkerConfigRequest(google.protobuf.message.Message):
 
 global___UpdateWorkerConfigRequest = UpdateWorkerConfigRequest
 
+@typing_extensions.final
 class UpdateWorkerConfigResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11794,6 +12073,7 @@ class UpdateWorkerConfigResponse(google.protobuf.message.Message):
 
 global___UpdateWorkerConfigResponse = UpdateWorkerConfigResponse
 
+@typing_extensions.final
 class DescribeWorkerRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11818,6 +12098,7 @@ class DescribeWorkerRequest(google.protobuf.message.Message):
 
 global___DescribeWorkerRequest = DescribeWorkerRequest
 
+@typing_extensions.final
 class DescribeWorkerResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11838,6 +12119,7 @@ class DescribeWorkerResponse(google.protobuf.message.Message):
 
 global___DescribeWorkerResponse = DescribeWorkerResponse
 
+@typing_extensions.final
 class CountWorkersRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11874,6 +12156,7 @@ class CountWorkersRequest(google.protobuf.message.Message):
 
 global___CountWorkersRequest = CountWorkersRequest
 
+@typing_extensions.final
 class CountWorkersResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -11891,6 +12174,7 @@ class CountWorkersResponse(google.protobuf.message.Message):
 
 global___CountWorkersResponse = CountWorkersResponse
 
+@typing_extensions.final
 class PauseWorkflowExecutionRequest(google.protobuf.message.Message):
     """Request to pause a workflow execution."""
 
@@ -11944,6 +12228,7 @@ class PauseWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___PauseWorkflowExecutionRequest = PauseWorkflowExecutionRequest
 
+@typing_extensions.final
 class PauseWorkflowExecutionResponse(google.protobuf.message.Message):
     """Response to a successful PauseWorkflowExecution request."""
 
@@ -11955,6 +12240,7 @@ class PauseWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___PauseWorkflowExecutionResponse = PauseWorkflowExecutionResponse
 
+@typing_extensions.final
 class UnpauseWorkflowExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12006,6 +12292,7 @@ class UnpauseWorkflowExecutionRequest(google.protobuf.message.Message):
 
 global___UnpauseWorkflowExecutionRequest = UnpauseWorkflowExecutionRequest
 
+@typing_extensions.final
 class UnpauseWorkflowExecutionResponse(google.protobuf.message.Message):
     """Response to a successful UnpauseWorkflowExecution request."""
 
@@ -12017,6 +12304,7 @@ class UnpauseWorkflowExecutionResponse(google.protobuf.message.Message):
 
 global___UnpauseWorkflowExecutionResponse = UnpauseWorkflowExecutionResponse
 
+@typing_extensions.final
 class StartActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12285,6 +12573,7 @@ class StartActivityExecutionRequest(google.protobuf.message.Message):
 
 global___StartActivityExecutionRequest = StartActivityExecutionRequest
 
+@typing_extensions.final
 class StartActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12334,6 +12623,7 @@ class StartActivityExecutionResponse(google.protobuf.message.Message):
 
 global___StartActivityExecutionResponse = StartActivityExecutionResponse
 
+@typing_extensions.final
 class DescribeActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12401,6 +12691,7 @@ class DescribeActivityExecutionRequest(google.protobuf.message.Message):
 
 global___DescribeActivityExecutionRequest = DescribeActivityExecutionRequest
 
+@typing_extensions.final
 class DescribeActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12476,6 +12767,7 @@ class DescribeActivityExecutionResponse(google.protobuf.message.Message):
 
 global___DescribeActivityExecutionResponse = DescribeActivityExecutionResponse
 
+@typing_extensions.final
 class PollActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12507,6 +12799,7 @@ class PollActivityExecutionRequest(google.protobuf.message.Message):
 
 global___PollActivityExecutionRequest = PollActivityExecutionRequest
 
+@typing_extensions.final
 class PollActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12556,6 +12849,7 @@ class PollActivityExecutionResponse(google.protobuf.message.Message):
 
 global___PollActivityExecutionResponse = PollActivityExecutionResponse
 
+@typing_extensions.final
 class ListActivityExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12594,6 +12888,7 @@ class ListActivityExecutionsRequest(google.protobuf.message.Message):
 
 global___ListActivityExecutionsRequest = ListActivityExecutionsRequest
 
+@typing_extensions.final
 class ListActivityExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12625,9 +12920,11 @@ class ListActivityExecutionsResponse(google.protobuf.message.Message):
 
 global___ListActivityExecutionsResponse = ListActivityExecutionsResponse
 
+@typing_extensions.final
 class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class NexusHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12862,6 +13159,7 @@ class StartNexusOperationExecutionRequest(google.protobuf.message.Message):
 
 global___StartNexusOperationExecutionRequest = StartNexusOperationExecutionRequest
 
+@typing_extensions.final
 class StartNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12886,6 +13184,7 @@ class StartNexusOperationExecutionResponse(google.protobuf.message.Message):
 
 global___StartNexusOperationExecutionResponse = StartNexusOperationExecutionResponse
 
+@typing_extensions.final
 class DescribeNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -12941,6 +13240,7 @@ class DescribeNexusOperationExecutionRequest(google.protobuf.message.Message):
 
 global___DescribeNexusOperationExecutionRequest = DescribeNexusOperationExecutionRequest
 
+@typing_extensions.final
 class DescribeNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13037,6 +13337,7 @@ global___DescribeNexusOperationExecutionResponse = (
     DescribeNexusOperationExecutionResponse
 )
 
+@typing_extensions.final
 class PollNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13074,6 +13375,7 @@ class PollNexusOperationExecutionRequest(google.protobuf.message.Message):
 
 global___PollNexusOperationExecutionRequest = PollNexusOperationExecutionRequest
 
+@typing_extensions.final
 class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13151,6 +13453,7 @@ class PollNexusOperationExecutionResponse(google.protobuf.message.Message):
 
 global___PollNexusOperationExecutionResponse = PollNexusOperationExecutionResponse
 
+@typing_extensions.final
 class ListNexusOperationExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13203,6 +13506,7 @@ class ListNexusOperationExecutionsRequest(google.protobuf.message.Message):
 
 global___ListNexusOperationExecutionsRequest = ListNexusOperationExecutionsRequest
 
+@typing_extensions.final
 class ListNexusOperationExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13234,6 +13538,7 @@ class ListNexusOperationExecutionsResponse(google.protobuf.message.Message):
 
 global___ListNexusOperationExecutionsResponse = ListNexusOperationExecutionsResponse
 
+@typing_extensions.final
 class CountActivityExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13257,9 +13562,11 @@ class CountActivityExecutionsRequest(google.protobuf.message.Message):
 
 global___CountActivityExecutionsRequest = CountActivityExecutionsRequest
 
+@typing_extensions.final
 class CountActivityExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class AggregationGroup(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13322,6 +13629,7 @@ class CountActivityExecutionsResponse(google.protobuf.message.Message):
 
 global___CountActivityExecutionsResponse = CountActivityExecutionsResponse
 
+@typing_extensions.final
 class CountNexusOperationExecutionsRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13347,9 +13655,11 @@ class CountNexusOperationExecutionsRequest(google.protobuf.message.Message):
 
 global___CountNexusOperationExecutionsRequest = CountNexusOperationExecutionsRequest
 
+@typing_extensions.final
 class CountNexusOperationExecutionsResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class AggregationGroup(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13412,6 +13722,7 @@ class CountNexusOperationExecutionsResponse(google.protobuf.message.Message):
 
 global___CountNexusOperationExecutionsResponse = CountNexusOperationExecutionsResponse
 
+@typing_extensions.final
 class RequestCancelActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13463,6 +13774,7 @@ class RequestCancelActivityExecutionRequest(google.protobuf.message.Message):
 
 global___RequestCancelActivityExecutionRequest = RequestCancelActivityExecutionRequest
 
+@typing_extensions.final
 class RequestCancelActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13472,6 +13784,7 @@ class RequestCancelActivityExecutionResponse(google.protobuf.message.Message):
 
 global___RequestCancelActivityExecutionResponse = RequestCancelActivityExecutionResponse
 
+@typing_extensions.final
 class TerminateActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13521,6 +13834,7 @@ class TerminateActivityExecutionRequest(google.protobuf.message.Message):
 
 global___TerminateActivityExecutionRequest = TerminateActivityExecutionRequest
 
+@typing_extensions.final
 class TerminateActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13530,6 +13844,7 @@ class TerminateActivityExecutionResponse(google.protobuf.message.Message):
 
 global___TerminateActivityExecutionResponse = TerminateActivityExecutionResponse
 
+@typing_extensions.final
 class DeleteActivityExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13561,6 +13876,7 @@ class DeleteActivityExecutionRequest(google.protobuf.message.Message):
 
 global___DeleteActivityExecutionRequest = DeleteActivityExecutionRequest
 
+@typing_extensions.final
 class DeleteActivityExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13570,6 +13886,7 @@ class DeleteActivityExecutionResponse(google.protobuf.message.Message):
 
 global___DeleteActivityExecutionResponse = DeleteActivityExecutionResponse
 
+@typing_extensions.final
 class RequestCancelNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13621,6 +13938,7 @@ global___RequestCancelNexusOperationExecutionRequest = (
     RequestCancelNexusOperationExecutionRequest
 )
 
+@typing_extensions.final
 class RequestCancelNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13632,6 +13950,7 @@ global___RequestCancelNexusOperationExecutionResponse = (
     RequestCancelNexusOperationExecutionResponse
 )
 
+@typing_extensions.final
 class TerminateNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13683,6 +14002,7 @@ global___TerminateNexusOperationExecutionRequest = (
     TerminateNexusOperationExecutionRequest
 )
 
+@typing_extensions.final
 class TerminateNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13694,6 +14014,7 @@ global___TerminateNexusOperationExecutionResponse = (
     TerminateNexusOperationExecutionResponse
 )
 
+@typing_extensions.final
 class DeleteNexusOperationExecutionRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13725,6 +14046,7 @@ class DeleteNexusOperationExecutionRequest(google.protobuf.message.Message):
 
 global___DeleteNexusOperationExecutionRequest = DeleteNexusOperationExecutionRequest
 
+@typing_extensions.final
 class DeleteNexusOperationExecutionResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -13734,6 +14056,7 @@ class DeleteNexusOperationExecutionResponse(google.protobuf.message.Message):
 
 global___DeleteNexusOperationExecutionResponse = DeleteNexusOperationExecutionResponse
 
+@typing_extensions.final
 class PollWorkflowExecutionTimeSkippingRequest(google.protobuf.message.Message):
     """A long-poll request that blocks according to a time-skipping waiting policy on the workflow
     execution. Currently the only supported policy is waiting for completion of the fast-forward
@@ -13785,6 +14108,7 @@ global___PollWorkflowExecutionTimeSkippingRequest = (
     PollWorkflowExecutionTimeSkippingRequest
 )
 
+@typing_extensions.final
 class PollWorkflowExecutionTimeSkippingResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
