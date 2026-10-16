@@ -557,6 +557,7 @@ Some things to note about driver selection:
 ###### Built-in Drivers
 
 - **[S3 Storage Driver](temporalio/contrib/aws/s3driver/)**: ⚠️ **Experimental** ⚠️ Amazon S3 driver. Ships with an aioboto3 client, or bring your own by subclassing `S3StorageDriverClient`.
+- **[GCS Storage Driver](temporalio/contrib/gcp/gcsdriver/)**: ⚠️ **Experimental** ⚠️ Google Cloud Storage driver. Ships with a gcloud-aio-storage client adapter, or bring your own by subclassing `GCSStorageDriverClient`.
 
 ###### Custom Drivers
 
