@@ -89,6 +89,53 @@ class PollerBehaviorAutoscaling:
 PollerBehavior: TypeAlias = PollerBehaviorSimpleMaximum | PollerBehaviorAutoscaling
 
 
+@dataclass
+class SessionWorkerOptions:
+    """Experimental options enabling sticky activities for session workers.
+
+    Passing an instance to :py:class:`Worker` enables session worker support.
+    This requires workflows, remote activities, and a nonzero workflow cache.
+    """
+
+    def _to_bridge(self) -> temporalio.bridge.worker.SessionWorkerOptions:
+        return temporalio.bridge.worker.SessionWorkerOptions()
+
+
+@dataclass
+class ExperimentalWorkerAffinityOptions:
+    """Short-lived experimental worker affinity controls.
+
+    This API is expected to be substantially redesigned or removed as sessions
+    evolve. Applications using it should expect migration work in future releases.
+    """
+
+    sticky_queue_name: str | None = None
+    """Override the workflow sticky queue name, also used for sticky activities
+    when session worker support is enabled.
+
+    The name must be nonempty and unique to one live worker, but should remain
+    stable across that worker's restarts to preserve the server's routing
+    association. Sharing a name between live workers defeats worker affinity.
+    Requires a nonzero workflow cache.
+    """
+
+    single_workflow_mode: bool = False
+    """Poll only sticky workflow and activity queues, dedicating this worker to
+    one workflow. Nexus polling is unchanged.
+
+    Requires session worker support, workflows, remote activities, and a nonzero
+    workflow cache. Completing an execution does not automatically rebind the
+    sticky destination: serving another workflow requires deliberately choosing
+    a new destination and worker lifecycle.
+    """
+
+    def _to_bridge(self) -> temporalio.bridge.worker.ExperimentalWorkerAffinityOptions:
+        return temporalio.bridge.worker.ExperimentalWorkerAffinityOptions(
+            sticky_queue_name=self.sticky_queue_name,
+            single_workflow_mode=self.single_workflow_mode,
+        )
+
+
 class Worker:
     """Worker to process workflows and/or activities.
 
@@ -152,6 +199,9 @@ class Worker:
         ),
         disable_payload_error_limit: bool = False,
         max_workflow_task_external_storage_concurrency: int = _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
+        session_worker_options: SessionWorkerOptions | None = None,
+        experimental_worker_affinity_options: ExperimentalWorkerAffinityOptions
+        | None = None,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -345,6 +395,14 @@ class Worker:
                 Please report any issues you encounter with this setting or if you
                 feel the default should be changed.
                 WARNING: This setting is experimental.
+            session_worker_options: Experimental session worker support. Passing
+                an instance enables sticky activities; None leaves it disabled.
+                Requires workflows, remote activities, and a nonzero workflow cache.
+            experimental_worker_affinity_options: Short-lived experimental
+                worker affinity controls. This API is expected to be substantially
+                redesigned or removed; applications should expect migration work.
+                See :py:class:`ExperimentalWorkerAffinityOptions` for routing and
+                single-workflow lifecycle requirements.
 
         """
         config = WorkerConfig(
@@ -393,6 +451,8 @@ class Worker:
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
             max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
+            session_worker_options=session_worker_options,
+            experimental_worker_affinity_options=experimental_worker_affinity_options,
         )
 
         plugins_from_client = cast(
@@ -636,6 +696,10 @@ class Worker:
         deduped_storage_driver_types = {
             driver.type() for driver in self._storage_drivers
         }
+        session_worker_options = config.get("session_worker_options")
+        experimental_worker_affinity_options = config.get(
+            "experimental_worker_affinity_options"
+        )
 
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
@@ -706,6 +770,16 @@ class Worker:
                 storage_drivers=deduped_storage_driver_types,
                 disable_payload_error_limit=config.get(
                     "disable_payload_error_limit", False
+                ),
+                session_worker_options=(
+                    session_worker_options._to_bridge()
+                    if session_worker_options is not None
+                    else None
+                ),
+                experimental_worker_affinity_options=(
+                    experimental_worker_affinity_options._to_bridge()
+                    if experimental_worker_affinity_options is not None
+                    else None
                 ),
             ),
         )
@@ -1030,6 +1104,8 @@ class WorkerConfig(TypedDict, total=False):
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
     max_workflow_task_external_storage_concurrency: int
+    session_worker_options: SessionWorkerOptions | None
+    experimental_worker_affinity_options: ExperimentalWorkerAffinityOptions | None
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

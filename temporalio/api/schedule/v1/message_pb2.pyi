@@ -29,6 +29,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class CalendarSpec(google.protobuf.message.Message):
     """CalendarSpec describes an event specification relative to the calendar,
     similar to a traditional cron specification, but with labeled fields. Each
@@ -115,6 +116,7 @@ class CalendarSpec(google.protobuf.message.Message):
 
 global___CalendarSpec = CalendarSpec
 
+@typing_extensions.final
 class Range(google.protobuf.message.Message):
     """Range represents a set of integer values, used to match fields of a calendar
     time in StructuredCalendarSpec. If end < start, then end is interpreted as
@@ -149,6 +151,7 @@ class Range(google.protobuf.message.Message):
 
 global___Range = Range
 
+@typing_extensions.final
 class StructuredCalendarSpec(google.protobuf.message.Message):
     """StructuredCalendarSpec describes an event specification relative to the
     calendar, in a form that's easy to work with programmatically. Each field can
@@ -261,6 +264,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
 
 global___StructuredCalendarSpec = StructuredCalendarSpec
 
+@typing_extensions.final
 class IntervalSpec(google.protobuf.message.Message):
     """IntervalSpec matches times that can be expressed as:
     epoch + n * interval + phase
@@ -304,6 +308,7 @@ class IntervalSpec(google.protobuf.message.Message):
 
 global___IntervalSpec = IntervalSpec
 
+@typing_extensions.final
 class ScheduleSpec(google.protobuf.message.Message):
     """ScheduleSpec is a complete description of a set of absolute timestamps
     (possibly infinite) that an action should occur at. The meaning of a
@@ -492,6 +497,7 @@ class ScheduleSpec(google.protobuf.message.Message):
 
 global___ScheduleSpec = ScheduleSpec
 
+@typing_extensions.final
 class SchedulePolicies(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -549,6 +555,7 @@ class SchedulePolicies(google.protobuf.message.Message):
 
 global___SchedulePolicies = SchedulePolicies
 
+@typing_extensions.final
 class ScheduleAction(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -587,6 +594,7 @@ class ScheduleAction(google.protobuf.message.Message):
 
 global___ScheduleAction = ScheduleAction
 
+@typing_extensions.final
 class ScheduleActionResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -647,6 +655,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
 
 global___ScheduleActionResult = ScheduleActionResult
 
+@typing_extensions.final
 class ScheduleState(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -695,6 +704,7 @@ class ScheduleState(google.protobuf.message.Message):
 
 global___ScheduleState = ScheduleState
 
+@typing_extensions.final
 class TriggerImmediatelyRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -725,6 +735,7 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
 
 global___TriggerImmediatelyRequest = TriggerImmediatelyRequest
 
+@typing_extensions.final
 class BackfillRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -771,6 +782,7 @@ class BackfillRequest(google.protobuf.message.Message):
 
 global___BackfillRequest = BackfillRequest
 
+@typing_extensions.final
 class SchedulePatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -778,6 +790,7 @@ class SchedulePatch(google.protobuf.message.Message):
     BACKFILL_REQUEST_FIELD_NUMBER: builtins.int
     PAUSE_FIELD_NUMBER: builtins.int
     UNPAUSE_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def trigger_immediately(self) -> global___TriggerImmediatelyRequest:
         """If set, trigger one action immediately."""
@@ -796,6 +809,13 @@ class SchedulePatch(google.protobuf.message.Message):
     notes field to the value of the string.
     """
     unpause: builtins.str
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
+        """If set, applies the specified time-skipping configuration to this schedule,
+        replacing any existing time-skipping configuration.
+        """
     def __init__(
         self,
         *,
@@ -804,11 +824,16 @@ class SchedulePatch(google.protobuf.message.Message):
         | None = ...,
         pause: builtins.str = ...,
         unpause: builtins.str = ...,
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "trigger_immediately", b"trigger_immediately"
+            "time_skipping_config",
+            b"time_skipping_config",
+            "trigger_immediately",
+            b"trigger_immediately",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -818,6 +843,8 @@ class SchedulePatch(google.protobuf.message.Message):
             b"backfill_request",
             "pause",
             b"pause",
+            "time_skipping_config",
+            b"time_skipping_config",
             "trigger_immediately",
             b"trigger_immediately",
             "unpause",
@@ -827,6 +854,7 @@ class SchedulePatch(google.protobuf.message.Message):
 
 global___SchedulePatch = SchedulePatch
 
+@typing_extensions.final
 class ScheduleInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -842,6 +870,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     UPDATE_TIME_FIELD_NUMBER: builtins.int
     INVALID_SCHEDULE_ERROR_FIELD_NUMBER: builtins.int
     STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
     action_count: builtins.int
     """Number of actions taken so far."""
     missed_catchup_window: builtins.int
@@ -890,6 +919,13 @@ class ScheduleInfo(google.protobuf.message.Message):
     """Deprecated."""
     state_size_bytes: builtins.int
     """Size of the schedule's internal state (including payloads) in bytes."""
+    @property
+    def time_skipping_info(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingInfo:
+        """Information about time skipping for this schedule.
+        If the schedule has never enabled time skipping, this will be unset.
+        """
     def __init__(
         self,
         *,
@@ -912,11 +948,18 @@ class ScheduleInfo(google.protobuf.message.Message):
         update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         invalid_schedule_error: builtins.str = ...,
         state_size_bytes: builtins.int = ...,
+        time_skipping_info: temporalio.api.common.v1.message_pb2.TimeSkippingInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "create_time", b"create_time", "update_time", b"update_time"
+            "create_time",
+            b"create_time",
+            "time_skipping_info",
+            b"time_skipping_info",
+            "update_time",
+            b"update_time",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -944,6 +987,8 @@ class ScheduleInfo(google.protobuf.message.Message):
             b"running_workflows",
             "state_size_bytes",
             b"state_size_bytes",
+            "time_skipping_info",
+            b"time_skipping_info",
             "update_time",
             b"update_time",
         ],
@@ -951,6 +996,7 @@ class ScheduleInfo(google.protobuf.message.Message):
 
 global___ScheduleInfo = ScheduleInfo
 
+@typing_extensions.final
 class Schedule(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1003,6 +1049,7 @@ class Schedule(google.protobuf.message.Message):
 
 global___Schedule = Schedule
 
+@typing_extensions.final
 class ScheduleListInfo(google.protobuf.message.Message):
     """ScheduleListInfo is an abbreviated set of values from Schedule and ScheduleInfo
     that's returned in ListSchedules.
@@ -1089,6 +1136,7 @@ class ScheduleListInfo(google.protobuf.message.Message):
 
 global___ScheduleListInfo = ScheduleListInfo
 
+@typing_extensions.final
 class ScheduleListEntry(google.protobuf.message.Message):
     """ScheduleListEntry is returned by ListSchedules."""
 

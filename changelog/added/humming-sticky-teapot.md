@@ -1,0 +1,1 @@
+Added experimental workflow-affine activity sessions through `workflow.ActivitySessionOptions` and `worker.SessionWorkerOptions`, with short-lived `worker.ExperimentalWorkerAffinityOptions` for stable sticky destinations and single-workflow polling.

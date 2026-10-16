@@ -1599,6 +1599,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         summary: str | None = None,
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        session_options: temporalio.workflow.ActivitySessionOptions | None = None,
     ) -> temporalio.workflow.ActivityHandle[Any]:
         self._assert_not_read_only("start activity")
         # Get activity definition if it's callable
@@ -1637,6 +1638,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 summary=summary,
                 event_groups=event_groups,
                 priority=priority,
+                session_options=session_options,
             )
         )
 
@@ -3530,6 +3532,10 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
                     self._input.priority._to_proto()
+                )
+            if self._input.session_options is not None:
+                command.schedule_activity.session_options.workflow_sticky_session = (
+                    self._input.session_options.workflow_sticky_session
                 )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:

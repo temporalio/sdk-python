@@ -18,6 +18,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.session.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 
@@ -28,6 +29,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing_extensions.final
 class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -44,6 +46,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
     REQUEST_EAGER_EXECUTION_FIELD_NUMBER: builtins.int
     USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     @property
     def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
@@ -106,6 +109,10 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.ActivitySessionOptions: ...
     def __init__(
         self,
         *,
@@ -122,6 +129,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
         request_eager_execution: builtins.bool = ...,
         use_workflow_build_id: builtins.bool = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.ActivitySessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -142,6 +151,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -171,6 +182,8 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -182,6 +195,7 @@ class ScheduleActivityTaskCommandAttributes(google.protobuf.message.Message):
 
 global___ScheduleActivityTaskCommandAttributes = ScheduleActivityTaskCommandAttributes
 
+@typing_extensions.final
 class RequestCancelActivityTaskCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -204,6 +218,7 @@ global___RequestCancelActivityTaskCommandAttributes = (
     RequestCancelActivityTaskCommandAttributes
 )
 
+@typing_extensions.final
 class StartTimerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -241,6 +256,7 @@ class StartTimerCommandAttributes(google.protobuf.message.Message):
 
 global___StartTimerCommandAttributes = StartTimerCommandAttributes
 
+@typing_extensions.final
 class CompleteWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -263,6 +279,7 @@ global___CompleteWorkflowExecutionCommandAttributes = (
     CompleteWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class FailWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -283,6 +300,7 @@ class FailWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
 
 global___FailWorkflowExecutionCommandAttributes = FailWorkflowExecutionCommandAttributes
 
+@typing_extensions.final
 class CancelTimerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -300,6 +318,7 @@ class CancelTimerCommandAttributes(google.protobuf.message.Message):
 
 global___CancelTimerCommandAttributes = CancelTimerCommandAttributes
 
+@typing_extensions.final
 class CancelWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -322,6 +341,7 @@ global___CancelWorkflowExecutionCommandAttributes = (
     CancelWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class RequestCancelExternalWorkflowExecutionCommandAttributes(
     google.protobuf.message.Message
 ):
@@ -378,6 +398,7 @@ global___RequestCancelExternalWorkflowExecutionCommandAttributes = (
     RequestCancelExternalWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class SignalExternalWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -450,6 +471,7 @@ global___SignalExternalWorkflowExecutionCommandAttributes = (
     SignalExternalWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class UpsertWorkflowSearchAttributesCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -481,6 +503,7 @@ global___UpsertWorkflowSearchAttributesCommandAttributes = (
     UpsertWorkflowSearchAttributesCommandAttributes
 )
 
+@typing_extensions.final
 class ModifyWorkflowPropertiesCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -507,9 +530,11 @@ global___ModifyWorkflowPropertiesCommandAttributes = (
     ModifyWorkflowPropertiesCommandAttributes
 )
 
+@typing_extensions.final
 class RecordMarkerCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class DetailsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -580,6 +605,7 @@ class RecordMarkerCommandAttributes(google.protobuf.message.Message):
 
 global___RecordMarkerCommandAttributes = RecordMarkerCommandAttributes
 
+@typing_extensions.final
 class ContinueAsNewWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -739,6 +765,7 @@ global___ContinueAsNewWorkflowExecutionCommandAttributes = (
     ContinueAsNewWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class StartChildWorkflowExecutionCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -919,6 +946,7 @@ global___StartChildWorkflowExecutionCommandAttributes = (
     StartChildWorkflowExecutionCommandAttributes
 )
 
+@typing_extensions.final
 class ProtocolMessageCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -936,9 +964,11 @@ class ProtocolMessageCommandAttributes(google.protobuf.message.Message):
 
 global___ProtocolMessageCommandAttributes = ProtocolMessageCommandAttributes
 
+@typing_extensions.final
 class ScheduleNexusOperationCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing_extensions.final
     class NexusHeaderEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1070,6 +1100,7 @@ global___ScheduleNexusOperationCommandAttributes = (
     ScheduleNexusOperationCommandAttributes
 )
 
+@typing_extensions.final
 class RequestCancelNexusOperationCommandAttributes(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1094,6 +1125,7 @@ global___RequestCancelNexusOperationCommandAttributes = (
     RequestCancelNexusOperationCommandAttributes
 )
 
+@typing_extensions.final
 class Command(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

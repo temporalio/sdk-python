@@ -285,6 +285,12 @@ class StartActivityInput:
     # The types may be absent
     arg_types: list[type] | None
     ret_type: type | None
+    session_options: temporalio.workflow.ActivitySessionOptions | None = field(
+        default=None, kw_only=True
+    )
+    """.. warning::
+        Activity sessions are experimental and may change without notice.
+    """
 
 
 @dataclass
