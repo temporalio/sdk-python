@@ -50,9 +50,11 @@ from ._tuning import (
     WorkflowSlotInfo,
 )
 from ._worker import (
+    ExperimentalWorkerAffinityOptions,
     PollerBehavior,
     PollerBehaviorAutoscaling,
     PollerBehaviorSimpleMaximum,
+    SessionWorkerOptions,
     Worker,
     WorkerConfig,
     WorkerDeploymentConfig,
@@ -71,6 +73,8 @@ __all__ = [
     "WorkerConfig",
     "WorkerDeploymentConfig",
     "WorkerDeploymentVersion",
+    "SessionWorkerOptions",
+    "ExperimentalWorkerAffinityOptions",
     "Replayer",
     "ReplayerConfig",
     "WorkflowReplayResult",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from datetime import timedelta
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, TypedDict, overload
@@ -32,6 +33,7 @@ __all__ = [
     "ActivityCancellationType",
     "ActivityConfig",
     "ActivityHandle",
+    "ActivitySessionOptions",
     "LocalActivityConfig",
     "execute_activity",
     "execute_activity_class",
@@ -83,11 +85,28 @@ class ActivityCancellationType(IntEnum):
     )
 
 
+@dataclass
+class ActivitySessionOptions:
+    """Session routing options for an activity.
+
+    .. warning::
+        Activity sessions are experimental and may change without notice.
+    """
+
+    workflow_sticky_session: bool = False
+    """Whether to route this activity to the workflow's sticky activity session.
+
+    When enabled, the activity must use the workflow's task queue and the worker
+    must support workflow sticky activity sessions.
+    """
+
+
 class ActivityConfig(TypedDict, total=False):
     """TypedDict of config that can be used for :py:func:`start_activity` and
     :py:func:`execute_activity`.
 
-    ``event_groups`` is experimental and may change without notice.
+    ``event_groups`` and ``session_options`` are experimental and may change
+    without notice.
     """
 
     task_queue: str | None
@@ -102,6 +121,7 @@ class ActivityConfig(TypedDict, total=False):
     summary: str | None
     event_groups: Sequence[EventGroup] | None
     priority: temporalio.common.Priority
+    session_options: ActivitySessionOptions | None
 
 
 # Overload for async no-param activity
@@ -121,6 +141,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -141,6 +162,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -162,6 +184,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -183,6 +206,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -204,6 +228,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -225,6 +250,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -248,6 +274,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[Any]: ...
 
 
@@ -269,6 +296,7 @@ def start_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[Any]:
     """Start an activity and return its handle.
 
@@ -309,6 +337,7 @@ def start_activity(
             addition to those active in the current scope. See
             :py:func:`temporalio.workflow.create_event_group`.
         priority: Priority of the activity.
+        session_options: Experimental session routing options for this activity.
 
     Returns:
         An activity handle to the activity which is an async task.
@@ -329,6 +358,7 @@ def start_activity(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 
@@ -349,6 +379,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -369,6 +400,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -390,6 +422,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -411,6 +444,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -432,6 +466,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -453,6 +488,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -476,6 +512,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> Any: ...
 
 
@@ -497,6 +534,7 @@ async def execute_activity(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> Any:
     """Start an activity and wait for completion.
 
@@ -520,6 +558,7 @@ async def execute_activity(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 
@@ -540,6 +579,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -560,6 +600,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -581,6 +622,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -602,6 +644,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -623,6 +666,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -644,6 +688,7 @@ def start_activity_class(  # type: ignore[reportOverlappingOverload]
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -664,6 +709,7 @@ def start_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a callable class.
 
@@ -685,6 +731,7 @@ def start_activity_class(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 
@@ -705,6 +752,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -725,6 +773,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -746,6 +795,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -767,6 +817,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -788,6 +839,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -809,6 +861,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -829,6 +882,7 @@ async def execute_activity_class(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> Any:
     """Start an activity from a callable class and wait for completion.
 
@@ -850,6 +904,7 @@ async def execute_activity_class(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 
@@ -870,6 +925,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -890,6 +946,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -911,6 +968,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -932,6 +990,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -953,6 +1012,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -974,6 +1034,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[ReturnType]: ...
 
 
@@ -994,6 +1055,7 @@ def start_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ActivityHandle[Any]:
     """Start an activity from a method.
 
@@ -1015,6 +1077,7 @@ def start_activity_method(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 
@@ -1035,6 +1098,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1055,6 +1119,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1076,6 +1141,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1097,6 +1163,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1118,6 +1185,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1139,6 +1207,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> ReturnType: ...
 
 
@@ -1159,6 +1228,7 @@ async def execute_activity_method(
     summary: str | None = None,
     event_groups: Sequence[EventGroup] | None = None,
     priority: temporalio.common.Priority = temporalio.common.Priority.default,
+    session_options: ActivitySessionOptions | None = None,
 ) -> Any:
     """Start an activity from a method and wait for completion.
 
@@ -1182,6 +1252,7 @@ async def execute_activity_method(
         summary=summary,
         event_groups=event_groups,
         priority=priority,
+        session_options=session_options,
     )
 
 

@@ -65,6 +65,25 @@ pub struct WorkerConfig {
     plugins: Vec<String>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
+    session_worker_options: Option<SessionWorkerOptions>,
+    experimental_worker_affinity_options: Option<ExperimentalWorkerAffinityOptions>,
+}
+
+pub struct SessionWorkerOptions {}
+
+// PyO3 cannot derive extraction for empty structs; presence alone enables sessions.
+impl FromPyObject<'_, '_> for SessionWorkerOptions {
+    type Error = PyErr;
+
+    fn extract(_obj: Borrowed<'_, '_, PyAny>) -> Result<Self, Self::Error> {
+        Ok(Self {})
+    }
+}
+
+#[derive(FromPyObject)]
+pub struct ExperimentalWorkerAffinityOptions {
+    sticky_queue_name: Option<String>,
+    single_workflow_mode: bool,
 }
 
 #[derive(FromPyObject)]
@@ -780,6 +799,18 @@ fn convert_worker_config(
                 .collect::<HashSet<_>>(),
         )
         .disable_payload_error_limit(conf.disable_payload_error_limit)
+        .maybe_session_worker_options(
+            conf.session_worker_options
+                .map(|_| temporalio_sdk_core::SessionWorkerOptions::builder().build()),
+        )
+        .maybe_experimental_worker_affinity_options(conf.experimental_worker_affinity_options.map(
+            |options| {
+                temporalio_sdk_core::ExperimentalWorkerAffinityOptions::builder()
+                    .maybe_sticky_queue_name(options.sticky_queue_name)
+                    .single_workflow_mode(options.single_workflow_mode)
+                    .build()
+            },
+        ))
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }

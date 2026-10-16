@@ -60,6 +60,23 @@ class WorkerConfig:
     plugins: Sequence[str]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
+    session_worker_options: SessionWorkerOptions | None = None
+    experimental_worker_affinity_options: ExperimentalWorkerAffinityOptions | None = (
+        None
+    )
+
+
+@dataclass
+class SessionWorkerOptions:
+    """Python representation of the Rust session worker options."""
+
+
+@dataclass
+class ExperimentalWorkerAffinityOptions:
+    """Python representation of the Rust experimental worker affinity options."""
+
+    sticky_queue_name: str | None = None
+    single_workflow_mode: bool = False
 
 
 @dataclass
