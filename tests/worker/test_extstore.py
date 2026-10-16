@@ -591,7 +591,7 @@ class ReferencesBeforeEncodingWorkflow:
     test_extstore_references_before_encoding_history.json."""
 
     @workflow.run
-    async def run(self, input: str) -> str:
+    async def run(self, _input: str) -> str:
         await workflow.execute_activity(
             "references_before_encoding_activity",
             "ai" * 512,
