@@ -25,7 +25,6 @@ from temporalio.converter import (
 
 _T = TypeVar("_T")
 
-# Match the Python S3 driver's segment encoding for consistent storage keys.
 _KEY_SAFE_CHARS = frozenset(string.ascii_letters + string.digits + "!-_.*'()")
 
 
