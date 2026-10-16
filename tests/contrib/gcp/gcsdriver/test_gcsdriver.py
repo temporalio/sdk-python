@@ -349,17 +349,19 @@ async def test_adapter_conditional_upload(status: int | None) -> None:
         b"data",
         content_type="application/octet-stream",
         parameters={"ifGenerationMatch": "0"},
+        force_resumable_upload=False,
     )
 
 
-async def test_adapter_resumable_conflict_with_missing_session() -> None:
+async def test_adapter_upload_404_propagates_when_object_exists() -> None:
     storage = AsyncMock(spec=Storage)
     storage.upload.side_effect = response_error(404)
     storage.download_metadata.return_value = {"name": "key"}
-    await new_gcloud_aio_client(storage).put_object(
-        bucket="bucket", key="key", data=b"data"
-    )
-    storage.download_metadata.assert_awaited_once_with("bucket", "key")
+    with pytest.raises(ClientResponseError):
+        await new_gcloud_aio_client(storage).put_object(
+            bucket="bucket", key="key", data=b"data"
+        )
+    storage.download_metadata.assert_not_awaited()
 
 
 async def test_adapter_download() -> None:

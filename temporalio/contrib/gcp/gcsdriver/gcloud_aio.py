@@ -38,13 +38,11 @@ class _GcloudAioStorageDriverClient(GCSStorageDriverClient):
                 data,
                 content_type="application/octet-stream",
                 parameters={"ifGenerationMatch": "0"},
+                force_resumable_upload=False,
             )
         except ClientResponseError as err:
             # Another writer may create the content-addressed object after our check.
             if err.status == 412:
-                return
-            # Retrying a resumable upload after a 412 can report a missing session.
-            if err.status == 404 and await self.object_exists(bucket=bucket, key=key):
                 return
             raise
 

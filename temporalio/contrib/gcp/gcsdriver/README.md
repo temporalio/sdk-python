@@ -40,7 +40,9 @@ The application owns the `Storage` client and configures credentials, request
 timeouts, and retry behavior. See the [gcloud-aio documentation](https://talkiq.github.io/gcloud-aio/)
 for authentication and customization. The library has no general retry policy;
 applications can supply a `Storage` subclass with async retries and timeouts.
-The adapter preserves the client's resumable upload handling.
+The adapter uses a single request for each upload, including payloads over 5 MiB.
+Interrupted uploads must restart from the beginning. Conditional creation prevents
+retries from overwriting existing objects.
 
 ## Configuration
 
