@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import dataclasses
 import hashlib
 import logging
 import sys
@@ -466,6 +467,16 @@ class Worker:
             if _ext_storage
             else None
         )
+        # Every worker operation draws on the worker's limit, not the client's,
+        # so the worker carries its own copy of the converter.
+        worker_data_converter = (
+            dataclasses.replace(
+                client_config["data_converter"],
+                _driver_operation_semaphore=self._driver_operation_semaphore,
+            )
+            if self._driver_operation_semaphore is not None
+            else client_config["data_converter"]
+        )
 
         # Extract the bridge service client
         bridge_client = _extract_bridge_client_for_worker(config["client"])  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -493,7 +504,7 @@ class Worker:
                 activities=activities,
                 activity_executor=config.get("activity_executor"),
                 shared_state_manager=config.get("shared_state_manager"),
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
                 client=client,
@@ -511,7 +522,7 @@ class Worker:
                 namespace=client_config["namespace"],
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 service_handlers=nexus_service_handlers,
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 metric_meter=self._runtime.metric_meter,
                 executor=config.get("nexus_task_executor"),
@@ -536,7 +547,6 @@ class Worker:
                 self._activity_worker.assert_activity_valid(activity)
 
             self._workflow_worker = _WorkflowWorker(
-                driver_operation_semaphore=self._driver_operation_semaphore,
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=config["client"].namespace,  # type: ignore[reportTypedDictNotRequiredAccess]
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
@@ -547,7 +557,7 @@ class Worker:
                 ),
                 workflow_runner=config["workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 unsandboxed_workflow_runner=config["unsandboxed_workflow_runner"],  # type: ignore[reportTypedDictNotRequiredAccess]
-                data_converter=client_config["data_converter"],
+                data_converter=worker_data_converter,
                 interceptors=interceptors,
                 workflow_failure_exception_types=config[
                     "workflow_failure_exception_types"
