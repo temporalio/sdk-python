@@ -246,12 +246,25 @@ class _ActivityWorker:
         logger = temporalio.activity.logger
         activity = self._running_activities.get(task_token)
         if activity and not activity.done:
-            # Put on queue and schedule a task. We will let the queue-full error
-            # be thrown here.
+            while not activity.pending_heartbeats.empty():
+                activity.pending_heartbeats.get_nowait()
             activity.pending_heartbeats.put_nowait(details)
-            activity.last_heartbeat_task = asyncio.create_task(
-                self._heartbeat_async(logger, activity, task_token)
-            )
+            if (
+                activity.last_heartbeat_task is None
+                or activity.last_heartbeat_task.done()
+            ):
+                activity.last_heartbeat_task = asyncio.create_task(
+                    self._send_heartbeats(logger, activity, task_token)
+                )
+
+    async def _send_heartbeats(
+        self,
+        logger: logging.LoggerAdapter,
+        activity: _RunningActivity,
+        task_token: bytes,
+    ) -> None:
+        while not activity.pending_heartbeats.empty():
+            await self._heartbeat_async(logger, activity, task_token)
 
     async def _heartbeat_async(
         self,
