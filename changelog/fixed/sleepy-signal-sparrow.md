@@ -1,0 +1,1 @@
+POSIX workers now request graceful shutdown on SIGTERM, respecting the configured activity grace period. Existing application signal handlers are preserved; set `shutdown_on_sigterm=False` to opt out.
