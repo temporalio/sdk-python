@@ -1340,7 +1340,7 @@ class CancelReasonWorkflow:
         except asyncio.CancelledError:
             self._reason_inner = workflow.cancellation_reason()
         try:
-            await asyncio.sleep(1000)
+            await workflow.wait_condition(lambda: False)
         except asyncio.CancelledError:
             self._reason_outer = workflow.cancellation_reason()
             raise
