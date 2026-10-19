@@ -1,5 +1,7 @@
 # Contributing to Temporal SDKs
 
+Non-Temporal contributors must not solicit user or customer information, including but not limited to workload, use-case, or failure information. Doing so will result in a ban from all Temporal repositories at Temporal's sole discretion.
+
 Thanks for your interest in contributing to Temporal SDKs.
 
 This guide describes expectations that apply across Temporal SDK repositories. Each
