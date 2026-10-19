@@ -1,0 +1,2 @@
+`WorkflowEnvironment.start_time_skipping_v2()` starts a Temporal CLI dev server with per-workflow virtual-clock time skipping, the eventual replacement to the global-clock Java test server returned by `start_time_skipping()`.
+`TimeSkipper(client, config=TimeSkippingConfig(...))` from `temporalio.testing` wraps an existing `Client` with per-workflow time skipping for use outside the test environment.

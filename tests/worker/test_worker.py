@@ -270,7 +270,7 @@ class WaitOnSignalWorkflow:
 
 
 async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not appear to fail on invalid namespace")
     # Try to run a worker on an invalid namespace
     config = client.config()
@@ -435,7 +435,7 @@ class CustomSlotSupplierWorkflow:
 
 @pytest.mark.requires_local_server
 async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work under Java test server")
 
     class MyPermit(SlotPermit):
@@ -786,7 +786,7 @@ class DeploymentVersioningWorkflowV3AutoUpgrade:
 async def test_worker_with_worker_deployment_config(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-{uuid.uuid4()}"
@@ -877,7 +877,7 @@ async def test_worker_with_worker_deployment_config(
 
 
 async def test_worker_deployment_ramp(client: Client, env: WorkflowEnvironment):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-ramping-{uuid.uuid4()}"
@@ -997,7 +997,7 @@ async def _test_worker_deployment_dynamic_workflow(
     workflow_class: type[Any],
     expected_versioning_behavior: temporalio.api.enums.v1.VersioningBehavior.ValueType,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-dynamic-{uuid.uuid4()}"
@@ -1109,7 +1109,7 @@ async def test_workflows_must_have_versioning_behavior_when_feature_turned_on(
 async def test_workflows_can_use_default_versioning_behavior(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker versioning")
 
     deployment_name = f"deployment-default-versioning-{uuid.uuid4()}"
@@ -1151,7 +1151,7 @@ async def test_workflows_can_use_default_versioning_behavior(
 async def test_worker_deployment_config_without_versioning(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     build_id = "my-custom-build-id-1.0"
@@ -1208,7 +1208,7 @@ async def test_deployment_config_rejects_versioning_behavior_without_versioning(
 async def test_workflows_can_use_versioning_override(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker versioning")
 
     deployment_name = f"deployment-versioning-override-{uuid.uuid4()}"
@@ -1811,7 +1811,7 @@ async def wait_for_workflow_running_on_version(
 async def test_continue_as_new_with_version_upgrade(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-can-upgrade-{uuid.uuid4()}"
@@ -1880,7 +1880,7 @@ async def test_continue_as_new_with_version_upgrade(
 async def test_continue_as_new_with_ramping_version(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Test Server doesn't support worker deployments")
 
     deployment_name = f"deployment-can-ramping-{uuid.uuid4()}"

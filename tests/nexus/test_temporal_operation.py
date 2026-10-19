@@ -501,7 +501,7 @@ async def test_temporal_operation_update_workflow(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     if (
-        env.supports_time_skipping
+        env.supports_time_skipping_v1
     ):  # time skipping server uses different dynamic configs
         pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
@@ -681,7 +681,7 @@ async def test_temporal_operation_update_workflow_delayed(
     client: Client, env: WorkflowEnvironment
 ) -> None:
     if (
-        env.supports_time_skipping
+        env.supports_time_skipping_v1
     ):  # time skipping server uses different dynamic configs
         pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
@@ -778,7 +778,7 @@ async def test_temporal_operation_update_workflow_delayed(
 async def test_start_workflow_update_rejects_non_accepted_wait_for_stage(
     client: Client, env: WorkflowEnvironment
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Update workflow tests don't work with time-skipping server")
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
@@ -952,7 +952,7 @@ async def test_temporal_operation_query_workflow(
             assert not any(event.links for event in target_history.events)
 
             # The Java time-skipping test server does not return Nexus operation links.
-            if not env.supports_time_skipping:
+            if not env.supports_time_skipping_v1:
                 assert target_handle.result_run_id is not None
                 assert Link(
                     workflow=Link.Workflow(
@@ -1022,7 +1022,7 @@ async def test_temporal_operation_cancel_workflow(
 async def test_customized_temporal_operation_cancel_workflow(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1182,7 +1182,7 @@ async def test_temporal_operation_failed_start_allows_retry(
 async def test_temporal_operation_mixed_start_raises_handler_err(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1256,7 +1256,7 @@ async def test_temporal_operation_sync_result(client: Client, env: WorkflowEnvir
 async def test_temporal_operation_start_activity(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1283,7 +1283,7 @@ async def test_temporal_operation_start_activity(
 async def test_temporal_operation_backing_activity_does_not_duplicate_links(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1344,7 +1344,7 @@ async def test_temporal_operation_backing_activity_does_not_duplicate_links(
 async def test_temporal_operation_start_activity_raises_error(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1377,7 +1377,7 @@ async def test_temporal_operation_start_activity_raises_error(
 async def test_temporal_operation_cancel_activity(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1414,7 +1414,7 @@ async def test_temporal_operation_cancel_activity(
 async def test_customized_temporal_operation_cancel_activity(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1455,7 +1455,7 @@ async def test_customized_temporal_operation_cancel_activity(
 async def test_temporal_operation_double_start_activity_raises_handler_err(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )
@@ -1749,7 +1749,7 @@ class UpdatableWorkflow:
 async def test_temporal_operation_includes_activity_token_in_callback(
     client: Client, env: WorkflowEnvironment
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip(
             "Standalone Nexus Operation tests don't work with time-skipping server"
         )

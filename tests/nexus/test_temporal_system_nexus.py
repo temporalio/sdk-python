@@ -798,7 +798,7 @@ def test_system_nexus_payload_converter_restores_user_context_on_failure() -> No
 async def test_external_workflow_handle_signal_with_start_workflow_uses_system_nexus(
     env: WorkflowEnvironment,
 ):
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     codec = RejectOuterSystemNexusCodec()
@@ -855,7 +855,7 @@ async def test_signal_with_start_uses_target_workflow_serialization_context(
     env: WorkflowEnvironment,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     captured_contexts: list[SerializationContext | None] = []
@@ -915,7 +915,7 @@ async def test_signal_with_start_uses_operation_context_for_converter_and_codec(
     monkeypatch: pytest.MonkeyPatch,
     use_operation_context: bool,
 ) -> None:
-    if env.supports_time_skipping:
+    if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
 
     failure_converter_contexts: list[SerializationContext | None] = []

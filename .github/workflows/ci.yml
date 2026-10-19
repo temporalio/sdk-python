@@ -65,7 +65,9 @@ jobs:
         timeout-minutes: 15
       # Time skipping doesn't yet support ARM
       - if: ${{ !endsWith(matrix.os, '-arm') }}
-        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping.xml
+        run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v1 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v1.xml
+        timeout-minutes: 10
+      - run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v2 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v2.xml
         timeout-minutes: 10
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
