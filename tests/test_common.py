@@ -119,6 +119,15 @@ def test_typed_search_attributes_contains_missing_key():
     assert missing_key not in attrs
 
 
+def test_guess_search_attribute_key_from_untyped_values():
+    assert SearchAttributeKey._guess_from_untyped_values(
+        "my-key", [True]
+    ) == SearchAttributeKey.for_bool("my-key")
+    assert SearchAttributeKey._guess_from_untyped_values(
+        "my-key", [123]
+    ) == SearchAttributeKey.for_int("my-key")
+
+
 def test_cant_construct_bad_priority():
     with pytest.raises(TypeError):
         Priority(priority_key=1.1)  # type: ignore
