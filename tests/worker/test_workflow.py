@@ -8468,22 +8468,25 @@ async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnviro
         task_queue=task_queue,
     )
 
+    async def wait_for_history_event(event_type: EventType.ValueType) -> None:
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type is event_type:
+                return
+
     async with new_worker(
         client,
         ActivityAndSignalsWhileWorkflowDown,
         activities=[say_hello],
         task_queue=task_queue,
     ):
-        # This sleep exists to make sure the first WFT is processed
-        await asyncio.sleep(0.2)
+        await wait_for_history_event(EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED)
 
     async with new_worker(
         client,
         activities=[say_hello],
         task_queue=activity_tq,
     ):
-        # Make sure the activity starts being processed before sending signals
-        await asyncio.sleep(1)
+        await wait_for_history_event(EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED)
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "1")
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")
 
