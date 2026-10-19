@@ -1,0 +1,1 @@
+Core: Ephemeral server downloads now use `zip` 9.0 for ZIP extraction, replacing the 8.x dependency [yanked upstream for security issues](https://github.com/zip-rs/zip2/issues/1075#issuecomment-6209381974).
