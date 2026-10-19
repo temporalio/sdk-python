@@ -1,4 +1,4 @@
-"""Modal-tuned defaults for Temporal worker and client configuration."""
+"""Defaults for Temporal workers running in Modal Functions."""
 
 from __future__ import annotations
 
@@ -16,9 +16,7 @@ DEFAULT_MAX_CONCURRENT_NEXUS_TASKS: int = 5
 DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT: timedelta = timedelta(seconds=5)
 DEFAULT_SHUTDOWN_HOOK_BUFFER: timedelta = timedelta(seconds=2)
 DEFAULT_MAX_CACHED_WORKFLOWS: int = 30
-DEFAULT_EXECUTION_TIMEOUT: timedelta = timedelta(minutes=5)
-MIN_FUNCTION_TIMEOUT_HEADROOM: timedelta = timedelta(seconds=15)
-"""Minimum time by which the Modal Function timeout must exceed the worker budget."""
+_FUNCTION_TIMEOUT_HEADROOM: timedelta = timedelta(seconds=15)
 
 DEFAULT_WORKFLOW_TASK_POLLER_BEHAVIOR = PollerBehaviorSimpleMaximum(maximum=2)
 DEFAULT_ACTIVITY_TASK_POLLER_BEHAVIOR = PollerBehaviorSimpleMaximum(maximum=1)

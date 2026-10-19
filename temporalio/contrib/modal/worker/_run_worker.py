@@ -21,12 +21,11 @@ from temporalio.contrib.modal.worker._configure import (
     _run_shutdown_hooks,
 )
 from temporalio.contrib.modal.worker._defaults import (
-    DEFAULT_EXECUTION_TIMEOUT,
+    _FUNCTION_TIMEOUT_HEADROOM,
     DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT,
     DEFAULT_SHUTDOWN_HOOK_BUFFER,
     ENV_MODAL_TASK_ID,
     ENV_TASK_QUEUE,
-    MIN_FUNCTION_TIMEOUT_HEADROOM,
     apply_modal_worker_defaults,
     build_modal_identity,
     modal_default_config_file_path,
@@ -93,26 +92,49 @@ def _validate_task_queue(config: ModalWorkerConfig) -> None:
 
 
 def _work_time(
-    config: ModalWorkerConfig, invocation_started: float, monotonic: Callable[[], float]
+    config: ModalWorkerConfig,
+    shutdown_deadline_buffer: timedelta,
+    invocation_started: float,
+    monotonic: Callable[[], float],
 ) -> timedelta:
     if config.execution_timeout <= timedelta(0):
         raise ValueError("execution_timeout must be greater than zero")
-    if config.shutdown_deadline_buffer < timedelta(0):
+    if shutdown_deadline_buffer < timedelta(0):
         raise ValueError("shutdown_deadline_buffer must not be negative")
     elapsed = timedelta(seconds=monotonic() - invocation_started)
-    return config.execution_timeout - elapsed - config.shutdown_deadline_buffer
+    return config.execution_timeout - elapsed - shutdown_deadline_buffer
+
+
+def _default_execution_timeout(modal_function_timeout: timedelta) -> timedelta:
+    if modal_function_timeout <= timedelta(0):
+        raise ValueError("modal_function_timeout must be greater than zero")
+    if modal_function_timeout <= _FUNCTION_TIMEOUT_HEADROOM:
+        raise ValueError(
+            "modal_function_timeout must be greater than the SDK's "
+            f"{_FUNCTION_TIMEOUT_HEADROOM.total_seconds():.0f}s safety margin"
+        )
+    return modal_function_timeout - _FUNCTION_TIMEOUT_HEADROOM
+
+
+def _resolve_shutdown_deadline_buffer(config: ModalWorkerConfig) -> timedelta:
+    shutdown_buffer = config.shutdown_deadline_buffer
+    if shutdown_buffer is None:
+        graceful_timeout = config.worker_config.get(
+            "graceful_shutdown_timeout", DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT
+        )
+        shutdown_buffer = graceful_timeout + DEFAULT_SHUTDOWN_HOOK_BUFFER
+        config.shutdown_deadline_buffer = shutdown_buffer
+    return shutdown_buffer
 
 
 def _validate_function_timeout(
     config: ModalWorkerConfig, modal_function_timeout: timedelta
 ) -> None:
-    if modal_function_timeout <= timedelta(0):
-        raise ValueError("modal_function_timeout must be greater than zero")
-    minimum_function_timeout = config.execution_timeout + MIN_FUNCTION_TIMEOUT_HEADROOM
+    minimum_function_timeout = config.execution_timeout + _FUNCTION_TIMEOUT_HEADROOM
     if modal_function_timeout < minimum_function_timeout:
         raise ValueError(
             "modal_function_timeout must be at least execution_timeout + "
-            f"{MIN_FUNCTION_TIMEOUT_HEADROOM.total_seconds():.0f}s "
+            f"{_FUNCTION_TIMEOUT_HEADROOM.total_seconds():.0f}s "
             f"({minimum_function_timeout.total_seconds():.1f}s required, "
             f"{modal_function_timeout.total_seconds():.1f}s configured)"
         )
@@ -158,13 +180,9 @@ async def run_worker(
     context manager. Async-generator setup runs before the Temporal client
     connects; its teardown runs after the worker and shutdown hooks stop.
 
-    Worker Deployment Versioning is always enabled. Modal does not expose a
-    remaining-time API inside a running Function, so *modal_function_timeout*
-    must declare the timeout configured on ``@app.function``. The declared
-    timeout must be at least
-    :py:attr:`ModalWorkerConfig.execution_timeout` plus
-    :py:const:`MIN_FUNCTION_TIMEOUT_HEADROOM`. The SDK validates that
-    relationship but cannot verify the decorator configuration itself.
+    Worker Deployment Versioning is always enabled. Pass the timeout configured
+    on ``@app.function`` as *modal_function_timeout*; the SDK reserves an
+    internal safety margin from it.
 
     Args:
         version: Required worker deployment version.
@@ -172,41 +190,6 @@ async def run_worker(
             activities and may override client or worker options.
         modal_function_timeout: Timeout configured on the enclosing Modal
             Function. The deployment and this argument must use the same value.
-
-    Example::
-
-        from datetime import timedelta
-
-        import modal
-        from temporalio.common import WorkerDeploymentVersion
-        from temporalio.contrib.modal.worker import (
-            MIN_FUNCTION_TIMEOUT_HEADROOM,
-            ModalWorkerConfig,
-            run_worker,
-        )
-
-        app = modal.App("temporal-worker")
-        worker_execution_timeout = timedelta(minutes=5)
-        modal_function_timeout = (
-            worker_execution_timeout + MIN_FUNCTION_TIMEOUT_HEADROOM
-        )
-
-        def configure(config: ModalWorkerConfig) -> None:
-            config.worker_config["task_queue"] = "my-task-queue"
-            config.worker_config["workflows"] = [MyWorkflow]
-            config.worker_config["activities"] = [my_activity]
-            config.execution_timeout = worker_execution_timeout
-
-        @app.function(timeout=int(modal_function_timeout.total_seconds()))
-        async def temporal_worker() -> None:
-            await run_worker(
-                WorkerDeploymentVersion(
-                    deployment_name="my-service",
-                    build_id="v1.0",
-                ),
-                configure,
-                modal_function_timeout=modal_function_timeout,
-            )
     """
     await _run_worker_internal(
         version,
@@ -225,6 +208,7 @@ async def _run_worker_internal(
     """Run one invocation with injected dependencies."""
     invocation_started = deps.monotonic()
     _validate_version(version)
+    execution_timeout = _default_execution_timeout(modal_function_timeout)
 
     load_config = deps.load_config or (lambda: _default_load_config(deps.getenv))
     profile = load_config()
@@ -237,15 +221,10 @@ async def _run_worker_internal(
         use_worker_versioning=True,
     )
 
-    graceful_timeout = base_worker_config.get(
-        "graceful_shutdown_timeout", DEFAULT_GRACEFUL_SHUTDOWN_TIMEOUT
-    )
-    shutdown_buffer = graceful_timeout + DEFAULT_SHUTDOWN_HOOK_BUFFER
     config = ModalWorkerConfig(
+        execution_timeout=execution_timeout,
         client_connect_config=base_connect_config,
         worker_config=base_worker_config,
-        execution_timeout=DEFAULT_EXECUTION_TIMEOUT,
-        shutdown_deadline_buffer=shutdown_buffer,
     )
     env_task_queue = deps.getenv(ENV_TASK_QUEUE)
     if env_task_queue:
@@ -253,25 +232,32 @@ async def _run_worker_internal(
 
     async with _invocation_config_scope(configure, config):
         try:
-            work_time = _work_time(config, invocation_started, deps.monotonic)
             _validate_function_timeout(config, modal_function_timeout)
+            shutdown_buffer = _resolve_shutdown_deadline_buffer(config)
+            work_time = _work_time(
+                config,
+                shutdown_buffer,
+                invocation_started,
+                deps.monotonic,
+            )
             if work_time <= timedelta(seconds=1):
                 raise RuntimeError(
                     "Modal execution timeout is too short: "
                     f"{config.execution_timeout.total_seconds():.1f}s configured but "
-                    f"{config.shutdown_deadline_buffer.total_seconds():.1f}s is "
+                    f"{shutdown_buffer.total_seconds():.1f}s is "
                     "reserved for shutdown, leaving no time for work after setup. "
-                    "Increase execution_timeout (and the Modal Function timeout if "
-                    "necessary), or decrease the shutdown deadline buffer"
+                    "Increase the Modal Function timeout, increase execution_timeout "
+                    "if it was shortened, or decrease shutdown_deadline_buffer"
                 )
             if work_time < timedelta(seconds=5):
                 logger.warning(
                     "Modal execution timeout leaves less than 5s for work after setup "
-                    "and the shutdown buffer; consider increasing execution_timeout "
-                    "(and the Modal Function timeout if necessary) or decreasing the "
-                    "shutdown deadline buffer (work_time=%s, shutdown_buffer=%s)",
+                    "and the shutdown buffer; consider increasing the Modal Function "
+                    "timeout, increasing execution_timeout if it was shortened, or "
+                    "decreasing shutdown_deadline_buffer "
+                    "(work_time=%s, shutdown_buffer=%s)",
                     work_time,
-                    config.shutdown_deadline_buffer,
+                    shutdown_buffer,
                 )
 
             invocation_connect_config: ClientConnectConfig = {
@@ -288,7 +274,12 @@ async def _run_worker_internal(
             client = await deps.connect(**invocation_connect_config)
             worker = deps.create_worker(client, **config.worker_config)
 
-            work_time = _work_time(config, invocation_started, deps.monotonic)
+            work_time = _work_time(
+                config,
+                shutdown_buffer,
+                invocation_started,
+                deps.monotonic,
+            )
             if work_time <= timedelta(0):
                 raise RuntimeError(
                     "Modal execution budget was exhausted before the worker started"

@@ -19,13 +19,12 @@ from temporalio.contrib.modal.worker._configure import (
     _run_shutdown_hooks,
 )
 from temporalio.contrib.modal.worker._defaults import (
-    DEFAULT_EXECUTION_TIMEOUT,
+    _FUNCTION_TIMEOUT_HEADROOM,
     DEFAULT_MAX_CACHED_WORKFLOWS,
     DEFAULT_MAX_CONCURRENT_ACTIVITIES,
     DEFAULT_MAX_CONCURRENT_LOCAL_ACTIVITIES,
     DEFAULT_MAX_CONCURRENT_NEXUS_TASKS,
     DEFAULT_MAX_CONCURRENT_WORKFLOW_TASKS,
-    MIN_FUNCTION_TIMEOUT_HEADROOM,
     apply_modal_worker_defaults,
     build_modal_identity,
     modal_default_config_file_path,
@@ -42,7 +41,8 @@ TEST_VERSION = WorkerDeploymentVersion(
     deployment_name="test-deployment",
     build_id="test-build",
 )
-TEST_MODAL_FUNCTION_TIMEOUT = DEFAULT_EXECUTION_TIMEOUT + MIN_FUNCTION_TIMEOUT_HEADROOM
+TEST_MODAL_FUNCTION_TIMEOUT = timedelta(minutes=5)
+TEST_EXECUTION_TIMEOUT = TEST_MODAL_FUNCTION_TIMEOUT - _FUNCTION_TIMEOUT_HEADROOM
 
 
 def _make_test_deps(
@@ -80,7 +80,7 @@ def _make_test_deps(
 
 class TestModalWorkerConfig:
     def test_fields_are_modifiable(self) -> None:
-        config = ModalWorkerConfig()
+        config = ModalWorkerConfig(execution_timeout=TEST_EXECUTION_TIMEOUT)
         config.client_connect_config["namespace"] = "custom-ns"
         config.worker_config["task_queue"] = "my-queue"
         config.execution_timeout = timedelta(minutes=10)
@@ -92,8 +92,8 @@ class TestModalWorkerConfig:
         assert config.shutdown_deadline_buffer == timedelta(seconds=10)
 
     def test_mutable_fields_are_independent(self) -> None:
-        first = ModalWorkerConfig()
-        second = ModalWorkerConfig()
+        first = ModalWorkerConfig(execution_timeout=TEST_EXECUTION_TIMEOUT)
+        second = ModalWorkerConfig(execution_timeout=TEST_EXECUTION_TIMEOUT)
         first.worker_config["max_concurrent_activities"] = 99
         first.shutdown_hooks.append(lambda: None)
 
@@ -105,7 +105,7 @@ class TestModalWorkerConfig:
     async def test_shutdown_hooks_run_in_order_and_continue_after_error(
         self,
     ) -> None:
-        config = ModalWorkerConfig()
+        config = ModalWorkerConfig(execution_timeout=TEST_EXECUTION_TIMEOUT)
         calls: list[str] = []
 
         async def async_hook() -> None:
@@ -238,7 +238,7 @@ class TestRunWorkerInternal:
         )
 
         def configure(config: ModalWorkerConfig) -> None:
-            assert config.execution_timeout == DEFAULT_EXECUTION_TIMEOUT
+            assert config.execution_timeout == TEST_EXECUTION_TIMEOUT
             assert (
                 config.worker_config.get("max_concurrent_activities")
                 == DEFAULT_MAX_CONCURRENT_ACTIVITIES
@@ -254,6 +254,34 @@ class TestRunWorkerInternal:
         assert connect_capture[0]["namespace"] == "custom-ns"
         assert worker_capture[0]["task_queue"] == "custom-queue"
         assert worker_capture[0]["max_concurrent_activities"] == 42
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("modal_function_timeout", "expected_execution_timeout"),
+        [
+            (timedelta(minutes=5), timedelta(minutes=4, seconds=45)),
+            (timedelta(minutes=15), timedelta(minutes=14, seconds=45)),
+        ],
+    )
+    async def test_execution_timeout_defaults_from_function_timeout(
+        self,
+        modal_function_timeout: timedelta,
+        expected_execution_timeout: timedelta,
+    ) -> None:
+        deps = _make_test_deps()
+        execution_timeouts: list[timedelta] = []
+
+        def configure(config: ModalWorkerConfig) -> None:
+            execution_timeouts.append(config.execution_timeout)
+
+        await _run_worker_internal(
+            TEST_VERSION,
+            configure,
+            modal_function_timeout,
+            deps,
+        )
+
+        assert execution_timeouts == [expected_execution_timeout]
 
     @pytest.mark.asyncio
     async def test_identity_uses_function_call_and_container(self) -> None:
@@ -319,14 +347,17 @@ class TestRunWorkerInternal:
             worker_kwargs_capture=worker_capture,
         )
 
+        def configure(config: ModalWorkerConfig) -> None:
+            config.execution_timeout = TEST_MODAL_FUNCTION_TIMEOUT
+
         with pytest.raises(
             ValueError,
             match=("modal_function_timeout must be at least execution_timeout \\+ 15s"),
         ):
             await _run_worker_internal(
                 TEST_VERSION,
-                lambda config: None,
-                DEFAULT_EXECUTION_TIMEOUT,
+                configure,
+                TEST_MODAL_FUNCTION_TIMEOUT,
                 deps,
             )
 
@@ -338,15 +369,69 @@ class TestRunWorkerInternal:
         deps = _make_test_deps()
 
         def configure(config: ModalWorkerConfig) -> None:
-            config.execution_timeout = DEFAULT_EXECUTION_TIMEOUT + timedelta(seconds=1)
+            config.execution_timeout = TEST_EXECUTION_TIMEOUT + timedelta(seconds=1)
 
-        with pytest.raises(ValueError, match="316.0s required, 315.0s configured"):
+        with pytest.raises(ValueError, match="301.0s required, 300.0s configured"):
             await _run_worker_internal(
                 TEST_VERSION,
                 configure,
                 TEST_MODAL_FUNCTION_TIMEOUT,
                 deps,
             )
+
+    @pytest.mark.asyncio
+    async def test_function_timeout_must_exceed_internal_headroom(self) -> None:
+        deps = _make_test_deps()
+
+        with pytest.raises(ValueError, match="greater than the SDK's 15s safety"):
+            await _run_worker_internal(
+                TEST_VERSION,
+                lambda config: None,
+                _FUNCTION_TIMEOUT_HEADROOM,
+                deps,
+            )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("configured_buffer", "expected_buffer", "expected_work_time"),
+        [
+            (None, timedelta(seconds=32), 28.0),
+            (timedelta(seconds=10), timedelta(seconds=10), 50.0),
+        ],
+    )
+    async def test_shutdown_buffer_follows_graceful_timeout_unless_overridden(
+        self,
+        configured_buffer: timedelta | None,
+        expected_buffer: timedelta,
+        expected_work_time: float,
+    ) -> None:
+        deps = _make_test_deps()
+        captured_config: list[ModalWorkerConfig] = []
+        captured_timeout: list[float] = []
+
+        async def fake_wait_for(awaitable: Awaitable[None], timeout: float) -> None:
+            captured_timeout.append(timeout)
+            await awaitable
+
+        def configure(config: ModalWorkerConfig) -> None:
+            config.execution_timeout = timedelta(seconds=60)
+            config.worker_config["graceful_shutdown_timeout"] = timedelta(seconds=30)
+            config.shutdown_deadline_buffer = configured_buffer
+            captured_config.append(config)
+
+        with patch(
+            "temporalio.contrib.modal.worker._run_worker.asyncio.wait_for",
+            fake_wait_for,
+        ):
+            await _run_worker_internal(
+                TEST_VERSION,
+                configure,
+                TEST_MODAL_FUNCTION_TIMEOUT,
+                deps,
+            )
+
+        assert captured_config[0].shutdown_deadline_buffer == expected_buffer
+        assert captured_timeout == [expected_work_time]
 
     @pytest.mark.asyncio
     async def test_timeout_too_short_after_setup(self) -> None:
