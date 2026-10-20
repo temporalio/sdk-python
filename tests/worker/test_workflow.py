@@ -153,6 +153,7 @@ from tests.helpers.external_stack_trace import (
     external_wait_cancel,
 )
 from tests.helpers.metrics import PromMetricMatcher
+from tests.helpers.time_skipping import skip_if_time_skipping_v1_unsupported
 
 
 @workflow.defn
@@ -4819,12 +4820,8 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
         self.timer_task.cancel()
 
 
-async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v1(
-    env: WorkflowEnvironment,
-):
-    # This test only works when we support time skipping
-    if not env.supports_time_skipping_v1:
-        pytest.skip("Need to skip time to validate this test")
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v1():
+    skip_if_time_skipping_v1_unsupported()
 
     # TODO(cretz): There is a bug in the Java test server, probably
     # https://github.com/temporalio/sdk-java/issues/1138 where the first

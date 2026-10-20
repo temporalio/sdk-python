@@ -1,9 +1,19 @@
-"""Test-side assertions that per-workflow time skipping actually engaged."""
+"""Helpers for time-skipping tests."""
 
 from __future__ import annotations
 
+import platform
+
+import pytest
+
 from temporalio.api.enums.v1 import event_type_pb2 as _event_type
 from temporalio.client import WorkflowHandle
+
+
+def skip_if_time_skipping_v1_unsupported() -> None:
+    """Skip when a V1 time-skipping environment cannot be started here."""
+    if platform.machine() not in ("i386", "AMD64", "x86_64"):
+        pytest.skip("Time skipping server does not run outside x86")
 
 
 async def _has_time_skipping_transitioned_event(handle: WorkflowHandle) -> bool:
