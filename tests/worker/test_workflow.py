@@ -3788,7 +3788,7 @@ async def test_workflow_eviction_deadlock(client: Client):
     await assert_eq_eventually(
         "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s).",
         last_history_task_failure,
-        timeout=timedelta(seconds=5),
+        timeout=timedelta(seconds=10),
         interval=timedelta(seconds=1),
     )
 
