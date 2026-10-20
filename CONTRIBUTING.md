@@ -6,6 +6,9 @@ This guide describes expectations that apply across Temporal SDK repositories. E
 repository may have additional local conventions, but the guidance below should help
 you open issues and pull requests that maintainers can evaluate efficiently.
 
+> [!IMPORTANT]
+> Non-Temporal contributors must not solicit user or customer information, including but not limited to workload, use-case, or failure information. Doing so will result in a ban from all Temporal repositories at Temporal's sole discretion.
+
 ## Before You Open an Issue
 
 Search the existing issues first. If you find an issue that describes the same bug,
