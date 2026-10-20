@@ -238,14 +238,30 @@ class LoggerAdapter(logging.LoggerAdapter):
         log_during_replay: Boolean for whether logs should occur during replay.
             Default is False.
 
-    Values added to ``extra`` are merged with the ``extra`` dictionary from a
+    By default, values added to ``extra`` are merged with the ``extra`` dictionary from a
     logging call, with values from the logging call taking precedence. I.e. the
     behavior is that of ``merge_extra=True`` in Python >= 3.13.
     """
 
-    def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None) -> None:
-        """Create the logger adapter."""
+    def __init__(
+        self,
+        logger: logging.Logger,
+        extra: Mapping[str, Any] | None,
+        *,
+        merge_extra: bool = True,
+    ) -> None:
+        """Create the logger adapter.
+
+        Args:
+            logger: Underlying logger.
+            extra: Extra fields to include in each log record.
+            merge_extra: Whether to merge per-call extra fields with adapter
+                fields, with per-call fields taking precedence. Defaults to True
+                to preserve per-call extra fields. If False, per-call extra
+                fields are ignored. Workflow context is still added in either case.
+        """
         super().__init__(logger, extra or {})
+        self.merge_extra = merge_extra
         self.workflow_info_on_message = True
         self.workflow_info_on_extra = True
         self.full_workflow_info_on_extra = False
@@ -256,6 +272,10 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         """Override to add workflow details."""
+        adapter_extra = dict(self.extra or {})
+        if self.merge_extra:
+            adapter_extra.update(kwargs.get("extra") or {})
+        kwargs["extra"] = adapter_extra
         msg_extra: dict[str, Any] = {}
         extra: dict[str, Any] = {}
 

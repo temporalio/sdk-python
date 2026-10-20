@@ -1,0 +1,1 @@
+Workflow and activity logger adapters now include adapter-level extra fields and accept a `merge_extra` option to control whether per-call extra fields are merged. Merging is enabled by default to preserve existing per-call metadata.

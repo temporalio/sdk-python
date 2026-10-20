@@ -500,9 +500,25 @@ class LoggerAdapter(logging.LoggerAdapter):
             use by others. Default is False.
     """
 
-    def __init__(self, logger: logging.Logger, extra: Mapping[str, Any] | None) -> None:
-        """Create the logger adapter."""
+    def __init__(
+        self,
+        logger: logging.Logger,
+        extra: Mapping[str, Any] | None,
+        *,
+        merge_extra: bool = True,
+    ) -> None:
+        """Create the logger adapter.
+
+        Args:
+            logger: Underlying logger.
+            extra: Extra fields to include in each log record.
+            merge_extra: Whether to merge per-call extra fields with adapter
+                fields, with per-call fields taking precedence. Defaults to True
+                to preserve per-call extra fields. If False, per-call extra
+                fields are ignored. Activity context is still added in either case.
+        """
         super().__init__(logger, extra or {})
+        self.merge_extra = merge_extra
         self.activity_info_on_message = True
         self.activity_info_on_extra = True
         self.full_activity_info_on_extra = False
@@ -511,6 +527,11 @@ class LoggerAdapter(logging.LoggerAdapter):
         self, msg: Any, kwargs: MutableMapping[str, Any]
     ) -> tuple[Any, MutableMapping[str, Any]]:
         """Override to add activity details."""
+        # Copy extra fields before adding context (see issue #503).
+        extra = dict(self.extra or {})
+        if self.merge_extra:
+            extra.update(kwargs.get("extra") or {})
+        kwargs["extra"] = extra
         if (
             self.activity_info_on_message
             or self.activity_info_on_extra
@@ -521,14 +542,10 @@ class LoggerAdapter(logging.LoggerAdapter):
                 if self.activity_info_on_message:
                     msg = f"{msg} ({context.logger_details})"
                 if self.activity_info_on_extra or self.full_activity_info_on_extra:
-                    # Copy any caller-provided extra rather than mutating it in
-                    # place (see https://github.com/temporalio/sdk-python/issues/503).
-                    extra = dict(kwargs.get("extra") or {})
                     if self.activity_info_on_extra:
                         extra["temporal_activity"] = context.logger_details
                     if self.full_activity_info_on_extra:
                         extra["activity_info"] = context.info()
-                    kwargs["extra"] = extra
         return (msg, kwargs)
 
     @property
