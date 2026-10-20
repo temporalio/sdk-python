@@ -879,14 +879,21 @@ async def test_activity_heartbeat_details_timeout(
     assert list(timeout.last_heartbeat_details) == ["some details!"]
 
 
-class _SlowFirstHeartbeatCodec(PayloadCodec):
-    """Encodes the first heartbeat slower than later ones, like a codec waiting on a remote KMS."""
+class _GatedFirstHeartbeatCodec(PayloadCodec):
+    """Holds the first heartbeat in encode until released, like a codec waiting on a remote KMS."""
+
+    def __init__(self) -> None:
+        self.first_started = asyncio.Event()
+        self.release_first = asyncio.Event()
+        self.first_done = asyncio.Event()
 
     async def encode(
         self, payloads: Sequence[temporalio.api.common.v1.Payload]
     ) -> list[temporalio.api.common.v1.Payload]:
         if any(p.data == b'"first"' for p in payloads):
-            await asyncio.sleep(0.5)
+            self.first_started.set()
+            await self.release_first.wait()
+            self.first_done.set()
         return list(payloads)
 
     async def decode(
@@ -904,20 +911,24 @@ async def test_activity_heartbeat_details_keep_order_with_slow_codec(
     if env.supports_time_skipping:
         pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
 
+    codec = _GatedFirstHeartbeatCodec()
+
     @activity.defn
     async def some_activity() -> str:
         info = activity.info()
         if info.heartbeat_details:
             return f"resumed from: {next(iter(info.heartbeat_details))}"
         activity.heartbeat("first")
-        await asyncio.sleep(0.1)
+        # Send the second heartbeat while the first one is still encoding
+        await codec.first_started.wait()
         activity.heartbeat("second")
-        await asyncio.sleep(1)
+        codec.release_first.set()
+        await codec.first_done.wait()
         raise RuntimeError("Try again!")
 
     config = client.config()
     config["data_converter"] = dataclasses.replace(
-        client.data_converter, payload_codec=_SlowFirstHeartbeatCodec()
+        client.data_converter, payload_codec=codec
     )
     result = await _execute_workflow_with_activity(
         Client(**config),
