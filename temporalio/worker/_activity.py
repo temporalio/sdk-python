@@ -165,9 +165,8 @@ class _ActivityWorker:
 
                 if task.HasField("start"):
                     # Cancelled event and sync field will be updated inside
-                    # _run_activity when the activity function is obtained. Max
-                    # size of 1000 should be plenty for the heartbeat queue.
-                    activity = _RunningActivity(pending_heartbeats=asyncio.Queue(1000))
+                    # _run_activity when the activity function is obtained.
+                    activity = _RunningActivity()
                     activity.task = asyncio.create_task(
                         self._handle_start_activity_task(
                             task.task_token, task.start, activity
@@ -246,9 +245,9 @@ class _ActivityWorker:
         logger = temporalio.activity.logger
         activity = self._running_activities.get(task_token)
         if activity and not activity.done:
-            # Put on queue and schedule a task. We will let the queue-full error
-            # be thrown here.
-            activity.pending_heartbeats.put_nowait(details)
+            # Only the newest heartbeat gets sent, so it replaces one that hasn't
+            # been picked up yet
+            activity.pending_heartbeat = details
             activity.last_heartbeat_task = asyncio.create_task(
                 self._heartbeat_async(logger, activity, task_token)
             )
@@ -259,10 +258,20 @@ class _ActivityWorker:
         activity: _RunningActivity,
         task_token: bytes,
     ) -> None:
-        # Drain the queue, only taking the last value to actually heartbeat
-        details: Sequence[Any] | None = None
-        while not activity.pending_heartbeats.empty():
-            details = activity.pending_heartbeats.get_nowait()
+        # One heartbeat at a time, so a slow encode can't let an older heartbeat
+        # reach core after a newer one
+        async with activity.heartbeat_lock:
+            await self._send_latest_heartbeat(logger, activity, task_token)
+
+    async def _send_latest_heartbeat(
+        self,
+        logger: logging.LoggerAdapter,
+        activity: _RunningActivity,
+        task_token: bytes,
+    ) -> None:
+        # Nothing to send if an earlier task already sent the newest heartbeat
+        details = activity.pending_heartbeat
+        activity.pending_heartbeat = None
         if details is None:
             return
 
@@ -716,12 +725,13 @@ class _ActivityWorker:
 
 @dataclass
 class _RunningActivity:
-    pending_heartbeats: asyncio.Queue[Sequence[Any]]
     # Most of these optional values are set before use
     info: temporalio.activity.Info | None = None
     task: asyncio.Task | None = None
     cancelled_event: temporalio.common._CompositeEvent | None = None
     last_heartbeat_task: asyncio.Task | None = None
+    pending_heartbeat: Sequence[Any] | None = None
+    heartbeat_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     cancel_thread_raiser: _ThreadExceptionRaiser | None = None
     sync: bool = False
     done: bool = False
