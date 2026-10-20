@@ -31,6 +31,7 @@ class DevServerConfig:
     log_format: str
     log_level: str
     extra_args: Sequence[str]
+    startup_timeout_ms: int | None
 
 
 @dataclass
@@ -45,6 +46,7 @@ class TestServerConfig:
     download_ttl_ms: int | None
     port: int | None
     extra_args: Sequence[str]
+    startup_timeout_ms: int | None
 
 
 class EphemeralServer:
