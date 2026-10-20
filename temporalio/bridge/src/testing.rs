@@ -29,6 +29,7 @@ pub struct DevServerConfig {
     log_format: String,
     log_level: String,
     extra_args: Vec<String>,
+    startup_timeout_ms: Option<u64>,
 }
 
 #[derive(FromPyObject)]
@@ -41,6 +42,7 @@ pub struct TestServerConfig {
     download_ttl_ms: Option<u64>,
     port: Option<u16>,
     extra_args: Vec<String>,
+    startup_timeout_ms: Option<u64>,
 }
 
 pub fn start_dev_server<'a>(
@@ -137,6 +139,7 @@ impl From<DevServerConfig> for ephemeral_server::TemporalDevServerConfig {
             .maybe_ui_port(conf.ui_port)
             .log((conf.log_format, conf.log_level))
             .extra_args(conf.extra_args)
+            .maybe_startup_timeout(conf.startup_timeout_ms.map(Duration::from_millis))
             .build()
     }
 }
@@ -162,6 +165,7 @@ impl From<TestServerConfig> for ephemeral_server::TestServerConfig {
             })
             .maybe_port(conf.port)
             .extra_args(conf.extra_args)
+            .maybe_startup_timeout(conf.startup_timeout_ms.map(Duration::from_millis))
             .build()
     }
 }
