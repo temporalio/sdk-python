@@ -64,6 +64,14 @@ def test_configuration(client: MemoryClient) -> None:
     [
         (None, "v0"),
         (
+            StorageDriverWorkflowInfo(namespace=""),
+            "v0/ns/null/wt/null/wi/null/ri/null",
+        ),
+        (
+            StorageDriverActivityInfo(namespace=""),
+            "v0/ns/null/at/null/ai/null/ri/null",
+        ),
+        (
             StorageDriverWorkflowInfo(
                 namespace="ns", type="Workflow", id="wf", run_id="run"
             ),

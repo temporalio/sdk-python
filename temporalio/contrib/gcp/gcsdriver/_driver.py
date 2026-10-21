@@ -152,7 +152,7 @@ class GCSStorageDriver(StorageDriver):
         context_segments = ""
         target = context.target
         namespace = _percent_encode(target.namespace) if target is not None else None
-        namespace_segment = f"/ns/{namespace}" if namespace else ""
+        namespace_segment = f"/ns/{namespace or 'null'}" if target is not None else ""
         if isinstance(target, StorageDriverWorkflowInfo):
             wf_type = _percent_encode(target.type) or "null"
             wf_id = _percent_encode(target.id) or "null"

@@ -73,8 +73,9 @@ v0/ns/{namespace}/at/{activity-type}/ai/{activity-id}/ri/{run-id}/d/sha256/{hex-
 v0/d/sha256/{hex-digest}
 ```
 
-The last form applies when target context is unavailable. Missing identity fields
-use `null`. Dynamic segments preserve Unicode, spaces, and safe punctuation.
+The last form applies when target context is unavailable. Empty or missing identity
+fields use `null`, including the namespace when a workflow or activity target is
+present. Dynamic segments preserve Unicode, spaces, and safe punctuation.
 Characters `# [ ] * ? : " < > | / %`, C0 controls (U+0000–U+001F), and DEL/C1
 controls (U+007F–U+009F) are escaped as uppercase `%XX` per UTF-8 byte. Whole
 segments `.` and `..` become `%2E` and `%2E%2E`. See the
