@@ -108,5 +108,5 @@ archive's SHA-256 checksum, and caches the binary in `.pytest_cache`. Supported
 platforms are Linux and macOS on AMD64/ARM64, and Windows on AMD64.
 
 Set `FAKE_GCS_SERVER_PATH` to use an existing binary, or put `fake-gcs-server` on
-`PATH`. Set `STORAGE_EMULATOR_HOST` to use an already running emulator instead.
+`PATH`.
 Each test creates a unique bucket and deletes its objects and bucket afterward.

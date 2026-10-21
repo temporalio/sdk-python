@@ -79,10 +79,6 @@ def _emulator_binary(config: pytest.Config) -> Path:
 def gcs_server_url(
     pytestconfig: pytest.Config, tmp_path_factory: pytest.TempPathFactory
 ) -> Iterator[str]:
-    endpoint = os.environ.get("STORAGE_EMULATOR_HOST")
-    if endpoint:
-        yield endpoint.rstrip("/")
-        return
     binary = _emulator_binary(pytestconfig)
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
