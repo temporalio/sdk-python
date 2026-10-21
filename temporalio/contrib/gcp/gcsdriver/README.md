@@ -2,8 +2,7 @@
 
 > ⚠️ **This package is experimental.** ⚠️
 
-`GCSStorageDriver` stores and retrieves Temporal payloads in Google Cloud Storage,
-following the Python SDK's [S3 driver](../../aws/s3driver/) conventions.
+`GCSStorageDriver` stores and retrieves Temporal payloads in Google Cloud Storage.
 
 Install the optional async client dependency:
 
@@ -65,7 +64,8 @@ object unchanged. Importing the driver and client ABC requires no GCS dependenci
 ## Object names and integrity
 
 Objects contain the complete serialized Temporal `Payload` protobuf, including
-metadata. Names use the same layout and percent-encoding as the Python S3 driver:
+metadata. Object names include available workflow or activity context and a
+SHA-256 digest:
 
 ```text
 v0/ns/{namespace}/wt/{workflow-type}/wi/{workflow-id}/ri/{run-id}/d/sha256/{hex-digest}
