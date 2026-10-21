@@ -1674,34 +1674,30 @@ async def test_extstore_workflow_activity_and_nexus_workers_share_driver_operati
         )
         # Each workflow causes exactly one store: a workflow completion, an
         # activity result and a Nexus operation result.
-        handles = [
-            await client.start_workflow(
-                ManyLargeActivityInputsWorkflow.run,
-                1,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            ),
-            await client.start_workflow(
-                LargeActivityResultWorkflow.run,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            ),
-            await client.start_workflow(
-                LargeNexusResultWorkflow.run,
-                worker.task_queue,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            ),
-        ]
+        workflow_completion = await client.start_workflow(
+            ManyLargeActivityInputsWorkflow.run,
+            1,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        activity_result = await client.start_workflow(
+            LargeActivityResultWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        nexus_result = await client.start_workflow(
+            LargeNexusResultWorkflow.run,
+            worker.task_queue,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
         await driver.wait_until(lambda: driver.requested == 3)
         await _settle()
         assert driver.in_flight == 1
 
         driver.release()
-        assert [await handle.result() for handle in handles] == [
-            [len(_LARGE_DATA)],
-            len(_LARGE_DATA),
-            len(_LARGE_DATA),
-        ]
+        assert await workflow_completion.result() == [len(_LARGE_DATA)]
+        assert await activity_result.result() == len(_LARGE_DATA)
+        assert await nexus_result.result() == len(_LARGE_DATA)
 
     assert driver.peak == 1
