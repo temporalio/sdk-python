@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import string
 from collections.abc import Callable, Coroutine, Sequence
 from typing import Any, TypeVar
 
@@ -25,23 +24,28 @@ from temporalio.converter import (
 
 _T = TypeVar("_T")
 
-_KEY_SAFE_CHARS = frozenset(string.ascii_letters + string.digits + "!-_.*'()")
+_GCS_UNSAFE_CHARS = frozenset('#[]*?:"<>|/%')
 
 
 def _percent_encode(val: str | None) -> str | None:
     """Percent-encode a segment of a GCS object name.
 
-    Encodes every byte outside :data:`_KEY_SAFE_CHARS` as ``%XX`` with
-    upper-case hex digits, operating on the UTF-8 bytes so non-ASCII
-    characters are escaped byte by byte. Returns ``None`` for empty or
+    Escape characters that interfere with GCS tooling, path separators, and
+    percent signs, preserving readable Unicode. Returns ``None`` for empty or
     missing values so callers can substitute ``"null"``.
     """
     if not val:
         return None
-    return "".join(
-        chr(byte) if chr(byte) in _KEY_SAFE_CHARS else f"%{byte:02X}"
-        for byte in val.encode("utf-8")
-    )
+    encoded: list[str] = []
+    for char in val:
+        if char in _GCS_UNSAFE_CHARS or ord(char) <= 0x1F or 0x7F <= ord(char) <= 0x9F:
+            encoded.extend(f"%{byte:02X}" for byte in char.encode("utf-8"))
+        else:
+            encoded.append(char)
+    segment = "".join(encoded)
+    if segment in (".", ".."):
+        return segment.replace(".", "%2E")
+    return segment
 
 
 def _format_client_context(client: GCSStorageDriverClient) -> str:

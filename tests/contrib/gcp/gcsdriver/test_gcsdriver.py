@@ -79,7 +79,7 @@ def test_configuration(client: MemoryClient) -> None:
         ),
         (
             StorageDriverWorkflowInfo(namespace="ns /%", id="日本語 😀", type="A+B=C"),
-            "v0/ns/ns%20%2F%25/wt/A%2BB%3DC/wi/%E6%97%A5%E6%9C%AC%E8%AA%9E%20%F0%9F%98%80/ri/null",
+            "v0/ns/ns %2F%25/wt/A+B=C/wi/日本語 😀/ri/null",
         ),
     ],
 )
@@ -99,6 +99,38 @@ async def test_object_names(
         "hash_algorithm": "sha256",
         "hash_value": digest,
     }
+
+
+@pytest.mark.parametrize(
+    "value,encoded",
+    [
+        ("hello-world_v2.0", "hello-world_v2.0"),
+        ("日本語 café 😀", "日本語 café 😀"),
+        ("a+b=c@d!$&'();,", "a+b=c@d!$&'();,"),
+        ('#[]*?:"<>|/%', "%23%5B%5D%2A%3F%3A%22%3C%3E%7C%2F%25"),
+        ("\x00\n\r\x1f\x7f\x80\x9f", "%00%0A%0D%1F%7F%C2%80%C2%9F"),
+        (".", "%2E"),
+        ("..", "%2E%2E"),
+        ("...", "..."),
+        ("a.b", "a.b"),
+        ("a/b", "a%2Fb"),
+        ("a%2Fb", "a%252Fb"),
+    ],
+)
+async def test_object_name_encoding(
+    client: MemoryClient, value: str, encoded: str
+) -> None:
+    [claim] = await GCSStorageDriver(client, "bucket").store(
+        StorageDriverStoreContext(
+            target=StorageDriverWorkflowInfo(
+                namespace=value, type=value, id=value, run_id=value
+            )
+        ),
+        [payload()],
+    )
+    assert claim.claim_data["object_name"].startswith(
+        f"v0/ns/{encoded}/wt/{encoded}/wi/{encoded}/ri/{encoded}/d/sha256/"
+    )
 
 
 async def test_round_trip_and_deduplication(client: MemoryClient) -> None:
@@ -161,7 +193,7 @@ async def test_size_includes_metadata(client: MemoryClient) -> None:
 
 async def test_object_name_limit(client: MemoryClient) -> None:
     context = StorageDriverStoreContext(
-        target=StorageDriverWorkflowInfo(namespace="ns", id="日" * 200)
+        target=StorageDriverWorkflowInfo(namespace="ns", id="日" * 400)
     )
     with pytest.raises(ValueError, match="1024 UTF-8 bytes"):
         await GCSStorageDriver(client, "bucket").store(context, [payload()])
