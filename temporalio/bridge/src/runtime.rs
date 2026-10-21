@@ -4,7 +4,6 @@ use pyo3::prelude::*;
 use pythonize::pythonize;
 use std::collections::HashMap;
 use std::future::Future;
-use std::mem::ManuallyDrop;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
@@ -34,9 +33,28 @@ pub struct RuntimeRef {
 #[derive(Clone)]
 pub(crate) struct Runtime {
     pub(crate) pid: u32,
-    pub(crate) core: ManuallyDrop<Arc<CoreRuntime>>,
+    pub(crate) core: Arc<CoreRuntimeHandle>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
+}
+
+/// Owns the Core runtime so the last runtime clone can shut it down with the GIL released.
+/// Shutting down waits for running Tokio tasks, and the log forwarder may be one of them,
+/// waiting for the GIL.
+pub(crate) struct CoreRuntimeHandle(Option<CoreRuntime>);
+
+impl std::ops::Deref for CoreRuntimeHandle {
+    type Target = CoreRuntime;
+
+    fn deref(&self) -> &CoreRuntime {
+        self.0.as_ref().expect("Core runtime used after drop")
+    }
+}
+
+impl Drop for CoreRuntimeHandle {
+    fn drop(&mut self) {
+        let _ = Python::try_attach(|py| py.detach(|| drop(self.0.take())));
+    }
 }
 
 #[derive(FromPyObject)]
@@ -200,7 +218,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     Ok(RuntimeRef {
         runtime: Runtime {
             pid: std::process::id(),
-            core: ManuallyDrop::new(Arc::new(core)),
+            core: Arc::new(CoreRuntimeHandle(Some(core))),
             metrics_call_buffer,
             log_forwarder_handle,
         },
@@ -244,16 +262,6 @@ impl Drop for Runtime {
         // log forwarder when the last clone is dropped
         if let Some(handle) = self.log_forwarder_handle.take().and_then(Arc::into_inner) {
             handle.abort();
-        }
-
-        // SAFETY: `core` is not used again after this
-        let core = unsafe { ManuallyDrop::take(&mut self.core) };
-        if let Some(core) = Arc::into_inner(core) {
-            // Dropping the last clone shuts down Tokio, which waits for running tasks.
-            // The log forwarder may be one of them, waiting for the GIL, so release it.
-            let mut core = Some(core);
-            let _ = Python::try_attach(|py| py.detach(|| drop(core.take())));
-            drop(core);
         }
     }
 }
