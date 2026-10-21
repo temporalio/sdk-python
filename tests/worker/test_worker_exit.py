@@ -26,7 +26,7 @@ class CleanupPlugin(SimplePlugin):
         try:
             await super().run_worker(worker, next)
         finally:
-            # A call after the Worker stops, as a plugin's cleanup makes.
+            # Plugin cleanup code calls the server after the Worker stops.
             self.cleanup_result = (await self.client.count_workflows()).count
 
 
@@ -40,5 +40,5 @@ async def test_plugin_cleanup_awaits_after_worker_exit(client: Client):
     ):
         pass
     assert plugin.cleanup_result is not None
-    # The caller's own awaits after the block must not be cancelled.
+    # The caller can still await after the block.
     await client.count_workflows()

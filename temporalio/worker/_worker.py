@@ -961,8 +961,7 @@ class Worker:
                 await self.run()
             except BaseException as err:
                 self._async_context_run_exception = err
-                # After __aexit__ starts, the caller is past the block, so a cancel would hit
-                # its later awaits.
+                # After __aexit__ starts, a cancel would stop the caller's code after the block.
                 if not self._async_context_exiting:
                     self._async_context_inner_task.cancel()  # type: ignore[union-attr]
 
@@ -979,8 +978,7 @@ class Worker:
         if not self._async_context_run_task:
             raise RuntimeError("Never started")
         await self.shutdown()
-        # The run is done after shutdown, except for the code that plugins run after it. Let
-        # that code finish, so a plugin can still await calls in its cleanup.
+        # Plugins can run cleanup code after shutdown. Wait for that code instead of cancelling it.
         self._async_context_exiting = True
         run_task = self._async_context_run_task
         await asyncio.wait([run_task], timeout=_RUN_TASK_EXIT_TIMEOUT.total_seconds())
@@ -991,7 +989,7 @@ class Worker:
             raise self._async_context_run_exception
 
 
-# How long __aexit__ waits for the plugins' code after the Worker shut down.
+# How long __aexit__ waits for plugin cleanup code after shutdown.
 _RUN_TASK_EXIT_TIMEOUT = timedelta(seconds=60)
 
 
