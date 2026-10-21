@@ -80,7 +80,7 @@ overwrite existing objects, and downloads verify the hash before decoding.
 
 ## Testing
 
-Run the tests without cloud credentials or Docker:
+Run the tests:
 
 ```bash
 poe test -s tests/contrib/gcp/gcsdriver
