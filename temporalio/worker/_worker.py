@@ -488,6 +488,7 @@ class Worker:
         self._async_context_inner_task: asyncio.Task | None = None
         self._async_context_run_task: asyncio.Task | None = None
         self._async_context_run_exception: BaseException | None = None
+        self._async_context_exiting = False
 
         self._activity_worker: _ActivityWorker | None = None
         self._runtime = (
@@ -960,7 +961,10 @@ class Worker:
                 await self.run()
             except BaseException as err:
                 self._async_context_run_exception = err
-                self._async_context_inner_task.cancel()  # type: ignore[union-attr]
+                # After __aexit__ starts, the caller is past the block, so a cancel would hit
+                # its later awaits.
+                if not self._async_context_exiting:
+                    self._async_context_inner_task.cancel()  # type: ignore[union-attr]
 
         self._async_context_run_task = asyncio.create_task(run())
         return self
@@ -975,11 +979,20 @@ class Worker:
         if not self._async_context_run_task:
             raise RuntimeError("Never started")
         await self.shutdown()
-        # Cancel our run task
-        self._async_context_run_task.cancel()
+        # The run is done after shutdown, except for the code that plugins run after it. Let
+        # that code finish, so a plugin can still await calls in its cleanup.
+        self._async_context_exiting = True
+        run_task = self._async_context_run_task
+        await asyncio.wait([run_task], timeout=_RUN_TASK_EXIT_TIMEOUT.total_seconds())
+        if not run_task.done():
+            run_task.cancel()
         # Only re-raise our exception if present and exc_type is cancel
         if exc_type is asyncio.CancelledError and self._async_context_run_exception:
             raise self._async_context_run_exception
+
+
+# How long __aexit__ waits for the plugins' code after the Worker shut down.
+_RUN_TASK_EXIT_TIMEOUT = timedelta(seconds=60)
 
 
 class WorkerConfig(TypedDict, total=False):
