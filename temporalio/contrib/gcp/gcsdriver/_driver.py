@@ -180,7 +180,8 @@ class GCSStorageDriver(StorageDriver):
 
             object_name = f"v0{namespace_segment}{context_segments}{digest_segments}"
             if len(object_name.encode("utf-8")) > 1024:
-                raise ValueError("GCS object name exceeds maximum 1024 UTF-8 bytes")
+                # Retain namespace scope for authorization policies on object prefixes.
+                object_name = f"v0{namespace_segment}{digest_segments}"
 
             try:
                 if not await self._client.object_exists(

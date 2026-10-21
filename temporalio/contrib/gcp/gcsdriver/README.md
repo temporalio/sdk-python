@@ -80,7 +80,10 @@ Characters `# [ ] * ? : " < > | / %`, C0 controls (U+0000–U+001F), and DEL/C1
 controls (U+007F–U+009F) are escaped as uppercase `%XX` per UTF-8 byte. Whole
 segments `.` and `..` become `%2E` and `%2E%2E`. See the
 [GCS naming guidance](https://cloud.google.com/storage/docs/objects#naming).
-Object names over 1,024 UTF-8 bytes are rejected.
+If a full object name exceeds 1,024 UTF-8 bytes, the driver omits the workflow or
+activity identity segments and uses `v0/ns/{namespace}/d/sha256/{hex-digest}`.
+This preserves namespace scope for authorization policies and deduplicates
+identical serialized payloads across that namespace.
 
 Identical serialized bytes in the same context share an object. The driver checks
 existence before uploading; the built-in adapter also uses conditional creation to

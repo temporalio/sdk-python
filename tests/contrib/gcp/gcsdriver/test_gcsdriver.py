@@ -199,13 +199,56 @@ async def test_size_includes_metadata(client: MemoryClient) -> None:
     assert client.uploads == 1
 
 
-async def test_object_name_limit(client: MemoryClient) -> None:
-    context = StorageDriverStoreContext(
-        target=StorageDriverWorkflowInfo(namespace="ns", id="日" * 400)
+@pytest.mark.parametrize(
+    "target_type", [StorageDriverWorkflowInfo, StorageDriverActivityInfo]
+)
+@pytest.mark.parametrize("size", [1023, 1024, 1025])
+@pytest.mark.parametrize("char", ["x", "日"])
+async def test_object_name_limit(
+    client: MemoryClient,
+    target_type: type[StorageDriverWorkflowInfo] | type[StorageDriverActivityInfo],
+    size: int,
+    char: str,
+) -> None:
+    original = payload()
+    digest = hashlib.sha256(original.SerializeToString()).hexdigest()
+    identity = (
+        "wt/Type/wi" if target_type is StorageDriverWorkflowInfo else "at/Type/ai"
     )
-    with pytest.raises(ValueError, match="1024 UTF-8 bytes"):
-        await GCSStorageDriver(client, "bucket").store(context, [payload()])
-    assert not client.objects
+    prefix = f"v0/ns/ns/{identity}/"
+    suffix = f"/ri/run/d/sha256/{digest}"
+    remaining = size - len(prefix) - len(suffix)
+    count, padding = divmod(remaining, len(char.encode("utf-8")))
+    target_id = char * count + "x" * padding
+    context = StorageDriverStoreContext(
+        target=target_type(namespace="ns", type="Type", id=target_id, run_id="run")
+    )
+    driver = GCSStorageDriver(client, "bucket")
+    [claim] = await driver.store(context, [original])
+    assert claim.claim_data["object_name"] == (
+        f"v0/ns/ns/d/sha256/{digest}" if size > 1024 else f"{prefix}{target_id}{suffix}"
+    )
+    assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [original]
+
+
+async def test_long_object_names_preserve_namespace(client: MemoryClient) -> None:
+    driver = GCSStorageDriver(client, "bucket")
+    claims = []
+    for namespace in ("first", "second", ""):
+        [claim] = await driver.store(
+            StorageDriverStoreContext(
+                target=StorageDriverWorkflowInfo(namespace=namespace, id="日" * 400)
+            ),
+            [payload()],
+        )
+        assert claim.claim_data["object_name"].startswith(
+            f"v0/ns/{namespace or 'null'}/d/sha256/"
+        )
+        claims.append(claim)
+    assert len(client.objects) == 3
+    assert (
+        await driver.retrieve(StorageDriverRetrieveContext(), claims) == [payload()] * 3
+    )
 
 
 @pytest.mark.parametrize(
