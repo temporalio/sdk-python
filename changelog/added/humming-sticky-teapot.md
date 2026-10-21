@@ -1,0 +1,1 @@
+Added experimental workflow-affine activities through `workflow.ActivitySessionOptions.workflow_session()` and `worker.WorkerSessionOptions`, with optional `worker.SingleSessionOptions` for lifetime dedication to a stable destination.

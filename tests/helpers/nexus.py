@@ -3,19 +3,12 @@ from collections.abc import Sequence
 import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.history.v1
-from temporalio.client import WorkflowHistory
+from tests.helpers import events_of_type as events_of_type
 
 
 def make_nexus_endpoint_name(task_queue: str) -> str:
     # Create endpoints for different task queues without name collisions.
     return f"nexus-endpoint-{task_queue}"
-
-
-def events_of_type(
-    history: WorkflowHistory,
-    event_type: temporalio.api.enums.v1.EventType.ValueType,
-) -> list[temporalio.api.history.v1.HistoryEvent]:
-    return [event for event in history.events if event.event_type == event_type]
 
 
 def links_from_workflow_execution_started_event(

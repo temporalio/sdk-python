@@ -21,7 +21,11 @@ from ..types import AnyType, ParamType
 from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
-    from ._activities import ActivityCancellationType, ActivityHandle
+    from ._activities import (
+        ActivityCancellationType,
+        ActivityHandle,
+        ActivitySessionOptions,
+    )
     from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
@@ -435,6 +439,7 @@ class _Runtime(ABC):
         summary: str | None = None,
         event_groups: Sequence[EventGroup] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
+        session_options: ActivitySessionOptions | None = None,
     ) -> ActivityHandle[Any]: ...
 
     @abstractmethod

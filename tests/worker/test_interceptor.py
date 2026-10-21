@@ -121,6 +121,11 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         await super().signal_external_workflow(input)
 
     def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
+        assert (
+            input.session_options == workflow.ActivitySessionOptions.workflow_session()
+        )
+        # Exercise the field without requiring session routing on the stock test server.
+        input.session_options = None
         interceptor_traces.append(("workflow.start_activity", input))
         return super().start_activity(input)
 
@@ -208,7 +213,10 @@ class InterceptedWorkflow:
             return
 
         await workflow.execute_activity(
-            intercepted_activity, "val1", schedule_to_close_timeout=timedelta(seconds=5)
+            intercepted_activity,
+            "val1",
+            schedule_to_close_timeout=timedelta(seconds=5),
+            session_options=workflow.ActivitySessionOptions.workflow_session(),
         )
         await workflow.execute_local_activity(
             intercepted_activity, "val2", schedule_to_close_timeout=timedelta(seconds=5)

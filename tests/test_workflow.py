@@ -10,6 +10,14 @@ from temporalio import workflow
 from temporalio.common import RawValue, VersioningBehavior
 
 
+def test_activity_session_options_require_factory() -> None:
+    options_type: Any = workflow.ActivitySessionOptions
+    with pytest.raises(TypeError):
+        options_type()
+    with pytest.raises(TypeError):
+        options_type(use_workflow_session=False)
+
+
 class GoodDefnBase:
     @workflow.run
     async def run(self, _name: str) -> str:

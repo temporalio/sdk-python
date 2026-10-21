@@ -285,6 +285,16 @@ class StartActivityInput:
     # The types may be absent
     arg_types: list[type] | None
     ret_type: type | None
+    session_options: temporalio.workflow.ActivitySessionOptions | None = field(
+        default=None, kw_only=True
+    )
+    """Activity session routing. Use
+    :py:meth:`temporalio.workflow.ActivitySessionOptions.workflow_session` to join
+    the workflow's session; ``None`` selects ordinary task-queue routing.
+
+    .. warning::
+        Activity sessions are experimental and may change without notice.
+    """
 
 
 @dataclass
