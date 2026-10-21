@@ -1,5 +1,4 @@
 import asyncio
-import platform
 import uuid
 from datetime import datetime, timedelta, timezone
 from time import monotonic
@@ -32,6 +31,7 @@ from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers import new_worker
+from tests.helpers.time_skipping import skip_if_time_skipping_v1_unsupported
 
 
 @workflow.defn
@@ -58,13 +58,8 @@ class SleepWorkflow:
         return workflow.now().timestamp()
 
 
-def skip_if_not_x86() -> None:
-    if platform.machine() not in ("i386", "AMD64", "x86_64"):
-        pytest.skip("Time skipping server does not run outside x86")
-
-
 async def test_workflow_env_time_skipping_basic():
-    skip_if_not_x86()
+    skip_if_time_skipping_v1_unsupported()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, SleepWorkflow) as worker:
             # Check that time is around now
@@ -82,7 +77,7 @@ async def test_workflow_env_time_skipping_basic():
 
 
 async def test_workflow_env_time_skipping_manual():
-    skip_if_not_x86()
+    skip_if_time_skipping_v1_unsupported()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, SleepWorkflow) as worker:
             # Start workflow
@@ -134,7 +129,7 @@ class ActivityWaitWorkflow:
 
 
 async def test_workflow_env_time_skipping_heartbeat_timeout():
-    skip_if_not_x86()
+    skip_if_time_skipping_v1_unsupported()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(
             env.client,
@@ -154,7 +149,7 @@ async def test_workflow_env_time_skipping_heartbeat_timeout():
 
 
 async def test_workflow_env_time_skipping_disabled():
-    skip_if_not_x86()
+    skip_if_time_skipping_v1_unsupported()
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with new_worker(env.client, SleepWorkflow) as worker:
             # Confirm when executing normally it does not sleep for a full 3s
