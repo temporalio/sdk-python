@@ -962,7 +962,8 @@ def set_dynamic_signal_handler(handler: Callable | None) -> None:
     This overrides the existing dynamic handler even if it was created via the
     ``@workflow.signal`` decorator.
 
-    When set, all unhandled past signals are immediately sent to the handler.
+    When set, all unhandled past signals are immediately sent to the handler
+    in the order they were received.
 
     Args:
         handler: Callable to set or None to unset.

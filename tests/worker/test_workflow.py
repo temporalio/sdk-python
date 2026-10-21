@@ -687,6 +687,87 @@ async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Clie
         )
 
 
+@workflow.defn
+class DynamicSignalBufferOrderWorkflow:
+    def __init__(self) -> None:
+        self._events: list[str] = []
+        self._activities: list[workflow.ActivityHandle[str]] = []
+
+    @workflow.run
+    async def run(self) -> list[str]:
+        def on_signal(name: str, args: Sequence[RawValue]) -> None:
+            arg = workflow.payload_converter().from_payload(args[0].payload, str)
+            event = f"{name}:{arg}"
+            self._events.append(event)
+            # Replay checks activity IDs, so a different delivery order fails
+            # replay instead of passing silently
+            self._activities.append(
+                workflow.start_activity(
+                    say_hello,
+                    event,
+                    activity_id=event,
+                    start_to_close_timeout=timedelta(seconds=30),
+                )
+            )
+
+        workflow.set_dynamic_signal_handler(on_signal)
+        await workflow.wait_condition(lambda: len(self._events) == 4)
+        await asyncio.gather(*self._activities)
+        return self._events
+
+
+async def start_with_buffered_dynamic_signals(
+    client: Client, task_queue: str
+) -> WorkflowHandle:
+    handle = await client.start_workflow(
+        DynamicSignalBufferOrderWorkflow.run,
+        id=f"workflow-{uuid.uuid4()}",
+        task_queue=task_queue,
+    )
+    # No worker is polling yet, so all four signals are buffered until the
+    # workflow sets its dynamic handler
+    for name, arg in [("add", "1"), ("remove", "2"), ("add", "3"), ("remove", "4")]:
+        await handle.signal(name, arg)
+    return handle
+
+
+async def test_workflow_dynamic_signal_handler_buffered_order(client: Client):
+    task_queue = str(uuid.uuid4())
+    handle = await start_with_buffered_dynamic_signals(client, task_queue)
+    async with new_worker(
+        client,
+        DynamicSignalBufferOrderWorkflow,
+        activities=[say_hello],
+        task_queue=task_queue,
+    ):
+        assert await handle.result() == ["add:1", "remove:2", "add:3", "remove:4"]
+    await Replayer(workflows=[DynamicSignalBufferOrderWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
+
+
+async def test_workflow_dynamic_signal_handler_buffered_order_legacy_replay(
+    client: Client,
+):
+    task_queue = str(uuid.uuid4())
+    handle = await start_with_buffered_dynamic_signals(client, task_queue)
+    worker = new_worker(
+        client,
+        DynamicSignalBufferOrderWorkflow,
+        activities=[say_hello],
+        task_queue=task_queue,
+    )
+    worker._set_default_workflow_logic_flag(
+        _WorkflowLogicFlag.DELIVER_BUFFERED_SIGNALS_IN_ARRIVAL_ORDER, enabled=False
+    )
+    async with worker:
+        assert await handle.result() == ["add:1", "add:3", "remove:2", "remove:4"]
+    # A history recorded without the flag still replays with the flag on
+    await Replayer(workflows=[DynamicSignalBufferOrderWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
+
+
 @dataclass
 class BadSignalParam:
     some_str: str

@@ -394,9 +394,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
 
         # Maintain buffered signals for later-added dynamic handlers
-        self._buffered_signals: dict[
-            str, list[temporalio.bridge.proto.workflow_activation.SignalWorkflow]
-        ] = {}
+        self._buffered_signals: list[
+            temporalio.bridge.proto.workflow_activation.SignalWorkflow
+        ] = []
 
         # When we evict, we have to mark the workflow as deleting so we don't
         # add any commands and we swallow exceptions on tear down
@@ -1156,7 +1156,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Apply to named or to dynamic or buffer
         signal_defn = self._signals.get(job.signal_name) or self._signals.get(None)
         if not signal_defn:
-            self._buffered_signals.setdefault(job.signal_name, []).append(job)
+            self._buffered_signals.append(job)
             return
         self._process_signal_job(signal_defn, job)
 
@@ -1551,13 +1551,28 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
             # We have to send buffered signals to the handler if they apply
             if name:
-                for job in self._buffered_signals.pop(name, []):
-                    self._process_signal_job(defn, job)
+                jobs = [j for j in self._buffered_signals if j.signal_name == name]
+                self._buffered_signals = [
+                    j for j in self._buffered_signals if j.signal_name != name
+                ]
             else:
-                for jobs in self._buffered_signals.values():
-                    for job in jobs:
-                        self._process_signal_job(defn, job)
-                self._buffered_signals.clear()
+                jobs = self._buffered_signals
+                self._buffered_signals = []
+                # Histories recorded without the flag delivered these grouped by
+                # signal name, so replay of those must keep that order
+                by_name: dict[
+                    str,
+                    list[temporalio.bridge.proto.workflow_activation.SignalWorkflow],
+                ] = {}
+                for job in jobs:
+                    by_name.setdefault(job.signal_name, []).append(job)
+                grouped = [job for named in by_name.values() for job in named]
+                if grouped != jobs and not self._workflow_logic_flag_enabled(
+                    _WorkflowLogicFlag.DELIVER_BUFFERED_SIGNALS_IN_ARRIVAL_ORDER
+                ):
+                    jobs = grouped
+            for job in jobs:
+                self._process_signal_job(defn, job)
         else:
             self._signals.pop(name, None)
 
@@ -4170,10 +4185,13 @@ class _WorkflowLogicFlag(IntEnum):
 
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
     PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
+    DELIVER_BUFFERED_SIGNALS_IN_ARRIVAL_ORDER = 3
 
 
 # TODO: Enable PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH by default after
 # two published SDK releases have recognized flag 2. When enabling it, remove the
 # explicit overrides for this flag from tests/worker/test_workflow.py, then remove
 # this reminder.
-_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
+_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
+    {_WorkflowLogicFlag.DELIVER_BUFFERED_SIGNALS_IN_ARRIVAL_ORDER}
+)
