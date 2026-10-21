@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
 import platform
 import shutil
 import socket
@@ -33,14 +32,14 @@ _EMULATOR_CHECKSUMS = {
 
 
 def _emulator_binary(config: pytest.Config) -> Path:
-    override = os.environ.get("FAKE_GCS_SERVER_PATH") or shutil.which("fake-gcs-server")
-    if override:
-        return Path(override).resolve(strict=True)
+    installed_binary = shutil.which("fake-gcs-server")
+    if installed_binary:
+        return Path(installed_binary).resolve(strict=True)
     machine = platform.machine().lower()
     arch = {"x86_64": "amd64", "aarch64": "arm64"}.get(machine, machine)
     target = f"{platform.system()}_{arch}"
     if target not in _EMULATOR_CHECKSUMS:
-        pytest.fail(f"No fake GCS binary for {target}; set FAKE_GCS_SERVER_PATH")
+        pytest.fail(f"No fake GCS binary for {target}; install fake-gcs-server on PATH")
     assert config.cache is not None
     cache = config.cache.mkdir("fake-gcs-server") / _EMULATOR_VERSION / target
     cache.mkdir(parents=True, exist_ok=True)
