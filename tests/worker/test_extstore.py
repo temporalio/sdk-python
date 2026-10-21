@@ -1606,6 +1606,19 @@ async def test_extstore_client_rebuilt_from_config_gets_its_own_driver_operation
     assert driver.peak == 2
 
 
+async def test_extstore_client_data_converter_is_the_one_passed_in(
+    env: WorkflowEnvironment,
+) -> None:
+    """The client's driver operation limit stays internal, so the public
+    converter holds no state tied to the client's event loop."""
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        external_storage=ExternalStorage(drivers=[InMemoryTestDriver()]),
+    )
+    client = await env.connect_client(data_converter=data_converter)
+    assert client.data_converter is data_converter
+
+
 async def test_extstore_worker_driver_operation_limit_is_separate_from_client(
     env: WorkflowEnvironment,
 ) -> None:

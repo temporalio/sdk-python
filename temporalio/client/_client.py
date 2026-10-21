@@ -295,8 +295,9 @@ class Client:
 
     def _init_from_config(self, config: ClientConfig):
         self._config = config
-        # The driver operation limit is state of this client, not config, so it
-        # is kept off the config. Clients built from this config get their own.
+        # The driver operation limit is state of this client, so it rides on a
+        # private copy of the converter rather than the config or the public
+        # data_converter. Clients built from this config get their own.
         converter = config["data_converter"]
         self._data_converter = (
             dataclasses.replace(
@@ -360,7 +361,7 @@ class Client:
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
-        return self._data_converter
+        return self._config["data_converter"]
 
     @property
     def rpc_metadata(self) -> Mapping[str, str | bytes]:
