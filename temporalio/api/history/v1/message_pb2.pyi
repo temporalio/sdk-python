@@ -24,6 +24,7 @@ import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.session.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
@@ -1290,6 +1291,7 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
     RETRY_POLICY_FIELD_NUMBER: builtins.int
     USE_WORKFLOW_BUILD_ID_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """The worker/user assigned identifier for the activity"""
     @property
@@ -1348,6 +1350,13 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
         """Priority metadata. If this message is not present, or any fields are not
         present, they inherit the values from the workflow.
         """
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.ActivitySessionOptions:
+        """Preserves the scheduling command's session routing options so activity state
+        can be reconstructed from history.
+        """
     def __init__(
         self,
         *,
@@ -1364,6 +1373,8 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
         retry_policy: temporalio.api.common.v1.message_pb2.RetryPolicy | None = ...,
         use_workflow_build_id: builtins.bool = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.ActivitySessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1384,6 +1395,8 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",
@@ -1411,6 +1424,8 @@ class ActivityTaskScheduledEventAttributes(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",

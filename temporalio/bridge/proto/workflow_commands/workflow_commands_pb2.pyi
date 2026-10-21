@@ -25,6 +25,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.session.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -444,6 +445,7 @@ class ScheduleActivity(google.protobuf.message.Message):
     DO_NOT_EAGERLY_EXECUTE_FIELD_NUMBER: builtins.int
     VERSIONING_INTENT_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     seq: builtins.int
     """Lang's incremental sequence number, used as the operation identifier"""
     activity_id: builtins.str
@@ -503,6 +505,10 @@ class ScheduleActivity(google.protobuf.message.Message):
     @property
     def priority(self) -> temporalio.api.common.v1.message_pb2.Priority:
         """The Priority to use for this activity"""
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.ActivitySessionOptions: ...
     def __init__(
         self,
         *,
@@ -527,6 +533,8 @@ class ScheduleActivity(google.protobuf.message.Message):
         do_not_eagerly_execute: builtins.bool = ...,
         versioning_intent: temporalio.bridge.proto.common.common_pb2.VersioningIntent.ValueType = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.ActivitySessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -541,6 +549,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"schedule_to_close_timeout",
             "schedule_to_start_timeout",
             b"schedule_to_start_timeout",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
         ],
@@ -572,6 +582,8 @@ class ScheduleActivity(google.protobuf.message.Message):
             b"schedule_to_start_timeout",
             "seq",
             b"seq",
+            "session_options",
+            b"session_options",
             "start_to_close_timeout",
             b"start_to_close_timeout",
             "task_queue",

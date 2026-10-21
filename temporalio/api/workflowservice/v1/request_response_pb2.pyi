@@ -47,6 +47,7 @@ import temporalio.api.schedule.v1.message_pb2
 import temporalio.api.sdk.v1.task_complete_metadata_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
 import temporalio.api.sdk.v1.worker_config_pb2
+import temporalio.api.session.v1.message_pb2
 import temporalio.api.taskqueue.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.api.version.v1.message_pb2
@@ -606,6 +607,7 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     EAGER_WORKER_DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_STATE_PROPAGATION_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     workflow_id: builtins.str
     @property
@@ -737,6 +739,14 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
         """Serialization context propagated from the Nexus caller that started this workflow."""
+    @property
+    def time_skipping_state_propagation(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
+        """Time-skipping state propagated by the execution that started this workflow.
+        This field is intended for use by the Temporal server, for example when a schedule
+        starts a workflow, and is not intended to be set by external clients.
+        """
     def __init__(
         self,
         *,
@@ -782,6 +792,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
         | None = ...,
         propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
         | None = ...,
+        time_skipping_state_propagation: temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -812,6 +824,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -871,6 +885,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
             b"task_queue",
             "time_skipping_config",
             b"time_skipping_config",
+            "time_skipping_state_propagation",
+            b"time_skipping_state_propagation",
             "user_metadata",
             b"user_metadata",
             "versioning_override",
@@ -1177,6 +1193,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -1214,6 +1231,11 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.WorkerSessionOptions:
+        """EXPERIMENTAL. Subject to redesign or removal. Only applicable to sticky polls."""
     def __init__(
         self,
         *,
@@ -1228,12 +1250,16 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.WorkerSessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "deployment_options",
             b"deployment_options",
+            "session_options",
+            b"session_options",
             "task_queue",
             b"task_queue",
             "worker_version_capabilities",
@@ -1253,6 +1279,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "session_options",
+            b"session_options",
             "task_queue",
             b"task_queue",
             "worker_control_task_queue",
@@ -2010,6 +2038,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    SESSION_OPTIONS_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     @property
     def task_queue(self) -> temporalio.api.taskqueue.v1.message_pb2.TaskQueue: ...
@@ -2046,6 +2075,11 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         self,
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
+    @property
+    def session_options(
+        self,
+    ) -> temporalio.api.session.v1.message_pb2.WorkerSessionOptions:
+        """EXPERIMENTAL. Subject to redesign or removal. Only applicable to sticky polls."""
     def __init__(
         self,
         *,
@@ -2061,12 +2095,16 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        session_options: temporalio.api.session.v1.message_pb2.WorkerSessionOptions
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
             "deployment_options",
             b"deployment_options",
+            "session_options",
+            b"session_options",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -2086,6 +2124,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "session_options",
+            b"session_options",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
