@@ -94,18 +94,19 @@ may produce different bytes and object names.
 
 ## Testing
 
-Unit tests run without cloud credentials. To also run the emulator and Temporal
-worker integration tests, start a local emulator:
+The driver, emulator, and Temporal worker integration tests run without cloud
+credentials or Docker:
 
 ```bash
-docker run --rm -p 127.0.0.1:4443:4443 fsouza/fake-gcs-server:1.56.1 \
-    -scheme http -external-url http://127.0.0.1:4443
+poe test -s tests/contrib/gcp/gcsdriver
 ```
 
-In another terminal, run:
+Pytest starts a local [fake-gcs-server](https://github.com/fsouza/fake-gcs-server)
+process for each worker that needs it and stops the process after the session.
+On first use, it downloads version 1.56.1 for the current platform, verifies the
+archive's SHA-256 checksum, and caches the binary in `.pytest_cache`. Supported
+platforms are Linux and macOS on AMD64/ARM64, and Windows on AMD64.
 
-```bash
-STORAGE_EMULATOR_HOST=http://127.0.0.1:4443 poe test -s tests/contrib/gcp/gcsdriver
-```
-
-Emulator integration tests are skipped when `STORAGE_EMULATOR_HOST` is unset.
+Set `FAKE_GCS_SERVER_PATH` to use an existing binary, or put `fake-gcs-server` on
+`PATH`. Set `STORAGE_EMULATOR_HOST` to use an already running emulator instead.
+Each test creates a unique bucket and deletes its objects and bucket afterward.

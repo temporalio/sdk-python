@@ -2,10 +2,12 @@
 
 import asyncio
 import dataclasses
+import hashlib
 import uuid
 from datetime import timedelta
 
 import pytest
+from aiohttp import ClientResponseError
 from gcloud.aio.storage import Storage
 
 from temporalio.api.common.v1 import Payload
@@ -14,6 +16,7 @@ from temporalio.contrib.gcp.gcsdriver.gcloud_aio import new_gcloud_aio_client
 from temporalio.converter import (
     DataConverter,
     ExternalStorage,
+    StorageDriverClaim,
     StorageDriverRetrieveContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
@@ -21,6 +24,96 @@ from temporalio.converter import (
 from temporalio.testing import WorkflowEnvironment
 from tests.contrib.gcp.gcsdriver.workflows import EchoWorkflow, echo_activity
 from tests.helpers import new_worker
+
+
+async def test_gcs_adapter_object_operations(
+    gcs_storage: Storage, gcs_bucket: str
+) -> None:
+    client = new_gcloud_aio_client(gcs_storage)
+    name = "日本語 café 😀 /%+="
+    assert not await client.object_exists(bucket=gcs_bucket, object_name=name)
+    with pytest.raises(ClientResponseError) as error:
+        await client.get_object(bucket=gcs_bucket, object_name=name)
+    assert error.value.status == 404
+    await client.put_object(bucket=gcs_bucket, object_name=name, data=b"\x00\xff")
+    assert await client.object_exists(bucket=gcs_bucket, object_name=name)
+    assert await client.get_object(bucket=gcs_bucket, object_name=name) == b"\x00\xff"
+
+
+@pytest.mark.parametrize("operation", ["object_exists", "put_object", "get_object"])
+async def test_gcs_adapter_missing_bucket(
+    gcs_storage: Storage, gcs_bucket: str, operation: str
+) -> None:
+    client = new_gcloud_aio_client(gcs_storage)
+    missing_bucket = f"{gcs_bucket}-missing"
+    if operation == "object_exists":
+        assert not await client.object_exists(
+            bucket=missing_bucket, object_name="object"
+        )
+    else:
+        with pytest.raises(ClientResponseError) as error:
+            if operation == "put_object":
+                await client.put_object(
+                    bucket=missing_bucket, object_name="object", data=b"data"
+                )
+            else:
+                await client.get_object(bucket=missing_bucket, object_name="object")
+        assert error.value.status == 404
+
+
+async def test_gcs_adapter_concurrent_creation(
+    gcs_storage: Storage, gcs_bucket: str
+) -> None:
+    client = new_gcloud_aio_client(gcs_storage)
+    name = "concurrent-object"
+    candidates = [f"writer-{i}".encode() for i in range(5)]
+    await asyncio.gather(
+        *(
+            client.put_object(bucket=gcs_bucket, object_name=name, data=data)
+            for data in candidates
+        )
+    )
+    stored = await client.get_object(bucket=gcs_bucket, object_name=name)
+    assert stored in candidates
+    before = await gcs_storage.download_metadata(gcs_bucket, name)
+    await client.put_object(bucket=gcs_bucket, object_name=name, data=b"replacement")
+    after = await gcs_storage.download_metadata(gcs_bucket, name)
+    assert after["generation"] == before["generation"]
+    assert await client.get_object(bucket=gcs_bucket, object_name=name) == stored
+
+
+async def test_gcs_retrieve_canonical_claim(
+    gcs_storage: Storage, gcs_bucket: str
+) -> None:
+    original = Payload(metadata={"encoding": b"binary/plain"}, data=b"external-writer")
+    data = original.SerializeToString()
+    name = "existing/日本語 object"
+    await gcs_storage.upload(gcs_bucket, name, data, force_resumable_upload=False)
+    claim = StorageDriverClaim(
+        {
+            "bucket": gcs_bucket,
+            "object_name": name,
+            "hash_algorithm": "sha256",
+            "hash_value": hashlib.sha256(data).hexdigest(),
+        }
+    )
+    driver = GCSStorageDriver(new_gcloud_aio_client(gcs_storage), "unused-bucket")
+    assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [original]
+
+
+async def test_gcs_long_object_name_round_trip(
+    gcs_storage: Storage, gcs_bucket: str
+) -> None:
+    driver = GCSStorageDriver(new_gcloud_aio_client(gcs_storage), gcs_bucket)
+    original = Payload(data=b"long-identity")
+    [claim] = await driver.store(
+        StorageDriverStoreContext(
+            target=StorageDriverWorkflowInfo(namespace="ns /%", id="日" * 400)
+        ),
+        [original],
+    )
+    assert claim.claim_data["object_name"].startswith("v0/ns/ns %2F%25/d/sha256/")
+    assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [original]
 
 
 @pytest.mark.parametrize("size", [0, 6 * 1024 * 1024])
