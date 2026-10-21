@@ -6086,6 +6086,57 @@ async def test_workflow_update_task_fails(client: Client):
         assert bad_validator_fail_ct == 2
 
 
+@workflow.defn
+class AsyncUpdateValidatorDynamicWorkflow:
+    @workflow.run
+    async def run(self) -> list[str]:
+        def handler(_arg: int) -> int:
+            return 1
+
+        async def async_validator(_arg: int) -> None:
+            pass
+
+        def sync_validator(_arg: int) -> None:
+            pass
+
+        def dynamic_handler(_name: str, _args: Sequence[RawValue]) -> int:
+            return 3
+
+        # A rejected registration must not replace the existing handler
+        workflow.set_update_handler("named", handler, validator=sync_validator)
+        results = []
+        for set_handler in (
+            lambda: workflow.set_update_handler(
+                "named", lambda _arg: 2, validator=async_validator
+            ),
+            lambda: workflow.set_dynamic_update_handler(
+                dynamic_handler, validator=async_validator
+            ),
+        ):
+            try:
+                set_handler()
+            except ValueError as err:
+                results.append(str(err))
+        results.append(str(workflow.get_update_handler("named") is handler))
+        results.append(str(workflow.get_dynamic_update_handler() is None))
+        return results
+
+
+async def test_workflow_update_async_validator_dynamic_rejected(client: Client):
+    async with new_worker(client, AsyncUpdateValidatorDynamicWorkflow) as worker:
+        result = await client.execute_workflow(
+            AsyncUpdateValidatorDynamicWorkflow.run,
+            id=f"async-update-validator-dynamic-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == [
+        "Update validator must not be an async function",
+        "Update validator must not be an async function",
+        "True",
+        "True",
+    ]
+
+
 async def test_workflow_update_continue_as_new_fails_task(client: Client):
     # Continue-as-new is a control-flow BaseException. From an update handler
     # it must fail the workflow task, then retry the update rather than letting
