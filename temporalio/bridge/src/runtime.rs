@@ -239,8 +239,9 @@ impl Runtime {
 
 impl Drop for Runtime {
     fn drop(&mut self) {
-        // Stop the log forwarder
-        if let Some(handle) = self.log_forwarder_handle.as_ref() {
+        // Clients and workers each hold a clone of the runtime, so only stop the
+        // log forwarder when the last clone is dropped
+        if let Some(handle) = self.log_forwarder_handle.take().and_then(Arc::into_inner) {
             handle.abort();
         }
     }
