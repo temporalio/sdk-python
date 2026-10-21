@@ -22,16 +22,16 @@ class GCSStorageDriverClient(ABC):
     """
 
     @abstractmethod
-    async def put_object(self, *, bucket: str, key: str, data: bytes) -> None:
-        """Upload *data* if absent at the given GCS *bucket* and *key*."""
+    async def put_object(self, *, bucket: str, object_name: str, data: bytes) -> None:
+        """Upload *data* if absent at the given GCS *bucket* and *object_name*."""
 
     @abstractmethod
-    async def object_exists(self, *, bucket: str, key: str) -> bool:
-        """Return ``True`` if an object exists at the given *bucket* and *key*."""
+    async def object_exists(self, *, bucket: str, object_name: str) -> bool:
+        """Return ``True`` if an object exists at the given *bucket* and *object_name*."""
 
     @abstractmethod
-    async def get_object(self, *, bucket: str, key: str) -> bytes:
-        """Download and return the bytes stored at the given GCS *bucket* and *key*."""
+    async def get_object(self, *, bucket: str, object_name: str) -> bytes:
+        """Download and return the bytes stored at the given GCS *bucket* and *object_name*."""
 
     def describe(self) -> Mapping[str, str]:
         """Return client-specific diagnostic metadata (e.g. region, credentials

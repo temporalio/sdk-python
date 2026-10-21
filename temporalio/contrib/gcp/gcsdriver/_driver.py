@@ -174,25 +174,27 @@ class GCSStorageDriver(StorageDriver):
 
             digest_segments = f"/d/sha256/{hash_digest}"
 
-            key = f"v0{namespace_segment}{context_segments}{digest_segments}"
-            if len(key.encode("utf-8")) > 1024:
+            object_name = f"v0{namespace_segment}{context_segments}{digest_segments}"
+            if len(object_name.encode("utf-8")) > 1024:
                 raise ValueError("GCS object name exceeds maximum 1024 UTF-8 bytes")
 
             try:
-                if not await self._client.object_exists(bucket=bucket, key=key):
+                if not await self._client.object_exists(
+                    bucket=bucket, object_name=object_name
+                ):
                     await self._client.put_object(
-                        bucket=bucket, key=key, data=payload_bytes
+                        bucket=bucket, object_name=object_name, data=payload_bytes
                     )
             except Exception as e:
                 raise RuntimeError(
-                    f"GCSStorageDriver store failed [bucket={bucket}, key={key}"
+                    f"GCSStorageDriver store failed [bucket={bucket}, object_name={object_name}"
                     f"{_format_client_context(self._client)}]"
                 ) from e
 
             return StorageDriverClaim(
                 claim_data={
                     "bucket": bucket,
-                    "key": key,
+                    "object_name": object_name,
                     "hash_algorithm": "sha256",
                     "hash_value": hash_digest,
                 },
@@ -209,13 +211,15 @@ class GCSStorageDriver(StorageDriver):
 
         async def _download(claim: StorageDriverClaim) -> Payload:
             bucket = claim.claim_data["bucket"]
-            key = claim.claim_data["key"]
+            object_name = claim.claim_data["object_name"]
 
             try:
-                payload_bytes = await self._client.get_object(bucket=bucket, key=key)
+                payload_bytes = await self._client.get_object(
+                    bucket=bucket, object_name=object_name
+                )
             except Exception as e:
                 raise RuntimeError(
-                    f"GCSStorageDriver retrieve failed [bucket={bucket}, key={key}"
+                    f"GCSStorageDriver retrieve failed [bucket={bucket}, object_name={object_name}"
                     f"{_format_client_context(self._client)}]"
                 ) from e
 
@@ -224,20 +228,20 @@ class GCSStorageDriver(StorageDriver):
             if not hash_algorithm or not expected_hash:
                 raise ValueError(
                     f"GCSStorageDriver claim is missing required content hash information "
-                    f"[bucket={bucket}, key={key}]: "
+                    f"[bucket={bucket}, object_name={object_name}]: "
                     f"claim_data must contain 'hash_algorithm' and 'hash_value'"
                 )
             if hash_algorithm != "sha256":
                 raise ValueError(
                     f"GCSStorageDriver unsupported hash algorithm "
-                    f"[bucket={bucket}, key={key}]: "
+                    f"[bucket={bucket}, object_name={object_name}]: "
                     f"expected sha256, got {hash_algorithm}"
                 )
             actual_hash = hashlib.sha256(payload_bytes).hexdigest()
             if actual_hash != expected_hash:
                 raise ValueError(
                     f"GCSStorageDriver integrity check failed "
-                    f"[bucket={bucket}, key={key}]: "
+                    f"[bucket={bucket}, object_name={object_name}]: "
                     f"expected {hash_algorithm}:{expected_hash}, "
                     f"got {hash_algorithm}:{actual_hash}"
                 )

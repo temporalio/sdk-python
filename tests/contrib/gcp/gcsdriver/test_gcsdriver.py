@@ -28,15 +28,15 @@ class MemoryClient(GCSStorageDriverClient):
         self.objects: dict[tuple[str, str], bytes] = {}
         self.uploads = 0
 
-    async def object_exists(self, *, bucket: str, key: str) -> bool:
-        return (bucket, key) in self.objects
+    async def object_exists(self, *, bucket: str, object_name: str) -> bool:
+        return (bucket, object_name) in self.objects
 
-    async def put_object(self, *, bucket: str, key: str, data: bytes) -> None:
+    async def put_object(self, *, bucket: str, object_name: str, data: bytes) -> None:
         self.uploads += 1
-        self.objects.setdefault((bucket, key), data)
+        self.objects.setdefault((bucket, object_name), data)
 
-    async def get_object(self, *, bucket: str, key: str) -> bytes:
-        return self.objects[bucket, key]
+    async def get_object(self, *, bucket: str, object_name: str) -> bytes:
+        return self.objects[bucket, object_name]
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def test_configuration(client: MemoryClient) -> None:
         ),
     ],
 )
-async def test_keys(
+async def test_object_names(
     client: MemoryClient,
     target: StorageDriverWorkflowInfo | StorageDriverActivityInfo | None,
     prefix: str,
@@ -95,7 +95,7 @@ async def test_keys(
     digest = hashlib.sha256(original.SerializeToString()).hexdigest()
     assert claim.claim_data == {
         "bucket": "bucket",
-        "key": f"{prefix}/d/sha256/{digest}",
+        "object_name": f"{prefix}/d/sha256/{digest}",
         "hash_algorithm": "sha256",
         "hash_value": digest,
     }
@@ -115,6 +115,23 @@ async def test_round_trip_and_deduplication(client: MemoryClient) -> None:
     )
     assert await driver.store(StorageDriverStoreContext(), []) == []
     assert await driver.retrieve(StorageDriverRetrieveContext(), []) == []
+
+
+async def test_retrieve_canonical_claim(client: MemoryClient) -> None:
+    original = payload()
+    data = original.SerializeToString()
+    client.objects["source-bucket", "existing/object"] = data
+    claim = StorageDriverClaim(
+        {
+            "bucket": "source-bucket",
+            "object_name": "existing/object",
+            "hash_algorithm": "sha256",
+            "hash_value": hashlib.sha256(data).hexdigest(),
+        }
+    )
+    assert await GCSStorageDriver(client, "destination-bucket").retrieve(
+        StorageDriverRetrieveContext(), [claim]
+    ) == [original]
 
 
 async def test_callable_bucket(client: MemoryClient) -> None:
@@ -169,7 +186,7 @@ async def test_invalid_hash_claim(client: MemoryClient, field: str, value: str) 
 async def test_corruption(client: MemoryClient) -> None:
     driver = GCSStorageDriver(client, "bucket")
     [claim] = await driver.store(StorageDriverStoreContext(), [payload()])
-    client.objects["bucket", claim.claim_data["key"]] = b"corrupted"
+    client.objects["bucket", claim.claim_data["object_name"]] = b"corrupted"
     with pytest.raises(ValueError, match="integrity check failed"):
         await driver.retrieve(StorageDriverRetrieveContext(), [claim])
 
@@ -196,11 +213,15 @@ async def test_provider_error_context(operation: str) -> None:
     cause = ConnectionError("connection lost")
     getattr(client, operation).side_effect = cause
     driver = GCSStorageDriver(client, "bucket")
-    with pytest.raises(RuntimeError, match="bucket=bucket, key=") as error:
+    with pytest.raises(RuntimeError, match="bucket=bucket, object_name=") as error:
         if operation == "get_object":
             await driver.retrieve(
                 StorageDriverRetrieveContext(),
-                [StorageDriverClaim({"bucket": "bucket", "key": "key"})],
+                [
+                    StorageDriverClaim(
+                        {"bucket": "bucket", "object_name": "object_name"}
+                    )
+                ],
             )
         else:
             await driver.store(StorageDriverStoreContext(), [payload()])
@@ -237,7 +258,7 @@ async def test_batch_cancellation(retrieving: bool, cancel_parent: bool) -> None
     driver = GCSStorageDriver(client, "bucket")
     task: asyncio.Task[list[Payload]] | asyncio.Task[list[StorageDriverClaim]]
     if retrieving:
-        claim = StorageDriverClaim({"bucket": "bucket", "key": "key"})
+        claim = StorageDriverClaim({"bucket": "bucket", "object_name": "object_name"})
         task = asyncio.create_task(
             driver.retrieve(StorageDriverRetrieveContext(), [claim, claim])
         )
@@ -284,7 +305,7 @@ async def test_concurrent_transfers_preserve_order(retrieving: bool) -> None:
         StorageDriverClaim(
             {
                 "bucket": "bucket",
-                "key": str(i),
+                "object_name": str(i),
                 "hash_algorithm": "sha256",
                 "hash_value": hashlib.sha256(p.SerializeToString()).hexdigest(),
             }
@@ -322,12 +343,12 @@ async def test_adapter_object_exists(status: int | None) -> None:
     client = new_gcloud_aio_client(storage)
     if status in (403, 500):
         with pytest.raises(ClientResponseError):
-            await client.object_exists(bucket="bucket", key="key")
+            await client.object_exists(bucket="bucket", object_name="object_name")
     else:
-        assert await client.object_exists(bucket="bucket", key="key") is (
-            status is None
-        )
-    storage.download_metadata.assert_awaited_once_with("bucket", "key")
+        assert await client.object_exists(
+            bucket="bucket", object_name="object_name"
+        ) is (status is None)
+    storage.download_metadata.assert_awaited_once_with("bucket", "object_name")
 
 
 @pytest.mark.parametrize("status", [None, 412, 403, 404, 500])
@@ -335,16 +356,20 @@ async def test_adapter_conditional_upload(status: int | None) -> None:
     storage = AsyncMock(spec=Storage)
     if status:
         storage.upload.side_effect = response_error(status)
-    storage.download_metadata.return_value = {"name": "key"}
+    storage.download_metadata.return_value = {"name": "object_name"}
     client = new_gcloud_aio_client(storage)
     if status in (403, 404, 500):
         with pytest.raises(ClientResponseError):
-            await client.put_object(bucket="bucket", key="key", data=b"data")
+            await client.put_object(
+                bucket="bucket", object_name="object_name", data=b"data"
+            )
     else:
-        await client.put_object(bucket="bucket", key="key", data=b"data")
+        await client.put_object(
+            bucket="bucket", object_name="object_name", data=b"data"
+        )
     storage.upload.assert_awaited_once_with(
         "bucket",
-        "key",
+        "object_name",
         b"data",
         content_type="application/octet-stream",
         parameters={"ifGenerationMatch": "0"},
@@ -357,7 +382,9 @@ async def test_adapter_download() -> None:
     storage = AsyncMock(spec=Storage)
     storage.download.return_value = b"\x00\xff"
     assert (
-        await new_gcloud_aio_client(storage).get_object(bucket="bucket", key="key")
+        await new_gcloud_aio_client(storage).get_object(
+            bucket="bucket", object_name="object_name"
+        )
         == b"\x00\xff"
     )
-    storage.download.assert_awaited_once_with("bucket", "key")
+    storage.download.assert_awaited_once_with("bucket", "object_name")

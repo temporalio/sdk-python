@@ -79,10 +79,10 @@ use `null`. Dynamic segments escape UTF-8 bytes outside `a-z`, `A-Z`, `0-9`, and
 
 Identical serialized bytes in the same context share an object. The driver checks
 existence before uploading; the built-in adapter also uses conditional creation to
-prevent concurrent writers from overwriting objects. Claims contain `bucket`, `key`,
+prevent concurrent writers from overwriting objects. Claims contain `bucket`, `object_name`,
 `hash_algorithm`, and `hash_value`. Downloads verify SHA-256 over the exact stored
 bytes before parsing the protobuf. Equivalent values serialized by different SDKs
-may produce different bytes and keys.
+may produce different bytes and object names.
 
 ## Testing
 

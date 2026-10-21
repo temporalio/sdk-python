@@ -40,14 +40,14 @@ async def test_gcs_emulator_round_trip(
     claims = await driver.store(context, [original])
     assert await driver.store(context, [original]) == claims
     assert await driver.retrieve(StorageDriverRetrieveContext(), claims) == [original]
-    key = claims[0].claim_data["key"]
+    object_name = claims[0].claim_data["object_name"]
     replacement = b"must not overwrite" + original.data
     await asyncio.gather(
-        client.put_object(bucket=gcs_bucket, key=key, data=replacement),
-        client.put_object(bucket=gcs_bucket, key=key, data=replacement),
+        client.put_object(bucket=gcs_bucket, object_name=object_name, data=replacement),
+        client.put_object(bucket=gcs_bucket, object_name=object_name, data=replacement),
     )
     assert (
-        await client.get_object(bucket=gcs_bucket, key=key)
+        await client.get_object(bucket=gcs_bucket, object_name=object_name)
         == original.SerializeToString()
     )
 
@@ -80,5 +80,7 @@ async def test_gcs_workflow_round_trip(
     objects = await gcs_storage.list_objects(gcs_bucket)
     keys = [item["name"] for item in objects["items"]]
     assert len(keys) == 2
-    assert all(f"/wt/EchoWorkflow/wi/{workflow_id}/ri/" in key for key in keys)
-    assert sum("/ri/null/" in key for key in keys) == 1
+    assert all(
+        f"/wt/EchoWorkflow/wi/{workflow_id}/ri/" in object_name for object_name in keys
+    )
+    assert sum("/ri/null/" in object_name for object_name in keys) == 1

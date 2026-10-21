@@ -19,22 +19,22 @@ class _GcloudAioStorageDriverClient(GCSStorageDriverClient):
         """Wrap the async storage client."""
         self._client = client
 
-    async def object_exists(self, *, bucket: str, key: str) -> bool:
+    async def object_exists(self, *, bucket: str, object_name: str) -> bool:
         """Check existence via object metadata."""
         try:
-            await self._client.download_metadata(bucket, key)
+            await self._client.download_metadata(bucket, object_name)
             return True
         except ClientResponseError as err:
             if err.status == 404:
                 return False
             raise
 
-    async def put_object(self, *, bucket: str, key: str, data: bytes) -> None:
+    async def put_object(self, *, bucket: str, object_name: str, data: bytes) -> None:
         """Upload bytes using conditional object creation."""
         try:
             await self._client.upload(
                 bucket,
-                key,
+                object_name,
                 data,
                 content_type="application/octet-stream",
                 parameters={"ifGenerationMatch": "0"},
@@ -46,9 +46,9 @@ class _GcloudAioStorageDriverClient(GCSStorageDriverClient):
                 return
             raise
 
-    async def get_object(self, *, bucket: str, key: str) -> bytes:
+    async def get_object(self, *, bucket: str, object_name: str) -> bytes:
         """Download the object's bytes."""
-        return await self._client.download(bucket, key)
+        return await self._client.download(bucket, object_name)
 
 
 def new_gcloud_aio_client(client: Storage) -> GCSStorageDriverClient:
