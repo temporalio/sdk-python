@@ -294,18 +294,20 @@ class Client:
         self._init_from_config(config)
 
     def _init_from_config(self, config: ClientConfig):
+        self._config = config
+        # The driver operation limit is state of this client, not config, so it
+        # is kept off the config. Clients built from this config get their own.
         converter = config["data_converter"]
-        if (
-            converter.external_storage is not None
-            and converter._driver_operation_semaphore is None
-        ):
-            config["data_converter"] = dataclasses.replace(
+        self._data_converter = (
+            dataclasses.replace(
                 converter,
                 _driver_operation_semaphore=temporalio.converter._extstore.new_driver_operation_semaphore(
                     converter.external_storage
                 ),
             )
-        self._config = config
+            if converter.external_storage is not None
+            else converter
+        )
 
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)
@@ -358,7 +360,7 @@ class Client:
     @property
     def data_converter(self) -> temporalio.converter.DataConverter:
         """Data converter used by this client."""
-        return self._config["data_converter"]
+        return self._data_converter
 
     @property
     def rpc_metadata(self) -> Mapping[str, str | bytes]:

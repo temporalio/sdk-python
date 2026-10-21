@@ -2,12 +2,14 @@ import asyncio
 import contextlib
 import dataclasses
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest import mock
 
+import nexusrpc
 import pytest
+from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
 
 import temporalio
 import temporalio.bridge.client
@@ -31,8 +33,9 @@ from temporalio.converter import (
 )
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
-from temporalio.worker import Replayer
+from temporalio.worker import Replayer, UnsandboxedWorkflowRunner
 from tests.helpers import assert_task_fail_eventually, new_worker
+from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver, _settle
 
 
@@ -1351,18 +1354,27 @@ async def test_extstore_continue_as_new_result_stored_under_current_run(
 
 class _HeldStoreDriver(InMemoryTestDriver):
     """Holds every store inside its permit until released, recording how many
-    stores are in flight at once."""
+    stores have been requested and how many are in flight at once."""
 
-    def __init__(self, in_flight_target: int) -> None:
+    def __init__(self) -> None:
         super().__init__()
+        self.requested = 0
         self.in_flight = 0
         self.peak = 0
-        self._in_flight_target = in_flight_target
-        self.target_reached = asyncio.Event()
+        self._changed = asyncio.Event()
         self._released = asyncio.Event()
 
     def release(self) -> None:
         self._released.set()
+
+    async def wait_until(self, condition: Callable[[], bool]) -> None:
+        # The timeout only stops a broken limiter from hanging the test.
+        async def wait() -> None:
+            while not condition():
+                self._changed.clear()
+                await self._changed.wait()
+
+        await asyncio.wait_for(wait(), timeout=10)
 
     async def store(
         self,
@@ -1370,11 +1382,12 @@ class _HeldStoreDriver(InMemoryTestDriver):
         payloads: Sequence[Payload],
     ) -> list[StorageDriverClaim]:
         async def one(payload: Payload) -> StorageDriverClaim:
+            self.requested += 1
+            self._changed.set()
             async with context.limiter.permit(payload):
                 self.in_flight += 1
                 self.peak = max(self.peak, self.in_flight)
-                if self.in_flight >= self._in_flight_target:
-                    self.target_reached.set()
+                self._changed.set()
                 try:
                     await self._released.wait()
                     claims = await InMemoryTestDriver.store(self, context, [payload])
@@ -1443,7 +1456,7 @@ async def _connect_with_held_driver(
 async def test_extstore_workflow_completion_respects_max_operations_per_message(
     env: WorkflowEnvironment,
 ) -> None:
-    driver = _HeldStoreDriver(in_flight_target=2)
+    driver = _HeldStoreDriver()
     client = await _connect_with_held_driver(
         env,
         driver,
@@ -1461,8 +1474,9 @@ async def test_extstore_workflow_completion_respects_max_operations_per_message(
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        # The timeout only stops a broken limiter from hanging the test.
-        await asyncio.wait_for(driver.target_reached.wait(), timeout=10)
+        # The payload visitor also caps visits per message, so the other stores
+        # wait before reaching the driver.
+        await driver.wait_until(lambda: driver.in_flight == 2)
         await _settle()
         assert driver.in_flight == 2
 
@@ -1478,7 +1492,7 @@ async def test_extstore_max_driver_operations_shared_across_workflows(
     """Each completion stores 2 payloads and the worker allows 3 at once, so the
     second workflow's completion can only start one store until the first
     finishes."""
-    driver = _HeldStoreDriver(in_flight_target=3)
+    driver = _HeldStoreDriver()
     client = await _connect_with_held_driver(
         env,
         driver,
@@ -1499,8 +1513,7 @@ async def test_extstore_max_driver_operations_shared_across_workflows(
             )
             for _ in range(2)
         ]
-        # The timeout only stops a broken limiter from hanging the test.
-        await asyncio.wait_for(driver.target_reached.wait(), timeout=10)
+        await driver.wait_until(lambda: driver.requested == 4)
         await _settle()
         assert driver.in_flight == 3
 
@@ -1509,3 +1522,173 @@ async def test_extstore_max_driver_operations_shared_across_workflows(
             assert await handle.result() == [2048, 2048]
 
     assert driver.peak == 3
+
+
+_LARGE_DATA = "x" * 2048
+
+
+@activity.defn
+async def large_result() -> str:
+    return _LARGE_DATA
+
+
+@workflow.defn
+class LargeActivityResultWorkflow:
+    @workflow.run
+    async def run(self) -> int:
+        result = await workflow.execute_activity(
+            large_result, schedule_to_close_timeout=timedelta(seconds=10)
+        )
+        return len(result)
+
+
+@nexusrpc.service
+class LargeResultNexusService:
+    large_result_op: nexusrpc.Operation[None, str]
+
+
+@service_handler(service=LargeResultNexusService)
+class LargeResultNexusServiceHandler:
+    @sync_operation
+    async def large_result_op(self, _ctx: StartOperationContext, _input: None) -> str:
+        return _LARGE_DATA
+
+
+@workflow.defn
+class LargeNexusResultWorkflow:
+    @workflow.run
+    async def run(self, task_queue: str) -> int:
+        nexus_client = workflow.create_nexus_client(
+            service=LargeResultNexusService,
+            endpoint=make_nexus_endpoint_name(task_queue),
+        )
+        result = await nexus_client.execute_operation(
+            LargeResultNexusService.large_result_op, None
+        )
+        return len(result)
+
+
+def _start_unrun_workflow_with_large_input(client: Client) -> asyncio.Task:
+    """Starts a workflow no worker polls for, so the only store is the client's
+    store of its input."""
+    return asyncio.create_task(
+        client.start_workflow(
+            "UnregisteredWorkflow",
+            _LARGE_DATA,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=f"tq-{uuid.uuid4()}",
+        )
+    )
+
+
+@pytest.mark.parametrize("active_config", [False, True])
+async def test_extstore_client_rebuilt_from_config_gets_its_own_driver_operation_limit(
+    env: WorkflowEnvironment, active_config: bool
+) -> None:
+    driver = _HeldStoreDriver()
+    client = await _connect_with_held_driver(
+        env, driver, ExternalStorageConcurrency(max_driver_operations=1)
+    )
+    rebuilt_client = Client(**client.config(active_config=active_config))
+
+    starts = [
+        _start_unrun_workflow_with_large_input(client),
+        _start_unrun_workflow_with_large_input(client),
+        _start_unrun_workflow_with_large_input(rebuilt_client),
+    ]
+    await driver.wait_until(lambda: driver.requested == 3)
+    await _settle()
+    # One store from each client. The original's second store waits.
+    assert driver.in_flight == 2
+
+    driver.release()
+    await asyncio.gather(*starts)
+    assert driver.peak == 2
+
+
+async def test_extstore_worker_driver_operation_limit_is_separate_from_client(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = _HeldStoreDriver()
+    client = await _connect_with_held_driver(
+        env, driver, ExternalStorageConcurrency(max_driver_operations=1)
+    )
+
+    async with new_worker(
+        client, LargeActivityResultWorkflow, activities=[large_result]
+    ) as worker:
+        handle = await client.start_workflow(
+            LargeActivityResultWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # The worker stores the activity result.
+        await driver.wait_until(lambda: driver.requested == 1)
+        client_start = _start_unrun_workflow_with_large_input(client)
+        await driver.wait_until(lambda: driver.requested == 2)
+        await _settle()
+        assert driver.in_flight == 2
+
+        driver.release()
+        await client_start
+        assert await handle.result() == len(_LARGE_DATA)
+
+    assert driver.peak == 2
+
+
+@pytest.mark.requires_local_server
+async def test_extstore_workflow_activity_and_nexus_workers_share_driver_operation_limit(
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping:
+        pytest.skip("Nexus tests don't work with the Java test server")
+    driver = _HeldStoreDriver()
+    client = await _connect_with_held_driver(
+        env, driver, ExternalStorageConcurrency(max_driver_operations=1)
+    )
+
+    async with new_worker(
+        client,
+        ManyLargeActivityInputsWorkflow,
+        LargeActivityResultWorkflow,
+        LargeNexusResultWorkflow,
+        activities=[large_input_length, large_result],
+        nexus_service_handlers=[LargeResultNexusServiceHandler()],
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ) as worker:
+        await env.create_nexus_endpoint(
+            make_nexus_endpoint_name(worker.task_queue), worker.task_queue
+        )
+        # Each workflow causes exactly one store: a workflow completion, an
+        # activity result and a Nexus operation result.
+        handles = [
+            await client.start_workflow(
+                ManyLargeActivityInputsWorkflow.run,
+                1,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+            await client.start_workflow(
+                LargeActivityResultWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+            await client.start_workflow(
+                LargeNexusResultWorkflow.run,
+                worker.task_queue,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            ),
+        ]
+        await driver.wait_until(lambda: driver.requested == 3)
+        await _settle()
+        assert driver.in_flight == 1
+
+        driver.release()
+        assert [await handle.result() for handle in handles] == [
+            [len(_LARGE_DATA)],
+            len(_LARGE_DATA),
+            len(_LARGE_DATA),
+        ]
+
+    assert driver.peak == 1
