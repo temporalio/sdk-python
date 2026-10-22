@@ -284,6 +284,7 @@ class Worker:
                 that plugins run after the Worker stops in ``run_worker``. That
                 code is cancelled after this time. ``None`` waits with no limit.
                 The default is 60 seconds.
+                WARNING: This setting is experimental.
             workflow_failure_exception_types: The types of exceptions that, if a
                 workflow-thrown exception extends, will cause the
                 workflow/update to fail instead of suspending the workflow via
@@ -988,6 +989,7 @@ class Worker:
         # Plugins can run cleanup code after shutdown. Wait for that code instead of cancelling it.
         self._async_context_exiting = True
         run_task = self._async_context_run_task
+        # A plugin's `configure_worker` may drop this key, so default here.
         timeout = self._config.get("plugin_shutdown_timeout", timedelta(seconds=60))
         try:
             # wait() doesn't raise for the task's own outcome, only when this call is cancelled.
