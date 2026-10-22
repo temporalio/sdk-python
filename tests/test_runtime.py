@@ -1,3 +1,4 @@
+import gc
 import logging
 import logging.handlers
 import queue
@@ -141,6 +142,39 @@ async def test_runtime_log_forwarding():
         assert log_queue_list[2].levelno == logging.INFO
         assert log_queue_list[2].message.startswith(
             "[sdk_core::temporal_sdk_bridge::runtime] info6"
+        )
+
+
+async def test_runtime_log_forwarding_after_client_dropped(env: WorkflowEnvironment):
+    log_queue: queue.Queue[logging.LogRecord] = queue.Queue()
+    log_queue_list = cast(list[logging.LogRecord], log_queue.queue)
+    handler = logging.handlers.QueueHandler(log_queue)
+    logger = logging.getLogger(f"log-{uuid.uuid4()}")
+    logger.setLevel(logging.INFO)
+
+    async def log_queue_len() -> int:
+        return len(log_queue_list)
+
+    runtime = Runtime(
+        telemetry=TelemetryConfig(
+            logging=LoggingConfig(
+                filter=TelemetryFilter(core_level="INFO", other_level="ERROR"),
+                forwarding=LogForwardingConfig(logger=logger),
+            )
+        )
+    )
+
+    # Every client holds its own handle to the runtime, so dropping one client
+    # must not stop log forwarding for everything else on the runtime
+    client = await env.connect_client(runtime=runtime)
+    del client
+    gc.collect()
+
+    with LogHandler.apply(logger, handler):
+        runtime._core_runtime.write_test_info_log("info1", "extra1")
+        await assert_eq_eventually(1, log_queue_len)
+        assert log_queue_list[0].message.startswith(
+            "[sdk_core::temporal_sdk_bridge::runtime] info1"
         )
 
 
