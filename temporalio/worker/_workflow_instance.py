@@ -514,11 +514,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         # Let errors bubble out of these to the caller to fail the task
                         self._apply(job)
                 if any(job_sets):
-                    # Updates only change state once accepted, which _run_once
-                    # checks for itself
                     self._run_once(
-                        check_conditions=bool(job_sets[2])
-                        or any(job.HasField("signal_workflow") for job in job_sets[1])
+                        check_conditions=bool(job_sets[1] or job_sets[2]),
+                        jobs=act.jobs,
                     )
             else:
                 # Preserve the legacy scheduling order for histories which do
@@ -532,14 +530,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
                     # Run one iteration of the loop. We do not allow conditions to
                     # be checked in patch jobs (first index) or query jobs (last
-                    # index). Updates (second index) only change state once
-                    # accepted, which _run_once checks for itself.
+                    # index).
                     self._run_once(
-                        check_conditions=index == 2
-                        or (
-                            index == 1
-                            and any(job.HasField("signal_workflow") for job in job_set)
-                        )
+                        check_conditions=index == 1 or index == 2, jobs=act.jobs
                     )
         except Exception as err:
             # We want some errors during activation, like those that can happen
@@ -2795,7 +2788,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if hasattr(task, "_log_destroy_pending"):
             setattr(task, "_log_destroy_pending", False)
 
-    def _run_once(self, *, check_conditions: bool) -> None:
+    def _run_once(
+        self,
+        *,
+        check_conditions: bool,
+        jobs: Sequence[
+            temporalio.bridge.proto.workflow_activation.WorkflowActivationJob
+        ],
+    ) -> None:
         try:
             asyncio._set_running_loop(self)
 
@@ -2823,11 +2823,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 #
                 # Rejected updates leave nothing in history, so a condition they
                 # let through (e.g. one on a value refreshed every activation)
-                # could not unblock on replay. Callers leave updates out of
-                # check_conditions, so accepted ones are detected here.
-                if check_conditions or any(
-                    c.update_response.HasField("accepted")
-                    for c in self._current_completion.successful.commands
+                # could not unblock on replay.
+                if check_conditions and (
+                    any(not job.HasField("do_update") for job in jobs)
+                    or any(
+                        c.update_response.HasField("accepted")
+                        for c in self._current_completion.successful.commands
+                    )
                 ):
                     self._conditions[:] = [
                         t
