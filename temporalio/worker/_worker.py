@@ -981,16 +981,15 @@ class Worker:
         # Plugins can run cleanup code after shutdown. Wait for that code instead of cancelling it.
         self._async_context_exiting = True
         run_task = self._async_context_run_task
-        await asyncio.wait([run_task], timeout=_RUN_TASK_EXIT_TIMEOUT.total_seconds())
-        if not run_task.done():
+        try:
+            # wait() doesn't raise for the task's own outcome, only when this call is cancelled.
+            await asyncio.wait([run_task])
+        except asyncio.CancelledError:
             run_task.cancel()
+            raise
         # Only re-raise our exception if present and exc_type is cancel
         if exc_type is asyncio.CancelledError and self._async_context_run_exception:
             raise self._async_context_run_exception
-
-
-# How long __aexit__ waits for plugin cleanup code after shutdown.
-_RUN_TASK_EXIT_TIMEOUT = timedelta(seconds=60)
 
 
 class WorkerConfig(TypedDict, total=False):
