@@ -112,6 +112,25 @@ async def test_start_activity_generates_request_id() -> None:
     assert requests[0].request_id != requests[1].request_id
 
 
+async def test_terminate_activity_generates_request_id() -> None:
+    terminate_activity_execution = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse()
+    )
+    service_client = mock.MagicMock()
+    service_client.config.identity = "test-identity"
+    service_client.workflow_service.terminate_activity_execution = (
+        terminate_activity_execution
+    )
+    client = Client(service_client)
+
+    for activity_id in ("activity-id-1", "activity-id-2"):
+        await client.get_activity_handle(activity_id).terminate(reason="done")
+
+    requests = [call.args[0] for call in terminate_activity_execution.call_args_list]
+    assert all(uuid.UUID(request.request_id).version == 4 for request in requests)
+    assert requests[0].request_id != requests[1].request_id
+
+
 class TestDescribe:
     @pytest.fixture
     def task_queue(self):
