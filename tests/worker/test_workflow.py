@@ -8938,19 +8938,30 @@ async def test_workflow_deadlock_uninterruptible(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        # Wait for task fail
-        await assert_task_fail_eventually(handle, message_contains="deadlock")
-        # Confirm could not be interrupted
-        assert deadlock_uninterruptible_completed == 0
+        try:
+            # Wait for task fail
+            await assert_task_fail_eventually(handle, message_contains="deadlock")
+            # The thread is still blocked, so eviction must retain the instance
+            # and a completion future that cannot be cancelled by the timeout.
+            assert deadlock_uninterruptible_completed == 0
+            workflow_worker = worker._workflow_worker
+            assert workflow_worker is not None
+            assert handle.result_run_id is not None
+            running = workflow_worker._running_workflows[handle.result_run_id]
+            future = running.deadlocked_activation_task
+            assert isinstance(future, asyncio.Future)
+            assert not future.done()
 
-        # Now complete the event and confirm the workflow does complete
-        deadlock_uninterruptible_event.set()
+            # Now complete the event and confirm the workflow does complete
+            deadlock_uninterruptible_event.set()
 
-        async def check_completed():
-            assert deadlock_uninterruptible_completed >= 1
+            async def check_completed():
+                assert deadlock_uninterruptible_completed >= 1
 
-        await assert_eventually(check_completed)
-        completed_sec = time.monotonic()
+            await assert_eventually(check_completed)
+            completed_sec = time.monotonic()
+        finally:
+            deadlock_uninterruptible_event.set()
     # Confirm worker shutdown didn't hang
     assert time.monotonic() - completed_sec < 20
 
