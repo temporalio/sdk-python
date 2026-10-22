@@ -75,8 +75,8 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
             raise ValueError("max_cached_type_adapters cannot be negative")
         self._schema_serializer = SchemaSerializer(any_schema())
         self._to_json_options = to_json_options
-        self._type_adapter = functools.lru_cache(maxsize=max_cached_type_adapters)(
-            TypeAdapter
+        self._type_adapter: functools._lru_cache_wrapper[TypeAdapter[Any]] = (
+            functools.lru_cache(maxsize=max_cached_type_adapters)(TypeAdapter)
         )
 
     def __getstate__(self) -> dict[str, Any]:
