@@ -839,6 +839,32 @@ async def test_exception_format():
     )
 
 
+async def test_exception_implicit_context():
+    def raise_while_handling(suppress_context: bool) -> Exception:
+        try:
+            try:
+                raise ValueError("error1")
+            except Exception:
+                if suppress_context:
+                    raise RuntimeError("error2") from None
+                raise RuntimeError("error2")
+        except Exception as err:
+            return err
+
+    failure = Failure()
+    await DataConverter.default.encode_failure(raise_while_handling(False), failure)
+    failure_error = await DataConverter.default.decode_failure(failure)
+    assert "RuntimeError: error2" == str(failure_error)
+    assert isinstance(failure_error.cause, ApplicationError)
+    assert "ValueError: error1" == str(failure_error.cause)
+
+    failure = Failure()
+    await DataConverter.default.encode_failure(raise_while_handling(True), failure)
+    failure_error = await DataConverter.default.decode_failure(failure)
+    assert "RuntimeError: error2" == str(failure_error)
+    assert failure_error.cause is None
+
+
 # Just serializes in a "payloads" wrapper
 class SimpleCodec(PayloadCodec):
     async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:

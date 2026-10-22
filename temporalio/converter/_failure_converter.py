@@ -111,6 +111,9 @@ class DefaultFailureConverter(FailureConverter):
             )
             failure_error.__traceback__ = exception.__traceback__
             failure_error.__cause__ = exception.__cause__
+            failure_error.__context__ = exception.__context__
+            # Assigning __cause__ sets __suppress_context__, so restore it last
+            failure_error.__suppress_context__ = exception.__suppress_context__
             self._error_to_failure(failure_error, payload_converter, failure)
         # Encode common attributes if requested
         if self._encode_common_attributes:
