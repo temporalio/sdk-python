@@ -49,7 +49,7 @@ async def test_plugin_cleanup_awaits_after_worker_exit(client: Client):
 class StuckCleanupPlugin(SimplePlugin):
     def __init__(self) -> None:
         super().__init__("test-stuck-cleanup")
-        self.cancelled = False
+        self.cancelled = asyncio.Event()
 
     async def run_worker(
         self, worker: Worker, next: Callable[[Worker], Awaitable[None]]
@@ -60,7 +60,7 @@ class StuckCleanupPlugin(SimplePlugin):
             try:
                 await asyncio.Event().wait()
             except asyncio.CancelledError:
-                self.cancelled = True
+                self.cancelled.set()
                 raise
 
 
@@ -76,6 +76,5 @@ async def test_plugin_cleanup_is_cancelled_after_plugin_shutdown_timeout(
         plugin_shutdown_timeout=timedelta(milliseconds=100),
     ):
         pass
-    # Let the cancelled run task finish its cleanup.
-    await asyncio.sleep(0)
-    assert plugin.cancelled
+    # The cancel reaches the cleanup code on a later loop iteration, so wait for it.
+    await asyncio.wait_for(plugin.cancelled.wait(), timeout=10)
