@@ -8,6 +8,28 @@ import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.nexus._link_conversion
 
+_CALLBACK_TYPE = temporalio.api.common.v1.Link.Callback.DESCRIPTOR.full_name
+_WORKFLOW_EXECUTION = temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_WORKFLOW
+
+
+def _callback_link(
+    execution_type: temporalio.api.enums.v1.ExecutionType.ValueType,
+    business_id: str,
+    component_path: list[str] | None = None,
+) -> temporalio.api.common.v1.Link:
+    return temporalio.api.common.v1.Link(
+        callback=temporalio.api.common.v1.Link.Callback(
+            namespace="ns",
+            execution=temporalio.api.common.v1.Execution(
+                type=execution_type,
+                business_id=business_id,
+                run_id="run-id",
+            ),
+            component_path=component_path,
+            request_id="request-id",
+        )
+    )
+
 
 @pytest.mark.parametrize(
     ["query_param_str", "expected_event_ref"],
@@ -485,3 +507,96 @@ def test_link_with_non_temporal_scheme_is_ignored(converter: str, url: str):
     """A link must carry the temporal scheme; the path alone does not make it one of ours."""
     link = nexusrpc.Link(url=url, type="ignored")
     assert getattr(temporalio.nexus._link_conversion, converter)(link) is None
+
+
+@pytest.mark.parametrize(
+    ["url", "expected_link"],
+    [
+        (
+            "temporal:///namespaces/ns/workflows/wf-id/run-id/callbacks/request-id",
+            _callback_link(_WORKFLOW_EXECUTION, "wf-id"),
+        ),
+        (
+            "temporal:///namespaces/ns/activities/act-id/run-id/callbacks/request-id",
+            _callback_link(
+                temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_ACTIVITY, "act-id"
+            ),
+        ),
+        (
+            "temporal:///namespaces/ns/nexus-operations/op-id/run-id/callbacks/request-id",
+            _callback_link(
+                temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_NEXUS_OPERATION,
+                "op-id",
+            ),
+        ),
+        (
+            "temporal:///namespaces/ns/workflows/wf-id/run-id/callbacks/request-id"
+            "?componentPath=A%3AB&componentPath=C%2FD&componentPath=E_F",
+            _callback_link(_WORKFLOW_EXECUTION, "wf-id", ["A:B", "C/D", "E_F"]),
+        ),
+        # Segments end in a user-supplied ID, so a comma inside one is reachable.
+        (
+            "temporal:///namespaces/ns/workflows/wf-id/run-id/callbacks/request-id"
+            "?componentPath=Updates&componentPath=id%2Cwith%2Ccommas",
+            _callback_link(_WORKFLOW_EXECUTION, "wf-id", ["Updates", "id,with,commas"]),
+        ),
+        # Only a path whose order differs from its sorted order proves order is preserved.
+        (
+            "temporal:///namespaces/ns/workflows/wf-id/run-id/callbacks/request-id"
+            "?componentPath=zulu&componentPath=alpha&componentPath=",
+            _callback_link(_WORKFLOW_EXECUTION, "wf-id", ["zulu", "alpha", ""]),
+        ),
+        (
+            "temporal:///namespaces/ns%2Fwith-slash/workflows/wf-id%2Fcallbacks%2Ffake"
+            "/run-id/callbacks/request%20id%3Fx%3D1",
+            temporalio.api.common.v1.Link(
+                callback=temporalio.api.common.v1.Link.Callback(
+                    namespace="ns/with-slash",
+                    execution=temporalio.api.common.v1.Execution(
+                        type=_WORKFLOW_EXECUTION,
+                        business_id="wf-id/callbacks/fake",
+                        run_id="run-id",
+                    ),
+                    request_id="request id?x=1",
+                )
+            ),
+        ),
+    ],
+)
+def test_link_conversion_callback_to_link_and_back(
+    url: str, expected_link: temporalio.api.common.v1.Link
+):
+    link = nexusrpc.Link(url=url, type=_CALLBACK_TYPE)
+    assert (
+        temporalio.nexus._link_conversion.temporal_link_to_nexus_link(expected_link)
+        == link
+    )
+    assert (
+        temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link)
+        == expected_link
+    )
+
+
+def test_callback_link_with_unsupported_execution_type_is_ignored():
+    assert (
+        temporalio.nexus._link_conversion.temporal_link_to_nexus_link(
+            _callback_link(
+                temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_UNSPECIFIED,
+                "wf-id",
+            )
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https:///namespaces/ns/workflows/wf-id/run-id/callbacks/request-id",
+        "temporal:///namespaces/ns/workflows/wf-id/run-id/callbacks",
+        "temporal:///namespaces/ns/schedules/sched-id/run-id/callbacks/request-id",
+    ],
+)
+def test_invalid_callback_nexus_link_is_ignored(url: str):
+    link = nexusrpc.Link(url=url, type=_CALLBACK_TYPE)
+    assert temporalio.nexus._link_conversion.nexus_link_to_temporal_link(link) is None
