@@ -146,12 +146,15 @@ class S3StorageDriver(StorageDriver):
         Python value may serialize differently across payload converter versions
         (e.g. proto binary). The returned list is the same length as
         ``payloads``.
+
+        Object keys exceeding 1,024 bytes fall back to a namespace-scoped hash
+        key. Empty namespaces on workflow and activity targets use ``"null"``.
         """
         # Build context segments from the target identity.
         context_segments = ""
         target = context.target
         namespace = _percent_encode(target.namespace) if target is not None else None
-        namespace_segment = f"/ns/{namespace}" if namespace else ""
+        namespace_segment = f"/ns/{namespace or 'null'}" if target is not None else ""
         if isinstance(target, StorageDriverWorkflowInfo):
             wf_type = _percent_encode(target.type) or "null"
             wf_id = _percent_encode(target.id) or "null"
@@ -178,6 +181,9 @@ class S3StorageDriver(StorageDriver):
             digest_segments = f"/d/sha256/{hash_digest}"
 
             key = f"v0{namespace_segment}{context_segments}{digest_segments}"
+            if len(key.encode("utf-8")) > 1024:
+                # Retain namespace scope for authorization policies on object prefixes.
+                key = f"v0{namespace_segment}{digest_segments}"
 
             try:
                 if not await self._client.object_exists(bucket=bucket, key=key):
