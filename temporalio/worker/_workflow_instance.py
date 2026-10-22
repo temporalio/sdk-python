@@ -514,7 +514,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         # Let errors bubble out of these to the caller to fail the task
                         self._apply(job)
                 if any(job_sets):
-                    self._run_once(check_conditions=bool(job_sets[1] or job_sets[2]))
+                    # Updates only change state once accepted, which _run_once
+                    # checks for itself
+                    self._run_once(
+                        check_conditions=bool(job_sets[2])
+                        or any(job.HasField("signal_workflow") for job in job_sets[1])
+                    )
             else:
                 # Preserve the legacy scheduling order for histories which do
                 # not contain the single-batch workflow logic flag.
@@ -527,8 +532,15 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
                     # Run one iteration of the loop. We do not allow conditions to
                     # be checked in patch jobs (first index) or query jobs (last
-                    # index).
-                    self._run_once(check_conditions=index == 1 or index == 2)
+                    # index). Updates (second index) only change state once
+                    # accepted, which _run_once checks for itself.
+                    self._run_once(
+                        check_conditions=index == 2
+                        or (
+                            index == 1
+                            and any(job.HasField("signal_workflow") for job in job_set)
+                        )
+                    )
         except Exception as err:
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
@@ -2808,7 +2820,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Check conditions which may add to the ready list. Also remove
                 # conditions whose futures have already cancelled (e.g. when
                 # timed out).
-                if check_conditions:
+                #
+                # Values refreshed on every activation (time, history length,
+                # version changed, etc.) must not unblock workflow code unless
+                # the activation may have changed workflow state. Rejected
+                # updates, for example, leave nothing in history, so code they
+                # unblocked would not run on replay. Accepted updates are
+                # detected here because check_conditions leaves updates out.
+                if check_conditions or any(
+                    c.update_response.HasField("accepted")
+                    for c in self._current_completion.successful.commands
+                ):
                     self._conditions[:] = [
                         t
                         for t in self._conditions
