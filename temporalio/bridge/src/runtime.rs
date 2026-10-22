@@ -33,9 +33,28 @@ pub struct RuntimeRef {
 #[derive(Clone)]
 pub(crate) struct Runtime {
     pub(crate) pid: u32,
-    pub(crate) core: Arc<CoreRuntime>,
+    pub(crate) core: Arc<CoreRuntimeHandle>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
+}
+
+/// Owns the Core runtime so the last runtime clone can shut it down with the GIL released.
+/// Shutting down waits for running Tokio tasks, and the log forwarder may be one of them,
+/// waiting for the GIL.
+pub(crate) struct CoreRuntimeHandle(Option<CoreRuntime>);
+
+impl std::ops::Deref for CoreRuntimeHandle {
+    type Target = CoreRuntime;
+
+    fn deref(&self) -> &CoreRuntime {
+        self.0.as_ref().expect("Core runtime used after drop")
+    }
+}
+
+impl Drop for CoreRuntimeHandle {
+    fn drop(&mut self) {
+        let _ = Python::try_attach(|py| py.detach(|| drop(self.0.take())));
+    }
 }
 
 #[derive(FromPyObject)]
@@ -199,7 +218,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     Ok(RuntimeRef {
         runtime: Runtime {
             pid: std::process::id(),
-            core: Arc::new(core),
+            core: Arc::new(CoreRuntimeHandle(Some(core))),
             metrics_call_buffer,
             log_forwarder_handle,
         },
@@ -239,8 +258,9 @@ impl Runtime {
 
 impl Drop for Runtime {
     fn drop(&mut self) {
-        // Stop the log forwarder
-        if let Some(handle) = self.log_forwarder_handle.as_ref() {
+        // Clients and workers each hold a clone of the runtime, so only stop the
+        // log forwarder when the last clone is dropped
+        if let Some(handle) = self.log_forwarder_handle.take().and_then(Arc::into_inner) {
             handle.abort();
         }
     }
