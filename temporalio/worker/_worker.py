@@ -132,6 +132,7 @@ class Worker:
         max_task_queue_activities_per_second: float | None = None,
         max_eager_activity_reservations_per_workflow_task: int = 3,
         graceful_shutdown_timeout: timedelta = timedelta(),
+        plugin_shutdown_timeout: timedelta | None = timedelta(seconds=60),
         workflow_failure_exception_types: Sequence[type[BaseException]] = [],
         shared_state_manager: SharedStateManager | None = None,
         debug_mode: bool = False,
@@ -278,6 +279,12 @@ class Worker:
             graceful_shutdown_timeout: Amount of time after shutdown is called
                 that activities are given to complete before their tasks are
                 cancelled.
+            plugin_shutdown_timeout: Amount of time that exiting
+                ``async with Worker(...)`` waits, after shutdown, for the code
+                that plugins run after the Worker stops in ``run_worker``. That
+                code is cancelled after this time. ``None`` waits with no limit.
+                The default is 60 seconds.
+                WARNING: This setting is experimental.
             workflow_failure_exception_types: The types of exceptions that, if a
                 workflow-thrown exception extends, will cause the
                 workflow/update to fail instead of suspending the workflow via
@@ -379,6 +386,7 @@ class Worker:
             max_task_queue_activities_per_second=max_task_queue_activities_per_second,
             max_eager_activity_reservations_per_workflow_task=max_eager_activity_reservations_per_workflow_task,
             graceful_shutdown_timeout=graceful_shutdown_timeout,
+            plugin_shutdown_timeout=plugin_shutdown_timeout,
             workflow_failure_exception_types=workflow_failure_exception_types,
             shared_state_manager=shared_state_manager,
             debug_mode=debug_mode,
@@ -488,6 +496,7 @@ class Worker:
         self._async_context_inner_task: asyncio.Task | None = None
         self._async_context_run_task: asyncio.Task | None = None
         self._async_context_run_exception: BaseException | None = None
+        self._async_context_exiting = False
 
         self._activity_worker: _ActivityWorker | None = None
         self._runtime = (
@@ -960,7 +969,9 @@ class Worker:
                 await self.run()
             except BaseException as err:
                 self._async_context_run_exception = err
-                self._async_context_inner_task.cancel()  # type: ignore[union-attr]
+                # After __aexit__ starts, a cancel would stop the caller's code after the block.
+                if not self._async_context_exiting:
+                    self._async_context_inner_task.cancel()  # type: ignore[union-attr]
 
         self._async_context_run_task = asyncio.create_task(run())
         return self
@@ -975,8 +986,21 @@ class Worker:
         if not self._async_context_run_task:
             raise RuntimeError("Never started")
         await self.shutdown()
-        # Cancel our run task
-        self._async_context_run_task.cancel()
+        # Plugins can run cleanup code after shutdown. Wait for that code instead of cancelling it.
+        self._async_context_exiting = True
+        run_task = self._async_context_run_task
+        # A plugin's `configure_worker` may drop this key, so default here.
+        timeout = self._config.get("plugin_shutdown_timeout", timedelta(seconds=60))
+        try:
+            # wait() doesn't raise for the task's own outcome, only when this call is cancelled.
+            await asyncio.wait(
+                [run_task], timeout=timeout.total_seconds() if timeout else None
+            )
+        except asyncio.CancelledError:
+            run_task.cancel()
+            raise
+        if not run_task.done():
+            run_task.cancel()
         # Only re-raise our exception if present and exc_type is cancel
         if exc_type is asyncio.CancelledError and self._async_context_run_exception:
             raise self._async_context_run_exception
@@ -1016,6 +1040,7 @@ class WorkerConfig(TypedDict, total=False):
     max_task_queue_activities_per_second: float | None
     max_eager_activity_reservations_per_workflow_task: int
     graceful_shutdown_timeout: timedelta
+    plugin_shutdown_timeout: timedelta | None
     workflow_failure_exception_types: Sequence[type[BaseException]]
     shared_state_manager: SharedStateManager | None
     debug_mode: bool
