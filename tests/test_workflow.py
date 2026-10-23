@@ -491,6 +491,42 @@ def test_workflow_update_validator_not_update():
     )
 
 
+def test_workflow_update_validator_async():
+    # The validator decorator itself raises, so the class body fails to execute
+    with pytest.raises(ValueError) as err:
+
+        class AsyncUpdateValidator:  # type:ignore[reportUnusedClass]
+            @workflow.update
+            async def my_update(self, _a: str):
+                pass
+
+            # assert-type-error-pyright: "Argument of type .+ cannot be assigned to parameter"
+            @my_update.validator  # type: ignore
+            async def my_validator(self, _a: str):
+                pass
+
+    assert "Update validator must not be an async function" in str(err.value)
+
+
+class SyncUpdateValidator:
+    @workflow.update
+    async def my_update(self, _a: str):
+        pass
+
+    @my_update.validator
+    def my_validator(self, _a: str) -> None:
+        pass
+
+    @workflow.run
+    async def run(self):
+        pass
+
+
+def test_workflow_update_validator_sync():
+    defn = workflow._Definition.must_from_class(workflow.defn(SyncUpdateValidator))
+    assert defn.updates["my_update"].validator is SyncUpdateValidator.my_validator
+
+
 def _assert_config_function_parity(
     function_obj: Callable[..., Any],
     config_class: type[Any],
