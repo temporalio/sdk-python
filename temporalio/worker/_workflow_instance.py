@@ -514,7 +514,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         # Let errors bubble out of these to the caller to fail the task
                         self._apply(job)
                 if any(job_sets):
-                    self._run_once(check_conditions=bool(job_sets[1] or job_sets[2]))
+                    self._run_once(
+                        check_conditions=bool(job_sets[1] or job_sets[2]),
+                        jobs=act.jobs,
+                    )
             else:
                 # Preserve the legacy scheduling order for histories which do
                 # not contain the single-batch workflow logic flag.
@@ -528,7 +531,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     # Run one iteration of the loop. We do not allow conditions to
                     # be checked in patch jobs (first index) or query jobs (last
                     # index).
-                    self._run_once(check_conditions=index == 1 or index == 2)
+                    self._run_once(
+                        check_conditions=index == 1 or index == 2, jobs=act.jobs
+                    )
         except Exception as err:
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
@@ -2783,7 +2788,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         if hasattr(task, "_log_destroy_pending"):
             setattr(task, "_log_destroy_pending", False)
 
-    def _run_once(self, *, check_conditions: bool) -> None:
+    def _run_once(
+        self,
+        *,
+        check_conditions: bool,
+        jobs: Sequence[
+            temporalio.bridge.proto.workflow_activation.WorkflowActivationJob
+        ],
+    ) -> None:
         try:
             asyncio._set_running_loop(self)
 
@@ -2808,7 +2820,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Check conditions which may add to the ready list. Also remove
                 # conditions whose futures have already cancelled (e.g. when
                 # timed out).
-                if check_conditions:
+                #
+                # Rejected updates leave nothing in history, so a condition they
+                # let through (e.g. one on a value refreshed every activation)
+                # could not unblock on replay.
+                if check_conditions and (
+                    any(not job.HasField("do_update") for job in jobs)
+                    or any(
+                        c.update_response.HasField("accepted")
+                        for c in self._current_completion.successful.commands
+                    )
+                ):
                     self._conditions[:] = [
                         t
                         for t in self._conditions

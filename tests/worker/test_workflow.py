@@ -6060,6 +6060,57 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         assert "Rejected" == err.value.cause.message
 
 
+@workflow.defn
+class ConditionEvaluationWorkflow:
+    def __init__(self) -> None:
+        self._condition_evaluations = 0
+        self._done = False
+
+    @workflow.run
+    async def run(self) -> None:
+        def condition() -> bool:
+            self._condition_evaluations += 1
+            return self._done
+
+        await workflow.wait_condition(condition)
+
+    @workflow.query
+    def condition_evaluations(self) -> int:
+        return self._condition_evaluations
+
+    @workflow.update
+    def finish(self, accept: bool) -> None:
+        self._done = accept
+
+    @finish.validator
+    def finish_validator(self, accept: bool) -> None:
+        if not accept:
+            raise ApplicationError("Rejected")
+
+
+async def test_workflow_update_rejected_does_not_evaluate_conditions(client: Client):
+    async with new_worker(client, ConditionEvaluationWorkflow) as worker:
+        handle = await client.start_workflow(
+            ConditionEvaluationWorkflow.run,
+            id=f"update-rejected-conditions-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        evaluations = await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        # Neither the rejected update nor the queries can change state, so none of
+        # their activations may evaluate the condition
+        with pytest.raises(WorkflowUpdateFailedError):
+            await handle.execute_update(ConditionEvaluationWorkflow.finish, False)
+        assert evaluations == await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        await handle.execute_update(ConditionEvaluationWorkflow.finish, True)
+        await handle.result()
+
+
 async def test_workflow_update_task_fails(client: Client):
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
