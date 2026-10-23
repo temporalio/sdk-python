@@ -315,6 +315,11 @@ async def decode_activation(
     Returns:
         Metrics from any external storage retrieval operations that occurred.
     """
+    await CommandAwarePayloadVisitor(
+        skip_search_attributes=True,
+        skip_headers=not decode_headers,
+    ).visit(_Visitor(data_converter._decode_reference_payload_sequence), activation)
+
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
         await CommandAwarePayloadVisitor(
@@ -362,5 +367,13 @@ async def encode_completion(
             _Visitor(data_converter._external_store_payload_sequence),
             completion,
         )
+
+    await CommandAwarePayloadVisitor(
+        skip_search_attributes=True,
+        skip_headers=not encode_headers,
+    ).visit(
+        _Visitor(data_converter._encode_reference_payload_sequence),
+        completion,
+    )
 
     return metrics
