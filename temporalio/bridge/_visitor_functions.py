@@ -36,16 +36,33 @@ class VisitorFunctions(ABC):
         return None
 
 
+class _UnboundedSemaphore:
+    """A semaphore that never blocks. Used when visits are not limited."""
+
+    async def acquire(self) -> None:
+        """Returns immediately."""
+
+    def release(self) -> None:
+        """Does nothing."""
+
+
 class BoundedVisitorFunctions(VisitorFunctions):
     """Wraps VisitorFunctions to cap concurrent payload visits via a semaphore.
 
     After the full traversal, call drain() to await all in-flight tasks.
     """
 
-    def __init__(self, inner: VisitorFunctions, concurrency_limit: int) -> None:
-        """Create a bounded wrapper around the given visitor functions."""
+    def __init__(self, inner: VisitorFunctions, concurrency_limit: int | None) -> None:
+        """Create a bounded wrapper around the given visitor functions.
+
+        ``None`` runs visits without a limit, still tracking tasks to drain.
+        """
         self._inner = inner
-        self._sem = asyncio.Semaphore(concurrency_limit)
+        self._sem: asyncio.Semaphore | _UnboundedSemaphore = (
+            _UnboundedSemaphore()
+            if concurrency_limit is None
+            else asyncio.Semaphore(concurrency_limit)
+        )
         self._tasks: list[asyncio.Task[None]] = []
 
     async def visit_payload(self, payload: Payload) -> None:

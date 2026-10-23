@@ -235,7 +235,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: StartWorkflowInput
     ) -> temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest:
         assert input.start_signal
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
@@ -274,7 +274,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         ),
         input: StartWorkflowInput | UpdateWithStartStartWorkflowInput,
     ) -> None:
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
@@ -368,7 +368,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 timeout=input.rpc_timeout,
             ),
             namespace=self._client.namespace,
-            converter=self._client.data_converter.with_context(
+            converter=self._client._data_converter.with_context(
                 WorkflowSerializationContext(
                     namespace=self._client.namespace,
                     workflow_id=input.id,
@@ -402,7 +402,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         )
 
     async def query_workflow(self, input: QueryWorkflowInput) -> Any:
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
@@ -468,7 +468,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         return results[0]
 
     async def signal_workflow(self, input: SignalWorkflowInput) -> None:
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
@@ -506,7 +506,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         )
 
     async def terminate_workflow(self, input: TerminateWorkflowInput) -> None:
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=input.id,
@@ -581,7 +581,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: StartActivityInput
     ) -> temporalio.api.workflowservice.v1.StartActivityExecutionRequest:
         """Build StartActivityExecutionRequest from input."""
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             ActivitySerializationContext(
                 namespace=self._client.namespace,
                 activity_id=input.id,
@@ -807,7 +807,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         return ActivityExecutionDescription._from_resp(
             resp=resp,
             namespace=self._client.namespace,
-            data_converter=self._client.data_converter.with_context(
+            data_converter=self._client._data_converter.with_context(
                 ActivitySerializationContext(
                     namespace=self._client.namespace,
                     activity_id=resp.info.activity_id,
@@ -896,7 +896,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         input: StartWorkflowUpdateInput | UpdateWithStartUpdateWorkflowInput,
         workflow_id: str,
     ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest:
-        data_converter = self._client.data_converter._with_contexts(
+        data_converter = self._client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=workflow_id,
@@ -1128,7 +1128,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: HeartbeatAsyncActivityInput
     ) -> None:
         data_converter = (
-            input.data_converter_override or self._client.data_converter
+            input.data_converter_override or self._client._data_converter
         )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         details = (
             None
@@ -1185,7 +1185,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
     async def complete_async_activity(self, input: CompleteAsyncActivityInput) -> None:
         data_converter = (
-            input.data_converter_override or self._client.data_converter
+            input.data_converter_override or self._client._data_converter
         )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         result = (
             None
@@ -1221,7 +1221,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
 
     async def fail_async_activity(self, input: FailAsyncActivityInput) -> None:
         data_converter = (
-            input.data_converter_override or self._client.data_converter
+            input.data_converter_override or self._client._data_converter
         )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
 
         failure = temporalio.api.failure.v1.Failure()
@@ -1264,7 +1264,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: ReportCancellationAsyncActivityInput
     ) -> None:
         data_converter = (
-            input.data_converter_override or self._client.data_converter
+            input.data_converter_override or self._client._data_converter
         )._with_store_context(self._get_async_activity_store_context(input.id_or_token))
         details = (
             None
@@ -1340,7 +1340,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 initial_patch=initial_patch,
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
-                memo=await self._client.data_converter._encode_memo(input.memo)
+                memo=await self._client._data_converter._encode_memo(input.memo)
                 if input.memo
                 else None,
             )
@@ -1412,7 +1412,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             ),
-            self._client.data_converter,
+            self._client._data_converter,
         )
 
     async def pause_schedule(self, input: PauseScheduleInput) -> None:
@@ -1487,7 +1487,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         metadata=input.rpc_metadata,
                         timeout=input.rpc_timeout,
                     ),
-                    self._client.data_converter,
+                    self._client._data_converter,
                 )
             )
         )
@@ -1565,7 +1565,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             service=input.service,
             operation=input.operation,
         )
-        data_converter = self._client.data_converter.with_context(nexus_context)
+        data_converter = self._client._data_converter.with_context(nexus_context)
         req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
@@ -1653,7 +1653,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             metadata=input.rpc_metadata,
             timeout=input.rpc_timeout,
         )
-        data_converter = self._client.data_converter.with_context(
+        data_converter = self._client._data_converter.with_context(
             temporalio.converter.NexusSerializationContext(
                 endpoint=resp.info.endpoint,
                 service=resp.info.service,
@@ -1669,7 +1669,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         self, input: GetNexusOperationResultInput
     ) -> Any:
         """Poll for nexus operation result until it's available."""
-        data_converter = self._client.data_converter
+        data_converter = self._client._data_converter
         # These three are set together or not at all: a handle that started the operation has all
         # of them, and a handle obtained by operation ID alone has none and defaults them to "".
         # An empty endpoint therefore means "no operation to build a context from", not "an
@@ -1785,5 +1785,5 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             dest,
             self._client.config(active_config=True)["header_codec_behavior"]
             == HeaderCodecBehavior.CODEC,
-            self._client.data_converter,
+            self._client._data_converter,
         )

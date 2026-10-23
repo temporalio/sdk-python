@@ -199,11 +199,15 @@ class S3StorageDriver(StorageDriver):
                 },
             )
 
-        return await _gather_with_cancellation([_upload(p) for p in payloads])
+        async def _permitted_upload(payload: Payload) -> StorageDriverClaim:
+            async with context.limiter.permit(payload):
+                return await _upload(payload)
+
+        return await _gather_with_cancellation([_permitted_upload(p) for p in payloads])
 
     async def retrieve(
         self,
-        context: StorageDriverRetrieveContext,  # noqa: ARG002
+        context: StorageDriverRetrieveContext,
         claims: Sequence[StorageDriverClaim],
     ) -> list[Payload]:
         """Retrieves payloads from S3 for the given ``temporalio.extstore.DriverClaim`` list."""
@@ -247,4 +251,8 @@ class S3StorageDriver(StorageDriver):
             payload.ParseFromString(payload_bytes)
             return payload
 
-        return await _gather_with_cancellation([_download(c) for c in claims])
+        async def _permitted_download(claim: StorageDriverClaim) -> Payload:
+            async with context.limiter.permit(claim):
+                return await _download(claim)
+
+        return await _gather_with_cancellation([_permitted_download(c) for c in claims])
