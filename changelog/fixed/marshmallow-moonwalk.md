@@ -1,0 +1,1 @@
+Fix S3 external storage object names by preserving empty namespace segments and using namespace-scoped hash keys when names exceed 1,024 bytes. Document the read and bucket-listing permissions required for uploads.
