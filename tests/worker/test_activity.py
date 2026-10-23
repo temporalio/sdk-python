@@ -25,6 +25,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.exceptions
 from temporalio import activity, workflow
 from temporalio.client import (
+    AsyncActivityCancelledError,
     AsyncActivityHandle,
     Client,
     WorkflowFailureError,
@@ -1496,6 +1497,47 @@ async def test_activity_async_heartbeat_and_fail(
     assert isinstance(err.value.cause.cause, ApplicationError)
     assert err.value.cause.cause.message == "err message 2"
     assert list(err.value.cause.cause.details) == ["err details 2"]
+
+
+@pytest.mark.parametrize("use_task_token", [True, False])
+async def test_activity_async_heartbeat_reset(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    use_task_token: bool,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    wrapper = AsyncActivityWrapper()
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(
+            client,
+            worker,
+            wrapper.run,
+            shared_state_manager=shared_state_manager,
+        )
+    )
+    info = await wrapper.wait_info()
+    await client.workflow_service.reset_activity(
+        temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=info.workflow_id or "",
+                run_id=info.workflow_run_id or "",
+            ),
+            id=info.activity_id,
+        )
+    )
+    with pytest.raises(AsyncActivityCancelledError) as err:
+        await wrapper.async_handle(client, use_task_token).heartbeat()
+    assert err.value.details == activity.ActivityCancellationDetails(reset=True)
+
+    assert info.workflow_id
+    await client.get_workflow_handle(info.workflow_id).terminate()
+    with pytest.raises(WorkflowFailureError):
+        await task
 
 
 @pytest.mark.parametrize("use_task_token", [True, False])
