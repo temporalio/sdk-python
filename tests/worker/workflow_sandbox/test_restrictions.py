@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import operator
 import pathlib
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import ClassVar
+from datetime import timedelta
+from typing import Any, ClassVar
 
 import pytest
 
@@ -82,12 +85,45 @@ def test_restricted_proxy_in_place_operations_preserve_proxy():
         RestrictionContext(),
         SandboxMatcher(),
     )
-    values = restricted_list([1])
+    values = original = restricted_list([1])
 
     values += [2]
 
     assert type(values) is _RestrictedProxy
+    assert values is original
     assert RestrictionContext.unwrap_if_proxied(values) == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "value, other, operation",
+    [
+        ((1,), (2,), operator.iadd),
+        ((1,), 2, operator.imul),
+        (frozenset({1}), {2}, operator.ior),
+    ],
+)
+def test_restricted_proxy_in_place_operations_replace_value(
+    value: Any, other: Any, operation: Callable[[Any, Any], Any]
+):
+    proxy = _RestrictedProxy("value", value, RestrictionContext(), SandboxMatcher())
+
+    result = operation(proxy, other)
+
+    assert RestrictionContext.unwrap_if_proxied(result) == operation(value, other)
+    assert type(result) is _RestrictedProxy
+    assert result is not proxy
+    assert RestrictionContext.unwrap_if_proxied(proxy) is value
+
+
+def test_restricted_proxy_in_place_operation_returns_primitive():
+    value = _RestrictedProxy(
+        "timedelta", timedelta(seconds=4), RestrictionContext(), SandboxMatcher()
+    )
+
+    value /= timedelta(seconds=2)
+
+    assert value == 2.0
+    assert type(value) is float
 
 
 def test_workflow_sandbox_restricted_proxy():
