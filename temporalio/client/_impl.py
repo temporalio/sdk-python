@@ -1175,7 +1175,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp.cancel_requested or resp.activity_paused:
+            if resp.cancel_requested or resp.activity_paused or resp.activity_reset:
                 raise AsyncActivityCancelledError(
                     details=ActivityCancellationDetails(
                         cancel_requested=resp.cancel_requested,
