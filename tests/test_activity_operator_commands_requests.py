@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from typing import Any
 from unittest.mock import AsyncMock, Mock
@@ -26,6 +27,10 @@ class _CapturedService:
         self.unpause_activity_execution = self._recorder(
             "unpause",
             temporalio.api.workflowservice.v1.UnpauseActivityExecutionResponse(),
+        )
+        self.terminate_activity_execution = self._recorder(
+            "terminate",
+            temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse(),
         )
         self.update_activity_execution_options = self._recorder(
             "update",
@@ -201,3 +206,18 @@ async def test_update_options_masks_only_changed_options(
     assert update.activity_options.start_to_close_timeout.ToTimedelta() == timedelta(
         seconds=90
     )
+
+
+async def test_terminate_activity_sends_request_id_and_reason(
+    client: Client, captured: _CapturedService
+):
+    handle = client.get_activity_handle("act-1")
+    await handle.terminate(reason="term-reason")
+
+    req = captured.requests["terminate"]
+    assert req.activity_id == "act-1"
+    assert req.reason == "term-reason"
+    assert req.identity == "test-identity"
+    assert req.namespace == "test-namespace"
+    assert req.request_id
+    assert uuid.UUID(req.request_id)
