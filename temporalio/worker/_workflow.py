@@ -800,7 +800,7 @@ class _DeadlockError(Exception):
         msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {timeout} second(s)."
         tid = workflow.get_thread_id()
         if not tid:
-            return cls(msg)
+            return cls(f"{msg} (no thread ID available)")
 
         try:
             tb = cls._gen_tb_helper(tid)

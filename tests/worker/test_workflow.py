@@ -42,6 +42,7 @@ import temporalio.converter
 import temporalio.converter._extstore
 import temporalio.worker
 import temporalio.worker._command_aware_visitor
+import temporalio.worker._workflow
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 from temporalio import activity, workflow
@@ -3692,6 +3693,10 @@ async def test_workflow_local_activity_cancel_during_backoff(
 deadlock_thread_event = threading.Event()
 
 
+def block_until_deadlock_event() -> None:
+    deadlock_thread_event.wait()
+
+
 # We cannot sandbox this because we are intentionally non-deterministic when we
 # set the global threading event
 @workflow.defn(sandboxed=False)
@@ -3699,7 +3704,18 @@ class DeadlockedWorkflow:
     @workflow.run
     async def run(self) -> None:
         # Block on threading event
-        deadlock_thread_event.wait()
+        block_until_deadlock_event()
+
+
+def test_workflow_deadlock_no_thread_id_message() -> None:
+    class NoThreadIdWorkflow:
+        def get_thread_id(self) -> None:
+            return None
+
+    err = temporalio.worker._workflow._DeadlockError.from_deadlocked_workflow(
+        typing.cast(WorkflowInstance, typing.cast(object, NoThreadIdWorkflow())), 1
+    )
+    assert "(no thread ID available)" in str(err)
 
 
 async def test_workflow_deadlock(client: Client):
@@ -3716,7 +3732,7 @@ async def test_workflow_deadlock(client: Client):
             task_queue=worker.task_queue,
         )
 
-        async def last_history_task_failure() -> str:
+        async def last_history_task_failure() -> Failure | None:
             resp = await client.workflow_service.get_workflow_execution_history(
                 GetWorkflowExecutionHistoryRequest(
                     namespace=client.namespace,
@@ -3725,13 +3741,20 @@ async def test_workflow_deadlock(client: Client):
             )
             for event in reversed(resp.history.events):
                 if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
-                    return event.workflow_task_failed_event_attributes.failure.message
-            return "<no failure>"
+                    return event.workflow_task_failed_event_attributes.failure
+            return None
+
+        async def check_deadlock_failure() -> None:
+            failure = await last_history_task_failure()
+            assert failure is not None
+            assert failure.message == (
+                "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s)."
+            )
+            assert "block_until_deadlock_event" in failure.stack_trace
 
         try:
-            await assert_eq_eventually(
-                "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s).",
-                last_history_task_failure,
+            await assert_eventually(
+                check_deadlock_failure,
                 timeout=timedelta(seconds=5),
                 interval=timedelta(seconds=1),
             )
