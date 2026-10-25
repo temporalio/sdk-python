@@ -2742,6 +2742,24 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 extra={"temporal_workflow": self._info._logger_details()},
             )
             return
+        if defn.arg_count_range is not None:
+            minimum, maximum = defn.arg_count_range
+            if len(args) < minimum or (maximum is not None and len(args) > maximum):
+                expected = (
+                    str(minimum)
+                    if minimum == maximum
+                    else f"at least {minimum}"
+                    if maximum is None
+                    else f"{minimum} to {maximum}"
+                )
+                logger.error(
+                    f"Signal {job.signal_name} on workflow {self._info.workflow_type}"
+                    f" with ID {self._info.workflow_id} and run ID {self._info.run_id}"
+                    f" received {len(args)} arguments but accepts {expected},"
+                    " dropping the signal",
+                    extra={"temporal_workflow": self._info._logger_details()},
+                )
+                return
         input = HandleSignalInput(
             signal=job.signal_name, args=args, headers=job.headers
         )

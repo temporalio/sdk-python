@@ -1,0 +1,1 @@
+Signals sent to a workflow with too few or too many positional arguments for the handler are now logged and dropped, like signals with undecodable arguments, instead of repeatedly failing the workflow task.

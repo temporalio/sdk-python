@@ -461,6 +461,7 @@ class _SignalDefinition:
     # Types loaded on post init if None
     arg_types: list[type] | None = None
     dynamic_vararg: bool = False
+    arg_count_range: tuple[int, int | None] | None = None
 
     @staticmethod
     def from_fn(fn: Callable) -> _SignalDefinition | None:
@@ -494,9 +495,44 @@ class _SignalDefinition:
                     ),
                 )
             object.__setattr__(self, "arg_types", arg_types)
+        if self.name and self.arg_count_range is None:
+            object.__setattr__(
+                self,
+                "arg_count_range",
+                _positional_arg_count_range(self.fn, self.is_method),
+            )
 
     def bind_fn(self, obj: Any) -> Callable[..., Any]:
         return _bind_method(obj, self.fn)
+
+
+def _positional_arg_count_range(
+    fn: Callable, is_method: bool
+) -> tuple[int, int | None] | None:
+    try:
+        params = list(inspect.signature(fn).parameters.values())
+    except (TypeError, ValueError):
+        return None
+    if is_method:
+        params = params[1:]
+    if any(
+        p.kind is inspect.Parameter.KEYWORD_ONLY
+        and p.default is inspect.Parameter.empty
+        for p in params
+    ):
+        return None
+    positional = [
+        p
+        for p in params
+        if p.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        )
+    ]
+    minimum = sum(p.default is inspect.Parameter.empty for p in positional)
+    has_varargs = any(p.kind is inspect.Parameter.VAR_POSITIONAL for p in params)
+    return minimum, None if has_varargs else len(positional)
 
 
 @dataclass(frozen=True)

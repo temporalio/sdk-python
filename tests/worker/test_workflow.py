@@ -743,6 +743,115 @@ async def test_workflow_bad_signal_param(client: Client):
 
 
 @workflow.defn
+class BadSignalArgCountWorkflow:
+    def __init__(self) -> None:
+        self._received: list[str] = []
+
+    @workflow.run
+    async def run(self) -> list[str]:
+        await workflow.wait_condition(lambda: "finish" in self._received)
+        return self._received
+
+    @workflow.signal
+    async def required(self, value: str) -> None:
+        self._received.append(f"required:{value}")
+
+    @workflow.signal
+    async def optional(self, value: str = "default") -> None:
+        self._received.append(f"optional:{value}")
+
+    @workflow.signal
+    async def finish(self) -> None:
+        self._received.append("finish")
+
+
+async def test_workflow_bad_signal_arg_count(client: Client):
+    with LogCapturer().logs_captured(
+        temporalio.worker._workflow_instance.logger
+    ) as capturer:
+        async with new_worker(client, BadSignalArgCountWorkflow) as worker:
+            handle = await client.start_workflow(
+                BadSignalArgCountWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.signal("required", args=[])
+            await handle.signal("required", args=["a", "b"])
+            await handle.signal("optional", args=["a", "b"])
+            await handle.signal("required", "good")
+            await handle.signal("optional")
+            await handle.signal("optional", "given")
+            await handle.signal(BadSignalArgCountWorkflow.finish)
+            assert [
+                "required:good",
+                "optional:default",
+                "optional:given",
+                "finish",
+            ] == await handle.result()
+
+        messages = {
+            record.message
+            for record in capturer.find_all(
+                lambda l: "dropping the signal" in l.message
+            )
+        }
+        assert len(messages) == 3
+        assert any(
+            "Signal required" in m and "received 0 arguments but accepts 1" in m
+            for m in messages
+        )
+        assert any(
+            "Signal required" in m and "received 2 arguments but accepts 1" in m
+            for m in messages
+        )
+        assert any(
+            "Signal optional" in m and "received 2 arguments but accepts 0 to 1" in m
+            for m in messages
+        )
+        assert all(
+            "BadSignalArgCountWorkflow" in m and handle.id in m for m in messages
+        )
+
+
+def test_positional_arg_count_range():
+    from temporalio.workflow._handlers import _positional_arg_count_range
+
+    def none() -> None: ...
+
+    def two(a: str, b: str) -> list[str]:
+        return [a, b]
+
+    def defaults(a: str, b: str = "", c: str = "") -> list[str]:
+        return [a, b, c]
+
+    def varargs(a: str, *rest: str) -> list[str]:
+        return [a, *rest]
+
+    def positional_only(a: str, /, b: str) -> list[str]:
+        return [a, b]
+
+    def keyword_default(a: str, *, b: str = "") -> list[str]:
+        return [a, b]
+
+    def keyword_required(a: str, *, b: str) -> list[str]:
+        return [a, b]
+
+    class Callback:
+        def __call__(self, a: str) -> str:
+            return a
+
+    assert _positional_arg_count_range(none, False) == (0, 0)
+    assert _positional_arg_count_range(two, False) == (2, 2)
+    assert _positional_arg_count_range(defaults, False) == (1, 3)
+    assert _positional_arg_count_range(varargs, False) == (1, None)
+    assert _positional_arg_count_range(positional_only, False) == (2, 2)
+    assert _positional_arg_count_range(keyword_default, False) == (1, 1)
+    assert _positional_arg_count_range(keyword_required, False) is None
+    assert _positional_arg_count_range(Callback(), False) == (1, 1)
+    assert _positional_arg_count_range(Callback.__call__, True) == (1, 1)
+
+
+@workflow.defn
 class AsyncUtilWorkflow:
     def __init__(self) -> None:
         self._status = "starting"
