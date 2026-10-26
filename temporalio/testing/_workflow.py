@@ -100,6 +100,7 @@ class WorkflowEnvironment:
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: timedelta | None = None,
+        dev_server_startup_timeout: timedelta | None = None,
         ui_port: int | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
@@ -160,6 +161,9 @@ class WorkflowEnvironment:
             dev_server_extra_args: Extra arguments for the CLI binary.
             dev_server_download_ttl: TTL for the downloaded CLI binary. If unset, it will be
                 cached indefinitely.
+            dev_server_startup_timeout: Maximum time to wait for the dev server to
+                become ready after spawning. Defaults to 5 seconds and does not
+                include download time.
             ui_port: UI port to use if UI is enabled.
 
         Returns:
@@ -188,6 +192,7 @@ class WorkflowEnvironment:
             dev_server_download_version=dev_server_download_version,
             dev_server_extra_args=dev_server_extra_args,
             dev_server_download_ttl=dev_server_download_ttl,
+            dev_server_startup_timeout=dev_server_startup_timeout,
             ui_port=ui_port,
         )
 
@@ -210,6 +215,7 @@ class WorkflowEnvironment:
         test_server_download_version: str = "default",
         test_server_extra_args: Sequence[str] = [],
         test_server_download_ttl: timedelta | None = None,
+        test_server_startup_timeout: timedelta | None = None,
     ) -> WorkflowEnvironment:
         """Start a V1 time skipping workflow environment.
 
@@ -267,6 +273,9 @@ class WorkflowEnvironment:
             test_server_extra_args: Extra arguments for the test server binary.
             test_server_download_ttl: TTL for the downloaded test server binary. If unset, it
                 will be cached indefinitely.
+            test_server_startup_timeout: Maximum time to wait for the test server to
+                become ready after spawning. Defaults to 5 seconds and does not
+                include download time.
 
         Returns:
             The started workflow environment with time skipping.
@@ -286,6 +295,7 @@ class WorkflowEnvironment:
             test_server_download_version=test_server_download_version,
             test_server_extra_args=test_server_extra_args,
             test_server_download_ttl=test_server_download_ttl,
+            test_server_startup_timeout=test_server_startup_timeout,
         )
 
     @classmethod
@@ -570,6 +580,7 @@ class _HasAServer(WorkflowEnvironment):
         dev_server_download_version: str = "default",
         dev_server_extra_args: Sequence[str] = [],
         dev_server_download_ttl: timedelta | None = None,
+        dev_server_startup_timeout: timedelta | None = None,
         ui_port: int | None = None,
     ) -> tuple[
         temporalio.bridge.testing.EphemeralServer,
@@ -617,6 +628,11 @@ class _HasAServer(WorkflowEnvironment):
                 log_level=dev_server_log_level,
                 extra_args=dev_server_extra_args,
                 download_ttl_ms=download_ttl_ms,
+                startup_timeout_ms=int(
+                    dev_server_startup_timeout.total_seconds() * 1000
+                )
+                if dev_server_startup_timeout is not None
+                else None,
             ),
         )
 
@@ -702,6 +718,7 @@ class _V1WorkflowEnvironment(_HasAServer):
         test_server_download_version: str,
         test_server_extra_args: Sequence[str],
         test_server_download_ttl: timedelta | None,
+        test_server_startup_timeout: timedelta | None,
     ) -> _V1WorkflowEnvironment:
         runtime = runtime or temporalio.runtime.Runtime.default()
         download_ttl_ms = None
@@ -718,6 +735,11 @@ class _V1WorkflowEnvironment(_HasAServer):
                 download_ttl_ms=download_ttl_ms,
                 port=port,
                 extra_args=test_server_extra_args,
+                startup_timeout_ms=int(
+                    test_server_startup_timeout.total_seconds() * 1000
+                )
+                if test_server_startup_timeout is not None
+                else None,
             ),
         )
         try:

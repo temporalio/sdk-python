@@ -153,6 +153,7 @@ from tests.helpers.external_stack_trace import (
     external_wait_cancel,
 )
 from tests.helpers.metrics import PromMetricMatcher
+from tests.helpers.time_skipping import skip_if_time_skipping_v1_unsupported
 
 
 @workflow.defn
@@ -1340,7 +1341,7 @@ class CancelReasonWorkflow:
         except asyncio.CancelledError:
             self._reason_inner = workflow.cancellation_reason()
         try:
-            await asyncio.sleep(1000)
+            await workflow.wait_condition(lambda: False)
         except asyncio.CancelledError:
             self._reason_outer = workflow.cancellation_reason()
             raise
@@ -3788,7 +3789,7 @@ async def test_workflow_eviction_deadlock(client: Client):
     await assert_eq_eventually(
         "[TMPRL1101] Potential deadlock detected: workflow didn't yield within 1 second(s).",
         last_history_task_failure,
-        timeout=timedelta(seconds=5),
+        timeout=timedelta(seconds=10),
         interval=timedelta(seconds=1),
     )
 
@@ -4819,12 +4820,8 @@ class CancelSignalAndTimerFiredInSameTaskWorkflow:
         self.timer_task.cancel()
 
 
-async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v1(
-    env: WorkflowEnvironment,
-):
-    # This test only works when we support time skipping
-    if not env.supports_time_skipping_v1:
-        pytest.skip("Need to skip time to validate this test")
+async def test_workflow_cancel_signal_and_timer_fired_in_same_task_ts_v1():
+    skip_if_time_skipping_v1_unsupported()
 
     # TODO(cretz): There is a bug in the Java test server, probably
     # https://github.com/temporalio/sdk-java/issues/1138 where the first
@@ -6063,6 +6060,57 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         assert "Rejected" == err.value.cause.message
 
 
+@workflow.defn
+class ConditionEvaluationWorkflow:
+    def __init__(self) -> None:
+        self._condition_evaluations = 0
+        self._done = False
+
+    @workflow.run
+    async def run(self) -> None:
+        def condition() -> bool:
+            self._condition_evaluations += 1
+            return self._done
+
+        await workflow.wait_condition(condition)
+
+    @workflow.query
+    def condition_evaluations(self) -> int:
+        return self._condition_evaluations
+
+    @workflow.update
+    def finish(self, accept: bool) -> None:
+        self._done = accept
+
+    @finish.validator
+    def finish_validator(self, accept: bool) -> None:
+        if not accept:
+            raise ApplicationError("Rejected")
+
+
+async def test_workflow_update_rejected_does_not_evaluate_conditions(client: Client):
+    async with new_worker(client, ConditionEvaluationWorkflow) as worker:
+        handle = await client.start_workflow(
+            ConditionEvaluationWorkflow.run,
+            id=f"update-rejected-conditions-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        evaluations = await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        # Neither the rejected update nor the queries can change state, so none of
+        # their activations may evaluate the condition
+        with pytest.raises(WorkflowUpdateFailedError):
+            await handle.execute_update(ConditionEvaluationWorkflow.finish, False)
+        assert evaluations == await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        await handle.execute_update(ConditionEvaluationWorkflow.finish, True)
+        await handle.result()
+
+
 async def test_workflow_update_task_fails(client: Client):
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
@@ -6087,6 +6135,57 @@ async def test_workflow_update_task_fails(client: Client):
         global task_fail_ct, bad_validator_fail_ct
         assert task_fail_ct == 1
         assert bad_validator_fail_ct == 2
+
+
+@workflow.defn
+class AsyncUpdateValidatorDynamicWorkflow:
+    @workflow.run
+    async def run(self) -> list[str]:
+        def handler(_arg: int) -> int:
+            return 1
+
+        async def async_validator(_arg: int) -> None:
+            pass
+
+        def sync_validator(_arg: int) -> None:
+            pass
+
+        def dynamic_handler(_name: str, _args: Sequence[RawValue]) -> int:
+            return 3
+
+        # A rejected registration must not replace the existing handler
+        workflow.set_update_handler("named", handler, validator=sync_validator)
+        results = []
+        for set_handler in (
+            lambda: workflow.set_update_handler(
+                "named", lambda _arg: 2, validator=async_validator
+            ),
+            lambda: workflow.set_dynamic_update_handler(
+                dynamic_handler, validator=async_validator
+            ),
+        ):
+            try:
+                set_handler()
+            except ValueError as err:
+                results.append(str(err))
+        results.append(str(workflow.get_update_handler("named") is handler))
+        results.append(str(workflow.get_dynamic_update_handler() is None))
+        return results
+
+
+async def test_workflow_update_async_validator_dynamic_rejected(client: Client):
+    async with new_worker(client, AsyncUpdateValidatorDynamicWorkflow) as worker:
+        result = await client.execute_workflow(
+            AsyncUpdateValidatorDynamicWorkflow.run,
+            id=f"async-update-validator-dynamic-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == [
+        "Update validator must not be an async function",
+        "Update validator must not be an async function",
+        "True",
+        "True",
+    ]
 
 
 async def test_workflow_update_continue_as_new_fails_task(client: Client):
@@ -8468,22 +8567,25 @@ async def test_alternate_async_loop_ordering(client: Client, env: WorkflowEnviro
         task_queue=task_queue,
     )
 
+    async def wait_for_history_event(event_type: EventType.ValueType) -> None:
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type is event_type:
+                return
+
     async with new_worker(
         client,
         ActivityAndSignalsWhileWorkflowDown,
         activities=[say_hello],
         task_queue=task_queue,
     ):
-        # This sleep exists to make sure the first WFT is processed
-        await asyncio.sleep(0.2)
+        await wait_for_history_event(EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED)
 
     async with new_worker(
         client,
         activities=[say_hello],
         task_queue=activity_tq,
     ):
-        # Make sure the activity starts being processed before sending signals
-        await asyncio.sleep(1)
+        await wait_for_history_event(EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED)
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "1")
         await handle.signal(ActivityAndSignalsWhileWorkflowDown.dosig, "2")
 

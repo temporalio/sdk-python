@@ -1,0 +1,1 @@
+Decorating an `async def` function with `@update_method.validator` or passing one as `validator` to `workflow.set_update_handler`/`set_dynamic_update_handler` now raises `ValueError`. Previously the validator was silently never run, so every update was accepted.

@@ -1,0 +1,1 @@
+Heartbeating an async activity through a task-token `AsyncActivityHandle` now raises `AsyncActivityCancelledError` with `reset=True` when the activity was reset, as handles created from IDs already did.
