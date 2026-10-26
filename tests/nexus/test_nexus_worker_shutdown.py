@@ -398,8 +398,8 @@ class SlowEncodePayloadCodec(PayloadCodec):
 
     async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
         self.encode_started.set()
-        # Long enough for the worker shutdown to cancel the task mid-encode
-        await asyncio.sleep(3)
+        # Block until the worker shutdown cancels the task mid-encode
+        await asyncio.Future()
         return list(payloads)
 
     async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
