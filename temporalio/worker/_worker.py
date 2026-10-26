@@ -829,7 +829,14 @@ class Worker:
 
     async def _run(self):
         # Eagerly validate which will do a namespace check in Core.
-        await self._bridge_worker.validate()
+        try:
+            await self._bridge_worker.validate()
+        except BaseException:
+            # Nothing was started, so there is nothing to shut down. Mark
+            # shutdown complete or shutdown() and async with would wait forever.
+            if not self._started:
+                self._shutdown_complete_event.set()
+            raise
 
         if self._started:
             raise RuntimeError("Already started")
