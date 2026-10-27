@@ -325,6 +325,7 @@ async def test_ui_port():
     async with await WorkflowEnvironment.start_local(
         ui=True,
         ui_port=18080,
+        dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
     ) as env:
         # Just verify it starts without error
         assert env.client is not None
