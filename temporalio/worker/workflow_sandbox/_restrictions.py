@@ -742,6 +742,10 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
             use={
                 "pthread_getcpuclockid",
                 "get_clock_info",
+                # Not available on every platform (e.g. Windows); matching a
+                # nonexistent attribute is harmless
+                "clock_gettime",
+                "clock_gettime_ns",
                 "localtime",
                 "monotonic",
                 "monotonic_ns",
