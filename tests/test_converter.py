@@ -42,6 +42,7 @@ from temporalio.converter import (
     BinaryProtoPayloadConverter,
     CompositePayloadConverter,
     DataConverter,
+    DefaultFailureConverter,
     DefaultFailureConverterWithEncodedAttributes,
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
@@ -907,6 +908,42 @@ async def test_failure_encoded_attributes():
         not in failure.application_failure_info.details.payloads[0].metadata
     )
     assert failure == orig_failure
+
+
+def _failure_chain_messages(failure: Failure) -> list[str]:
+    messages = [failure.message]
+    while failure.HasField("cause"):
+        failure = failure.cause
+        messages.append(failure.message)
+    return messages
+
+
+def test_failure_with_cyclic_cause():
+    # `raise err from err` makes an exception its own cause
+    try:
+        try:
+            raise ValueError("self")
+        except ValueError as err:
+            raise err from err
+    except ValueError as err:
+        self_caused = err
+
+    # Two exceptions that are each other's cause
+    first = ApplicationError("first")
+    second = ValueError("second")
+    first.__cause__ = second
+    second.__cause__ = first
+
+    converter = DefaultFailureConverter()
+    payload_converter = DefaultPayloadConverter()
+    for exception, expected in [
+        (self_caused, ["self"]),
+        (first, ["first", "second"]),
+        (second, ["second", "first"]),
+    ]:
+        failure = Failure()
+        converter.to_failure(exception, payload_converter, failure)
+        assert _failure_chain_messages(failure) == expected
 
 
 @pytest.mark.parametrize(

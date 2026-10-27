@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import dataclasses
 import json
 import traceback
@@ -21,6 +22,12 @@ from temporalio.converter._payload_converter import PayloadConverter
 logger = getLogger("temporalio.converter")
 
 _TEMPORAL_FAILURE_PROTO_TYPE = "temporal.api.failure.v1.Failure"
+
+# IDs of the exceptions whose failures are being built, from the outermost one to the
+# current cause.
+_exceptions_being_converted: contextvars.ContextVar[tuple[int, ...]] = (
+    contextvars.ContextVar("_exceptions_being_converted", default=())
+)
 
 
 class FailureConverter(ABC):
@@ -98,6 +105,24 @@ class DefaultFailureConverter(FailureConverter):
         failure: temporalio.api.failure.v1.Failure,
     ) -> None:
         """See base class."""
+        # A cause or context chain can lead back to an exception that is already
+        # being converted, e.g. after ``raise e from e``. Like traceback printing,
+        # stop the chain there instead of recursing until RecursionError.
+        being_converted = _exceptions_being_converted.get()
+        if id(exception) in being_converted:
+            return
+        token = _exceptions_being_converted.set(being_converted + (id(exception),))
+        try:
+            self._to_failure(exception, payload_converter, failure)
+        finally:
+            _exceptions_being_converted.reset(token)
+
+    def _to_failure(
+        self,
+        exception: BaseException,
+        payload_converter: PayloadConverter,
+        failure: temporalio.api.failure.v1.Failure,
+    ) -> None:
         # If already a failure error, use that
         if isinstance(exception, temporalio.exceptions.FailureError):
             self._error_to_failure(exception, payload_converter, failure)

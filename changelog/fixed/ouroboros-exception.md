@@ -1,0 +1,1 @@
+Converting an exception whose cause or context chain loops back to itself, for example after `raise err from err`, now stops the chain at the repeated exception instead of failing with `RecursionError`.
