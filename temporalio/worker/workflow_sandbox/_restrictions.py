@@ -958,9 +958,16 @@ class _RestrictedProxyIOp(_RestrictedProxyLookup):
         super().__init__(access_func, fallback_func=fallback_func)
 
         def bind_f(instance: _RestrictedProxy, obj: Any) -> Callable:
-            def i_op(self: Any, other: Any) -> _RestrictedProxy:
-                access_func(self, other)  # type: ignore
-                return instance
+            def i_op(self: Any, other: Any) -> Any:
+                result = access_func(self, other)  # type: ignore
+                if result is self:
+                    return instance
+                if _is_restrictable(result):
+                    state = _RestrictionState.from_proxy(instance)
+                    return _RestrictedProxy(
+                        state.name, result, state.context, state.matcher
+                    )
+                return result
 
             return i_op.__get__(obj, type(obj))  # type: ignore
 

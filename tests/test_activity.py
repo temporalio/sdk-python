@@ -112,6 +112,25 @@ async def test_start_activity_generates_request_id() -> None:
     assert requests[0].request_id != requests[1].request_id
 
 
+async def test_terminate_activity_generates_request_id() -> None:
+    terminate_activity_execution = mock.AsyncMock(
+        return_value=temporalio.api.workflowservice.v1.TerminateActivityExecutionResponse()
+    )
+    service_client = mock.MagicMock()
+    service_client.config.identity = "test-identity"
+    service_client.workflow_service.terminate_activity_execution = (
+        terminate_activity_execution
+    )
+    client = Client(service_client)
+
+    for activity_id in ("activity-id-1", "activity-id-2"):
+        await client.get_activity_handle(activity_id).terminate(reason="done")
+
+    requests = [call.args[0] for call in terminate_activity_execution.call_args_list]
+    assert all(uuid.UUID(request.request_id).version == 4 for request in requests)
+    assert requests[0].request_id != requests[1].request_id
+
+
 class TestDescribe:
     @pytest.fixture
     def task_queue(self):
@@ -166,6 +185,23 @@ class TestDescribe:
         assert desc.last_worker_identity is None
         assert desc.next_attempt_schedule_time is None
         assert desc.retry_policy is not None
+
+    async def test_describe_without_schedule_to_close_timeout(
+        self, client: Client, env: WorkflowEnvironment, task_queue: str
+    ):
+        if env.supports_time_skipping_v1:
+            pytest.skip(
+                "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+            )
+        activity_handle = await client.start_activity(
+            heartbeat_fail_increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+        desc = await activity_handle.describe()
+        assert desc.expiration_time is None  # no schedule-to-close timeout
 
     async def test_describe_payloads(
         self, client: Client, activity_handle: ActivityHandle, task_queue: str
