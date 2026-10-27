@@ -186,6 +186,23 @@ class TestDescribe:
         assert desc.next_attempt_schedule_time is None
         assert desc.retry_policy is not None
 
+    async def test_describe_without_schedule_to_close_timeout(
+        self, client: Client, env: WorkflowEnvironment, task_queue: str
+    ):
+        if env.supports_time_skipping_v1:
+            pytest.skip(
+                "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
+            )
+        activity_handle = await client.start_activity(
+            heartbeat_fail_increment,
+            args=(1,),
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+            start_to_close_timeout=timedelta(minutes=1),
+        )
+        desc = await activity_handle.describe()
+        assert desc.expiration_time is None  # no schedule-to-close timeout
+
     async def test_describe_payloads(
         self, client: Client, activity_handle: ActivityHandle, task_queue: str
     ):
