@@ -89,6 +89,67 @@ class PollerBehaviorAutoscaling:
 PollerBehavior: TypeAlias = PollerBehaviorSimpleMaximum | PollerBehaviorAutoscaling
 
 
+@dataclass(frozen=True)
+class SingleSessionAdmission:
+    """Serve exactly one workflow for the worker's lifetime, including across
+    restarts that reuse the same ``stable_identity``.
+
+    The worker polls only its session queue (currently, its sticky queues) and
+    is excluded from eager workflow start. The server binds it to the first
+    workflow task it hands out and dispatches no other work to it, even after
+    that workflow completes. Requires a supporting server. Nexus polling is
+    unchanged.
+
+    .. warning::
+        Worker sessions are experimental and may change without notice.
+    """
+
+    stable_identity: str
+    """Key the server stores the binding under. Required; must be non-empty.
+    Reuse across restarts of the same session; never share between concurrently
+    running workers. This is distinct from worker identity."""
+
+    def _to_bridge(self) -> temporalio.bridge.worker.SingleSessionOptions:
+        return temporalio.bridge.worker.SingleSessionOptions(
+            stable_identity=self.stable_identity,
+        )
+
+
+# Future modes join the union, e.g. a bounded number of concurrent sessions.
+SessionAdmission: TypeAlias = SingleSessionAdmission
+"""Which sessions a worker accepts.
+
+.. warning::
+    Worker sessions are experimental and may change without notice.
+"""
+
+
+@dataclass(frozen=True)
+class WorkerSessionConfig:
+    """Declares that this worker can serve sessions.
+
+    Presence alone enables session routing to this worker (currently, it also
+    polls its sticky queue for activities). This requires workflows, remote
+    activities, and a nonzero workflow cache. Activity slots must be
+    fixed-size, with capacity of at least two for paired polling or one for
+    :py:class:`SingleSessionAdmission`. Resource-based and custom activity slot
+    suppliers are not supported yet.
+
+    .. warning::
+        Worker sessions are experimental and may change without notice.
+    """
+
+    admission: SessionAdmission | None = None
+    """Which sessions this worker accepts. Unset = serve any number."""
+
+    def _to_bridge(self) -> temporalio.bridge.worker.WorkerSessionOptions:
+        return temporalio.bridge.worker.WorkerSessionOptions(
+            single_session=(
+                self.admission._to_bridge() if self.admission is not None else None
+            ),
+        )
+
+
 class Worker:
     """Worker to process workflows and/or activities.
 
@@ -152,6 +213,7 @@ class Worker:
         ),
         disable_payload_error_limit: bool = False,
         max_workflow_task_external_storage_concurrency: int = _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
+        session_config: WorkerSessionConfig | None = None,
     ) -> None:
         """Create a worker to process workflows and/or activities.
 
@@ -345,6 +407,9 @@ class Worker:
                 Please report any issues you encounter with this setting or if you
                 feel the default should be changed.
                 WARNING: This setting is experimental.
+            session_config: Experimental session support. Passing an instance
+                lets activities run in this worker's workflow sessions; None
+                leaves it disabled. See :py:class:`WorkerSessionConfig`.
 
         """
         config = WorkerConfig(
@@ -393,6 +458,7 @@ class Worker:
             nexus_task_poller_behavior=nexus_task_poller_behavior,
             disable_payload_error_limit=disable_payload_error_limit,
             max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
+            session_config=session_config,
         )
 
         plugins_from_client = cast(
@@ -599,6 +665,20 @@ class Worker:
             )
 
         bridge_tuner = tuner._to_bridge_tuner()
+        session_config = config.get("session_config")
+        if session_config is not None:
+            activity_slots = bridge_tuner.activity_slot_supplier
+            if not isinstance(
+                activity_slots, temporalio.bridge.worker.FixedSizeSlotSupplier
+            ):
+                raise ValueError(
+                    "Session workers currently require a fixed-size activity slot supplier"
+                )
+            minimum_slots = 1 if session_config.admission is not None else 2
+            if activity_slots.num_slots < minimum_slots:
+                raise ValueError(
+                    f"Session workers require at least {minimum_slots} fixed activity slots"
+                )
 
         versioning_strategy: temporalio.bridge.worker.WorkerVersioningStrategy
         deployment_config = config.get("deployment_config")
@@ -706,6 +786,9 @@ class Worker:
                 storage_drivers=deduped_storage_driver_types,
                 disable_payload_error_limit=config.get(
                     "disable_payload_error_limit", False
+                ),
+                session_worker_options=(
+                    session_config._to_bridge() if session_config is not None else None
                 ),
             ),
         )
@@ -1030,6 +1113,7 @@ class WorkerConfig(TypedDict, total=False):
     nexus_task_poller_behavior: PollerBehavior
     disable_payload_error_limit: bool
     max_workflow_task_external_storage_concurrency: int
+    session_config: WorkerSessionConfig | None
 
 
 def _warn_if_activity_executor_max_workers_is_inconsistent(

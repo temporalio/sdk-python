@@ -60,6 +60,21 @@ class WorkerConfig:
     plugins: Sequence[str]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
+    session_worker_options: WorkerSessionOptions | None = None
+
+
+@dataclass
+class WorkerSessionOptions:
+    """Python representation of the Rust session worker options."""
+
+    single_session: SingleSessionOptions | None = None
+
+
+@dataclass
+class SingleSessionOptions:
+    """Python representation of the Rust single-session options."""
+
+    stable_identity: str
 
 
 @dataclass

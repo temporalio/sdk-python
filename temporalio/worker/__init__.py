@@ -53,9 +53,12 @@ from ._worker import (
     PollerBehavior,
     PollerBehaviorAutoscaling,
     PollerBehaviorSimpleMaximum,
+    SessionAdmission,
+    SingleSessionAdmission,
     Worker,
     WorkerConfig,
     WorkerDeploymentConfig,
+    WorkerSessionConfig,
 )
 from ._workflow_instance import (
     PatchActivationInput,
@@ -71,6 +74,9 @@ __all__ = [
     "WorkerConfig",
     "WorkerDeploymentConfig",
     "WorkerDeploymentVersion",
+    "WorkerSessionConfig",
+    "SessionAdmission",
+    "SingleSessionAdmission",
     "Replayer",
     "ReplayerConfig",
     "WorkflowReplayResult",

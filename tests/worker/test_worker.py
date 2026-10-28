@@ -11,13 +11,14 @@ from collections.abc import Awaitable, Callable, Sequence
 from contextlib import contextmanager
 from datetime import timedelta
 from typing import Any
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from urllib.request import urlopen
 
 import nexusrpc
 import pytest
 
 import temporalio.api.enums.v1
+import temporalio.bridge.worker
 import temporalio.common
 import temporalio.nexus
 import temporalio.service
@@ -53,6 +54,7 @@ from temporalio.worker import (
     ResourceBasedSlotConfig,
     ResourceBasedSlotSupplier,
     ResourceBasedTunerConfig,
+    SingleSessionAdmission,
     SlotMarkUsedContext,
     SlotPermit,
     SlotReleaseContext,
@@ -60,6 +62,7 @@ from temporalio.worker import (
     Worker,
     WorkerDeploymentConfig,
     WorkerDeploymentVersion,
+    WorkerSessionConfig,
     WorkerTuner,
     WorkflowSlotInfo,
 )
@@ -304,6 +307,59 @@ async def test_can_run_resource_based_worker(client: Client):
         )
         await wf1.signal(WaitOnSignalWorkflow.my_signal, "finish")
         await wf1.result()
+
+
+async def test_session_worker_requires_two_paired_activity_slots(client: Client):
+    with pytest.raises(ValueError, match="at least 2 fixed activity slots"):
+        new_worker(
+            client,
+            NeverRunWorkflow,
+            activities=[never_run_activity],
+            session_config=WorkerSessionConfig(),
+            tuner=WorkerTuner.create_fixed(activity_slots=1),
+        )
+
+
+async def test_session_worker_requires_fixed_activity_slots(client: Client):
+    with pytest.raises(ValueError, match="fixed-size activity slot supplier"):
+        new_worker(
+            client,
+            NeverRunWorkflow,
+            activities=[never_run_activity],
+            session_config=WorkerSessionConfig(),
+            tuner=WorkerTuner.create_resource_based(
+                target_memory_usage=0.8, target_cpu_usage=0.8
+            ),
+        )
+
+
+async def test_single_session_worker_bridge_config(client: Client):
+    # Replay exercises native extraction without polling a server for lifetime isolation.
+    with patch.object(temporalio.bridge.worker.Worker, "create") as create:
+        new_worker(
+            client,
+            NeverRunWorkflow,
+            activities=[never_run_activity],
+            session_config=WorkerSessionConfig(
+                admission=SingleSessionAdmission(stable_identity="session-worker")
+            ),
+            tuner=WorkerTuner.create_fixed(activity_slots=1),
+        )
+    config: temporalio.bridge.worker.WorkerConfig = create.call_args.args[1]
+    assert (
+        config.session_worker_options
+        == temporalio.bridge.worker.WorkerSessionOptions(
+            single_session=temporalio.bridge.worker.SingleSessionOptions(
+                stable_identity="session-worker"
+            )
+        )
+    )
+    replay, pusher = temporalio.bridge.worker.Worker.for_replay(
+        Runtime.default()._core_runtime, config
+    )
+    pusher.close()
+    replay.initiate_shutdown()
+    await replay.finalize_shutdown()
 
 
 async def test_can_run_composite_tuner_worker(client: Client):

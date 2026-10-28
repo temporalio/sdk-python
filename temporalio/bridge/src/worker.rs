@@ -65,6 +65,17 @@ pub struct WorkerConfig {
     plugins: Vec<String>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
+    session_worker_options: Option<WorkerSessionOptions>,
+}
+
+#[derive(FromPyObject)]
+pub struct WorkerSessionOptions {
+    single_session: Option<SingleSessionOptions>,
+}
+
+#[derive(FromPyObject)]
+pub struct SingleSessionOptions {
+    stable_identity: String,
 }
 
 #[derive(FromPyObject)]
@@ -780,6 +791,15 @@ fn convert_worker_config(
                 .collect::<HashSet<_>>(),
         )
         .disable_payload_error_limit(conf.disable_payload_error_limit)
+        .maybe_session_worker_options(conf.session_worker_options.map(|options| {
+            temporalio_sdk_core::WorkerSessionOptions::builder()
+                .maybe_single_session(options.single_session.map(|single| {
+                    temporalio_sdk_core::SingleSessionOptions::builder()
+                        .stable_identity(single.stable_identity)
+                        .build()
+                }))
+                .build()
+        }))
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }
