@@ -13,15 +13,19 @@ import pytest
 import temporalio.worker._workflow_instance
 from temporalio import activity, workflow
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
+from temporalio.common import ActivitySessionOptions, UseWorkflowSession
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ExecuteWorkflowInput,
     Interceptor,
     Replayer,
+    StartActivityInput,
     Worker,
+    WorkerSessionConfig,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
+    WorkflowOutboundInterceptor,
 )
 from temporalio.workflow import NondeterminismError
 from tests.helpers import assert_eq_eventually
@@ -647,3 +651,67 @@ async def test_swallowed_activity_cancellation_no_flag() -> None:
         workflows=[QuickActivityWorkflow],
         interceptors=[WorkerWorkflowResultInterceptor()],
     ).replay_workflow(WorkflowHistory.from_json("fake", history))
+
+
+@workflow.defn
+class SessionActivityWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        with workflow.activity_session(
+            ActivitySessionOptions(placement=UseWorkflowSession())
+        ):
+            return await workflow.execute_activity(
+                say_hello, "Session", schedule_to_close_timeout=timedelta(seconds=60)
+            )
+
+
+class ClearSessionInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> type[WorkflowInboundInterceptor] | None:
+        return ClearSessionInboundInterceptor
+
+
+class ClearSessionInboundInterceptor(WorkflowInboundInterceptor):
+    def init(self, outbound: WorkflowOutboundInterceptor) -> None:
+        super().init(ClearSessionOutboundInterceptor(outbound))
+
+
+class ClearSessionOutboundInterceptor(WorkflowOutboundInterceptor):
+    def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
+        # Lets the workflow run on the stock test server, which can't route
+        # session activities, without a session worker
+        input.session_options = None
+        return super().start_activity(input)
+
+
+async def test_replayer_session_workflow_requires_session_config(
+    client: Client,
+) -> None:
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[SessionActivityWorkflow],
+        activities=[say_hello],
+        interceptors=[ClearSessionInterceptor()],
+    ):
+        handle = await client.start_workflow(
+            SessionActivityWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        assert "Hello, Session!" == await handle.result()
+    history = await handle.fetch_history()
+
+    # Without session_config, like a worker that doesn't serve sessions
+    result = await Replayer(workflows=[SessionActivityWorkflow]).replay_workflow(
+        history, raise_on_replay_failure=False
+    )
+    assert result.replay_failure is not None
+    assert "session_worker_options is not enabled" in str(result.replay_failure)
+
+    # With session_config, like the session worker the workflow belongs on
+    await Replayer(
+        workflows=[SessionActivityWorkflow], session_config=WorkerSessionConfig()
+    ).replay_workflow(history)

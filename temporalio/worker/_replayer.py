@@ -22,7 +22,7 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
-from ._worker import load_default_build_id
+from ._worker import WorkerSessionConfig, load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import (
     _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
@@ -56,6 +56,7 @@ class Replayer:
         runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        session_config: WorkerSessionConfig | None = None,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -68,6 +69,10 @@ class Replayer:
         will default to a new thread pool executor with no max_workers set that
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
+
+        Workflows that ran activities in a session must be replayed with
+        ``session_config`` set, as on the worker they ran on; otherwise replay
+        fails. The replayer doesn't poll, so ``admission`` has no effect here.
         """
         self._config = ReplayerConfig(
             workflows=list(workflows),
@@ -86,6 +91,7 @@ class Replayer:
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
+            session_config=session_config,
         )
         self._initial_config = self._config.copy()
         self._default_workflow_logic_flags = set(_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS)
@@ -295,6 +301,8 @@ class Replayer:
                 else set()
             )
 
+            session_config = self._config.get("session_config")
+
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
@@ -324,12 +332,14 @@ class Replayer:
                         ),
                     ),
                     nonsticky_to_sticky_poll_ratio=1,
-                    no_remote_activities=True,
+                    # Core requires remote activities for session options; replay
+                    # still runs workflow-only
+                    no_remote_activities=session_config is None,
                     disable_payload_error_limit=True,
                     task_types=temporalio.bridge.worker.WorkerTaskTypes(
                         enable_workflows=True,
                         enable_local_activities=False,
-                        enable_remote_activities=False,
+                        enable_remote_activities=session_config is not None,
                         enable_nexus=False,
                     ),
                     sticky_queue_schedule_to_start_timeout_millis=1000,
@@ -354,6 +364,12 @@ class Replayer:
                     ),
                     plugins=[plugin.name() for plugin in self.plugins],
                     storage_drivers=storage_driver_types,
+                    # Core rejects session activities during replay without these
+                    session_worker_options=(
+                        session_config._to_bridge()
+                        if session_config is not None
+                        else None
+                    ),
                 ),
             )
             bridge_worker_scope = bridge_worker
@@ -433,6 +449,7 @@ class ReplayerConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
+    session_config: WorkerSessionConfig | None
 
 
 @dataclass(frozen=True)
