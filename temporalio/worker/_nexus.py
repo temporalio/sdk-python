@@ -321,18 +321,22 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                 completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                     task_token=task_token,
                 )
-                data_converter.failure_converter.to_failure(
-                    handler_error,
-                    data_converter.payload_converter,
-                    completion.failure,
-                )
                 try:
+                    data_converter.failure_converter.to_failure(
+                        handler_error,
+                        data_converter.payload_converter,
+                        completion.failure,
+                    )
                     await self._encode_completion(completion, data_converter)
                 except asyncio.CancelledError:
                     # Core still needs a completion, or worker shutdown hangs
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                         task_token=task_token,
                         ack_cancel=task_cancellation.is_cancelled(),
+                    )
+                except Exception as inner_err:
+                    completion = _failure_building_completion(
+                        task_token, err, inner_err
                     )
             await self._complete_task(completion)
         except Exception:
@@ -390,21 +394,25 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     task_token=task_token,
                 )
                 handler_error = _exception_to_handler_error(err)
-                data_converter.failure_converter.to_failure(
-                    handler_error,
-                    data_converter.payload_converter,
-                    completion.failure,
-                )
 
                 if isinstance(err, concurrent.futures.BrokenExecutor):
                     self._fail_worker_exception_queue.put_nowait(err)
                 try:
+                    data_converter.failure_converter.to_failure(
+                        handler_error,
+                        data_converter.payload_converter,
+                        completion.failure,
+                    )
                     await self._encode_completion(completion, data_converter)
                 except asyncio.CancelledError:
                     # Core still needs a completion, or worker shutdown hangs
                     completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
                         task_token=task_token,
                         ack_cancel=task_cancellation.is_cancelled(),
+                    )
+                except Exception as inner_err:
+                    completion = _failure_building_completion(
+                        task_token, err, inner_err
                     )
 
             await self._complete_task(completion)
@@ -637,6 +645,22 @@ class _NexusPayloadSerializer:
                 type=nexusrpc.HandlerErrorType.BAD_REQUEST,
                 retryable_override=False,
             ) from err
+
+
+def _failure_building_completion(
+    task_token: bytes, err: BaseException, inner_err: Exception
+) -> temporalio.bridge.proto.nexus.NexusTaskCompletion:
+    # Core still needs a completion when the failure can't be converted or
+    # encoded, or the task's slot is never released and shutdown hangs
+    logger.exception(f"Failed building Nexus failure, original error: {err}")
+    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+        task_token=task_token,
+    )
+    completion.failure.message = f"Failed building exception result: {inner_err}"
+    completion.failure.nexus_handler_failure_info.type = (
+        nexusrpc.HandlerErrorType.INTERNAL.name
+    )
+    return completion
 
 
 def _exception_to_handler_error(err: BaseException) -> nexusrpc.HandlerError:
