@@ -52,6 +52,19 @@ class _ReplaySafeLogger(Logger):
             return
         self._logger.emit(*args, **kwargs)
 
+    def enabled(self, *args: Any, **kwargs: Any) -> bool:
+        # Abstract on Logger from opentelemetry-api 1.45, so without this
+        # override the wrapper cannot be instantiated there. Callers use it to
+        # skip building records, so it must agree with emit() during replay.
+        if _skip_emitting():
+            return False
+        enabled = getattr(self._logger, "enabled", None)
+        if enabled is None:
+            # Loggers from opentelemetry-api before 1.45 have no enabled(), and
+            # their callers always emit, so leave the decision to emit().
+            return True
+        return enabled(*args, **kwargs)
+
 
 class ReplaySafeLoggerProvider(LoggerProvider):
     """A logger provider that is safe for use during workflow replay.

@@ -154,6 +154,73 @@ def test_replay_safe_logger_provider_emits_from_live_operations_during_replay():
     assert [(r.event_name, r.body) for r in records] == [("live-query", "kept")]
 
 
+class _EnabledLogger(NoOpLogger):
+    def __init__(self) -> None:
+        super().__init__("enabled-logger")
+        self.enabled_calls: list[dict[str, Any]] = []
+
+    def enabled(self, **kwargs: Any) -> bool:
+        self.enabled_calls.append(kwargs)
+        return True
+
+
+class _EnabledLoggerProvider(NoOpLoggerProvider):
+    def __init__(self) -> None:
+        self.logger = _EnabledLogger()
+
+    def get_logger(self, *args: Any, **kwargs: Any) -> Logger:  # type: ignore[override]
+        return self.logger
+
+
+def test_replay_safe_logger_provider_delegates_enabled_outside_workflow():
+    inner_provider = _EnabledLoggerProvider()
+    logger: Any = ReplaySafeLoggerProvider(inner_provider).get_logger("test-logger")
+
+    assert logger.enabled(event_name="event")
+    assert inner_provider.logger.enabled_calls == [{"event_name": "event"}]
+
+
+def test_replay_safe_logger_provider_disabled_replaying_history_events():
+    """Callers that check enabled() before building a record must skip it
+    during replay, since emit() would drop it."""
+    inner_provider = _EnabledLoggerProvider()
+    logger: Any = ReplaySafeLoggerProvider(inner_provider).get_logger("test-logger")
+
+    with _workflow_replay_state(replaying_history_events=True):
+        assert not logger.enabled(event_name="event")
+    assert not inner_provider.logger.enabled_calls
+
+
+def test_replay_safe_logger_provider_enabled_for_live_operations_during_replay():
+    inner_provider = _EnabledLoggerProvider()
+    logger: Any = ReplaySafeLoggerProvider(inner_provider).get_logger("test-logger")
+
+    with _workflow_replay_state(replaying_history_events=False):
+        assert logger.enabled(event_name="live-query")
+    assert inner_provider.logger.enabled_calls == [{"event_name": "live-query"}]
+
+
+def test_replay_safe_logger_provider_enabled_without_inner_enabled():
+    """Loggers from opentelemetry-api before 1.45 have no enabled(), so
+    callers that probe for it must not get an AttributeError."""
+
+    class LoggerWithoutEnabled:
+        def emit(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+    class LoggerWithoutEnabledProvider(NoOpLoggerProvider):
+        def get_logger(self, *args: Any, **kwargs: Any) -> Any:  # type: ignore[override]
+            return LoggerWithoutEnabled()
+
+    logger: Any = ReplaySafeLoggerProvider(LoggerWithoutEnabledProvider()).get_logger(
+        "test-logger"
+    )
+
+    assert logger.enabled()
+    with _workflow_replay_state(replaying_history_events=True):
+        assert not logger.enabled()
+
+
 def test_replay_safe_logger_provider_delegates_other_attributes():
     provider, _ = _sdk_provider()
     assert provider.force_flush()
