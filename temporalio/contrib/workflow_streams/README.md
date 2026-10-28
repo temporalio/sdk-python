@@ -13,7 +13,8 @@ scales with durable batches rather than tokens.
 
 Under the hood the stream is built directly on Temporal's existing
 message-passing primitives: Signals carry publishes, Updates serve
-long-poll subscriptions, and a Query exposes the current global offset.
+long-poll subscriptions, and Queries expose retained items and the current
+global offset.
 The library packages the boilerplate that turns those primitives into
 a usable stream: batching to amortize per-event overhead, deduplication
 for exactly-once delivery, topic filtering, and continue-as-new helpers
@@ -31,3 +32,16 @@ snippets throughout.
 
 For runnable end-to-end examples, see the
 [Workflow Streams samples](https://github.com/temporalio/samples-python/tree/main/workflow-streams).
+
+Subscriptions to completed, failed, canceled, terminated, or timed-out runs
+drain their remaining retained items through the
+`__temporal_workflow_stream_poll` Query, then finish. Each Query targets the
+confirmed terminal run, including when the Workflow ID is reused. Queries
+return immediately, paginate within the same response size limit as Updates,
+and start at the retained base when the requested offset has been truncated.
+
+Upgrade workers before enabling upgraded clients. Existing clients work with
+upgraded workers; upgraded clients surface missing-query errors from older
+workers. Closed-stream reads require retained history and an available
+compatible worker. Query rejection policies and server/query errors remain
+visible; truncated items and expired history cannot be recovered.

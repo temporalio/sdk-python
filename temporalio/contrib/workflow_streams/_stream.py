@@ -51,7 +51,8 @@ from ._types import (
 )
 
 _PUBLISH_SIGNAL = "__temporal_workflow_stream_publish"
-_POLL_UPDATE = "__temporal_workflow_stream_poll"
+# Updates and queries share a name because they implement the same poll protocol.
+_POLL = "__temporal_workflow_stream_poll"
 _OFFSET_QUERY = "__temporal_workflow_stream_offset"
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
@@ -84,6 +85,7 @@ class WorkflowStream:
 
     - ``__temporal_workflow_stream_publish`` signal — external publish with dedup
     - ``__temporal_workflow_stream_poll`` update — long-poll subscription
+    - ``__temporal_workflow_stream_poll`` query — immediate retained-item read
     - ``__temporal_workflow_stream_offset`` query — current log length
 
     Note:
@@ -155,9 +157,8 @@ class WorkflowStream:
         self._topic_types: dict[str, type[Any]] = {}
 
         workflow.set_signal_handler(_PUBLISH_SIGNAL, self._on_publish)
-        workflow.set_update_handler(
-            _POLL_UPDATE, self._on_poll, validator=self._validate_poll
-        )
+        workflow.set_update_handler(_POLL, self._on_poll, validator=self._validate_poll)
+        workflow.set_query_handler(_POLL, self._collect_batch)
         workflow.set_query_handler(_OFFSET_QUERY, self._on_offset)
 
     def _publish_to_topic(self, topic: str, value: Any) -> None:
@@ -337,9 +338,9 @@ class WorkflowStream:
     def truncate(self, up_to_offset: int) -> None:
         """Discard log entries before ``up_to_offset``.
 
-        After truncation, polls requesting an offset before the new
-        base will receive an ApplicationError. All global offsets
-        remain monotonic.
+        After truncation, poll updates requesting a nonzero offset before
+        the new base receive an ApplicationError. Poll queries read from
+        the retained base instead. All global offsets remain monotonic.
 
         Raises ApplicationError (not ValueError) when ``up_to_offset``
         is past the end of the log so that callers invoking this from
@@ -407,21 +408,18 @@ class WorkflowStream:
                 or self._detaching
             ),
         )
-        log_offset = payload.from_offset - self._base_offset
-        if log_offset < 0:
-            if payload.from_offset == 0:
-                # "From the beginning" — start at whatever is available.
-                log_offset = 0
-            else:
-                # Subscriber had a specific position that's been
-                # truncated. ApplicationError fails this update (client
-                # gets the error) without crashing the workflow task —
-                # avoids a poison pill during replay.
-                raise ApplicationError(
-                    f"Requested offset {payload.from_offset} has been truncated. "
-                    f"Current base offset is {self._base_offset}.",
-                    type=TRUNCATED_OFFSET_ERROR_TYPE,
-                )
+        if payload.from_offset != 0 and payload.from_offset < self._base_offset:
+            # ApplicationError fails this update without failing the workflow task.
+            raise ApplicationError(
+                f"Requested offset {payload.from_offset} has been truncated. "
+                f"Current base offset is {self._base_offset}.",
+                type=TRUNCATED_OFFSET_ERROR_TYPE,
+            )
+        return self._collect_batch(payload)
+
+    def _collect_batch(self, payload: PollInput) -> PollResult:
+        """Read retained items immediately without changing stream state."""
+        log_offset = max(0, payload.from_offset - self._base_offset)
         all_new = self._log[log_offset:]
         if payload.topics:
             topic_set = set(payload.topics)

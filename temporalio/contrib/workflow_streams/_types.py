@@ -5,7 +5,7 @@ The user-facing ``data`` fields on :class:`WorkflowStreamItem` are
 ``Payload`` by the payload converter at publish time, and the resulting
 bytes/metadata are preserved per item so subscribers can decode with
 ``subscribe(result_type=T)``. The codec chain (e.g. encryption, compression)
-applies once at the outer signal/update envelope level — not separately to each
+applies once at the outer signal/update/query envelope level — not separately to each
 embedded item — so codec behavior is symmetric between workflow-side and
 client-side publishing.
 
@@ -106,7 +106,10 @@ class PublishInput:
 
 @dataclass
 class PollInput:
-    """Update payload: request to poll for new items.
+    """Update/query payload: request to poll for new items.
+
+    Updates wait for items and reject truncated nonzero offsets. Queries
+    return immediately and clamp offsets to the retained base.
 
     .. warning::
         This class is experimental and may change in future versions.
@@ -127,7 +130,7 @@ class _WorkflowStreamWireItem:
 
 @dataclass
 class PollResult:
-    """Update response: items matching the poll request.
+    """Update/query response: items matching the poll request.
 
     .. warning::
         This class is experimental and may change in future versions.
