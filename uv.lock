@@ -11,10 +11,11 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-10-14T20:44:37.610021Z"
+exclude-newer = "2026-10-14T21:52:00.478292Z"
 exclude-newer-span = "P2W"
 
 [options.exclude-newer-package]
+nexus-rpc = false
 temporalio-google-genai = false
 temporalio-deepagents = false
 temporalio-langgraph = false
@@ -3130,10 +3131,14 @@ wheels = [
 
 [[package]]
 name = "nexus-rpc"
-version = "1.4.0"
-source = { git = "https://github.com/nexus-rpc/sdk-python?rev=e1d70abbb9378a8398fd472bd466c5dfa9f1aca7#e1d70abbb9378a8398fd472bd466c5dfa9f1aca7" }
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/25/e5/25be948c92492cfc8ac24a524ad8828fe0cb9f71f46a974d7a37f0794a26/nexus_rpc-1.5.0.tar.gz", hash = "sha256:be2d6934414677bc9dd8e571fb5106c22b8769edc19562c3f49d9988edd24e1c", size = 97404, upload-time = "2026-10-28T17:12:21.82Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/33/e2/00541e7997f3dfb294f7be3dafea3307ea09b9d3fd332054fe4d30627efc/nexus_rpc-1.5.0-py3-none-any.whl", hash = "sha256:5d6e856972be812573948df02da2257344c407a8eaa99977b5d38be54448305a", size = 30406, upload-time = "2026-10-28T17:12:20.245Z" },
 ]
 
 [[package]]
@@ -5080,7 +5085,7 @@ requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
     { name = "gcloud-aio-storage", marker = "extra == 'gcloud-aio-storage'", specifier = ">=9.6.4,<10" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.48.2,<2" },
-    { name = "nexus-rpc", git = "https://github.com/nexus-rpc/sdk-python?rev=e1d70abbb9378a8398fd472bd466c5dfa9f1aca7" },
+    { name = "nexus-rpc", specifier = "==1.5.0" },
     { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },

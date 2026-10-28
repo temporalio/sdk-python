@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
-  "nexus-rpc==1.4.0",
+  "nexus-rpc==1.5.0",
   "protobuf>=3.20,<8.0.0",
   "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
   "types-protobuf>=3.20,<8.0.0",
@@ -280,9 +280,5 @@ exclude = ["temporalio/bridge/target/**/*", "temporalio/bridge/sdk-core/.git"]
 # Prevent uv commands from building the package by default
 package = false
 exclude-newer = "2 weeks"
-# The SDK compatibility extras need the newly published standalone integrations.
-exclude-newer-package = { temporalio-deepagents = false, temporalio-google-adk = false, temporalio-google-genai = false, temporalio-langgraph = false, temporalio-langsmith = false, temporalio-strands-agents = false }
-
-[tool.uv.sources]
-# TODO: Remove once a nexus-rpc release records the service of each operation
-nexus-rpc = { git = "https://github.com/nexus-rpc/sdk-python", rev = "e1d70abbb9378a8398fd472bd466c5dfa9f1aca7" }
+# Nexus and the SDK compatibility extras need newly published releases.
+exclude-newer-package = { nexus-rpc = false, temporalio-deepagents = false, temporalio-google-adk = false, temporalio-google-genai = false, temporalio-langgraph = false, temporalio-langsmith = false, temporalio-strands-agents = false }
