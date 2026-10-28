@@ -530,6 +530,8 @@ class WorkflowStreamClient:
         remaining retained items before the iterator finishes. These reads
         require retained history and an available worker with the poll query
         handler. Query failures, including configured query rejection, propagate.
+        If describing the execution fails with an RPC error, the original poll
+        error propagates.
 
         Args:
             topics: Topic filter. A single topic name, a list of topic
@@ -611,7 +613,12 @@ class WorkflowStreamClient:
                             continue
                     if isinstance(err.__cause__, asyncio.CancelledError):
                         raise err.__cause__
-                    desc = await self._describe_polled_run(poll_handle, polled_run_id)
+                    try:
+                        desc = await self._describe_polled_run(
+                            poll_handle, polled_run_id
+                        )
+                    except RPCError:
+                        raise err
                     if (
                         desc.status == WorkflowExecutionStatus.CONTINUED_AS_NEW
                         and self._client is not None
@@ -627,6 +634,8 @@ class WorkflowStreamClient:
                         WorkflowExecutionStatus.TERMINATED,
                         WorkflowExecutionStatus.TIMED_OUT,
                     ):
+                        # Use the handle's client so direct-handle subscriptions
+                        # can pin terminal reads without an explicit client.
                         terminal_handle = poll_handle._client.get_workflow_handle(
                             self._workflow_id, run_id=desc.run_id
                         )

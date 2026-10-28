@@ -51,8 +51,8 @@ from ._types import (
 )
 
 _PUBLISH_SIGNAL = "__temporal_workflow_stream_publish"
-_POLL_UPDATE = "__temporal_workflow_stream_poll"
-_POLL_QUERY = "__temporal_workflow_stream_poll"
+# Updates and queries share a name because they implement the same poll protocol.
+_POLL = "__temporal_workflow_stream_poll"
 _OFFSET_QUERY = "__temporal_workflow_stream_offset"
 
 _MAX_POLL_RESPONSE_BYTES = 1_000_000
@@ -157,10 +157,8 @@ class WorkflowStream:
         self._topic_types: dict[str, type[Any]] = {}
 
         workflow.set_signal_handler(_PUBLISH_SIGNAL, self._on_publish)
-        workflow.set_update_handler(
-            _POLL_UPDATE, self._on_poll, validator=self._validate_poll
-        )
-        workflow.set_query_handler(_POLL_QUERY, self._collect_batch)
+        workflow.set_update_handler(_POLL, self._on_poll, validator=self._validate_poll)
+        workflow.set_query_handler(_POLL, self._collect_batch)
         workflow.set_query_handler(_OFFSET_QUERY, self._on_offset)
 
     def _publish_to_topic(self, topic: str, value: Any) -> None:

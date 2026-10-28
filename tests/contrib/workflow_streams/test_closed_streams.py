@@ -21,6 +21,7 @@ from temporalio.client import (
     WorkflowQueryFailedError,
     WorkflowQueryRejectedError,
     WorkflowUpdateFailedError,
+    WorkflowUpdateRPCTimeoutOrCancelledError,
 )
 from temporalio.common import QueryRejectCondition, RawValue
 from temporalio.contrib.workflow_streams import (
@@ -98,6 +99,62 @@ async def test_workflow_streams_direct_handle_keeps_default_converter() -> None:
     client.get_workflow_handle.assert_called_once_with("workflow", run_id="closed-run")
 
 
+async def test_workflow_streams_update_to_query_resumes_at_next_offset() -> None:
+    stream, client, poll, read = mock_stream()
+    poll.start_update.side_effect = [
+        SimpleNamespace(
+            workflow_run_id="closed-run",
+            result=AsyncMock(
+                return_value=PollResult(
+                    [_WorkflowStreamWireItem("events", WIRE_ABC, i) for i in (0, 1)],
+                    2,
+                    True,
+                )
+            ),
+        ),
+        SimpleNamespace(
+            workflow_run_id="closed-run",
+            result=AsyncMock(
+                return_value=PollResult(
+                    [_WorkflowStreamWireItem("events", WIRE_ABC, 2)], 3
+                )
+            ),
+        ),
+        SimpleNamespace(
+            workflow_run_id="closed-run",
+            result=AsyncMock(
+                side_effect=WorkflowUpdateFailedError(
+                    ApplicationError("closed", type="AcceptedUpdateCompletedWorkflow")
+                )
+            ),
+        ),
+    ]
+    read.query.side_effect = [
+        PollResult([_WorkflowStreamWireItem("events", WIRE_ABC, 3)], 4, True),
+        PollResult([_WorkflowStreamWireItem("events", WIRE_ABC, 4)], 5),
+    ]
+    items = [
+        item
+        async for item in stream.subscribe(
+            "events", result_type=bytes, poll_cooldown=timedelta(0)
+        )
+    ]
+    assert [(item.offset, item.data) for item in items] == [
+        (i, b"abc") for i in range(5)
+    ]
+    assert [call.args for call in poll.start_update.await_args_list] == [
+        (POLL, PollInput(["events"], offset)) for offset in (0, 2, 3)
+    ]
+    assert [call.args for call in read.query.await_args_list] == [
+        (POLL, PollInput(["events"], offset)) for offset in (3, 4)
+    ]
+    read.describe.assert_awaited_once()
+    assert client.get_workflow_handle.call_count == 2
+    for call in client.get_workflow_handle.call_args_list:
+        assert call.args == ("workflow",)
+        assert call.kwargs == {"run_id": "closed-run"}
+
+
 @pytest.mark.parametrize(
     "failure", ["running", "unknown", "missing_run", "describe", "query"]
 )
@@ -115,14 +172,53 @@ async def test_workflow_streams_unconfirmed_closure_and_query_errors(
             )
         expected = poll.start_update.side_effect
     elif failure == "describe":
-        expected = RPCError("missing", RPCStatusCode.NOT_FOUND, b"")
-        poll.describe.side_effect = expected
+        poll.describe.side_effect = RPCError("missing", RPCStatusCode.NOT_FOUND, b"")
+        expected = poll.start_update.side_effect
     else:
         expected = WorkflowQueryFailedError("missing handler or query rejected")
         read.query.side_effect = expected
     with pytest.raises(type(expected)) as err:
         _ = [item async for item in stream.subscribe()]
     assert err.value is expected
+
+
+@pytest.mark.parametrize("accepted", [False, True])
+@pytest.mark.parametrize("failure", ["rpc", "update", "timeout"])
+async def test_workflow_streams_describe_failure_preserves_poll_error(
+    accepted: bool, failure: str
+) -> None:
+    stream, _, poll, read = mock_stream()
+    expected: Exception
+    if failure == "rpc":
+        expected = RPCError("poll failed", RPCStatusCode.UNAVAILABLE, b"")
+    elif failure == "update":
+        expected = WorkflowUpdateFailedError(ApplicationError("poll failed"))
+    else:
+        expected = WorkflowUpdateRPCTimeoutOrCancelledError()
+    cause = expected.__cause__
+    poll.describe.side_effect = RPCError(
+        "describe failed", RPCStatusCode.NOT_FOUND, b""
+    )
+    if accepted:
+        poll.start_update.side_effect = None
+        poll.start_update.return_value = SimpleNamespace(
+            workflow_run_id="closed-run", result=AsyncMock(side_effect=expected)
+        )
+    else:
+        poll.start_update.side_effect = expected
+    with pytest.raises(type(expected)) as err:
+        _ = [item async for item in stream.subscribe()]
+    assert err.value is expected
+    assert err.value.__cause__ is cause
+    read.query.assert_not_awaited()
+
+
+async def test_workflow_streams_describe_cancellation_propagates() -> None:
+    stream, _, poll, read = mock_stream()
+    poll.describe.side_effect = asyncio.CancelledError
+    with pytest.raises(asyncio.CancelledError):
+        _ = [item async for item in stream.subscribe()]
+    read.query.assert_not_awaited()
 
 
 async def test_workflow_streams_run_tracking_is_local_to_each_attempt() -> None:
@@ -376,14 +472,15 @@ async def test_workflow_streams_accepted_poll_drains_unread_tail(
 
         async def start(*args: Any, **kwargs: Any) -> Any:
             update = await original_start(*args, **kwargs)
-            accepted.set()
+            if args[1].from_offset == 3:
+                accepted.set()
             return update
 
-        async def consume() -> list[bytes]:
+        async def consume() -> list[tuple[int, bytes]]:
             return [
-                item.data
+                (item.offset, item.data)
                 async for item in stream.subscribe(
-                    from_offset=3, result_type=bytes, poll_cooldown=timedelta(0)
+                    result_type=bytes, poll_cooldown=timedelta(0)
                 )
             ]
 
@@ -391,7 +488,12 @@ async def test_workflow_streams_accepted_poll_drains_unread_tail(
             task = asyncio.create_task(consume())
             await accepted.wait()
             await handle.signal(ClosedStreamWorkflow.close)
-            assert await task == [b"tail"]
+            assert await task == [
+                (0, b"\x00"),
+                (1, b"\x01"),
+                (2, b"\x02"),
+                (3, b"tail"),
+            ]
 
 
 async def test_workflow_streams_query_is_immediate_while_draining(
