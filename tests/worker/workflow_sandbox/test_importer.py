@@ -25,6 +25,21 @@ from temporalio.worker.workflow_sandbox._restrictions import (
 from .testmodules import restrictions
 
 
+def test_workflow_sandbox_importer_path_in_place_division():
+    context = RestrictionContext()
+    context.is_runtime = True
+    with Importer(SandboxRestrictions.default, context).applied():
+        from pathlib import Path
+
+        path = original = Path("root")
+        path /= "child"
+
+        assert str(path) == str(Path("root") / "child")
+        assert str(original) == "root"
+        with pytest.raises(RestrictedWorkflowAccessError):
+            path.exists()
+
+
 @pytest.mark.parametrize("first", ["host", "sandbox"])
 def test_workflow_sandbox_importer_pydantic_constraints(first: str):
     pytest.importorskip("pydantic", minversion="2")

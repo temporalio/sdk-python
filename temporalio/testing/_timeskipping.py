@@ -361,3 +361,12 @@ class _TimeSkippingConfigOutbound(temporalio.client.OutboundInterceptor):
         if self._skipper._ts_enabled:
             input.time_skipping_config = self._skipper.config._to_proto()
         return await super().start_workflow(input)
+
+    async def start_update_with_start_workflow(
+        self, input: temporalio.client.StartWorkflowUpdateWithStartInput
+    ) -> temporalio.client.WorkflowUpdateHandle[Any]:
+        if self._skipper._ts_enabled:
+            input.start_workflow_input.time_skipping_config = (
+                self._skipper.config._to_proto()
+            )
+        return await super().start_update_with_start_workflow(input)

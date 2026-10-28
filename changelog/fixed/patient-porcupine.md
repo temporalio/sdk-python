@@ -1,0 +1,1 @@
+Exiting `async with Worker(...)` now waits for the code that plugins run after the Worker stops in `run_worker`, up to the new `plugin_shutdown_timeout` Worker option, instead of cancelling the task that entered the block.

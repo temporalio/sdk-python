@@ -2029,21 +2029,23 @@ class CancelExternalWorkflow:
 
 
 async def test_workflow_cancel_external(client: Client):
-    async with new_worker(client, CancelExternalWorkflow, LongSleepWorkflow) as worker:
-        # Start long sleep, then cancel and check that it got cancelled
-        long_sleep_handle = await client.start_workflow(
-            LongSleepWorkflow.run,
+    async with new_worker(
+        client, CancelExternalWorkflow, WaitForeverWorkflow
+    ) as worker:
+        # A timer can finish under time skipping before the external cancel is sent.
+        target_handle = await client.start_workflow(
+            WaitForeverWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         await client.execute_workflow(
             CancelExternalWorkflow.run,
-            long_sleep_handle.id,
+            target_handle.id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         with pytest.raises(WorkflowFailureError) as err:
-            await long_sleep_handle.result()
+            await target_handle.result()
         assert isinstance(err.value.cause, CancelledError)
 
 
@@ -6060,6 +6062,57 @@ async def test_workflow_update_handlers_unhappy(client: Client):
         assert "Rejected" == err.value.cause.message
 
 
+@workflow.defn
+class ConditionEvaluationWorkflow:
+    def __init__(self) -> None:
+        self._condition_evaluations = 0
+        self._done = False
+
+    @workflow.run
+    async def run(self) -> None:
+        def condition() -> bool:
+            self._condition_evaluations += 1
+            return self._done
+
+        await workflow.wait_condition(condition)
+
+    @workflow.query
+    def condition_evaluations(self) -> int:
+        return self._condition_evaluations
+
+    @workflow.update
+    def finish(self, accept: bool) -> None:
+        self._done = accept
+
+    @finish.validator
+    def finish_validator(self, accept: bool) -> None:
+        if not accept:
+            raise ApplicationError("Rejected")
+
+
+async def test_workflow_update_rejected_does_not_evaluate_conditions(client: Client):
+    async with new_worker(client, ConditionEvaluationWorkflow) as worker:
+        handle = await client.start_workflow(
+            ConditionEvaluationWorkflow.run,
+            id=f"update-rejected-conditions-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        evaluations = await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        # Neither the rejected update nor the queries can change state, so none of
+        # their activations may evaluate the condition
+        with pytest.raises(WorkflowUpdateFailedError):
+            await handle.execute_update(ConditionEvaluationWorkflow.finish, False)
+        assert evaluations == await handle.query(
+            ConditionEvaluationWorkflow.condition_evaluations
+        )
+
+        await handle.execute_update(ConditionEvaluationWorkflow.finish, True)
+        await handle.result()
+
+
 async def test_workflow_update_task_fails(client: Client):
     # Need to not sandbox so behavior can change based on globals
     async with new_worker(
@@ -6084,6 +6137,57 @@ async def test_workflow_update_task_fails(client: Client):
         global task_fail_ct, bad_validator_fail_ct
         assert task_fail_ct == 1
         assert bad_validator_fail_ct == 2
+
+
+@workflow.defn
+class AsyncUpdateValidatorDynamicWorkflow:
+    @workflow.run
+    async def run(self) -> list[str]:
+        def handler(_arg: int) -> int:
+            return 1
+
+        async def async_validator(_arg: int) -> None:
+            pass
+
+        def sync_validator(_arg: int) -> None:
+            pass
+
+        def dynamic_handler(_name: str, _args: Sequence[RawValue]) -> int:
+            return 3
+
+        # A rejected registration must not replace the existing handler
+        workflow.set_update_handler("named", handler, validator=sync_validator)
+        results = []
+        for set_handler in (
+            lambda: workflow.set_update_handler(
+                "named", lambda _arg: 2, validator=async_validator
+            ),
+            lambda: workflow.set_dynamic_update_handler(
+                dynamic_handler, validator=async_validator
+            ),
+        ):
+            try:
+                set_handler()
+            except ValueError as err:
+                results.append(str(err))
+        results.append(str(workflow.get_update_handler("named") is handler))
+        results.append(str(workflow.get_dynamic_update_handler() is None))
+        return results
+
+
+async def test_workflow_update_async_validator_dynamic_rejected(client: Client):
+    async with new_worker(client, AsyncUpdateValidatorDynamicWorkflow) as worker:
+        result = await client.execute_workflow(
+            AsyncUpdateValidatorDynamicWorkflow.run,
+            id=f"async-update-validator-dynamic-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert result == [
+        "Update validator must not be an async function",
+        "Update validator must not be an async function",
+        "True",
+        "True",
+    ]
 
 
 async def test_workflow_update_continue_as_new_fails_task(client: Client):

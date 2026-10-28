@@ -1049,6 +1049,7 @@ def set_update_handler(
         name: Name of the update.
         handler: Callable to set or None to unset.
         validator: Callable to set or None to unset as the update validator.
+            This must not be an ``async def`` function.
     """
     _Runtime.current().workflow_set_update_handler(name, handler, validator)
 
@@ -1076,6 +1077,7 @@ def set_dynamic_update_handler(
     Args:
         handler: Callable to set or None to unset.
         validator: Callable to set or None to unset as the update validator.
+            This must not be an ``async def`` function.
     """
     _Runtime.current().workflow_set_update_handler(None, handler, validator)
 

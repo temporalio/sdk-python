@@ -362,7 +362,7 @@ class ActivityExecutionDescription(ActivityExecution):
             expiration_time=(
                 resp.info.expiration_time.ToDatetime(tzinfo=timezone.utc)
                 if resp.info.HasField("expiration_time")
-                else datetime.min
+                else None
             ),
             heartbeat_timeout=(
                 resp.info.heartbeat_timeout.ToTimedelta()
