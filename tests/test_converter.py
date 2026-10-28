@@ -909,6 +909,22 @@ async def test_failure_encoded_attributes():
     assert failure == orig_failure
 
 
+def test_application_error_next_retry_delay_round_trip():
+    converter = DataConverter.default
+    for next_retry_delay in [None, timedelta(seconds=3)]:
+        failure = Failure()
+        converter.failure_converter.to_failure(
+            ApplicationError("boom", next_retry_delay=next_retry_delay),
+            converter.payload_converter,
+            failure,
+        )
+        err = converter.failure_converter.from_failure(
+            failure, converter.payload_converter
+        )
+        assert isinstance(err, ApplicationError)
+        assert err.next_retry_delay == next_retry_delay
+
+
 @pytest.mark.parametrize(
     "handler_type,retryable_override,expected_retryable",
     [

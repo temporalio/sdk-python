@@ -326,7 +326,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
                     data_converter.payload_converter,
                     completion.failure,
                 )
-                await self._encode_completion(completion, data_converter)
+                try:
+                    await self._encode_completion(completion, data_converter)
+                except asyncio.CancelledError:
+                    # Core still needs a completion, or worker shutdown hangs
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        ack_cancel=task_cancellation.is_cancelled(),
+                    )
             await self._complete_task(completion)
         except Exception:
             logger.exception("Failed to send Nexus task completion")
@@ -391,7 +398,14 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
 
                 if isinstance(err, concurrent.futures.BrokenExecutor):
                     self._fail_worker_exception_queue.put_nowait(err)
-                await self._encode_completion(completion, data_converter)
+                try:
+                    await self._encode_completion(completion, data_converter)
+                except asyncio.CancelledError:
+                    # Core still needs a completion, or worker shutdown hangs
+                    completion = temporalio.bridge.proto.nexus.NexusTaskCompletion(
+                        task_token=task_token,
+                        ack_cancel=task_cancellation.is_cancelled(),
+                    )
 
             await self._complete_task(completion)
         except Exception:

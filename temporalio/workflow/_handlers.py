@@ -267,7 +267,11 @@ class UpdateMethodMultiParam(Protocol[MultiParamSpec, ProtocolReturnType]):
     def validator(
         self, vfunc: Callable[MultiParamSpec, None]
     ) -> Callable[MultiParamSpec, None]:
-        """Use to decorate a function to validate the arguments passed to the update handler."""
+        """Use to decorate a function to validate the arguments passed to the update handler.
+
+        The validator must be a regular (non-``async``) function. Decorating an
+        ``async def`` function raises :py:class:`ValueError`.
+        """
         ...
 
 
@@ -568,6 +572,10 @@ class _UpdateDefinition:
         return lambda *args, **kwargs: None
 
     def set_validator(self, validator: Callable[..., None]) -> None:
+        # Validators are called without being awaited, so an async one would
+        # never run and every update would be accepted.
+        if inspect.iscoroutinefunction(validator):
+            raise ValueError("Update validator must not be an async function")
         if self.validator:
             raise RuntimeError(f"Validator already set for update {self.name}")
         object.__setattr__(self, "validator", validator)

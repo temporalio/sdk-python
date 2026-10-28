@@ -25,6 +25,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.exceptions
 from temporalio import activity, workflow
 from temporalio.client import (
+    AsyncActivityCancelledError,
     AsyncActivityHandle,
     Client,
     WorkflowFailureError,
@@ -879,6 +880,67 @@ async def test_activity_heartbeat_details_timeout(
     assert list(timeout.last_heartbeat_details) == ["some details!"]
 
 
+class _GatedFirstHeartbeatCodec(PayloadCodec):
+    """Holds the first heartbeat in encode until released, like a codec waiting on a remote KMS."""
+
+    def __init__(self) -> None:
+        self.first_started = asyncio.Event()
+        self.release_first = asyncio.Event()
+        self.first_done = asyncio.Event()
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        if any(p.data == b'"first"' for p in payloads):
+            self.first_started.set()
+            await self.release_first.wait()
+            self.first_done.set()
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+
+async def test_activity_heartbeat_details_keep_order_with_slow_codec(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping:
+        pytest.skip("https://github.com/temporalio/sdk-java/issues/2459")
+
+    codec = _GatedFirstHeartbeatCodec()
+
+    @activity.defn
+    async def some_activity() -> str:
+        info = activity.info()
+        if info.heartbeat_details:
+            return f"resumed from: {next(iter(info.heartbeat_details))}"
+        activity.heartbeat("first")
+        # Send the second heartbeat while the first one is still encoding
+        await codec.first_started.wait()
+        activity.heartbeat("second")
+        codec.release_first.set()
+        await codec.first_done.wait()
+        raise RuntimeError("Try again!")
+
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        client.data_converter, payload_codec=codec
+    )
+    result = await _execute_workflow_with_activity(
+        Client(**config),
+        worker,
+        some_activity,
+        retry_max_attempts=2,
+        shared_state_manager=shared_state_manager,
+    )
+    assert result.result == "resumed from: second"
+
+
 @activity.defn
 def picklable_heartbeat_details_activity() -> str:
     info = activity.info()
@@ -1435,6 +1497,47 @@ async def test_activity_async_heartbeat_and_fail(
     assert isinstance(err.value.cause.cause, ApplicationError)
     assert err.value.cause.cause.message == "err message 2"
     assert list(err.value.cause.cause.details) == ["err details 2"]
+
+
+@pytest.mark.parametrize("use_task_token", [True, False])
+async def test_activity_async_heartbeat_reset(
+    client: Client,
+    worker: ExternalWorker,
+    env: WorkflowEnvironment,
+    use_task_token: bool,
+    shared_state_manager: SharedStateManager,
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip("Time skipping server doesn't support activity reset")
+
+    wrapper = AsyncActivityWrapper()
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(
+            client,
+            worker,
+            wrapper.run,
+            shared_state_manager=shared_state_manager,
+        )
+    )
+    info = await wrapper.wait_info()
+    await client.workflow_service.reset_activity(
+        temporalio.api.workflowservice.v1.ResetActivityRequest(
+            namespace=client.namespace,
+            execution=temporalio.api.common.v1.WorkflowExecution(
+                workflow_id=info.workflow_id or "",
+                run_id=info.workflow_run_id or "",
+            ),
+            id=info.activity_id,
+        )
+    )
+    with pytest.raises(AsyncActivityCancelledError) as err:
+        await wrapper.async_handle(client, use_task_token).heartbeat()
+    assert err.value.details == activity.ActivityCancellationDetails(reset=True)
+
+    assert info.workflow_id
+    await client.get_workflow_handle(info.workflow_id).terminate()
+    with pytest.raises(WorkflowFailureError):
+        await task
 
 
 @pytest.mark.parametrize("use_task_token", [True, False])

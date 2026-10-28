@@ -232,6 +232,11 @@ async def test_workflow_sandbox_restrictions(client: Client):
             # General library allowed calls
             "import datetime\ndatetime.date(2001, 1, 1)",
             "import uuid\nuuid.uuid5(uuid.NAMESPACE_DNS, 'example.com')",
+            "from pathlib import Path\n"
+            "path = original = Path('root')\n"
+            "path /= 'child'\n"
+            "assert str(path) == str(Path('root') / 'child')\n"
+            "assert str(original) == 'root'",
             # Other imports we want to allow
             "from concurrent.futures import ThreadPoolExecutor",
         ]

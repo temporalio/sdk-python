@@ -283,6 +283,36 @@ async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
     assert str(err.value).startswith("Worker validation failed")
 
 
+async def test_worker_validate_fail_does_not_hang_shutdown(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip("Java test server does not appear to fail on invalid namespace")
+    config = client.config()
+    config["namespace"] = "does-not-exist"
+    client = Client(**config)
+
+    # Calling shutdown() after run() raised should return right away
+    worker = Worker(
+        client, task_queue=f"tq-{uuid.uuid4()}", workflows=[NeverRunWorkflow]
+    )
+    with pytest.raises(RuntimeError, match="^Worker validation failed"):
+        await worker.run()
+    await asyncio.wait_for(worker.shutdown(), 10)
+    assert worker.is_shutdown
+
+    # async with should raise the validation error instead of hanging
+    async def run_in_context() -> None:
+        async with Worker(
+            client, task_queue=f"tq-{uuid.uuid4()}", workflows=[NeverRunWorkflow]
+        ):
+            # The worker cancels this when it fails
+            await asyncio.Future()
+
+    with pytest.raises(RuntimeError, match="^Worker validation failed"):
+        await asyncio.wait_for(run_in_context(), 10)
+
+
 async def test_can_run_resource_based_worker(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,

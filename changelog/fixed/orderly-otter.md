@@ -1,0 +1,1 @@
+Activity heartbeats are now recorded in the order they were sent. With a payload codec that is slow to encode, an older heartbeat could be recorded after a newer one, so a retried activity resumed from stale heartbeat details.

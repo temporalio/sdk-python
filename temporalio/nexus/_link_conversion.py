@@ -29,6 +29,7 @@ class _LinkType(str, Enum):
     WORKFLOW = temporalio.api.common.v1.Link.Workflow.DESCRIPTOR.full_name
     NEXUS_OPERATION = temporalio.api.common.v1.Link.NexusOperation.DESCRIPTOR.full_name
     ACTIVITY = temporalio.api.common.v1.Link.Activity.DESCRIPTOR.full_name
+    CALLBACK = temporalio.api.common.v1.Link.Callback.DESCRIPTOR.full_name
 
 
 @dataclass(frozen=True)
@@ -66,12 +67,27 @@ _LINK_PATHS: dict[_LinkType, _LinkPath] = {
     _LinkType.ACTIVITY: _LinkPath("activities", "details"),
 }
 
+_EXECUTION_TYPE_SEGMENTS: dict[temporalio.api.enums.v1.ExecutionType.ValueType, str] = {
+    temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_WORKFLOW: "workflows",
+    temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_ACTIVITY: "activities",
+    temporalio.api.enums.v1.ExecutionType.EXECUTION_TYPE_NEXUS_OPERATION: "nexus-operations",
+}
+_SEGMENT_EXECUTION_TYPES = {v: k for k, v in _EXECUTION_TYPE_SEGMENTS.items()}
+
+# A callback is addressed by its execution's type as well as its IDs, so its path does not fit
+# _LinkPath.
+_CALLBACK_PATH_REGEX = re.compile(
+    r"^/namespaces/(?P<namespace>[^/]+)/(?P<execution_type>[^/]+)"
+    r"/(?P<id>[^/]+)/(?P<run_id>[^/]+)/callbacks/(?P<request_id>[^/]+)$"
+)
+
 
 LINK_EVENT_ID_PARAM_NAME = "eventID"
 LINK_EVENT_TYPE_PARAM_NAME = "eventType"
 LINK_REQUEST_ID_PARAM_NAME = "requestID"
 LINK_REFERENCE_TYPE_PARAM_NAME = "referenceType"
 LINK_REASON_PARAM_NAME = "reason"
+LINK_COMPONENT_PATH_PARAM_NAME = "componentPath"
 
 EVENT_REFERENCE_TYPE = "EventReference"
 REQUEST_ID_REFERENCE_TYPE = "RequestIdReference"
@@ -124,13 +140,16 @@ def nexus_link_to_temporal_link(
         case _LinkType.ACTIVITY:
             return nexus_link_to_activity_link(nexus_link)
 
+        case _LinkType.CALLBACK:
+            return nexus_link_to_callback_link(nexus_link)
+
 
 def temporal_link_to_nexus_link(
     temporal_link: temporalio.api.common.v1.Link,
 ) -> nexusrpc.Link | None:
     """Convert a Temporal API Link into a nexusrpc link.
 
-    Returns None when the Temporal link variant is missing.
+    Returns None when the Temporal link variant is missing or cannot be represented.
     """
     match temporal_link.WhichOneof("variant"):
         case "workflow_event":
@@ -149,8 +168,7 @@ def temporal_link_to_nexus_link(
             raise NotImplementedError("batch_job links are not supported")
 
         case "callback":
-            # TODO(Nexus team): Support callback links.
-            raise NotImplementedError("callback links are not supported")
+            return callback_link_to_nexus_link(temporal_link.callback)
 
         case None:
             logger.warning("Invalid Temporal link: missing variant")
@@ -246,6 +264,37 @@ def activity_link_to_nexus_link(
     )
 
 
+def callback_link_to_nexus_link(
+    callback: temporalio.api.common.v1.Link.Callback,
+) -> nexusrpc.Link | None:
+    """Convert a Callback link into a nexusrpc link.
+
+    Returns None when the callback's execution type is unsupported.
+    """
+    execution_type = _EXECUTION_TYPE_SEGMENTS.get(callback.execution.type)
+    if execution_type is None:
+        logger.warning(
+            f"Invalid Temporal callback link: unsupported execution type {callback.execution.type}"
+        )
+        return None
+    segments = [
+        callback.namespace,
+        execution_type,
+        callback.execution.business_id,
+        callback.execution.run_id,
+        "callbacks",
+        callback.request_id,
+    ]
+    path = "/namespaces/" + "/".join(urllib.parse.quote(s, safe="") for s in segments)
+    query_params = urllib.parse.urlencode(
+        [(LINK_COMPONENT_PATH_PARAM_NAME, p) for p in callback.component_path]
+    )
+    return nexusrpc.Link(
+        url=_temporal_nexus_url(path, query_params=query_params),
+        type=_LinkType.CALLBACK.value,
+    )
+
+
 def _build_link_url(
     link_type: _LinkType,
     namespace: str,
@@ -281,17 +330,25 @@ class _ParsedLinkUrl:
     query_params: dict[str, list[str]]
 
 
+def _parse_temporal_url(link: nexusrpc.Link) -> urllib.parse.ParseResult | None:
+    """Return the parsed link URL, or None if it does not carry the temporal scheme."""
+    url = urllib.parse.urlparse(link.url)
+    if url.scheme != _URL_SCHEME:
+        logger.warning(
+            f"Invalid Nexus link: {link}. Expected scheme {_URL_SCHEME!r}, got {url.scheme!r}"
+        )
+        return None
+    return url
+
+
 def _parse_link_url(link: nexusrpc.Link, link_type: _LinkType) -> _ParsedLinkUrl | None:
     """Return the parts of a link URL, or None if the URL is not a link of this type.
 
     The path is matched exactly, so the workflow and workflow-event shapes -- which differ only by
     the trailing /history -- cannot be mistaken for one another.
     """
-    url = urllib.parse.urlparse(link.url)
-    if url.scheme != _URL_SCHEME:
-        logger.warning(
-            f"Invalid Nexus link: {link}. Expected scheme {_URL_SCHEME!r}, got {url.scheme!r}"
-        )
+    url = _parse_temporal_url(link)
+    if url is None:
         return None
     regex = _LINK_PATHS[link_type].regex
     match = regex.match(url.path)
@@ -417,6 +474,45 @@ def nexus_link_to_activity_link(
             namespace=parsed.namespace,
             activity_id=parsed.id,
             run_id=parsed.run_id,
+        )
+    )
+
+
+def nexus_link_to_callback_link(
+    nexus_link: nexusrpc.Link,
+) -> temporalio.api.common.v1.Link | None:
+    """Convert a Nexus Callback link into a Temporal Callback link."""
+    url = _parse_temporal_url(nexus_link)
+    if url is None:
+        return None
+    match = _CALLBACK_PATH_REGEX.match(url.path)
+    if not match:
+        logger.warning(
+            f"Invalid Nexus link: {nexus_link}. Expected path to match {_CALLBACK_PATH_REGEX.pattern}"
+        )
+        return None
+    namespace, execution_type, business_id, run_id, request_id = (
+        urllib.parse.unquote(g) for g in match.groups()
+    )
+    execution_type_value = _SEGMENT_EXECUTION_TYPES.get(execution_type)
+    if execution_type_value is None:
+        logger.warning(
+            f"Invalid Nexus link: {nexus_link}. Unsupported execution type {execution_type!r}"
+        )
+        return None
+    # parse_qs drops empty values by default, which would remove an empty component path segment
+    # and shift the ones after it.
+    query_params = urllib.parse.parse_qs(url.query, keep_blank_values=True)
+    return temporalio.api.common.v1.Link(
+        callback=temporalio.api.common.v1.Link.Callback(
+            namespace=namespace,
+            execution=temporalio.api.common.v1.Execution(
+                type=execution_type_value,
+                business_id=business_id,
+                run_id=run_id,
+            ),
+            component_path=query_params.get(LINK_COMPONENT_PATH_PARAM_NAME, []),
+            request_id=request_id,
         )
     )
 

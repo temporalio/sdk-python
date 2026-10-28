@@ -687,6 +687,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 run_id=input.activity_run_id or "",
                 reason=input.reason or "",
                 identity=self._client.identity,
+                request_id=str(uuid.uuid4()),
             ),
             retry=True,
             metadata=input.rpc_metadata,
@@ -1174,7 +1175,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 metadata=input.rpc_metadata,
                 timeout=input.rpc_timeout,
             )
-            if resp.cancel_requested or resp.activity_paused:
+            if resp.cancel_requested or resp.activity_paused or resp.activity_reset:
                 raise AsyncActivityCancelledError(
                     details=ActivityCancellationDetails(
                         cancel_requested=resp.cancel_requested,
