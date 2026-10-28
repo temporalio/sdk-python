@@ -15,7 +15,7 @@ import hashlib
 from collections.abc import Callable, Coroutine
 from functools import wraps
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from botocore.exceptions import ClientError
@@ -203,6 +203,100 @@ class TestS3StorageDriverInit:
 
 
 class TestS3StorageDriverKeyConstruction:
+    @pytest.mark.parametrize(
+        "target_type,identity",
+        [
+            (StorageDriverWorkflowInfo, "wt/null/wi"),
+            (StorageDriverActivityInfo, "at/null/ai"),
+        ],
+    )
+    async def test_empty_namespace(
+        self,
+        driver_client: S3StorageDriverClient,
+        target_type: type[StorageDriverWorkflowInfo] | type[StorageDriverActivityInfo],
+        identity: str,
+    ) -> None:
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        [claim] = await driver.store(
+            make_store_context(target_type(namespace="")), [payload]
+        )
+        digest = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        assert claim.claim_data["key"] == (
+            f"v0/ns/null/{identity}/null/ri/null/d/sha256/{digest}"
+        )
+        assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [
+            payload
+        ]
+
+    @pytest.mark.parametrize(
+        "target_type", [StorageDriverWorkflowInfo, StorageDriverActivityInfo]
+    )
+    @pytest.mark.parametrize("size", [1023, 1024, 1025])
+    @pytest.mark.parametrize("char", ["x", "日"])
+    async def test_key_length_boundary(
+        self,
+        driver_client: S3StorageDriverClient,
+        target_type: type[StorageDriverWorkflowInfo] | type[StorageDriverActivityInfo],
+        size: int,
+        char: str,
+    ) -> None:
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        digest = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        identity = (
+            "wt/Type/wi" if target_type is StorageDriverWorkflowInfo else "at/Type/ai"
+        )
+        prefix = f"v0/ns/ns/{identity}/"
+        suffix = f"/ri/run/d/sha256/{digest}"
+        remaining = size - len(prefix) - len(suffix)
+        encoded_char = "x" if char == "x" else "%E6%97%A5"
+        count, padding = divmod(remaining, len(encoded_char))
+        target_id = char * count + "x" * padding
+        [claim] = await driver.store(
+            make_store_context(
+                target_type(namespace="ns", type="Type", id=target_id, run_id="run")
+            ),
+            [payload],
+        )
+        assert claim.claim_data["key"] == (
+            f"v0/ns/ns/d/sha256/{digest}"
+            if size > 1024
+            else f"{prefix}{encoded_char * count}{'x' * padding}{suffix}"
+        )
+        assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [
+            payload
+        ]
+
+    @pytest.mark.parametrize(
+        "target_type", [StorageDriverWorkflowInfo, StorageDriverActivityInfo]
+    )
+    async def test_long_keys_preserve_namespace(
+        self,
+        driver_client: S3StorageDriverClient,
+        target_type: type[StorageDriverWorkflowInfo] | type[StorageDriverActivityInfo],
+    ) -> None:
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        payload = make_payload()
+        digest = hashlib.sha256(payload.SerializeToString()).hexdigest()
+        claims = []
+        for namespace, encoded in [
+            ("first", "first"),
+            ("second /%", "second%20%2F%25"),
+            ("", "null"),
+        ]:
+            [claim] = await driver.store(
+                make_store_context(target_type(namespace=namespace, id="日" * 110)),
+                [payload],
+            )
+            assert claim.claim_data["key"] == f"v0/ns/{encoded}/d/sha256/{digest}"
+            claims.append(claim)
+        assert len({claim.claim_data["key"] for claim in claims}) == 3
+        assert (
+            await driver.retrieve(StorageDriverRetrieveContext(), claims)
+            == [payload] * 3
+        )
+
     async def test_key_context_none(self, driver_client: S3StorageDriverClient) -> None:
         driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
         payload = make_payload()
@@ -436,6 +530,32 @@ class TestS3StorageDriverKeyConstruction:
 
 
 class TestS3StorageDriverStoreRetrieve:
+    @pytest.mark.parametrize("identity", ["wt", "at"])
+    async def test_retrieve_legacy_empty_namespace_key(
+        self,
+        aioboto3_client: S3Client,
+        driver_client: S3StorageDriverClient,
+        identity: str,
+    ) -> None:
+        payload = make_payload()
+        data = payload.SerializeToString()
+        digest = hashlib.sha256(data).hexdigest()
+        identifier = "wi" if identity == "wt" else "ai"
+        key = f"v0/{identity}/null/{identifier}/null/ri/null/d/sha256/{digest}"
+        await aioboto3_client.put_object(Bucket=BUCKET, Key=key, Body=data)
+        claim = StorageDriverClaim(
+            {
+                "bucket": BUCKET,
+                "key": key,
+                "hash_algorithm": "sha256",
+                "hash_value": digest,
+            }
+        )
+        driver = S3StorageDriver(client=driver_client, bucket=BUCKET)
+        assert await driver.retrieve(StorageDriverRetrieveContext(), [claim]) == [
+            payload
+        ]
+
     async def test_store_returns_claim_with_bucket_key_and_hash(
         self, driver_client: S3StorageDriverClient
     ) -> None:
@@ -690,6 +810,19 @@ class TestS3StorageDriverBucketCallable:
 
 
 class TestS3StorageDriverErrors:
+    async def test_store_access_denied_does_not_upload(self) -> None:
+        aws_client = MagicMock()
+        cause = ClientError(
+            {"Error": {"Code": "403", "Message": "Forbidden"}}, "HeadObject"
+        )
+        aws_client.head_object = AsyncMock(side_effect=cause)
+        aws_client.upload_fileobj = AsyncMock()
+        driver = S3StorageDriver(_Aioboto3StorageDriverClient(aws_client), BUCKET)
+        with pytest.raises(RuntimeError) as error:
+            await driver.store(make_store_context(), [make_payload()])
+        assert error.value.__cause__ is cause
+        aws_client.upload_fileobj.assert_not_awaited()
+
     async def test_store_nonexistent_bucket_raises(
         self, driver_client: S3StorageDriverClient
     ) -> None:

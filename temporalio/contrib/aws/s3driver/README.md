@@ -73,8 +73,10 @@ Fallback key (used when no namespace, workflow, or activity information is avail
     v0/d/{hash-algorithm}/{hex-digest}
 
 - Missing values (including a missing run ID) are encoded as the literal `null`.
+- An empty namespace on a workflow or activity target is written as `/ns/null`.
 - `hex-digest` is the lower-case SHA-256 hex digest (64 characters).
 - Dynamic path segments are percent-encoded: any byte outside S3's [safe character set](https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-keys.html) (`0-9`, `a-z`, `A-Z`, and `! - _ . * ' ( )`) is escaped as `%XX` over its UTF-8 bytes.
+- Keys exceeding S3's 1,024-byte limit after encoding fall back to `v0/ns/{namespace}/d/sha256/{hex-digest}`, retaining the namespace for access policies. Existing saved references remain readable, including references with no namespace segment.
 
 ### Notes
 
@@ -103,17 +105,26 @@ driver = S3StorageDriver(
 
 ### Required IAM permissions
 
-The AWS credentials used by your S3 client must have the following S3 permissions on the target bucket and its objects:
+Components that store payloads with the built-in aioboto3 adapter require `s3:PutObject`, `s3:GetObject`, and `s3:ListBucket`:
 
 ```json
 {
-  "Effect": "Allow",
-  "Action": [
-    "s3:PutObject",
-    "s3:GetObject"
-  ],
-  "Resource": "arn:aws:s3:::my-temporal-payloads/*"
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::my-temporal-payloads/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::my-temporal-payloads"
+    }
+  ]
 }
 ```
 
-`s3:PutObject` is required by components that store payloads (typically the Temporal client and worker sending workflow/activity inputs), and `s3:GetObject` is required by components that retrieve them (typically workers and clients reading results). Components that only retrieve payloads do not need `s3:PutObject`, and vice versa.
+Uploads check whether an object already exists using `HeadObject`, which requires read permission even for components that only store payloads. Without `s3:ListBucket`, S3 returns 403 instead of 404 for a missing object, so the driver cannot distinguish it from an access denial and stops the upload. See the [AWS HeadObject permissions documentation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadObject.html).
+
+Components that only retrieve payloads require `s3:GetObject`; they do not need `s3:PutObject` or `s3:ListBucket`.

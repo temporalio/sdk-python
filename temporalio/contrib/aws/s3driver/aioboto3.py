@@ -43,7 +43,11 @@ class _Aioboto3StorageDriverClient(S3StorageDriverClient):
         return {"client_region": region} if region else {}
 
     async def object_exists(self, *, bucket: str, key: str) -> bool:
-        """Check existence via aioboto3's ``head_object``."""
+        """Check existence via aioboto3's ``head_object``.
+
+        Requires ``s3:GetObject`` and ``s3:ListBucket`` permissions so missing
+        objects return 404 rather than an ambiguous 403.
+        """
         try:
             await self._client.head_object(Bucket=bucket, Key=key)
             return True
