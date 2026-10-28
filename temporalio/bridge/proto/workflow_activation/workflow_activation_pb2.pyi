@@ -22,6 +22,7 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 import temporalio.api.update.v1.message_pb2
 import temporalio.bridge.proto.activity_result.activity_result_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
@@ -482,6 +483,7 @@ class InitializeWorkflow(google.protobuf.message.Message):
     ROOT_WORKFLOW_FIELD_NUMBER: builtins.int
     PRIORITY_FIELD_NUMBER: builtins.int
     ORIGINAL_EXECUTION_RUN_ID_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     workflow_type: builtins.str
     """The identifier the lang-specific sdk uses to execute workflow code"""
     workflow_id: builtins.str
@@ -589,6 +591,14 @@ class InitializeWorkflow(google.protobuf.message.Message):
     run id, this value is preserved across workflow resets. Mirrors the `original_execution_run_id`
     field from `WorkflowExecutionStartedEventAttributes`.
     """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context of the Nexus operation handler that started this workflow, if any.
+        Lang should use it to serialize the workflow's result and failure, which are returned to the
+        Nexus caller.
+        """
     def __init__(
         self,
         *,
@@ -630,6 +640,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
         | None = ...,
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         original_execution_run_id: builtins.str = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -646,6 +658,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"parent_workflow_info",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "root_workflow",
@@ -697,6 +711,8 @@ class InitializeWorkflow(google.protobuf.message.Message):
             b"parent_workflow_info",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "randomness_seed",
             b"randomness_seed",
             "retry_policy",
@@ -1287,6 +1303,7 @@ class DoUpdate(google.protobuf.message.Message):
     HEADERS_FIELD_NUMBER: builtins.int
     META_FIELD_NUMBER: builtins.int
     RUN_VALIDATOR_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     id: builtins.str
     """A workflow-unique identifier for this update"""
     protocol_instance_id: builtins.str
@@ -1318,6 +1335,14 @@ class DoUpdate(google.protobuf.message.Message):
     """If set true, lang must run the update's validator before running the handler. This will be
     set false during replay, since validation is not re-run during replay.
     """
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context of the Nexus operation handler that sent this update, if any. Lang
+        should use it to serialize the update's result and failure, which are returned to the Nexus
+        caller.
+        """
     def __init__(
         self,
         *,
@@ -1332,9 +1357,17 @@ class DoUpdate(google.protobuf.message.Message):
         | None = ...,
         meta: temporalio.api.update.v1.message_pb2.Meta | None = ...,
         run_validator: builtins.bool = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["meta", b"meta"]
+        self,
+        field_name: typing_extensions.Literal[
+            "meta",
+            b"meta",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -1349,6 +1382,8 @@ class DoUpdate(google.protobuf.message.Message):
             b"meta",
             "name",
             b"name",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "protocol_instance_id",
             b"protocol_instance_id",
             "run_validator",

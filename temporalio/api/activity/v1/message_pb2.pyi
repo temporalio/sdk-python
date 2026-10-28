@@ -239,6 +239,9 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     EXECUTION_TIME_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     EAGER_EXECUTION_ACCEPTED_FIELD_NUMBER: builtins.int
+    STARTED_BY_PRINCIPAL_FIELD_NUMBER: builtins.int
+    CLOSED_BY_PRINCIPAL_FIELD_NUMBER: builtins.int
+    LAST_WORKER_PRINCIPAL_FIELD_NUMBER: builtins.int
     activity_id: builtins.str
     """Unique identifier of this activity within its namespace along with run ID (below)."""
     run_id: builtins.str
@@ -390,6 +393,29 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
     """Indicates whether eager execution was requested for this activity and accepted by the server
     for its first task.
     """
+    @property
+    def started_by_principal(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.ResolvedPrincipal:
+        """Authenticated principal by which this activity execution was started.
+
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "by" identifies the authenticated actor. --)
+        """
+    @property
+    def closed_by_principal(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.ResolvedPrincipal:
+        """Authenticated principal by which this activity execution was closed.
+
+        (-- api-linter: core::0140::prepositions=disabled
+            aip.dev/not-precedent: "by" identifies the authenticated actor. --)
+        """
+    @property
+    def last_worker_principal(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.ResolvedPrincipal:
+        """Authenticated principal of the worker that most recently interacted with this activity execution."""
     def __init__(
         self,
         *,
@@ -440,6 +466,12 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
         propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
         | None = ...,
         eager_execution_accepted: builtins.bool = ...,
+        started_by_principal: temporalio.api.common.v1.message_pb2.ResolvedPrincipal
+        | None = ...,
+        closed_by_principal: temporalio.api.common.v1.message_pb2.ResolvedPrincipal
+        | None = ...,
+        last_worker_principal: temporalio.api.common.v1.message_pb2.ResolvedPrincipal
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -448,6 +480,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"activity_type",
             "close_time",
             b"close_time",
+            "closed_by_principal",
+            b"closed_by_principal",
             "current_retry_interval",
             b"current_retry_interval",
             "execution_duration",
@@ -472,6 +506,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"last_heartbeat_time",
             "last_started_time",
             b"last_started_time",
+            "last_worker_principal",
+            b"last_worker_principal",
             "next_attempt_schedule_time",
             b"next_attempt_schedule_time",
             "priority",
@@ -492,6 +528,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
+            "started_by_principal",
+            b"started_by_principal",
             "user_metadata",
             b"user_metadata",
         ],
@@ -509,6 +547,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"canceled_reason",
             "close_time",
             b"close_time",
+            "closed_by_principal",
+            b"closed_by_principal",
             "current_retry_interval",
             b"current_retry_interval",
             "eager_execution_accepted",
@@ -537,6 +577,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"last_started_time",
             "last_worker_identity",
             b"last_worker_identity",
+            "last_worker_principal",
+            b"last_worker_principal",
             "links",
             b"links",
             "next_attempt_schedule_time",
@@ -567,6 +609,8 @@ class ActivityExecutionInfo(google.protobuf.message.Message):
             b"start_delay",
             "start_to_close_timeout",
             b"start_to_close_timeout",
+            "started_by_principal",
+            b"started_by_principal",
             "state_size_bytes",
             b"state_size_bytes",
             "state_transition_count",
