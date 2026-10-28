@@ -1,0 +1,1 @@
+Fix `contrib.opentelemetry` `ReplaySafeLoggerProvider.get_logger()` raising `TypeError` with opentelemetry-api 1.45, where `Logger.enabled` became abstract. `enabled()` now returns `False` while replaying history events, matching `emit()`.
