@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Sequence
+import contextvars
+from collections.abc import Awaitable, Callable, Iterator, Sequence
+from contextlib import contextmanager
 from datetime import timedelta
 from enum import IntEnum
 from typing import TYPE_CHECKING, Any, Concatenate, Generic, TypedDict, overload
@@ -32,6 +34,7 @@ __all__ = [
     "ActivityCancellationType",
     "ActivityConfig",
     "ActivityHandle",
+    "activity_session",
     "LocalActivityConfig",
     "execute_activity",
     "execute_activity_class",
@@ -81,6 +84,49 @@ class ActivityCancellationType(IntEnum):
     ABANDON = int(
         temporalio.bridge.proto.workflow_commands.ActivityCancellationType.ABANDON
     )
+
+
+_current_activity_session: contextvars.ContextVar[
+    temporalio.common.ActivitySessionOptions | None
+] = contextvars.ContextVar("__temporal_current_activity_session", default=None)
+
+
+@contextmanager
+def activity_session(
+    options: temporalio.common.ActivitySessionOptions,
+) -> Iterator[None]:
+    """Apply session options to every activity started in this block.
+
+    Applies only to activities that target the workflow's task queue; others
+    use ordinary task-queue routing. Scopes nest, and the innermost wins. Tasks
+    created inside the block keep the scope, even if awaited after it exits.
+    Signal and update handlers don't inherit a scope from ``run``, so wrap
+    their bodies separately. Local activities, child workflows, and Nexus
+    operations are unaffected.
+
+    .. code-block:: python
+
+        with workflow.activity_session(
+            ActivitySessionOptions(placement=UseWorkflowSession())
+        ):
+            await workflow.execute_activity(
+                my_activity, start_to_close_timeout=timedelta(seconds=30)
+            )
+
+    Only usable from within a workflow.
+
+    Args:
+        options: Session options for activities started in this block.
+
+    .. warning::
+        Activity sessions are experimental and may change without notice.
+    """
+    _Runtime.current()
+    token = _current_activity_session.set(options)
+    try:
+        yield
+    finally:
+        _current_activity_session.reset(token)
 
 
 class ActivityConfig(TypedDict, total=False):

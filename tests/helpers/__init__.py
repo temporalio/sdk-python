@@ -6,7 +6,8 @@ import socket
 import threading
 import time
 import uuid
-from collections.abc import Awaitable, Callable, Iterator, Sequence
+from collections import Counter
+from collections.abc import Awaitable, Callable, Collection, Iterator, Sequence
 from contextlib import closing, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -18,15 +19,17 @@ from typing import (
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
-from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.enums.v1 import IndexedValueType, TaskQueueType
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
+from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflow.v1 import PendingActivityInfo
 from temporalio.api.workflowservice.v1 import (
+    DescribeTaskQueueRequest,
     PauseActivityRequest,
     PollWorkflowExecutionUpdateRequest,
     UnpauseActivityRequest,
@@ -35,6 +38,7 @@ from temporalio.client import (
     BuildIdOpAddNewDefault,
     Client,
     WorkflowHandle,
+    WorkflowHistory,
 )
 from temporalio.common import SearchAttributeKey
 from temporalio.converter import DataConverter
@@ -105,6 +109,86 @@ async def assert_eq_eventually(
         assert expected == await fn()
 
     await assert_eventually(check, timeout=timeout, interval=interval)
+
+
+async def assert_task_queue_poller_eventually(
+    client: Client,
+    task_queue: str,
+    identity: str,
+    *,
+    task_queue_type: TaskQueueType.ValueType,
+) -> None:
+    """Wait for a worker identity to appear among a normal task queue's pollers."""
+
+    async def check() -> None:
+        description = await client.workflow_service.describe_task_queue(
+            DescribeTaskQueueRequest(
+                namespace=client.namespace,
+                task_queue=TaskQueue(name=task_queue),
+                task_queue_type=task_queue_type,
+            )
+        )
+        identities = {poller.identity for poller in description.pollers}
+        assert identity in identities, (
+            f"Expected poller {identity!r} on {task_queue!r}, found {identities}"
+        )
+
+    await assert_eventually(check)
+
+
+def events_of_type(
+    history: WorkflowHistory, event_type: EventType.ValueType
+) -> list[HistoryEvent]:
+    return [event for event in history.events if event.event_type == event_type]
+
+
+def assert_workflow_and_activities_on_worker(
+    history: WorkflowHistory,
+    identity: str,
+    *,
+    activity_ids: Collection[str],
+    activity_attempt: int = 1,
+) -> None:
+    """Assert workflow tasks and one completed execution per expected activity ran on a worker.
+
+    Checks recorded start events, not intermediate activity attempts omitted from history.
+    """
+    workflow_starts = events_of_type(
+        history, EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+    )
+    assert {
+        event.workflow_task_started_event_attributes.identity
+        for event in workflow_starts
+    } == {identity}, "Missing workflow starts or unexpected workflow worker identity"
+
+    scheduled = {
+        event.event_id: event.activity_task_scheduled_event_attributes.activity_id
+        for event in events_of_type(
+            history, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+        )
+    }
+    assert Counter(scheduled.values()) == Counter(activity_ids)
+
+    starts = (
+        event.activity_task_started_event_attributes
+        for event in events_of_type(history, EventType.EVENT_TYPE_ACTIVITY_TASK_STARTED)
+    )
+    assert Counter(
+        (scheduled[start.scheduled_event_id], start.identity, start.attempt)
+        for start in starts
+    ) == Counter(
+        (activity_id, identity, activity_attempt) for activity_id in activity_ids
+    )
+
+    completions = (
+        event.activity_task_completed_event_attributes
+        for event in events_of_type(
+            history, EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
+        )
+    )
+    assert Counter(
+        scheduled[completion.scheduled_event_id] for completion in completions
+    ) == Counter(activity_ids)
 
 
 async def assert_task_fail_eventually(

@@ -23,12 +23,14 @@ from typing import (
     overload,
 )
 
+import google.protobuf.empty_pb2
 import google.protobuf.internal.containers
 from typing_extensions import NamedTuple, Self
 
 import temporalio.api.common.v1
 import temporalio.api.deployment.v1
 import temporalio.api.enums.v1
+import temporalio.api.session.v1
 import temporalio.api.workflow.v1
 import temporalio.types
 
@@ -1335,6 +1337,48 @@ class OneTimeVersioningOverride(VersioningOverride):
                 target_deployment_version=self.target_version._to_proto(),
             ),
         )
+
+
+@dataclass(frozen=True)
+class UseWorkflowSession:
+    """Run the activity on the workflow's current worker (its sticky queue).
+
+    The activity's task queue must be the workflow's task queue, and the worker
+    must enable sessions via :py:class:`temporalio.worker.WorkerSessionConfig`.
+
+    .. warning::
+        Activity sessions are experimental and may change without notice.
+    """
+
+
+# Future members of the oneof, e.g. a placement targeting a named session.
+ActivitySessionPlacement: TypeAlias = UseWorkflowSession
+"""Where a session activity runs.
+
+.. warning::
+    Activity sessions are experimental and may change without notice.
+"""
+
+
+@dataclass(frozen=True)
+class ActivitySessionOptions:
+    """Where activities run relative to sessions.
+
+    Apply with :py:func:`temporalio.workflow.activity_session`.
+
+    .. warning::
+        Activity sessions are experimental and may change without notice.
+    """
+
+    placement: ActivitySessionPlacement
+    """Where the activity runs."""
+
+    def _to_proto(self) -> temporalio.api.session.v1.ActivitySessionOptions:
+        if isinstance(self.placement, UseWorkflowSession):
+            return temporalio.api.session.v1.ActivitySessionOptions(
+                workflow_session=google.protobuf.empty_pb2.Empty()
+            )
+        raise ValueError(f"Unknown activity session placement: {self.placement!r}")
 
 
 # Should be set as the "arg" argument for _arg_or_args checks where the argument

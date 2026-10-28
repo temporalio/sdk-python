@@ -1633,6 +1633,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 summary=summary,
                 event_groups=event_groups,
                 priority=priority,
+                # Read in the caller's task, so it sees the caller's scope
+                session_options=_resolve_activity_session(
+                    temporalio.workflow._activities._current_activity_session.get(),
+                    task_queue,
+                    self._info.task_queue,
+                ),
             )
         )
 
@@ -3383,6 +3389,16 @@ class _ActivityDoBackoffError(BaseException):
         self.backoff = backoff
 
 
+def _resolve_activity_session(
+    default: temporalio.common.ActivitySessionOptions | None,
+    act_task_queue: str | None,
+    wf_task_queue: str,
+) -> temporalio.common.ActivitySessionOptions | None:
+    # A default only applies to activities on the workflow's task queue
+    same_queue = act_task_queue is None or act_task_queue == wf_task_queue
+    return default if same_queue else None
+
+
 class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
     def __init__(
         self,
@@ -3528,6 +3544,12 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
             if self._input.priority:
                 command.schedule_activity.priority.CopyFrom(
                     self._input.priority._to_proto()
+                )
+            # Core validates session placement against this worker, including
+            # during replay
+            if self._input.session_options is not None:
+                command.schedule_activity.session_options.CopyFrom(
+                    self._input.session_options._to_proto()
                 )
         if isinstance(self._input, StartLocalActivityInput):
             if self._input.local_retry_threshold:

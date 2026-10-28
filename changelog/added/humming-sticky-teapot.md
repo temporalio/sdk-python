@@ -1,0 +1,1 @@
+Added experimental sessions: `Worker(session_config=WorkerSessionConfig(...))` lets a worker serve sessions, optionally dedicated to one workflow with `SingleSessionAdmission(stable_identity=...)`, and activities started inside `workflow.activity_session(ActivitySessionOptions(placement=UseWorkflowSession()))` run on the workflow's worker.
