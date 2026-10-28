@@ -18,6 +18,7 @@ import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2
+import temporalio.api.nexus.v1.message_pb2
 
 if sys.version_info >= (3, 10):
     import typing as typing_extensions
@@ -160,6 +161,7 @@ class Start(google.protobuf.message.Message):
     PRIORITY_FIELD_NUMBER: builtins.int
     IS_LOCAL_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
+    PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
     workflow_type: builtins.str
@@ -227,6 +229,14 @@ class Start(google.protobuf.message.Message):
     """
     run_id: builtins.str
     """Run ID of this activity execution. Only set for standalone activities."""
+    @property
+    def propagated_nexus_serialization_context(
+        self,
+    ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
+        """Serialization context of the Nexus operation handler that started this activity, if any.
+        Only set for standalone activities. Lang should use it to serialize the activity's result and
+        failure, which are returned to the Nexus caller.
+        """
     def __init__(
         self,
         *,
@@ -258,6 +268,8 @@ class Start(google.protobuf.message.Message):
         priority: temporalio.api.common.v1.message_pb2.Priority | None = ...,
         is_local: builtins.bool = ...,
         run_id: builtins.str = ...,
+        propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -268,6 +280,8 @@ class Start(google.protobuf.message.Message):
             b"heartbeat_timeout",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "schedule_to_close_timeout",
@@ -305,6 +319,8 @@ class Start(google.protobuf.message.Message):
             b"is_local",
             "priority",
             b"priority",
+            "propagated_nexus_serialization_context",
+            b"propagated_nexus_serialization_context",
             "retry_policy",
             b"retry_policy",
             "run_id",

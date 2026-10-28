@@ -576,6 +576,8 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
     """Limits related to Worker Deployments are reached."""
     RESOURCE_EXHAUSTED_CAUSE_BANDWIDTH_LIMIT: _ResourceExhaustedCause.ValueType  # 11
     """Namespace exceeds bandwidth limit."""
+    RESOURCE_EXHAUSTED_CAUSE_CALLER_RPS_LIMIT: _ResourceExhaustedCause.ValueType  # 12
+    """Caller exceeds Nexus requests per second limit."""
 
 class ResourceExhaustedCause(
     _ResourceExhaustedCause, metaclass=_ResourceExhaustedCauseEnumTypeWrapper
@@ -608,6 +610,8 @@ RESOURCE_EXHAUSTED_CAUSE_WORKER_DEPLOYMENT_LIMITS: (
 """Limits related to Worker Deployments are reached."""
 RESOURCE_EXHAUSTED_CAUSE_BANDWIDTH_LIMIT: ResourceExhaustedCause.ValueType  # 11
 """Namespace exceeds bandwidth limit."""
+RESOURCE_EXHAUSTED_CAUSE_CALLER_RPS_LIMIT: ResourceExhaustedCause.ValueType  # 12
+"""Caller exceeds Nexus requests per second limit."""
 global___ResourceExhaustedCause = ResourceExhaustedCause
 
 class _ResourceExhaustedScope:

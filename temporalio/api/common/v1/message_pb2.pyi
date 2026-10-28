@@ -1249,6 +1249,38 @@ class Principal(google.protobuf.message.Message):
 
 global___Principal = Principal
 
+class ResolvedPrincipal(google.protobuf.message.Message):
+    """ResolvedPrincipal is a principal returned to an API caller."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TYPE_FIELD_NUMBER: builtins.int
+    NAME_AT_WRITE_TIME_FIELD_NUMBER: builtins.int
+    type: builtins.str
+    """Low-cardinality category of the principal (e.g., "jwt", "users")."""
+    name_at_write_time: builtins.str
+    """Identifier within that category (e.g., sub JWT claim, email address).
+
+    (-- api-linter: core::0140::prepositions=disabled
+        aip.dev/not-precedent: Identifies the principal name snapshot used for this response. --)
+    (-- api-linter: core::0142::time-field-type=disabled
+        aip.dev/not-precedent: This string is a principal name snapshot, not a timestamp. --)
+    """
+    def __init__(
+        self,
+        *,
+        type: builtins.str = ...,
+        name_at_write_time: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "name_at_write_time", b"name_at_write_time", "type", b"type"
+        ],
+    ) -> None: ...
+
+global___ResolvedPrincipal = ResolvedPrincipal
+
 class Priority(google.protobuf.message.Message):
     """Priority contains metadata that controls relative ordering of task processing
     when tasks are backed up in a queue. Initially, Priority will be used in

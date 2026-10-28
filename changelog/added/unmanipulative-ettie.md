@@ -1,0 +1,3 @@
+Core: Experimental session workers can poll workflow-affine activity queues; individual activities opt into their workflow's session, while normal activity routing remains the default. This increment supports fixed-size activity slots with capacity of at least two; resource-based and custom activity suppliers are not supported yet.
+Core: Experimental worker session options support a single-session policy with a stable destination, dedicating that destination to the first matched workflow for its lifetime with a supporting server. Sticky-only mode may use one fixed activity slot.
+Core: A workflow task that schedules a session activity fails on a worker without session support, including during replay.
