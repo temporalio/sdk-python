@@ -573,6 +573,40 @@ class ActivityOnCompleteHandler:
         )
 
 
+@workflow.defn
+class RecordCompletionWorkflow:
+    @workflow.run
+    async def run(
+        self, input: RecordCompletionInput
+    ) -> notifications.OnCompleteResponse:
+        assert input.output == EchoOutput(value="hello")
+        return notifications.OnCompleteResponse()
+
+
+@nexusrpc.handler.service_handler(name="callback.test.WorkflowNotificationService")
+class WorkflowOnCompleteHandler:
+    def __init__(self) -> None:
+        self.outputs: dict[str, EchoOutput] = {}
+
+    @nexus.temporal_operation
+    async def on_complete(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: notifications.OnCompleteRequest[EchoOutput, CallbackContext],
+    ) -> nexus.TemporalOperationResult[notifications.OnCompleteResponse]:
+        assert isinstance(input.result, OnCompleteRequestResultSuccess)
+        result = await client.start_workflow(
+            RecordCompletionWorkflow.run,
+            RecordCompletionInput(
+                label=input.source_context.label, output=input.result.value
+            ),
+            id=f"on-complete-{input.source_context.label}",
+        )
+        self.outputs[input.source_context.label] = input.result.value
+        return result
+
+
 @asynccontextmanager
 async def _callback_workers(
     client: Client,
@@ -580,6 +614,7 @@ async def _callback_workers(
     completion_handler: object,
     operation_handler: StandaloneTestServiceHandler | None = None,
     completion_activities: Sequence[Callable[..., Any]] = (),
+    completion_workflows: Sequence[type] = (),
 ) -> AsyncIterator[tuple[str, str]]:
     """Run operation and completion workers, yielding (endpoint, completion queue)."""
     operation_task_queue = str(uuid.uuid4())
@@ -604,6 +639,7 @@ async def _callback_workers(
             task_queue=completion_task_queue,
             nexus_service_handlers=[completion_handler],
             activities=completion_activities,
+            workflows=completion_workflows,
         ),
     ):
         endpoint = await env.create_nexus_endpoint(endpoint_name, operation_task_queue)
@@ -923,6 +959,56 @@ async def test_temporal_operation_completion_handler_starts_activity(
             f"on-complete-{label}", result_type=notifications.OnCompleteResponse
         )
         assert await activity_handle.result() == notifications.OnCompleteResponse()
+
+
+@pytest.mark.requires_local_server
+async def test_temporal_operation_completion_handler_starts_workflow(
+    client: Client, env: WorkflowEnvironment
+):
+    """A completion handler can start a workflow with the inbound callback link."""
+    if env.supports_time_skipping:
+        pytest.skip(
+            "Standalone Nexus Operation tests don't work with time-skipping server"
+        )
+    completion_handler = WorkflowOnCompleteHandler()
+    label = str(uuid.uuid4())
+    async with _callback_workers(
+        client,
+        env,
+        completion_handler,
+        completion_workflows=[RecordCompletionWorkflow],
+    ) as (endpoint_name, completion_task_queue):
+        result = await client.create_nexus_client(
+            service=StandaloneTestService, endpoint=endpoint_name
+        ).execute_operation(
+            StandaloneTestService.echo_async,
+            EchoInput(value="hello"),
+            id=str(uuid.uuid4()),
+            schedule_to_close_timeout=timedelta(seconds=30),
+            completion_callbacks=[
+                nexus.create_completion_callback(
+                    operation=WorkflowOnCompleteHandler.on_complete,
+                    task_queue=completion_task_queue,
+                    source_context=CallbackContext(label=label),
+                )
+            ],
+        )
+        assert result == EchoOutput(value="hello")
+
+        async def workflow_started() -> None:
+            assert completion_handler.outputs == {label: EchoOutput(value="hello")}
+
+        await assert_eventually(workflow_started)
+        handle = client.get_workflow_handle_for(
+            RecordCompletionWorkflow.run, f"on-complete-{label}"
+        )
+        assert await handle.result() == notifications.OnCompleteResponse()
+        history = await handle.fetch_history()
+        assert any(
+            link.HasField("callback")
+            for event in history.events
+            for link in event.links
+        )
 
 
 @pytest.mark.requires_local_server
