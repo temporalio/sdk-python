@@ -7,6 +7,144 @@ This file contains assembled releases only.
 
 # Changelog
 
+## [1.35.0] - 2026-10-28
+
+### Added
+
+- Nexus links now convert to and from `Link.Callback` instead of raising `NotImplementedError`.
+
+- Add an experimental Google Cloud Storage external payload storage driver with an optional async `gcloud-aio-storage` adapter.
+
+- Add experimental notification service models in `temporalio.nexus.notifications`. The SDK does not currently use these models.
+
+- Worker now warns when an activity method is registered from the class instead of from an instance (i.e. its first parameter is an unbound `self`).
+
+- Add experimental `versioning_override` to `workflow.start_child_workflow` and `workflow.execute_child_workflow` to override inherited parent versioning, and `common.OneTimeVersioningOverride` to route an execution to a deployment version until its first completed workflow task. Child overrides require Temporal Server 1.32 or newer; invalid child overrides raise `exceptions.InvalidVersioningOverrideError`.
+
+- Workers and clients can now read external storage reference payloads that were encoded with the configured payload codec and marked with `__temporal_external_storage_reference` metadata. This release does not write encoded references yet; a later release will, so upgrade all workers before then.
+
+- `WorkflowEnvironment.start_time_skipping_v2()` starts a Temporal CLI dev server with per-workflow virtual-clock time skipping, the eventual replacement to the global-clock Java test server returned by `start_time_skipping()`.
+- `TimeSkipper(client, config=TimeSkippingConfig(...))` from `temporalio.testing` wraps an existing `Client` with per-workflow time skipping for use outside the test environment.
+
+- Core: Child workflow commands, including those submitted through the C bridge, support pinned, auto-upgrade, and one-time worker deployment versioning overrides on Temporal Server 1.32.0 or later. Child-start resolutions distinguish invalid versioning overrides and missing namespaces from other start failures.
+
+- Expose `connect_timeout` on `Client.connect` and `ConnectConfig` to bound TCP connection attempts independently of RPC timeouts. The default remains unset.
+
+- `workflow.new_random()` accepts an optional `name` that is mixed into the seed, so differently named generators, and `workflow.random()`, produce different sequences.
+
+- Add startup timeout options to `WorkflowEnvironment.start_local` and `WorkflowEnvironment.start_time_skipping` to configure how long to wait for the server to become ready after spawning.
+
+### Stabilized
+
+- Removed experimental labels from the core plugin APIs.
+
+### Changed
+
+- Payload converters exposed by data converters and workflow/activity accessors retain transfer type conversion, so direct use behaves consistently with SDK serialization.
+
+### :boom: Breaking Changes
+
+- `SchedulePolicy.catchup_window` now defaults to `None`. An unspecified window will use the server configured default.
+
+- **Experimental**: Nexus Workflow Updates now require `wait_for_stage` to be explicitly set to `ACCEPTED`.
+
+- The Deep Agents, Google ADK, Google GenAI, LangGraph, LangSmith, and Strands Agents integrations have moved to independently versioned packages in [`temporalio/ai-integrations`](https://github.com/temporalio/ai-integrations). The existing SDK extras install the corresponding standalone packages and public `temporalio.contrib` imports forward their APIs; new code should depend on the standalone packages and use their `temporalio.<integration>` imports directly.
+
+- The OpenAI Agents integration has moved to the independently versioned [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/) package. The existing `temporalio[openai-agents]` extra now installs that package, and the old public `temporalio.contrib.openai_agents` imports remain available at runtime and retain their static type information. New code should depend on `temporalio-openai-agents` directly and import `temporalio.openai_agents`.
+
+- `temporalio.contrib.google_adk_agents`: ADK-generated ids and retry jitter now draw from a workflow-private deterministic stream (a `workflow.new_random()` per run) instead of `workflow.random()`. A workflow started under 1.34.0 that generated ADK ids or jitter (for example one waiting on a HITL response) may not replay deterministically across this upgrade; drain such workflows or use worker versioning.
+
+- Decorating an `async def` function with `@update_method.validator` or passing one as `validator` to `workflow.set_update_handler`/`set_dynamic_update_handler` now raises `ValueError`. Previously the validator was silently never run, so every update was accepted.
+
+- `temporalio.contrib.opentelemetry`: removed `TemporalIdGenerator.seed_span_id()` and `seed_trace_id()`.
+
+### Fixed
+
+- Fix `contrib.opentelemetry` `ReplaySafeLoggerProvider.get_logger()` raising `TypeError` with opentelemetry-api 1.45, where `Logger.enabled` became abstract. `enabled()` now returns `False` while replaying history events, matching `emit()`.
+
+- `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task when calling the model. The schema type is now sent to the model activity as its JSON schema. Custom Pydantic schema generation is preserved. Integer-valued output enums are normalized to strings to match Google GenAI.
+
+- Core: Worker heartbeats now report correct task-slot and poller counts when using buffered or custom metrics backends, including the Python SDK's `MetricBuffer`. Previously these counts could remain `0` because heartbeat accounting depended on reading labels from backend-owned attributes.
+
+- Decode enums that mix in `str` or `int` (for example `class Color(str, Enum)`) to the enum instead of a list of characters or an error, and decode `dict` keys typed as an `int` enum.
+
+- System Nexus operations without an operation-specific serialization context no longer give custom payload and failure converters the calling workflow's context.
+
+- `temporalio.contrib.strands` activity and MCP tools now give the model the Activity's failure message and expose its exception to after-tool hooks.
+
+- Cancelling a workflow, or the task awaiting `ExternalWorkflowHandle.cancel()`, before the external cancel request resolves no longer fails every following workflow task with `InvalidStateError`.
+
+- Preserve the result of augmented assignments such as `path /= "child"` in the workflow sandbox, while retaining restrictions on replacement objects.
+
+- Fixed Pydantic constraints being silently ignored inside or outside workflow sandboxes by passing through `annotated_types` by default.
+
+- Fix S3 external storage object names by preserving empty namespace segments and using namespace-scoped hash keys when names exceed 1,024 bytes. Document the read and bucket-listing permissions required for uploads.
+
+- Encoding a datetime search attribute without a timezone now raises `ValueError("Timezone must be present on all search attribute dates")` on the typed path, matching the deprecated untyped encoder, instead of sending a naive ISO string that the server rejects with `BadSearchAttributes`.
+
+- Core: A workflow task that arrives while a workflow waits on a local activity, such as a legacy query, now waits until the current workflow task is reported. Previously it replaced that workflow task ("Trying to send a new WFT for a run which already has one!"), which then timed out on the server and could leave the workflow stuck on a nondeterminism error.
+
+- Activity heartbeats are now recorded in the order they were sent. With a payload codec that is slow to encode, an older heartbeat could be recorded after a newer one, so a retried activity resumed from stale heartbeat details.
+
+- Fix `Worker.shutdown()` and `async with Worker(...)` hanging forever when worker validation fails, for example on a namespace that does not exist. `async with` now raises the validation error.
+
+- Exiting `async with Worker(...)` now waits for the code that plugins run after the Worker stops in `run_worker`, up to the new `plugin_shutdown_timeout` Worker option, instead of cancelling the task that entered the block.
+
+- A deserialized `ApplicationError` without a next retry delay now has `next_retry_delay` set to `None` instead of a zero `timedelta`.
+
+- Core: Workers now replay workflows paused before a scheduled task starts, allowing those workflows to make progress after unpause.
+
+- `temporalio.contrib.opentelemetry`: `TracingInterceptor` and `OpenTelemetryInterceptor` no longer log `Failed to detach context` when a context is torn down on a different thread while OpenTelemetry's threading instrumentation (enabled by strands, among others) is active; a context is now detached exactly when its token is still valid in the current `contextvars.Context`, which it stays when a workflow resumes on another pool thread.
+
+- Reject unsupported `InterpreterPoolExecutor` activity executors when creating a worker instead of failing during activity execution.
+
+- Setting `Worker.client` no longer raises "New client is not on the same runtime as the existing client" when both clients connected without a `runtime`, since both use the default runtime. The check now compares the runtime each client actually connected with.
+
+- Heartbeating an async activity through a task-token `AsyncActivityHandle` now raises `AsyncActivityCancelledError` with `reset=True` when the activity was reset, as handles created from IDs already did.
+
+- Keep whole-number `Double` values in typed search attributes returned by `list_workflows()` and other visibility results, instead of silently dropping them.
+
+- Stop `SandboxImportNotificationPolicy.WARN_ON_UNINTENTIONAL_PASSTHROUGH` and `RAISE_ON_UNINTENTIONAL_PASSTHROUGH` from flagging the module that defines the workflow, which the sandbox reloads on purpose.
+
+- Experimental Workflow Streams background publishing now retries transient signal delivery failures without delaying payload conversion errors.
+
+- Workflow wait conditions are no longer evaluated in a workflow task that only delivers updates and rejects all of them.
+
+- Preserve retained Workflow Stream items after workflow completion, failure, cancellation, termination, or timeout by draining them through read-only queries before subscriptions finish.
+- Preserve the original Workflow Streams poll error when the follow-up execution description fails with an RPC error.
+
+- Prevent pending Nexus operations from logging "Task was destroyed but it is pending!" when a worker stops or evicts a workflow.
+
+- Cancelling a workflow or local activity while the local activity waits on its retry backoff timer now cancels the timer, instead of failing every workflow task with a `Missing associated machine for LocalActivity` nondeterminism error.
+
+- `WorkflowStreamClient.subscribe` now propagates task cancellation instead of ending the subscription normally.
+
+- Fix worker shutdown hanging when a Nexus task is cancelled while its failure is still being encoded.
+
+- Dropping a client or worker no longer stops log forwarding for the other clients and workers that share its `Runtime`.
+
+- If enabled, time skipping is applied to workflows started through `Client.start_update_with_start_workflow()` or `Client.execute_update_with_start_workflow()`.
+
+- `ActivityHandle.describe()` now returns `None` as the `expiration_time` of a Standalone Activity that has no schedule-to-close timeout, instead of a naive `datetime.min`.
+
+- Send a request ID when terminating a standalone activity, so a retried `ActivityHandle.terminate()` call no longer fails after the first attempt already terminated the activity.
+
+- Evicting a workflow while an activity or local activity cancellation is still unresolved no longer leaves the eviction retrying forever and worker shutdown hung, a regression in 1.33.0.
+
+- Fix Nexus worker shutdown hanging forever, and the task slot never being released, when a Nexus handler failure can not be converted or encoded, for example when the payload codec raises or the error details are not serializable. The worker now completes the task with an internal handler error.
+
+- A cancel that arrives while an activity's result or failure is still being encoded no longer interrupts the reporting, so the completion is still sent.
+
+- `GoogleAdkPlugin`'s deterministic providers now work in read-only contexts (query handlers, update validators), returning the workflow's deterministic time and fresh entropy without touching the workflow's random state.
+
+- Decoding a dataclass with `field(init=False)` fields no longer raises `TypeError`; those fields are left out of the constructor call and their serialized values are restored afterwards, including on frozen dataclasses.
+
+### Security
+
+- Updated Rust bridge dependencies, including `rustls` to 0.23.45 and `ringbuf` to 0.5.2 to address RUSTSEC-2026-0285 and RUSTSEC-2026-0293.
+
+- Core: Ephemeral server downloads now use `zip` 9.0 for ZIP extraction, replacing the 8.x dependency [yanked upstream for security issues](https://github.com/zip-rs/zip2/issues/1075#issuecomment-6209381974).
+
 ## [1.34.0] - 2026-09-30
 
 ### Added

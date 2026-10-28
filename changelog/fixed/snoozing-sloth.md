@@ -1,1 +1,0 @@
-Cancelling a workflow or local activity while the local activity waits on its retry backoff timer now cancels the timer, instead of failing every workflow task with a `Missing associated machine for LocalActivity` nondeterminism error.
