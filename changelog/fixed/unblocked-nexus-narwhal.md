@@ -1,1 +1,0 @@
-Fix Nexus worker shutdown hanging forever, and the task slot never being released, when a Nexus handler failure can not be converted or encoded, for example when the payload codec raises or the error details are not serializable. The worker now completes the task with an internal handler error.

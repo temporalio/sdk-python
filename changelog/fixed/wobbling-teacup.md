@@ -1,1 +1,0 @@
-Decoding a dataclass with `field(init=False)` fields no longer raises `TypeError`; those fields are left out of the constructor call and their serialized values are restored afterwards, including on frozen dataclasses.
