@@ -45,6 +45,7 @@ class ShutdownTestService:
     check_shutdown: nexusrpc.Operation[None, str]
     fail_with_details: nexusrpc.Operation[None, str]
     fail_cancel_with_details: nexusrpc.Operation[None, str]
+    fail_with_unserializable_details: nexusrpc.Operation[None, str]
 
 
 class FailCancelWithDetailsHandler(OperationHandler[None, str]):
@@ -113,6 +114,15 @@ class ShutdownTestServiceHandler:
     def fail_cancel_with_details(self) -> OperationHandler[None, str]:
         return FailCancelWithDetailsHandler()
 
+    @sync_operation
+    async def fail_with_unserializable_details(
+        self, _ctx: StartOperationContext, _input: None
+    ) -> str:
+        assert self.operation_started
+        self.operation_started.set()
+        # The failure converter can't turn these details into a payload
+        raise ApplicationError("Operation failed", object())
+
 
 @dataclass
 class ShutdownTestCallerInput:
@@ -123,6 +133,7 @@ class ShutdownTestCallerInput:
         "check_shutdown",
         "fail_with_details",
         "fail_cancel_with_details",
+        "fail_with_unserializable_details",
     ]
     task_queue: str
 
@@ -162,6 +173,10 @@ class ShutdownTestCallerWorkflow:
                 )
                 handle.cancel()
                 return await handle
+            case "fail_with_unserializable_details":
+                return await nexus_client.execute_operation(
+                    ShutdownTestService.fail_with_unserializable_details, None
+                )
 
 
 async def test_nexus_worker_shutdown(env: WorkflowEnvironment):
@@ -451,6 +466,86 @@ async def test_nexus_worker_shutdown_while_encoding_failure(
             )
 
             await codec.encode_started.wait()
+
+            await asyncio.wait_for(handler_worker.shutdown(), 10)
+            await handler_worker_task
+
+
+class FailingEncodePayloadCodec(PayloadCodec):
+    def __init__(self) -> None:
+        self.encode_called = asyncio.Event()
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        self.encode_called.set()
+        raise RuntimeError("Codec failed")
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return list(payloads)
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        "fail_with_details",
+        "fail_cancel_with_details",
+        "fail_with_unserializable_details",
+    ],
+)
+async def test_nexus_worker_shutdown_after_failure_build_error(
+    env: WorkflowEnvironment,
+    operation: Literal[
+        "fail_with_details",
+        "fail_cancel_with_details",
+        "fail_with_unserializable_details",
+    ],
+):
+    """Test that shutdown doesn't hang when a handler failure can't be converted or encoded."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    handler_task_queue = str(uuid.uuid4())
+    caller_task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(
+        make_nexus_endpoint_name(handler_task_queue), handler_task_queue
+    )
+
+    # The unserializable details fail in the failure converter, the others in
+    # the codec
+    codec = FailingEncodePayloadCodec()
+    handler_client_config = env.client.config()
+    if operation != "fail_with_unserializable_details":
+        handler_client_config["data_converter"] = DataConverter(payload_codec=codec)
+    operation_started = asyncio.Event()
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        async with Worker(
+            env.client,
+            task_queue=caller_task_queue,
+            workflows=[ShutdownTestCallerWorkflow],
+        ):
+            handler_worker = Worker(
+                Client(**handler_client_config),
+                task_queue=handler_task_queue,
+                nexus_service_handlers=[ShutdownTestServiceHandler(operation_started)],
+                nexus_task_executor=executor,
+            )
+
+            handler_worker_task = asyncio.create_task(handler_worker.run())
+
+            await env.client.start_workflow(
+                ShutdownTestCallerWorkflow.run,
+                ShutdownTestCallerInput(
+                    operation=operation,
+                    task_queue=handler_task_queue,
+                ),
+                id=str(uuid.uuid4()),
+                task_queue=caller_task_queue,
+            )
+
+            if operation == "fail_with_unserializable_details":
+                await operation_started.wait()
+            else:
+                await codec.encode_called.wait()
 
             await asyncio.wait_for(handler_worker.shutdown(), 10)
             await handler_worker_task
