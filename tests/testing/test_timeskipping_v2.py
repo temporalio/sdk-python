@@ -10,7 +10,8 @@ import pytest
 
 from temporalio import workflow
 from temporalio.api.enums.v1 import event_type_pb2 as _event_type
-from temporalio.common import RetryPolicy
+from temporalio.client import WithStartWorkflowOperation
+from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import TimeSkipper, TimeSkippingConfig, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
@@ -518,6 +519,55 @@ async def test_signal_with_start_stamps_time_skipping_config(
 
     assert wall_elapsed < 10
     virtual_elapsed = result["end"] - result["after_signal"]
+    assert_duration_same(3600, virtual_elapsed, tolerance=50)
+    await assert_time_was_skipped(handle)
+
+
+@workflow.defn
+class UpdateWithStartTargetWorkflow:
+    """Accepts a ``ping`` update, then does a long sleep."""
+
+    @workflow.run
+    async def run(self, sleep_seconds: float) -> dict[str, float]:
+        t_start = workflow.now().timestamp()
+        await workflow.sleep(timedelta(seconds=sleep_seconds))
+        t_end = workflow.now().timestamp()
+        return {"start": t_start, "end": t_end}
+
+    @workflow.update
+    def ping(self) -> str:
+        return "pong"
+
+
+async def test_update_with_start_stamps_time_skipping_config(
+    ts_env: WorkflowEnvironment,
+) -> None:
+    """Timeskip an update-with-start workflow."""
+    async with new_worker(ts_env.client, UpdateWithStartTargetWorkflow) as worker:
+        wall_start = monotonic()
+        start_op = WithStartWorkflowOperation(
+            UpdateWithStartTargetWorkflow.run,
+            3600.0,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        )
+        update_result = await ts_env.client.execute_update_with_start_workflow(
+            UpdateWithStartTargetWorkflow.ping, start_workflow_operation=start_op
+        )
+        assert update_result == "pong"
+        handle = await start_op.workflow_handle()
+        # Fail here rather than wait for the timer in real time
+        tsi = await ts_env.get_time_skipping_info(handle)
+        assert tsi is not None
+        assert tsi.effective_config.enabled, (
+            "expected time skipping to be enabled (env-stamped)"
+        )
+        result = await handle.result()
+        wall_elapsed = monotonic() - wall_start
+
+    assert wall_elapsed < 10
+    virtual_elapsed = result["end"] - result["start"]
     assert_duration_same(3600, virtual_elapsed, tolerance=50)
     await assert_time_was_skipped(handle)
 

@@ -2029,21 +2029,23 @@ class CancelExternalWorkflow:
 
 
 async def test_workflow_cancel_external(client: Client):
-    async with new_worker(client, CancelExternalWorkflow, LongSleepWorkflow) as worker:
-        # Start long sleep, then cancel and check that it got cancelled
-        long_sleep_handle = await client.start_workflow(
-            LongSleepWorkflow.run,
+    async with new_worker(
+        client, CancelExternalWorkflow, WaitForeverWorkflow
+    ) as worker:
+        # A timer can finish under time skipping before the external cancel is sent.
+        target_handle = await client.start_workflow(
+            WaitForeverWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         await client.execute_workflow(
             CancelExternalWorkflow.run,
-            long_sleep_handle.id,
+            target_handle.id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         with pytest.raises(WorkflowFailureError) as err:
-            await long_sleep_handle.result()
+            await target_handle.result()
         assert isinstance(err.value.cause, CancelledError)
 
 
