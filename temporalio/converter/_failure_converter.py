@@ -336,7 +336,9 @@ class DefaultFailureConverter(FailureConverter):
                     *payload_converter.from_payloads_wrapper(app_info.details),
                     type=app_info.type or None,
                     non_retryable=app_info.non_retryable,
-                    next_retry_delay=app_info.next_retry_delay.ToTimedelta(),
+                    next_retry_delay=app_info.next_retry_delay.ToTimedelta()
+                    if app_info.HasField("next_retry_delay")
+                    else None,
                     category=temporalio.exceptions.ApplicationErrorCategory(
                         int(app_info.category)
                     ),
