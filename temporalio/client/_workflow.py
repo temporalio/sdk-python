@@ -130,7 +130,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             temporalio.converter.WorkflowSerializationContext(
                 namespace=self._client.namespace, workflow_id=self._id
             )
@@ -1615,7 +1615,7 @@ class WorkflowExecutionAsyncIterator:
 
         self._current_page = [
             WorkflowExecution._from_raw_info(
-                v, self._client.namespace, self._client.data_converter
+                v, self._client.namespace, self._client._data_converter
             )
             for v in resp.executions
         ]
@@ -1867,7 +1867,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=self.workflow_id,

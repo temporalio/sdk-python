@@ -164,7 +164,7 @@ class PayloadVisitor:
         *,
         skip_search_attributes: bool = False,
         skip_headers: bool = False,
-        concurrency_limit: int = 1,
+        concurrency_limit: int | None = 1,
     ):
         \"\"\"Creates a new payload visitor.
 
@@ -173,9 +173,10 @@ class PayloadVisitor:
             skip_headers: If True, headers are not visited.
             concurrency_limit: Maximum number of payload visits that may run
                 concurrently during a single call to visit(). Defaults to 1
-                (sequential).
+                (sequential). None runs every visit at once, for callers
+                that do their own limiting.
         \"\"\"
-        if concurrency_limit < 1:
+        if concurrency_limit is not None and concurrency_limit < 1:
             raise ValueError("concurrency_limit must be positive")
         self.skip_search_attributes = skip_search_attributes
         self.skip_headers = skip_headers

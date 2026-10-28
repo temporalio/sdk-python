@@ -943,8 +943,8 @@ class AsyncActivityHandle(WithSerializationContext):
         converter that makes use of this context then you can use this method to supply matching
         context data to the data converter used to serialize and encode the outbound payloads.
         """
-        data_converter = self._client.data_converter.with_context(context)
-        if data_converter is self._client.data_converter:
+        data_converter = self._client._data_converter.with_context(context)
+        if data_converter is self._client._data_converter:
             return self
         cls = type(self)
         if cls.__init__ is not AsyncActivityHandle.__init__:
@@ -981,7 +981,7 @@ class ActivityHandle(Generic[ReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             ActivitySerializationContext(
                 namespace=self._client.namespace,
                 activity_id=self._id,

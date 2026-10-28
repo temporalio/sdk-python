@@ -53,7 +53,7 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
         *,
         skip_search_attributes: bool = False,
         skip_headers: bool = False,
-        concurrency_limit: int = 1,
+        concurrency_limit: int | None = 1,
     ) -> None:
         """Creates a new command-aware payload visitor.
 
@@ -62,6 +62,7 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             skip_headers: If True, headers are not visited.
             concurrency_limit: Maximum number of payload visits that may run
                 concurrently during a single call to visit(). Defaults to 1.
+                None runs every visit concurrently.
         """
         super().__init__(
             skip_search_attributes=skip_search_attributes,
