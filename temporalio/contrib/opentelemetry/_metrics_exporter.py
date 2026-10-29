@@ -11,7 +11,6 @@ from datetime import timedelta
 import opentelemetry.metrics
 import opentelemetry.util.types
 
-import temporalio.common
 import temporalio.runtime
 
 logger = logging.getLogger(__name__)
@@ -20,11 +19,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class _GaugeState:
     lock: threading.Lock = field(default_factory=threading.Lock)
-    # Keyed by id(BufferedMetricUpdate.attributes) so repeated updates for the
-    # same attribute set overwrite rather than accumulate -- gauges are
-    # "latest value wins", unlike counters.
+    # Keyed by attribute values so repeated updates for the same attribute set
+    # overwrite rather than accumulate -- gauges are "latest value wins",
+    # unlike counters.
     last_values: dict[
-        int, tuple[Mapping[str, opentelemetry.util.types.AttributeValue], int | float]
+        frozenset[tuple[str, opentelemetry.util.types.AttributeValue]],
+        tuple[Mapping[str, opentelemetry.util.types.AttributeValue], int | float],
     ] = field(default_factory=dict)
 
 
@@ -136,9 +136,10 @@ class MetricsExporter:
         ).get_meter(meter_name, meter_version)
         self._poll_interval = poll_interval
         self._on_error = on_error
-        self._instruments: dict[int, _Instrument] = {}
-        self._attributes_cache: dict[
-            int, Mapping[str, opentelemetry.util.types.AttributeValue]
+        # Not keyed by id(): the buffer frees a metric or attribute set once
+        # Core drops it, and a later one can then get the same id().
+        self._instruments: dict[
+            tuple[str, temporalio.runtime.BufferedMetricKind], _Instrument
         ] = {}
         self._started = False
         self._shutdown_event = asyncio.Event()
@@ -221,7 +222,9 @@ class MetricsExporter:
 
     def _apply_update(self, update: temporalio.runtime.BufferedMetricUpdate) -> None:
         instrument = self._get_or_create_instrument(update.metric)
-        attributes = self._get_or_create_attributes(update.attributes)
+        attributes: dict[str, opentelemetry.util.types.AttributeValue] = dict(
+            update.attributes
+        )
 
         if instrument.kind == temporalio.runtime.BUFFERED_METRIC_KIND_COUNTER:
             assert instrument.counter is not None
@@ -232,7 +235,7 @@ class MetricsExporter:
         elif instrument.kind == temporalio.runtime.BUFFERED_METRIC_KIND_GAUGE:
             assert instrument.gauge_state is not None
             with instrument.gauge_state.lock:
-                instrument.gauge_state.last_values[id(update.attributes)] = (
+                instrument.gauge_state.last_values[frozenset(attributes.items())] = (
                     attributes,
                     update.value,
                 )
@@ -242,7 +245,8 @@ class MetricsExporter:
     def _get_or_create_instrument(
         self, metric: temporalio.runtime.BufferedMetric
     ) -> _Instrument:
-        instrument = self._instruments.get(id(metric))
+        key = (metric.name, metric.kind)
+        instrument = self._instruments.get(key)
         if instrument is not None:
             return instrument
 
@@ -269,17 +273,5 @@ class MetricsExporter:
         else:
             raise ValueError(f"Unrecognized buffered metric kind: {metric.kind}")
 
-        self._instruments[id(metric)] = instrument
+        self._instruments[key] = instrument
         return instrument
-
-    def _get_or_create_attributes(
-        self, attributes: temporalio.common.MetricAttributes
-    ) -> Mapping[str, opentelemetry.util.types.AttributeValue]:
-        cached = self._attributes_cache.get(id(attributes))
-        if cached is not None:
-            return cached
-        converted: Mapping[str, opentelemetry.util.types.AttributeValue] = dict(
-            attributes
-        )
-        self._attributes_cache[id(attributes)] = converted
-        return converted
