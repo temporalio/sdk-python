@@ -1148,6 +1148,8 @@ async def test_id_reuse_policy_allow_duplicate(
     assert handle1.run_id != handle2.run_id
 
 
+# Registering a custom search attribute needs the operator service, which cloud doesn't allow
+@pytest.mark.requires_local_server
 async def test_search_attributes(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping_v1:
         pytest.skip(
