@@ -56,6 +56,7 @@ import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.proto.workflow_completion
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
@@ -310,6 +311,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         else:
             self._result_payload_converter = self._workflow_context_payload_converter
             self._result_failure_converter = self._workflow_context_failure_converter
+        # Keyed by update protocol instance ID. Kept until the activation that finished the update
+        # has been encoded, so the codec can encode its response with the same context.
+        self._nexus_update_contexts: dict[
+            str, temporalio.converter.NexusSerializationContext
+        ] = {}
+        self._finished_nexus_update_ids: list[str] = []
 
         self._extern_functions = det.extern_functions
         self._disable_eager_activity_execution = det.disable_eager_activity_execution
@@ -475,6 +482,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
         )
         self._current_completion.successful.SetInParent()
+        for protocol_instance_id in self._finished_nexus_update_ids:
+            self._nexus_update_contexts.pop(protocol_instance_id, None)
+        self._finished_nexus_update_ids.clear()
 
         self._current_activation_error: Exception | None = None
         self._deployment_version_for_current_task = (
@@ -696,6 +706,24 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Run the validator & handler in a task. Everything, including looking up the update definition, needs to be
         # inside the task, since the update may not be defined until after we have started the workflow - for example
         # if an update is in the first WFT & is also registered dynamically at the top of workflow code.
+        # An update sent by a Nexus operation handler returns its result and failure to the Nexus
+        # caller, which decodes them with the handler's Nexus context. Its input keeps the workflow
+        # context.
+        nexus_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+            job
+        )
+        if nexus_context:
+            self._nexus_update_contexts[job.protocol_instance_id] = nexus_context
+            result_payload_converter = self._payload_converter_with_context(
+                nexus_context
+            )
+            result_failure_converter = self._failure_converter_with_context(
+                nexus_context
+            )
+        else:
+            result_payload_converter = self._workflow_context_payload_converter
+            result_failure_converter = self._workflow_context_failure_converter
+
         async def run_update() -> None:
             # Set the current update for the life of this task
             temporalio.workflow._set_current_update_info(
@@ -751,9 +779,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # Run the handler
                 with _inbound_update_event_group(job.id).scope():
                     success = await self._inbound.handle_update_handler(handler_input)
-                result_payloads = self._workflow_context_payload_converter.to_payloads(
-                    [success]
-                )
+                result_payloads = result_payload_converter.to_payloads([success])
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
@@ -785,9 +811,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                             job.protocol_instance_id
                         )
                     command.update_response.rejected.SetInParent()
-                    self._workflow_context_failure_converter.to_failure(
+                    result_failure_converter.to_failure(
                         err,
-                        self._workflow_context_payload_converter,
+                        result_payload_converter,
                         command.update_response.rejected,
                     )
                 else:
@@ -811,6 +837,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 raise
             finally:
                 self._in_progress_updates.pop(job.id, None)
+                if nexus_context:
+                    self._finished_nexus_update_ids.append(job.protocol_instance_id)
 
         self.create_task(
             run_update(),
@@ -2500,6 +2528,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             # The result and closing failure go back to the Nexus caller
             return self._nexus_serialization_context
+
+        if (
+            command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_PROTOCOL_MESSAGE
+            and command_info.update_protocol_instance_id in self._nexus_update_contexts
+        ):
+            # The update's result and failure go back to the Nexus caller
+            return self._nexus_update_contexts[command_info.update_protocol_instance_id]
 
         if (
             command_info.command_type

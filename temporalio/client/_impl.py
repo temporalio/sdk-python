@@ -891,7 +891,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             result_type=input.ret_type,
         )
         if resp.HasField("outcome"):
-            handle._known_outcome = resp.outcome
+            handle._set_known_outcome(resp)
         if input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
             await handle._poll_until_outcome()
         return handle
@@ -950,6 +950,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             temporalio.nexus._operation_context._apply_nexus_context_to_start_workflow_update_request(
                 req
             )
+        temporalio.nexus._operation_context._apply_nexus_serialization_context_to_workflow_update_request(
+            req
+        )
         if input.args:
             req.request.input.args.payloads.extend(
                 await data_converter.encode(input.args)
@@ -1083,9 +1086,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             start_response = multiop_response.responses[0].start_workflow
             update_response = multiop_response.responses[1].update_workflow
             on_start(start_response)
-            known_outcome = (
-                update_response.outcome if update_response.HasField("outcome") else None
-            )
             if (
                 update_response.stage
                 >= temporalio.api.enums.v1.UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED
@@ -1097,9 +1097,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             id=update_req.request.meta.update_id,
             workflow_id=start_input.id,
             workflow_run_id=start_response.run_id,
-            known_outcome=known_outcome,
             result_type=update_input.ret_type,
         )
+        if update_response.HasField("outcome"):
+            handle._set_known_outcome(update_response)
         if update_input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
             await handle._poll_until_outcome()
 
