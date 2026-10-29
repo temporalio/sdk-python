@@ -1818,9 +1818,13 @@ class WorkflowHistoryEventAsyncIterator:
         self._current_page = list(resp.history.events)
         self._current_page_index = 0
         self._next_page_token = resp.next_page_token or None
-        self._propagated_nexus_serialization_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+        # Pages after the first may omit the context, such as the page holding the close event
+        # after a long poll times out
+        context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
             resp
         )
+        if context is not None:
+            self._propagated_nexus_serialization_context = context
 
     def __aiter__(self) -> WorkflowHistoryEventAsyncIterator:
         """Return self as the iterator."""
