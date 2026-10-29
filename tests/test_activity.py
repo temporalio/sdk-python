@@ -31,7 +31,11 @@ from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    ensure_search_attributes_present,
+)
 
 
 @activity.defn
@@ -1158,9 +1162,10 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
 
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
-    temporal_change_version_key = SearchAttributeKey.for_keyword_list(
-        "TemporalChangeVersion"
+    keyword_list_key = SearchAttributeKey.for_keyword_list(
+        "python-test-activity-keyword-list"
     )
+    await ensure_search_attributes_present(client, keyword_list_key)
 
     handle = await client.start_activity(
         increment,
@@ -1169,12 +1174,12 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         schedule_to_close_timeout=timedelta(seconds=60),
         search_attributes=TypedSearchAttributes(
-            [SearchAttributePair(temporal_change_version_key, ["test-1", "test-2"])]
+            [SearchAttributePair(keyword_list_key, ["test-1", "test-2"])]
         ),
     )
 
     desc = await handle.describe()
-    assert desc.typed_search_attributes[temporal_change_version_key] == [
+    assert desc.typed_search_attributes[keyword_list_key] == [
         "test-1",
         "test-2",
     ]
