@@ -41,6 +41,11 @@ pub(crate) struct Runtime {
 /// Owns the Core runtime so the last runtime clone can shut it down with the GIL released.
 /// Shutting down waits for running Tokio tasks, and the log forwarder may be one of them,
 /// waiting for the GIL.
+///
+/// While the interpreter finalizes, the runtime is leaked instead. CPython then parks for
+/// good every thread that asks for the GIL, including a Tokio thread that is completing a
+/// Python future, so a shutdown that waits for the Tokio threads never returns. The process
+/// is exiting, so the operating system reclaims the leaked runtime.
 pub(crate) struct CoreRuntimeHandle(Option<CoreRuntime>);
 
 impl std::ops::Deref for CoreRuntimeHandle {
@@ -53,8 +58,29 @@ impl std::ops::Deref for CoreRuntimeHandle {
 
 impl Drop for CoreRuntimeHandle {
     fn drop(&mut self) {
-        let _ = Python::try_attach(|py| py.detach(|| drop(self.0.take())));
+        let mut core = self.0.take();
+        let dropped = Python::try_attach(|py| {
+            if interpreter_is_finalizing(py) {
+                return false;
+            }
+            py.detach(|| drop(core.take()));
+            true
+        });
+        if dropped != Some(true) {
+            std::mem::forget(core);
+        }
     }
+}
+
+/// Reports whether the interpreter is finalizing, and treats a failed check as finalizing.
+///
+/// `Python::try_attach` still attaches the finalizing thread itself, so its result does not
+/// show this state. `sys.is_finalizing` exists in every supported Python version, and calling
+/// it needs only the stable ABI.
+fn interpreter_is_finalizing(py: Python<'_>) -> bool {
+    py.import("sys")
+        .and_then(|sys| sys.getattr("is_finalizing")?.call0()?.is_truthy())
+        .unwrap_or(true)
 }
 
 #[derive(FromPyObject)]
