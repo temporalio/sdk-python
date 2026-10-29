@@ -6,9 +6,9 @@ required. They use the usual `new_worker` helper and default sandboxed workflow 
 
 ## Prerequisites and command
 
-Run an isolated development server built from
-[temporalio/temporal#12630](https://github.com/temporalio/temporal/pull/12630),
-with `system.enableStickyActivityExecution` enabled for the test namespace.
+Run an isolated development server built from the `shivam/agentcore-single-session`
+branch of [temporalio/temporal](https://github.com/temporalio/temporal), with
+`system.enableStickyActivityExecution` enabled for the test namespace.
 The stock downloaded dev server and time-skipping server are not substitutes.
 Server startup/database configuration belongs to that checkout; these tests do not
 change dynamic configuration or start the custom server.
@@ -28,7 +28,7 @@ Tests are skipped unless the environment variable is set and reject `local` and
 
 ## Assertions
 
-Each test starts a workflow/session worker and a competing activity-only worker on
+The affinity tests start a workflow/session worker and a competing activity-only worker on
 the same normal queue using `new_worker`. Both register the same activity. A separate
 connection gives the activity-only worker a distinct identity and independent
 registration. Before starting the workflow, the test waits for that worker's
@@ -39,13 +39,15 @@ namespace, authentication, transport, and converter settings; registering activi
 without workflows makes its worker activity-only. Shared helpers in `tests.helpers`
 handle poller readiness and history identity/attempt/completion assertions.
 
-No isolation/stable-destination option is set: the server increment explicitly
-rejects single-session isolation. Eager activity execution is disabled.
+The affinity tests set no admission option (shared session workers). The replay
+test also runs single-session workers with a stable identity. Eager activity
+execution is disabled.
 
 | Test | What success establishes |
 | --- | --- |
 | `test_session_activity_and_retry_stay_on_workflow_worker` | One workflow starts ten session activities concurrently. Each fails once; history records all ten starting on attempt two on the workflow worker and completing. Membership is persisted. |
 | `test_session_activity_backlog_waits_for_worker_capacity` | Four session activities wait on a release event with only two available slots. The server retains pending backlog. After release, history records all four starting on the workflow worker on attempt one and completing. |
+| `test_session_workflow_histories_replay` | Workflows with and without session activities run on shared and single-session workers, including one whose single-session worker is replaced by a new worker with the same stable identity between activities. History records `workflow_session` exactly when activities used a session scope. Each history replays with the session config it ran with; without session config, only histories without session activities replay. |
 
 Slots are reserved before polling. An idle normal long poll can occupy a slot;
 configured capacity is an upper bound, not a promise that every slot executes a
@@ -55,10 +57,12 @@ Synchronization uses activity-start events and an explicit release event, not sl
 ## What this does not establish
 
 This is validation of the current hot-worker routing subset, not the complete
-Workflow-as-Session/AgentCore lifecycle. Worker loss, relocation, sticky reset,
-sticky timeout fallback, lifetime isolation, Continue-As-New inheritance, server
-rate-limit behavior, WCI lifecycle, and AgentCore invocation require separate
-implementation/tests. Core unit tests cover SDK shutdown response ordering; these two
+Workflow-as-Session/AgentCore lifecycle. Worker crashes (the replay test
+replaces a worker after a graceful shutdown), relocation, sticky reset, sticky
+timeout fallback, Continue-As-New inheritance, server rate-limit behavior, WCI
+lifecycle, and AgentCore invocation require separate implementation/tests. The
+activity sessions sample in samples-python exercises single-session binding and a
+crash (SIGKILL) and restart end to end. Core unit tests cover SDK shutdown response ordering; these two
 integration tests do not deliberately manufacture that server race.
 
 The history identity assertions establish observed worker colocation despite a

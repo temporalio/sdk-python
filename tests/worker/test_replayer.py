@@ -20,6 +20,7 @@ from temporalio.worker import (
     ExecuteWorkflowInput,
     Interceptor,
     Replayer,
+    SingleSessionAdmission,
     StartActivityInput,
     Worker,
     WorkerSessionConfig,
@@ -685,33 +686,52 @@ class ClearSessionOutboundInterceptor(WorkflowOutboundInterceptor):
         return super().start_activity(input)
 
 
-async def test_replayer_session_workflow_requires_session_config(
-    client: Client,
+@workflow.defn
+class PlainActivityWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            say_hello, "Plain", schedule_to_close_timeout=timedelta(seconds=60)
+        )
+
+
+REPLAY_SESSION_CONFIGS = {
+    "no_session": None,
+    "shared": WorkerSessionConfig(),
+    "single_session": WorkerSessionConfig(
+        admission=SingleSessionAdmission(stable_identity="replay-session")
+    ),
+}
+
+
+@pytest.mark.parametrize("session_activities", [False, True])
+@pytest.mark.parametrize("replay_config", list(REPLAY_SESSION_CONFIGS))
+async def test_replayer_session_workflows(
+    client: Client, session_activities: bool, replay_config: str
 ) -> None:
+    workflow_cls = (
+        SessionActivityWorkflow if session_activities else PlainActivityWorkflow
+    )
     task_queue = f"tq-{uuid.uuid4()}"
     async with Worker(
         client,
         task_queue=task_queue,
-        workflows=[SessionActivityWorkflow],
+        workflows=[workflow_cls],
         activities=[say_hello],
-        interceptors=[ClearSessionInterceptor()],
+        interceptors=[ClearSessionInterceptor()] if session_activities else [],
     ):
         handle = await client.start_workflow(
-            SessionActivityWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=task_queue,
+            workflow_cls.run, id=f"workflow-{uuid.uuid4()}", task_queue=task_queue
         )
-        assert "Hello, Session!" == await handle.result()
+        await handle.result()
     history = await handle.fetch_history()
 
-    # Without session_config, like a worker that doesn't serve sessions
-    result = await Replayer(workflows=[SessionActivityWorkflow]).replay_workflow(
-        history, raise_on_replay_failure=False
-    )
-    assert result.replay_failure is not None
-    assert "session_worker_options is not enabled" in str(result.replay_failure)
-
-    # With session_config, like the session worker the workflow belongs on
-    await Replayer(
-        workflows=[SessionActivityWorkflow], session_config=WorkerSessionConfig()
-    ).replay_workflow(history)
+    result = await Replayer(
+        workflows=[workflow_cls], session_config=REPLAY_SESSION_CONFIGS[replay_config]
+    ).replay_workflow(history, raise_on_replay_failure=False)
+    if session_activities and replay_config == "no_session":
+        # Session workflows only replay on session workers, like they only run there
+        assert result.replay_failure is not None
+        assert "session_worker_options is not enabled" in str(result.replay_failure)
+    else:
+        assert result.replay_failure is None
