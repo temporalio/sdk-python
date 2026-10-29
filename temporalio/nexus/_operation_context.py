@@ -73,6 +73,12 @@ _temporal_nexus_backing_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-start-context"
 )
 
+# Set while a signal is sent through TemporalNexusClient.client so the request reuses
+# the Nexus request ID and the server deduplicates it when the Nexus task is retried.
+_temporal_operation_signal_context: ContextVar[bool] = ContextVar(
+    "temporal-operation-signal-context"
+)
+
 
 @dataclass(frozen=True)
 class Info:
@@ -184,6 +190,19 @@ def _nexus_backing_start_context() -> Generator[None]:
 
 def _in_nexus_backing_start_context() -> bool:  # type:ignore[reportUnusedClass]
     return _temporal_nexus_backing_start_context.get(False)
+
+
+@contextmanager
+def _operation_signal_context() -> Generator[None]:  # pyright: ignore[reportUnusedFunction]
+    token = _temporal_operation_signal_context.set(True)
+    try:
+        yield
+    finally:
+        _temporal_operation_signal_context.reset(token)
+
+
+def _in_operation_signal_context() -> bool:
+    return _temporal_operation_signal_context.get(False)
 
 
 _OperationCtxT = TypeVar("_OperationCtxT", bound=OperationContext)
@@ -796,6 +815,8 @@ def _apply_nexus_context_to_signal_workflow_request(  # pyright: ignore[reportUn
     nexus_ctx = _try_start_operation_context()
     if nexus_ctx is not None:
         req.links.extend(nexus_ctx._get_request_links())
+        if _in_operation_signal_context():
+            req.request_id = nexus_ctx.nexus_context.request_id
 
 
 def _apply_signal_workflow_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
@@ -814,6 +835,8 @@ def _apply_nexus_context_to_signal_with_start_workflow_request(  # pyright: igno
     nexus_ctx = _try_start_operation_context()
     if nexus_ctx is not None and not _in_nexus_backing_start_context():
         req.links.extend(nexus_ctx._get_request_links())
+        if _in_operation_signal_context():
+            req.request_id = nexus_ctx.nexus_context.request_id
 
 
 def _apply_nexus_context_to_start_workflow_request(  # pyright: ignore[reportUnusedFunction]
