@@ -28,6 +28,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._search_attributes
+import temporalio.converter._serialization_context
 from temporalio.converter import (
     ActivitySerializationContext,
     DataConverter,
@@ -437,6 +438,18 @@ class ActivityExecutionDescription(ActivityExecution):
             **kwargs,
         )
 
+    @functools.cached_property
+    def _caller_facing_data_converter(self) -> DataConverter:
+        # An activity started by a Nexus operation handler encodes its result, failures and
+        # heartbeat details with the handler's Nexus context, which the server returns with the
+        # activity info. Its input keeps the activity context.
+        context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+            self.raw_info
+        )
+        if context is None:
+            return self.data_converter
+        return self.data_converter.with_context(context)
+
     def has_heartbeat_details(self) -> bool:
         """True if heartbeat details are available. Use `heartbeat_details` to retrieve them.
 
@@ -453,7 +466,7 @@ class ActivityExecutionDescription(ActivityExecution):
         Type hints can be provided to aid data conversion.
         """
         return (
-            await self.data_converter.decode_wrapper(
+            await self._caller_facing_data_converter.decode_wrapper(
                 self.raw_info.heartbeat_details, type_hints
             )
             if self.has_heartbeat_details()
@@ -473,7 +486,9 @@ class ActivityExecutionDescription(ActivityExecution):
         Always `None` if ``include_last_failure`` was false in the `ActivityHandle.describe` call.
         """
         return (
-            await self.data_converter.decode_failure(self.raw_info.last_failure)
+            await self._caller_facing_data_converter.decode_failure(
+                self.raw_info.last_failure
+            )
             if self.has_last_failure()
             else None
         )
@@ -515,7 +530,7 @@ class ActivityExecutionDescription(ActivityExecution):
         if self.raw_outcome is None or not self.raw_outcome.HasField("result"):
             return None
         type_hints = [type_hint] if type_hint is not None else None
-        results = await self.data_converter.decode_wrapper(
+        results = await self._caller_facing_data_converter.decode_wrapper(
             self.raw_outcome.result, type_hints
         )
         if not results:
@@ -543,7 +558,9 @@ class ActivityExecutionDescription(ActivityExecution):
         Always false if ``include_outcome`` was false in the `ActivityHandle.describe` call.
         """
         return (
-            await self.data_converter.decode_failure(self.raw_outcome.failure)
+            await self._caller_facing_data_converter.decode_failure(
+                self.raw_outcome.failure
+            )
             if self.raw_outcome is not None and self.raw_outcome.HasField("failure")
             else None
         )
@@ -942,6 +959,11 @@ class AsyncActivityHandle(WithSerializationContext):
         with :py:class:`ActivitySerializationContext` set as context. If you are using a custom data
         converter that makes use of this context then you can use this method to supply matching
         context data to the data converter used to serialize and encode the outbound payloads.
+
+        A standalone activity started by a Nexus operation handler encodes its result, failure and
+        heartbeat details with the handler's
+        :py:class:`temporalio.converter.NexusSerializationContext`. To complete or heartbeat such an
+        activity, pass :py:attr:`temporalio.activity.Info.nexus_serialization_context`.
         """
         data_converter = self._client.data_converter.with_context(context)
         if data_converter is self._client.data_converter:
@@ -977,6 +999,9 @@ class ActivityHandle(Generic[ReturnType]):
         self._result_type = result_type
         self._known_outcome: (
             temporalio.api.activity.v1.ActivityExecutionOutcome | None
+        ) = None
+        self._known_outcome_nexus_context: (
+            temporalio.converter.NexusSerializationContext | None
         ) = None
 
     @functools.cached_property
@@ -1034,18 +1059,22 @@ class ActivityHandle(Generic[ReturnType]):
             rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
         )
 
-        # Convert outcome to failure or value
+        # Convert outcome to failure or value. An activity started by a Nexus operation handler
+        # encodes them with the handler's Nexus context, which the server returns with the outcome.
         assert self._known_outcome
+        data_converter = (
+            self._client.data_converter.with_context(self._known_outcome_nexus_context)
+            if self._known_outcome_nexus_context
+            else self._data_converter
+        )
         if self._known_outcome.HasField("failure"):
             raise ActivityFailureError(
-                cause=await self._data_converter.decode_failure(
-                    self._known_outcome.failure
-                ),
+                cause=await data_converter.decode_failure(self._known_outcome.failure),
             )
         if not self._known_outcome.result.payloads:
             return None  # type: ignore
         type_hints = [self._result_type] if self._result_type else None
-        results = await self._data_converter.decode(
+        results = await data_converter.decode(
             self._known_outcome.result.payloads, type_hints
         )
         if not results:
@@ -1080,6 +1109,9 @@ class ActivityHandle(Generic[ReturnType]):
                 )
                 if res.HasField("outcome"):
                     self._known_outcome = res.outcome
+                    self._known_outcome_nexus_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+                        res
+                    )
                     return
             except RPCError as err:
                 if err.status == RPCStatusCode.DEADLINE_EXCEEDED:

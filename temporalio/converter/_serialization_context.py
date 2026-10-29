@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC
 from dataclasses import dataclass
 
+import google.protobuf.message
 from typing_extensions import Self
 
 
@@ -102,15 +103,17 @@ class ActivitySerializationContext(SerializationContext):
 class NexusSerializationContext(SerializationContext):
     """Serialization context for Nexus operation payloads.
 
-    Callers receive this context when encoding inputs and decoding results or failures. The context
-    is not propagated to a handler that completes an asynchronous operation. Handlers receive it
-    when decoding inputs, encoding synchronous results, and encoding failures produced while
-    handling a Nexus task.
+    Callers receive this context when encoding inputs and decoding results or failures. Handlers
+    receive it when decoding inputs, encoding synchronous results, and encoding failures produced
+    while handling a Nexus task.
 
-    A standalone operation handle retains the context used to start the operation and uses it to
-    decode the result, including when the start request returns an existing operation. A handle
-    created with :py:meth:`temporalio.client.Client.get_nexus_operation_handle` has no endpoint,
-    service, or operation information and therefore decodes without Nexus context.
+    Workflows and standalone activities started by a handler receive this context through the
+    server and use it for payloads returned to the caller: results, failures, and standalone
+    activity heartbeat details. Clients decode these with the context the server returns. See
+    :py:attr:`temporalio.activity.Info.nexus_serialization_context` for asynchronous completion.
+
+    A standalone operation handle decodes with the context the server returns, falling back to the
+    context used to start the operation on older servers.
 
     A failure encoded by a handler is later decoded by a caller. Because some operation paths may
     lack this context, contextual encodings must be self-describing and decoders must continue to
@@ -128,6 +131,24 @@ class NexusSerializationContext(SerializationContext):
 
     operation: str
     """Nexus operation name."""
+
+
+def _propagated_nexus_serialization_context(  # pyright: ignore[reportUnusedFunction]
+    message: google.protobuf.message.Message,
+) -> NexusSerializationContext | None:
+    """Return the Nexus serialization context the server propagated on a message, if any.
+
+    The server sets ``propagated_nexus_serialization_context`` on executions started by a Nexus
+    operation handler.
+    """
+    if not message.HasField("propagated_nexus_serialization_context"):
+        return None
+    context = getattr(message, "propagated_nexus_serialization_context")
+    return NexusSerializationContext(
+        endpoint=context.endpoint,
+        service=context.service,
+        operation=context.operation,
+    )
 
 
 class WithSerializationContext(ABC):
