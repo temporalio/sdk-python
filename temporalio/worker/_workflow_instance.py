@@ -3159,10 +3159,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         *,
         name: str | None = None,
         context: contextvars.Context | None = None,
+        # Accepted for Python 3.14 signature compatibility; ignored
         eager_start: bool | None = None,
     ) -> asyncio.Task[_T]:
-        # eager_start (Python 3.14+) is ignored because starting a task eagerly would change the
-        # deterministic order in which workflow tasks run.
         # Context only supported on newer Python versions
         if sys.version_info >= (3, 11):
             task = asyncio.Task(coro, loop=self, context=context)  # type: ignore
