@@ -26,6 +26,7 @@ import temporalio.api.common.v1
 import temporalio.api.failure.v1
 import temporalio.api.history.v1
 import temporalio.api.nexus.v1
+import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import (
@@ -36,8 +37,11 @@ from temporalio.client import (
     Interceptor,
     NexusOperationFailureError,
     OutboundInterceptor,
+    StartWorkflowUpdateInput,
     WorkflowFailureError,
     WorkflowUpdateFailedError,
+    WorkflowUpdateHandle,
+    WorkflowUpdateStage,
 )
 from temporalio.common import RetryPolicy
 from temporalio.contrib.pydantic import PydanticJSONPlainPayloadConverter
@@ -2599,8 +2603,57 @@ async def nexus_started_activity(input: NexusStartedInput) -> str:
     return input.value
 
 
+@dataclass
+class NexusUpdateInput:
+    workflow_id: str
+    update_id: str
+    value: Literal["result", "failure", "rejection"]
+
+
+@workflow.defn
+class NexusUpdatedWorkflow:
+    def __init__(self) -> None:
+        self.finished = False
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.finished)
+
+    @workflow.update
+    async def update(self, value: str) -> str:
+        if value == "failure":
+            raise ApplicationError(
+                "nexus-update-failure", "failure-detail", non_retryable=True
+            )
+        return value
+
+    @update.validator
+    def validate_update(self, value: str) -> None:
+        if value == "rejection":
+            raise ApplicationError("nexus-update-rejection", "rejection-detail")
+
+    @workflow.signal
+    def finish(self) -> None:
+        self.finished = True
+
+
 @nexusrpc.handler.service_handler
 class NexusStartedExecutionHandler:
+    @nexus.temporal_operation
+    async def update_workflow(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: NexusUpdateInput,
+    ) -> nexus.TemporalOperationResult[str]:
+        return await client.start_workflow_update(
+            input.workflow_id,
+            NexusUpdatedWorkflow.update,
+            input.value,
+            wait_for_stage=WorkflowUpdateStage.ACCEPTED,
+            update_id=input.update_id,
+        )
+
     @nexus.temporal_operation
     async def start_workflow(
         self,
@@ -2924,3 +2977,135 @@ async def test_nexus_started_activity_async_completion_with_context(
             await client.get_activity_handle(activity_id, result_type=str).result()
             == "async-value"
         )
+
+
+class _UpdateOutcomeCapturingInterceptor(Interceptor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.outcomes: list[temporalio.api.update.v1.Outcome] = []
+
+    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
+        return _UpdateOutcomeCapturingOutboundInterceptor(next, self)
+
+
+class _UpdateOutcomeCapturingOutboundInterceptor(OutboundInterceptor):
+    def __init__(
+        self, next: OutboundInterceptor, parent: _UpdateOutcomeCapturingInterceptor
+    ) -> None:
+        super().__init__(next)
+        self._parent = parent
+
+    async def start_workflow_update(
+        self, input: StartWorkflowUpdateInput
+    ) -> WorkflowUpdateHandle[Any]:
+        handle = await super().start_workflow_update(input)
+        if handle._known_outcome:
+            # Copy, since decoding the outcome's failure later modifies it in place
+            outcome = temporalio.api.update.v1.Outcome()
+            outcome.CopyFrom(handle._known_outcome)
+            self._parent.outcomes.append(outcome)
+        return handle
+
+
+@pytest.mark.requires_local_server
+@pytest.mark.parametrize("value", ["result", "failure", "rejection"])
+async def test_nexus_sent_update_uses_nexus_context(
+    env: WorkflowEnvironment,
+    value: Literal["result", "failure", "rejection"],
+):
+    """An update sent by a Nexus handler encodes its result, failure and rejection with the
+    handler's context, and clients decode them with the context the server returns."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    context = _nexus_started_context(endpoint_name, "update_workflow")
+    # Rejected updates aren't stored in history, so the test reads the rejection from the
+    # update response the handler receives
+    outcome_capture = _UpdateOutcomeCapturingInterceptor()
+    config = _nexus_started_client(env, context).config()
+    config["interceptors"] = [outcome_capture]
+    client = Client(**config)
+    update_id = str(uuid.uuid4())
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[NexusUpdatedWorkflow],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        handle = await client.start_workflow(
+            NexusUpdatedWorkflow.run,
+            id=f"nexus-updated-workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        operation = client.create_nexus_client(
+            NexusStartedExecutionHandler, endpoint_name
+        ).execute_operation(
+            NexusStartedExecutionHandler.update_workflow,
+            NexusUpdateInput(workflow_id=handle.id, update_id=update_id, value=value),
+            id=str(uuid.uuid4()),
+        )
+        if value == "result":
+            assert await operation == "result"
+        else:
+            with pytest.raises(NexusOperationFailureError):
+                await operation
+
+        if value == "rejection":
+            [outcome] = outcome_capture.outcomes
+            [detail] = outcome.failure.application_failure_info.details.payloads
+            assert _marker(detail) == b"nexus"
+        else:
+            # This handle never sent the update, so it relies on the context the server returns
+            update_handle = handle.get_update_handle(update_id, result_type=str)
+            if value == "result":
+                assert await update_handle.result() == "result"
+            else:
+                with pytest.raises(WorkflowUpdateFailedError) as err:
+                    await update_handle.result()
+                assert isinstance(err.value.cause, ApplicationError)
+                assert err.value.cause.details == ("failure-detail",)
+
+        await handle.signal(NexusUpdatedWorkflow.finish)
+        await handle.result()
+
+        history = await handle.fetch_history()
+        if value != "rejection":
+            [accepted] = [
+                e.workflow_execution_update_accepted_event_attributes
+                for e in history.events
+                if e.HasField("workflow_execution_update_accepted_event_attributes")
+            ]
+            assert (
+                accepted.accepted_request.propagated_nexus_serialization_context
+                == temporalio.api.nexus.v1.PropagatedSerializationContext(
+                    endpoint=context.endpoint,
+                    service=context.service,
+                    operation=context.operation,
+                )
+            )
+            # The input keeps the workflow context
+            assert all(
+                _marker(p) is None
+                for p in accepted.accepted_request.input.args.payloads
+            )
+            [completed] = [
+                e.workflow_execution_update_completed_event_attributes
+                for e in history.events
+                if e.HasField("workflow_execution_update_completed_event_attributes")
+            ]
+            if value == "result":
+                [result] = completed.outcome.success.payloads
+                assert _marker(result) == b"nexus"
+            else:
+                failure = completed.outcome.failure
+                [detail] = failure.application_failure_info.details.payloads
+                assert _marker(detail) == b"nexus"
+
+    # Replaying re-runs the update handler with the context from history
+    await Replayer(
+        workflows=[NexusUpdatedWorkflow], data_converter=client.data_converter
+    ).replay_workflow(history)
