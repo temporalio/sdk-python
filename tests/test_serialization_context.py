@@ -24,8 +24,10 @@ from typing_extensions import Never
 
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
-from temporalio import activity, workflow
+import temporalio.api.nexus.v1
+from temporalio import activity, nexus, workflow
 from temporalio.client import (
+    ActivityFailureError,
     AsyncActivityHandle,
     Client,
     GetNexusOperationResultInput,
@@ -56,6 +58,8 @@ from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from tests.helpers import assert_eq_eventually
+from tests.helpers.nexus import make_nexus_endpoint_name
 
 
 @dataclass
@@ -1723,25 +1727,14 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
         self,
         markers: dict[NexusSerializationContext, bytes],
         context: SerializationContext | None = None,
-        allow_contextless_decode_of_marked_payload: bool = False,
     ):
         self.markers = markers
         self.context = context
-        # A handle obtained by operation ID decodes a payload that was encoded under
-        # a Nexus context without one. Every other caller must decode under the same context it
-        # encoded with, so that direction is an error unless a test opts out here.
-        self.allow_contextless_decode_of_marked_payload = (
-            allow_contextless_decode_of_marked_payload
-        )
 
     def with_context(
         self, context: SerializationContext
     ) -> NexusContextMarkerPayloadCodec:
-        return NexusContextMarkerPayloadCodec(
-            self.markers,
-            context,
-            self.allow_contextless_decode_of_marked_payload,
-        )
+        return NexusContextMarkerPayloadCodec(self.markers, context)
 
     def _marker(self) -> bytes | None:
         if not isinstance(self.context, NexusSerializationContext):
@@ -1772,12 +1765,12 @@ class NexusContextMarkerPayloadCodec(PayloadCodec, WithSerializationContext):
     ) -> list[temporalio.api.common.v1.Payload]:
         marker = self._marker()
         if marker is None:
-            if not self.allow_contextless_decode_of_marked_payload:
-                for payload in payloads:
-                    assert self.MARKER_KEY not in payload.metadata, (
-                        f"payload encoded under a Nexus context was decoded under "
-                        f"{self.context!r}"
-                    )
+            # Every reader must decode under the same Nexus context the payload was encoded with
+            for payload in payloads:
+                assert self.MARKER_KEY not in payload.metadata, (
+                    f"payload encoded under a Nexus context was decoded under "
+                    f"{self.context!r}"
+                )
             return list(payloads)
         decoded = []
         for payload in payloads:
@@ -2000,14 +1993,11 @@ async def test_workflow_nexus_payload_codec_receives_context(
 
 
 @pytest.mark.requires_local_server
-async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
+async def test_standalone_nexus_handle_obtained_by_id_uses_server_context(
     env: WorkflowEnvironment,
 ):
-    """A handle obtained by operation ID alone decodes its result without a Nexus context.
-
-    Such a handle never issued a start request, so it has no endpoint, service or operation to
-    build a context from. The result was still encoded by the handler under the operation's
-    context, so this is the one asymmetry the strict codec has to tolerate.
+    """A handle obtained by operation ID alone decodes its result with the context the server
+    returns, since it never issued a start request to build a context from.
     """
     if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
@@ -2022,10 +2012,7 @@ async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
     config = env.client.config()
     config["data_converter"] = dataclasses.replace(
         DataConverter.default,
-        payload_codec=NexusContextMarkerPayloadCodec(
-            {context: b"detached"},
-            allow_contextless_decode_of_marked_payload=True,
-        ),
+        payload_codec=NexusContextMarkerPayloadCodec({context: b"detached"}),
     )
     client = Client(**config)
 
@@ -2047,7 +2034,7 @@ async def test_standalone_nexus_handle_obtained_by_id_has_no_context(
         )
         assert await started.result() == "detached"
 
-        # The fresh handle knows only the operation ID, so it decodes without a context.
+        # The strict codec rejects a marked result decoded without the operation's context
         detached = client.get_nexus_operation_handle(operation_id, result_type=str)
         assert await detached.result() == "detached"
 
@@ -2561,3 +2548,325 @@ async def test_nexus_worker_task_without_endpoint_is_scoped_by_an_empty_endpoint
             endpoint="endpoint", service="Service", operation="operation"
         )
     ]
+
+
+@dataclass
+class NexusStartedInput:
+    id: str
+    value: str
+    outcome: Literal["result", "failure", "continue_as_new", "async"] = "result"
+
+
+@workflow.defn
+class NexusStartedWorkflow:
+    @workflow.run
+    async def run(self, input: NexusStartedInput) -> str:
+        if input.outcome == "continue_as_new":
+            workflow.continue_as_new(dataclasses.replace(input, outcome="result"))
+        if input.outcome == "failure":
+            raise ApplicationError(
+                "nexus-started-failure", "failure-detail", non_retryable=True
+            )
+        return input.value
+
+
+nexus_started_activity_contexts: list[NexusSerializationContext | None] = []
+nexus_started_async_completions: list[
+    tuple[bytes, NexusSerializationContext | None]
+] = []
+
+
+@activity.defn
+async def nexus_started_activity(input: NexusStartedInput) -> str:
+    info = activity.info()
+    nexus_started_activity_contexts.append(info.nexus_serialization_context)
+    if input.outcome == "failure":
+        raise ApplicationError(
+            "nexus-started-failure", "failure-detail", non_retryable=True
+        )
+    if input.outcome == "async":
+        nexus_started_async_completions.append(
+            (info.task_token, info.nexus_serialization_context)
+        )
+        activity.raise_complete_async()
+    if info.attempt == 1:
+        # The next attempt decodes these details with the same context
+        activity.heartbeat("heartbeat-detail")
+        raise ApplicationError("retry")
+    assert list(info.heartbeat_details) == ["heartbeat-detail"]
+    return input.value
+
+
+@nexusrpc.handler.service_handler
+class NexusStartedExecutionHandler:
+    @nexus.temporal_operation
+    async def start_workflow(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: NexusStartedInput,
+    ) -> nexus.TemporalOperationResult[str]:
+        return await client.start_workflow(NexusStartedWorkflow.run, input, id=input.id)
+
+    @nexus.temporal_operation
+    async def start_activity(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: NexusStartedInput,
+    ) -> nexus.TemporalOperationResult[str]:
+        return await client.start_activity(
+            nexus_started_activity,
+            input,
+            id=input.id,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=100), maximum_attempts=2
+            ),
+        )
+
+
+def _nexus_started_context(
+    endpoint_name: str, operation: str
+) -> NexusSerializationContext:
+    return NexusSerializationContext(
+        endpoint=endpoint_name,
+        service="NexusStartedExecutionHandler",
+        operation=operation,
+    )
+
+
+def _nexus_started_client(
+    env: WorkflowEnvironment, context: NexusSerializationContext
+) -> Client:
+    config = env.client.config()
+    config["data_converter"] = dataclasses.replace(
+        DataConverter.default,
+        payload_codec=NexusContextMarkerPayloadCodec({context: b"nexus"}),
+    )
+    return Client(**config)
+
+
+def _marker(payload: temporalio.api.common.v1.Payload) -> bytes | None:
+    return payload.metadata.get(NexusContextMarkerPayloadCodec.MARKER_KEY)
+
+
+@pytest.mark.requires_local_server
+@pytest.mark.parametrize("outcome", ["result", "failure", "continue_as_new"])
+async def test_nexus_started_workflow_uses_nexus_context(
+    env: WorkflowEnvironment,
+    outcome: Literal["result", "failure", "continue_as_new"],
+):
+    """A workflow started by a Nexus handler encodes its result and closing failure with the
+    handler's context, and clients decode them with the context the server returns."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    context = _nexus_started_context(endpoint_name, "start_workflow")
+    client = _nexus_started_client(env, context)
+    workflow_id = f"nexus-started-workflow-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[NexusStartedWorkflow],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        nexus_client = client.create_nexus_client(
+            NexusStartedExecutionHandler, endpoint_name
+        )
+        input = NexusStartedInput(id=workflow_id, value="nexus-value", outcome=outcome)
+        # This handle never started the workflow, so it relies on the context the server
+        # returns, including for the run after continue-as-new
+        handle = client.get_workflow_handle(workflow_id, result_type=str)
+        if outcome == "failure":
+            with pytest.raises(NexusOperationFailureError):
+                await nexus_client.execute_operation(
+                    NexusStartedExecutionHandler.start_workflow,
+                    input,
+                    id=str(uuid.uuid4()),
+                )
+            with pytest.raises(WorkflowFailureError) as err:
+                await handle.result()
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.details == ("failure-detail",)
+        else:
+            assert (
+                await nexus_client.execute_operation(
+                    NexusStartedExecutionHandler.start_workflow,
+                    input,
+                    id=str(uuid.uuid4()),
+                )
+                == "nexus-value"
+            )
+            assert await handle.result() == "nexus-value"
+
+        history = await handle.fetch_history()
+        started = history.events[0].workflow_execution_started_event_attributes
+        assert (
+            started.propagated_nexus_serialization_context
+            == temporalio.api.nexus.v1.PropagatedSerializationContext(
+                endpoint=context.endpoint,
+                service=context.service,
+                operation=context.operation,
+            )
+        )
+        # The input keeps the workflow context
+        assert all(_marker(p) is None for p in started.input.payloads)
+        close_event = history.events[-1]
+        if outcome == "failure":
+            failure = close_event.workflow_execution_failed_event_attributes.failure
+            [detail] = failure.application_failure_info.details.payloads
+            assert _marker(detail) == b"nexus"
+        else:
+            [result] = (
+                close_event.workflow_execution_completed_event_attributes.result.payloads
+            )
+            assert _marker(result) == b"nexus"
+
+
+@pytest.mark.requires_local_server
+async def test_nexus_started_activity_uses_nexus_context(env: WorkflowEnvironment):
+    """A standalone activity started by a Nexus handler encodes its result, failures and
+    heartbeat details with the handler's context, and clients decode them with the context the
+    server returns."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    context = _nexus_started_context(endpoint_name, "start_activity")
+    client = _nexus_started_client(env, context)
+    activity_id = f"nexus-started-activity-{uuid.uuid4()}"
+    nexus_started_activity_contexts.clear()
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[nexus_started_activity],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        result = await client.create_nexus_client(
+            NexusStartedExecutionHandler, endpoint_name
+        ).execute_operation(
+            NexusStartedExecutionHandler.start_activity,
+            NexusStartedInput(id=activity_id, value="nexus-value"),
+            id=str(uuid.uuid4()),
+        )
+        assert result == "nexus-value"
+        # Both attempts saw the context, and the second decoded the first's heartbeat details
+        assert nexus_started_activity_contexts == [context, context]
+
+        handle = client.get_activity_handle(activity_id, result_type=str)
+        assert await handle.result() == "nexus-value"
+        desc = await handle.describe(
+            include_outcome=True,
+            include_heartbeat_details=True,
+            include_last_failure=True,
+        )
+        assert await desc.result(str) == "nexus-value"
+        assert await desc.heartbeat_details() == ["heartbeat-detail"]
+        assert isinstance(await desc.last_failure(), ApplicationError)
+        assert desc.raw_outcome is not None
+        assert _marker(desc.raw_outcome.result.payloads[0]) == b"nexus"
+        assert _marker(desc.raw_info.heartbeat_details.payloads[0]) == b"nexus"
+
+
+@pytest.mark.requires_local_server
+async def test_nexus_started_activity_failure_uses_nexus_context(
+    env: WorkflowEnvironment,
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    client = _nexus_started_client(
+        env, _nexus_started_context(endpoint_name, "start_activity")
+    )
+    activity_id = f"nexus-started-activity-{uuid.uuid4()}"
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[nexus_started_activity],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        with pytest.raises(NexusOperationFailureError):
+            await client.create_nexus_client(
+                NexusStartedExecutionHandler, endpoint_name
+            ).execute_operation(
+                NexusStartedExecutionHandler.start_activity,
+                NexusStartedInput(id=activity_id, value="", outcome="failure"),
+                id=str(uuid.uuid4()),
+            )
+
+        handle = client.get_activity_handle(activity_id, result_type=str)
+        with pytest.raises(ActivityFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.details == ("failure-detail",)
+        desc = await handle.describe(include_outcome=True)
+        outcome_failure = await desc.outcome_failure()
+        assert isinstance(outcome_failure, ApplicationError)
+        assert outcome_failure.details == ("failure-detail",)
+
+
+@pytest.mark.requires_local_server
+async def test_nexus_started_activity_async_completion_with_context(
+    env: WorkflowEnvironment,
+):
+    """An activity started by a Nexus handler and completed asynchronously uses the context the
+    completing client passes in from the activity info."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    context = _nexus_started_context(endpoint_name, "start_activity")
+    client = _nexus_started_client(env, context)
+    activity_id = f"nexus-started-activity-{uuid.uuid4()}"
+    nexus_started_async_completions.clear()
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[nexus_started_activity],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        operation = await client.create_nexus_client(
+            NexusStartedExecutionHandler, endpoint_name
+        ).start_operation(
+            NexusStartedExecutionHandler.start_activity,
+            NexusStartedInput(id=activity_id, value="", outcome="async"),
+            id=str(uuid.uuid4()),
+        )
+
+        async def activity_started() -> bool:
+            return bool(nexus_started_async_completions)
+
+        await assert_eq_eventually(True, activity_started)
+        [(task_token, info_context)] = nexus_started_async_completions
+        assert info_context is not None
+        assert info_context == context
+        async_handle = client.get_async_activity_handle(
+            task_token=task_token
+        ).with_context(info_context)
+        await async_handle.heartbeat("client-heartbeat")
+        desc = await client.get_activity_handle(activity_id).describe(
+            include_heartbeat_details=True
+        )
+        assert await desc.heartbeat_details() == ["client-heartbeat"]
+        assert _marker(desc.raw_info.heartbeat_details.payloads[0]) == b"nexus"
+        await async_handle.complete("async-value")
+        assert await operation.result() == "async-value"
+        assert (
+            await client.get_activity_handle(activity_id, result_type=str).result()
+            == "async-value"
+        )

@@ -23,6 +23,7 @@ import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._extstore
+import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
@@ -741,6 +742,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             last_completion_result=init.last_completion_result,
             last_failure=last_failure,
             default_workflow_logic_flags=frozenset(self._default_workflow_logic_flags),
+            nexus_serialization_context=temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+                init
+            ),
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

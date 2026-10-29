@@ -32,6 +32,7 @@ import temporalio.bridge.worker
 import temporalio.client
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._serialization_context
 import temporalio.exceptions
 from temporalio.converter import (
     StorageDriverActivityInfo,
@@ -277,14 +278,19 @@ class _ActivityWorker:
 
         data_converter = self._data_converter
         if activity.info:
-            context = temporalio.converter.ActivitySerializationContext(
-                namespace=activity.info.namespace,
-                workflow_id=activity.info.workflow_id,
-                workflow_type=activity.info.workflow_type,
-                activity_type=activity.info.activity_type,
-                activity_id=activity.info.activity_id,
-                activity_task_queue=self._task_queue,
-                is_local=activity.info.is_local,
+            # The server puts a standalone activity's last heartbeat details into its timeout
+            # failure, which goes back to the Nexus caller if a Nexus handler started it
+            context: temporalio.converter.SerializationContext = (
+                activity.info.nexus_serialization_context
+                or temporalio.converter.ActivitySerializationContext(
+                    namespace=activity.info.namespace,
+                    workflow_id=activity.info.workflow_id,
+                    workflow_type=activity.info.workflow_type,
+                    activity_type=activity.info.activity_type,
+                    activity_id=activity.info.activity_id,
+                    activity_task_queue=self._task_queue,
+                    is_local=activity.info.is_local,
+                )
             )
             data_converter = data_converter._with_contexts(
                 context,
@@ -374,17 +380,35 @@ class _ActivityWorker:
         data_converter = self._data_converter._with_contexts(
             context, StorageDriverStoreContext(target=store_target)
         )
+        # A standalone activity started by a Nexus operation handler returns its result and
+        # failure to the Nexus caller, which decodes them with the handler's Nexus context. The
+        # input keeps the activity context.
+        nexus_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+            start
+        )
+        caller_facing_data_converter = (
+            self._data_converter._with_contexts(
+                nexus_context, StorageDriverStoreContext(target=store_target)
+            )
+            if nexus_context
+            else data_converter
+        )
         try:
             try:
                 result = await self._execute_activity(
-                    start, running_activity, task_token, data_converter
+                    start,
+                    running_activity,
+                    task_token,
+                    data_converter,
+                    caller_facing_data_converter,
+                    nexus_context,
                 )
             finally:
                 # The activity code has finished, so a cancel from here on must
                 # not interrupt reporting its outcome; done stops cancel() from
                 # cancelling this task
                 running_activity.done = True
-            [payload] = await data_converter.encode([result])
+            [payload] = await caller_facing_data_converter.encode([result])
             completion.result.completed.result.CopyFrom(payload)
         except BaseException as err:
             try:
@@ -405,7 +429,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         f"Completing as failure during heartbeat with error of type {type(err)}: {err}",
                     )
-                    await data_converter.encode_failure(
+                    await caller_facing_data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
                 elif (
@@ -422,7 +446,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing as failure due to unhandled cancel error produced by activity pause",
                     )
-                    await data_converter.encode_failure(
+                    await caller_facing_data_converter.encode_failure(
                         temporalio.exceptions.ApplicationError(
                             type="ActivityPause",
                             message="Unhandled activity cancel error produced by activity pause",
@@ -443,7 +467,7 @@ class _ActivityWorker:
                     temporalio.activity.logger.warning(
                         "Completing as failure due to unhandled cancel error produced by activity reset",
                     )
-                    await data_converter.encode_failure(
+                    await caller_facing_data_converter.encode_failure(
                         temporalio.exceptions.ApplicationError(
                             type="ActivityReset",
                             message="Unhandled activity cancel error produced by activity reset",
@@ -461,7 +485,7 @@ class _ActivityWorker:
                     and running_activity.cancelled_by_request
                 ):
                     temporalio.activity.logger.debug("Completing as cancelled")
-                    await data_converter.encode_failure(
+                    await caller_facing_data_converter.encode_failure(
                         # TODO(cretz): Should use some other message?
                         temporalio.exceptions.CancelledError("Cancelled"),
                         completion.result.cancelled.failure,
@@ -487,7 +511,7 @@ class _ActivityWorker:
                             exc_info=True,
                             extra={"__temporal_error_identifier": "ActivityFailure"},
                         )
-                    await data_converter.encode_failure(
+                    await caller_facing_data_converter.encode_failure(
                         err, completion.result.failed.failure
                     )
                     # For broken executors, we have to fail the entire worker
@@ -528,6 +552,8 @@ class _ActivityWorker:
         running_activity: _RunningActivity,
         task_token: bytes,
         data_converter: temporalio.converter.DataConverter,
+        caller_facing_data_converter: temporalio.converter.DataConverter,
+        nexus_context: temporalio.converter.NexusSerializationContext | None,
     ) -> Any:
         """Invoke the user's activity function.
 
@@ -617,7 +643,7 @@ class _ActivityWorker:
             heartbeat_details = (
                 []
                 if not start.heartbeat_details
-                else await data_converter.decode(start.heartbeat_details)
+                else await caller_facing_data_converter.decode(start.heartbeat_details)
             )
         except Exception as err:
             raise temporalio.exceptions.ApplicationError(
@@ -664,6 +690,7 @@ class _ActivityWorker:
             activity_run_id=getattr(start, "run_id", None)
             if not started_by_workflow
             else None,
+            nexus_serialization_context=nexus_context,
         )
 
         if self._encode_headers:

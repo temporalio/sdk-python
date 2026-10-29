@@ -29,6 +29,7 @@ import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.nexus._operation_context
@@ -264,6 +265,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     ) -> temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest:
         req = temporalio.api.workflowservice.v1.StartWorkflowExecutionRequest()
         await self._populate_start_workflow_execution_request(req, input)
+        temporalio.nexus._operation_context._apply_nexus_serialization_context_to_start_workflow_request(
+            req
+        )
         return req
 
     async def _populate_start_workflow_execution_request(
@@ -1676,10 +1680,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
     ) -> Any:
         """Poll for nexus operation result until it's available."""
         data_converter = self._client.data_converter
-        # These three are set together or not at all: a handle that started the operation has all
-        # of them, and a handle obtained by operation ID alone has none and defaults them to "".
-        # An empty endpoint therefore means "no operation to build a context from", not "an
-        # operation named the empty string".
+        # Fallback for older servers that don't return the context when polling. Handles obtained
+        # by operation ID alone have no start request context.
         if input.endpoint and input.service and input.operation:
             data_converter = data_converter.with_context(
                 temporalio.converter.NexusSerializationContext(
@@ -1706,6 +1708,15 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                         timeout=input.rpc_timeout,
                     )
                 )
+                # The context the server returns also identifies an operation whose handle was
+                # obtained by operation ID
+                server_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+                    res
+                )
+                if server_context:
+                    data_converter = self._client.data_converter.with_context(
+                        server_context
+                    )
                 match res.WhichOneof("outcome"):
                     case "result":
                         type_hints = [input.result_type] if input.result_type else None

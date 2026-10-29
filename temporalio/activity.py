@@ -141,6 +141,20 @@ class Info:
     activity_run_id: str | None = None
     """Run ID of this activity. None for workflow activities."""
 
+    nexus_serialization_context: (
+        temporalio.converter.NexusSerializationContext | None
+    ) = None
+    """Serialization context of the Nexus operation handler that started this activity, if any.
+
+    Only set for standalone activities. The activity's result, failure and heartbeat details are
+    encoded with it because they are returned to the Nexus caller. To complete the activity
+    asynchronously, store this context with the task token and pass it to
+    :py:meth:`temporalio.client.AsyncActivityHandle.with_context`.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
     @property
     def in_workflow(self) -> bool:
         """Was this activity started by a workflow?"""
