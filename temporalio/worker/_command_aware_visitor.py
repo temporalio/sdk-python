@@ -19,6 +19,7 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
     CompleteWorkflowExecution,
+    FailWorkflowExecution,
     ScheduleActivity,
     ScheduleLocalActivity,
     ScheduleNexusOperation,
@@ -77,6 +78,12 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             await super()._visit_coresdk_workflow_commands_CompleteWorkflowExecution(
                 fs, o
             )
+
+    async def _visit_coresdk_workflow_commands_FailWorkflowExecution(
+        self, fs: VisitorFunctions, o: FailWorkflowExecution
+    ) -> None:
+        with current_command(CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION, 0):
+            await super()._visit_coresdk_workflow_commands_FailWorkflowExecution(fs, o)
 
     async def _visit_coresdk_workflow_commands_ScheduleActivity(
         self, fs: VisitorFunctions, o: ScheduleActivity

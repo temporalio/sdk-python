@@ -181,6 +181,10 @@ class WorkflowInstanceDetails:
     default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] = field(
         default_factory=lambda: _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
     )
+    nexus_serialization_context: (
+        temporalio.converter.NexusSerializationContext | None
+    ) = None
+    """Serialization context of the Nexus operation handler that started the workflow, if any."""
 
 
 class WorkflowInstance(ABC):
@@ -293,6 +297,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._workflow_context_failure_converter = self._failure_converter_with_context(
             workflow_context
         )
+        # A workflow started by a Nexus operation handler returns its result and closing failure to
+        # the Nexus caller, which decodes them with the handler's Nexus context.
+        self._nexus_serialization_context = det.nexus_serialization_context
+        if self._nexus_serialization_context:
+            self._result_payload_converter = self._payload_converter_with_context(
+                self._nexus_serialization_context
+            )
+            self._result_failure_converter = self._failure_converter_with_context(
+                self._nexus_serialization_context
+            )
+        else:
+            self._result_payload_converter = self._workflow_context_payload_converter
+            self._result_failure_converter = self._workflow_context_failure_converter
 
         self._extern_functions = det.extern_functions
         self._disable_eager_activity_execution = det.disable_eager_activity_execution
@@ -1173,9 +1190,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_workflow(input: ExecuteWorkflowInput) -> None:
             try:
                 result = await self._inbound.execute_workflow(input)
-                result_payloads = self._workflow_context_payload_converter.to_payloads(
-                    [result]
-                )
+                result_payloads = self._result_payload_converter.to_payloads([result])
                 if len(result_payloads) != 1:
                     raise ValueError(
                         f"Expected 1 result payload, got {len(result_payloads)}"
@@ -2479,6 +2494,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 workflow_id=self._info.workflow_id,
             )
 
+        if self._nexus_serialization_context and command_info.command_type in (
+            temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION,
+            temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_FAIL_WORKFLOW_EXECUTION,
+        ):
+            # The result and closing failure go back to the Nexus caller
+            return self._nexus_serialization_context
+
         if (
             command_info.command_type
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK
@@ -2896,8 +2918,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         failure = self._add_command().fail_workflow_execution.failure
         failure.SetInParent()
         try:
-            self._workflow_context_failure_converter.to_failure(
-                err, self._workflow_context_payload_converter, failure
+            self._result_failure_converter.to_failure(
+                err, self._result_payload_converter, failure
             )
         except Exception as inner_err:
             raise ValueError("Failed converting workflow exception") from inner_err
@@ -3137,6 +3159,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         *,
         name: str | None = None,
         context: contextvars.Context | None = None,
+        # Accepted for Python 3.14 signature compatibility; ignored
+        eager_start: bool | None = None,
     ) -> asyncio.Task[_T]:
         # Context only supported on newer Python versions
         if sys.version_info >= (3, 11):
