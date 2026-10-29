@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import (
@@ -96,6 +97,35 @@ class TemporalOperationResult(Generic[_ResultT]):
             )
 
 
+class _SignalSlot:
+    """Allows one in-flight or successful signal per operation handler invocation."""
+
+    def __init__(self) -> None:
+        self._taken = False
+
+    @contextmanager
+    def reserve(self) -> Iterator[None]:
+        # Every signal through TemporalNexusClient.client carries the operation's
+        # request ID, so the server would deduplicate a second one against the
+        # first and report it delivered.
+        if self._taken:
+            raise HandlerError(
+                "Only one signal can be sent per operation handler invocation through TemporalNexusClient.client",
+                type=HandlerErrorType.BAD_REQUEST,
+            )
+        self._taken = True
+        try:
+            yield
+        except BaseException:
+            self._taken = False
+            raise
+
+
+_temporal_operation_signal_slot: ContextVar[_SignalSlot | None] = ContextVar(
+    "temporal-operation-signal-slot", default=None
+)
+
+
 class TemporalNexusClient(ABC):
     """Nexus-aware wrapper around a Temporal Client.
 
@@ -107,6 +137,14 @@ class TemporalNexusClient(ABC):
     @abstractmethod
     def client(self) -> temporalio.client.Client:
         """The underlying Temporal Client
+
+        Signals sent through this client from the operation handler reuse the Nexus
+        operation's request ID so a retried Nexus task does not deliver them twice.
+        Because they share that ID, only one signal may be sent per operation handler
+        invocation; a second raises a ``BAD_REQUEST`` :py:class:`nexusrpc.HandlerError`
+        instead of being silently dropped by the server. A signal that fails does not
+        count toward the limit. Signals sent through :py:func:`temporalio.nexus.client`
+        are not limited, but are not deduplicated across Nexus task retries.
 
         .. warning::
            This API is experimental and unstable.
@@ -595,7 +633,12 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
     @property
     def client(self) -> temporalio.client.Client:
         """Return the Temporal client for the active Nexus operation."""
-        return self._temporal_context.client
+        # temporalio.client imports this module, so it can't be imported at load time.
+        from temporalio.nexus._single_signal_interceptor import (
+            _single_signal_client,
+        )
+
+        return _single_signal_client(self._temporal_context.client)
 
     @contextmanager
     def _reserve_async_start(self) -> Iterator[None]:

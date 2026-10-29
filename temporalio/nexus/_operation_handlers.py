@@ -28,6 +28,8 @@ from temporalio.nexus._operation_context import (
 from temporalio.nexus._temporal_client import (
     TemporalNexusClient,
     TemporalOperationResult,
+    _SignalSlot,
+    _temporal_operation_signal_slot,
     _TemporalNexusClient,
 )
 from temporalio.nexus._token import OperationToken, OperationTokenType, WorkflowHandle
@@ -195,7 +197,11 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         """
         nexus_client = _TemporalNexusClient()
         start_ctx = TemporalStartOperationContext._from_start_operation_context(ctx)
-        result = await self.start_operation(start_ctx, nexus_client, input)
+        token = _temporal_operation_signal_slot.set(_SignalSlot())
+        try:
+            result = await self.start_operation(start_ctx, nexus_client, input)
+        finally:
+            _temporal_operation_signal_slot.reset(token)
         return result._to_nexus_result()
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
