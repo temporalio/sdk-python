@@ -24,7 +24,9 @@ from typing_extensions import Never
 
 import temporalio.api.common.v1
 import temporalio.api.failure.v1
+import temporalio.api.history.v1
 import temporalio.api.nexus.v1
+import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import (
     ActivityFailureError,
@@ -2649,6 +2651,58 @@ def _nexus_started_client(
 
 def _marker(payload: temporalio.api.common.v1.Payload) -> bytes | None:
     return payload.metadata.get(NexusContextMarkerPayloadCodec.MARKER_KEY)
+
+
+async def test_workflow_result_keeps_nexus_context_across_history_pages():
+    """The server may omit the context on later history pages, such as the page holding the
+    close event after a long poll times out with no events."""
+    from unittest import mock
+
+    context = NexusSerializationContext(
+        endpoint="endpoint", service="service", operation="operation"
+    )
+    result = temporalio.api.common.v1.Payload(
+        metadata={
+            "encoding": b"json/plain",
+            NexusContextMarkerPayloadCodec.MARKER_KEY: b"nexus",
+        },
+        data=b'"nexus-value"',
+    )
+    first_page = temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse(
+        next_page_token=b"next-page",
+        propagated_nexus_serialization_context=temporalio.api.nexus.v1.PropagatedSerializationContext(
+            endpoint=context.endpoint,
+            service=context.service,
+            operation=context.operation,
+        ),
+    )
+    close_page = temporalio.api.workflowservice.v1.GetWorkflowExecutionHistoryResponse(
+        history=temporalio.api.history.v1.History(
+            events=[
+                temporalio.api.history.v1.HistoryEvent(
+                    workflow_execution_completed_event_attributes=temporalio.api.history.v1.WorkflowExecutionCompletedEventAttributes(
+                        result=temporalio.api.common.v1.Payloads(payloads=[result])
+                    )
+                )
+            ]
+        )
+    )
+    service_client = mock.MagicMock()
+    service_client.workflow_service.get_workflow_execution_history = mock.AsyncMock(
+        side_effect=[first_page, close_page]
+    )
+    client = Client(
+        service_client,
+        data_converter=dataclasses.replace(
+            DataConverter.default,
+            payload_codec=NexusContextMarkerPayloadCodec({context: b"nexus"}),
+        ),
+    )
+
+    assert (
+        await client.get_workflow_handle("workflow-id", result_type=str).result()
+        == "nexus-value"
+    )
 
 
 @pytest.mark.requires_local_server
