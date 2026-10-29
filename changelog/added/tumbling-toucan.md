@@ -1,0 +1,1 @@
+Nexus operation handlers now propagate their `NexusSerializationContext` to the workflow updates they send, which encode their result, failure and rejection with it. Update handles decode them with the context the server returns. Requires a server that propagates the context.
