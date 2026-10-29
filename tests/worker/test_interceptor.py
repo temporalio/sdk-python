@@ -9,7 +9,6 @@ import pytest
 
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WorkflowUpdateFailedError
-from temporalio.common import ActivitySessionOptions, UseWorkflowSession
 from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
@@ -122,11 +121,6 @@ class TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         await super().signal_external_workflow(input)
 
     def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
-        assert input.session_options == ActivitySessionOptions(
-            placement=UseWorkflowSession()
-        )
-        # Exercise the field without requiring session routing on the stock test server.
-        input.session_options = None
         interceptor_traces.append(("workflow.start_activity", input))
         return super().start_activity(input)
 
@@ -213,14 +207,9 @@ class InterceptedWorkflow:
             await self.finish.wait()
             return
 
-        with workflow.activity_session(
-            ActivitySessionOptions(placement=UseWorkflowSession())
-        ):
-            await workflow.execute_activity(
-                intercepted_activity,
-                "val1",
-                schedule_to_close_timeout=timedelta(seconds=5),
-            )
+        await workflow.execute_activity(
+            intercepted_activity, "val1", schedule_to_close_timeout=timedelta(seconds=5)
+        )
         await workflow.execute_local_activity(
             intercepted_activity, "val2", schedule_to_close_timeout=timedelta(seconds=5)
         )

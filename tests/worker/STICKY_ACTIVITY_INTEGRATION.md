@@ -1,6 +1,6 @@
 # Sticky activity SDK/server integration
 
-These opt-in tests use the existing pytest external-server fixture, real Python
+The opt-in tests in `test_activity_sessions.py` (marked `requires_session_server`) use the existing pytest external-server fixture, real Python
 workers, the Rust bridge, and real workflow/activity RPCs. No separate harness is
 required. They use the usual `new_worker` helper and default sandboxed workflow runner.
 
@@ -18,12 +18,12 @@ From the Python SDK checkout:
 ```bash
 poe build-develop
 TEMPORAL_TEST_STICKY_ACTIVITIES=1 poe test -s -n 0 \
-  tests/worker/test_activity_sessions_integration.py \
+  tests/worker/test_activity_sessions.py \
   --workflow-environment 127.0.0.1:7233
 ```
 
 Use `--workflow-environment envconfig` for an existing configured target/namespace.
-Tests are skipped unless the environment variable is set and reject `local` and
+They are skipped unless the environment variable is set and reject `local` and
 `time-skipping` targets. They create uniquely named workflows and queues.
 
 ## Assertions
