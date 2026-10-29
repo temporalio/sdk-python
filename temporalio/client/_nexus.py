@@ -490,11 +490,15 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # Overload for string operation name
+    # Overload for string operation name with result_type. Callbacks must accept
+    # the result type.
     @overload
     @abstractmethod
     async def start_operation(
@@ -505,16 +509,45 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
+        result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
+
+    # Overload for string operation name without result_type. Callbacks of any
+    # output type are accepted.
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: str,
+        arg: Any,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
+        result_type: None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[Any]: ...
 
     # Overload for workflow_run_operation methods
     @overload
@@ -536,6 +569,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -560,6 +596,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -584,6 +623,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -607,6 +649,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -636,6 +681,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
@@ -656,6 +704,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[Any]:
@@ -686,6 +735,12 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             search_attributes: Search attributes for the operation.
             summary: Summary for the operation.
             headers: Headers to attach to the Nexus request.
+            completion_callbacks: Callbacks that report the outcome of the
+                operation. Create them with
+                :py:func:`temporalio.nexus.create_completion_callback`. Each
+                callback must accept the output type of the operation. For a
+                string operation name, type checkers check callbacks against
+                ``result_type`` if it is set.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -711,11 +766,15 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
 
-    # Overload for string operation name
+    # Overload for string operation name with result_type. Callbacks must accept
+    # the result type.
     @overload
     @abstractmethod
     async def execute_operation(
@@ -726,16 +785,45 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         id: str,
         id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
         id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
-        result_type: type[OutputT] | None = None,
+        result_type: type[OutputT],
         schedule_to_close_timeout: timedelta | None = None,
         schedule_to_start_timeout: timedelta | None = None,
         start_to_close_timeout: timedelta | None = None,
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
+
+    # Overload for string operation name without result_type. Callbacks of any
+    # output type are accepted.
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: str,
+        arg: Any,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
+        result_type: None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> Any: ...
 
     # Overload for workflow_run_operation methods
     @overload
@@ -757,6 +845,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
@@ -781,6 +872,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
@@ -805,6 +899,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
@@ -829,6 +926,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
@@ -858,6 +958,9 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
@@ -878,6 +981,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> Any:
@@ -910,6 +1014,12 @@ class NexusClient(ABC, Generic[NexusServiceType]):
             search_attributes: Search attributes for the operation.
             summary: Summary for the operation.
             headers: Headers to attach to the Nexus request.
+            completion_callbacks: Callbacks that report the outcome of the
+                operation. Create them with
+                :py:func:`temporalio.nexus.create_completion_callback`. Each
+                callback must accept the output type of the operation. For a
+                string operation name, type checkers check callbacks against
+                ``result_type`` if it is set.
             rpc_metadata: Headers used on the RPC call.
             rpc_timeout: Optional RPC deadline to set for the RPC call.
 
@@ -974,6 +1084,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[Any]:
@@ -1005,6 +1116,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
                 headers=dict(headers) if headers else {},
                 rpc_metadata=rpc_metadata,
                 rpc_timeout=rpc_timeout,
+                completion_callbacks=completion_callbacks,
             )
         )
 
@@ -1023,6 +1135,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
         search_attributes: temporalio.common.TypedSearchAttributes | None = None,
         summary: str | None = None,
         headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = (),
         rpc_metadata: Mapping[str, str | bytes] = {},
         rpc_timeout: timedelta | None = None,
     ) -> Any:
@@ -1046,6 +1159,7 @@ class _NexusClient(NexusClient[NexusServiceType]):  # pyright: ignore[reportUnus
             headers=headers,
             rpc_metadata=rpc_metadata,
             rpc_timeout=rpc_timeout,
+            completion_callbacks=completion_callbacks,
         )
         return await handle.result()
 
