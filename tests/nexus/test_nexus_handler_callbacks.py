@@ -999,8 +999,8 @@ async def test_temporal_operation_completion_handler_starts_workflow(
             assert completion_handler.outputs == {label: EchoOutput(value="hello")}
 
         await assert_eventually(workflow_started)
-        handle = client.get_workflow_handle_for(
-            RecordCompletionWorkflow.run, f"on-complete-{label}"
+        handle = client.get_workflow_handle(
+            f"on-complete-{label}", result_type=notifications.OnCompleteResponse
         )
         assert await handle.result() == notifications.OnCompleteResponse()
         history = await handle.fetch_history()
