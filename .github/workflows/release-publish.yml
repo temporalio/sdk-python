@@ -39,7 +39,7 @@ jobs:
           - os: macos-arm
             package-suffix: macos-aarch64
             cibw-build: cp310-macosx_arm64
-            runsOn: macos-14
+            runsOn: macos-15
           - os: windows-latest
             package-suffix: windows-amd64
             cibw-build: cp310-win_amd64
