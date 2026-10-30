@@ -1,0 +1,1 @@
+Core: Core now rejects activation responses with a nondeterminism error if the activation contained only updates and the response rejects every update but also includes another workflow command. SDKs must return only update rejections when all validators reject an update-only activation.
