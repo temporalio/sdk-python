@@ -1,0 +1,1 @@
+`temporalio.contrib.aws.lambda_worker.otel.apply_defaults` now creates its tracer provider once per process, so warm Lambda invocations no longer leak an OTLP span exporter thread and gRPC channel each time.

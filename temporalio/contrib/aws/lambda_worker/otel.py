@@ -21,12 +21,15 @@ from opentelemetry.trace import get_tracer_provider, set_tracer_provider
 from temporalio.contrib.aws.lambda_worker._configure import LambdaWorkerConfig
 from temporalio.contrib.opentelemetry import (
     OpenTelemetryPlugin,
+    ReplaySafeTracerProvider,
     _serverless,
     create_tracer_provider,
 )
 from temporalio.runtime import Runtime, TelemetryConfig
 
 logger = logging.getLogger(__name__)
+
+_installed_tracer_provider: ReplaySafeTracerProvider | None = None
 
 
 @dataclass
@@ -64,49 +67,19 @@ def _resolve_endpoint(options: OtelOptions) -> str:
     return _serverless.resolve_endpoint(options.collector_endpoint)
 
 
-def apply_defaults(
-    config: LambdaWorkerConfig,
-    options: OtelOptions | None = None,
-) -> None:
-    """Configure OTel metrics and tracing with AWS Lambda defaults.
+def _ensure_tracer_provider(endpoint: str, service_name: str) -> None:
+    """Install the global replay-safe ``TracerProvider`` once per process.
 
-    Sets up Core SDK metrics export via a :py:class:`temporalio.runtime.Runtime` with an
-    :py:class:`temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds the
-    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` for distributed tracing with
-    workflow sandbox passthrough.
-
-    Creates a replay-safe ``TracerProvider`` (with X-Ray ID generator and OTLP gRPC exporter if
-    available) and sets it as the global OpenTelemetry tracer provider. The
-    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` uses the global provider, so
-    it must be set before the worker starts.
-
-    The collector endpoint defaults to ``http://localhost:4317``, which is the endpoint expected by
-    the ADOT collector Lambda layer.
-
-    Registers a per-invocation ``ForceFlush`` shutdown hook for the global ``TracerProvider`` so
-    pending traces are exported before each Lambda invocation completes.
-
-    Metrics are exported on the ``metric_periodicity`` interval by the runtime's internal thread.
-    There is no explicit flush API for these metrics; set ``metric_periodicity`` short enough to
-    ensure at least one export per invocation.
-
-    Args:
-        config: The :py:class:`LambdaWorkerConfig` to configure.
-        options: Optional overrides for service name, endpoint, etc.
+    ``configure`` runs on every Lambda invocation, but OpenTelemetry only allows the global
+    provider to be set once and a warm container keeps the process alive. Later calls
+    reuse the installed provider instead of building (and leaking) a new span processor.
     """
-    if options is None:
-        options = OtelOptions()
-
-    endpoint = _resolve_endpoint(options)
-    service_name = _resolve_service_name(options)
-
-    telemetry_config = build_metrics_telemetry_config(
-        endpoint=endpoint,
-        service_name=service_name,
-        metric_periodicity=options.metric_periodicity,
-    )
-    runtime = Runtime(telemetry=telemetry_config)
-    config.client_connect_config["runtime"] = runtime
+    global _installed_tracer_provider
+    if (
+        _installed_tracer_provider is not None
+        and get_tracer_provider() is _installed_tracer_provider
+    ):
+        return
 
     resource = Resource.create({SERVICE_NAME: service_name})
 
@@ -141,6 +114,59 @@ def apply_defaults(
 
     # Set as global so the OpenTelemetryPlugin picks it up.
     set_tracer_provider(tracer_provider)
+    if get_tracer_provider() is tracer_provider:
+        _installed_tracer_provider = tracer_provider
+    else:
+        # Another provider is already global; ours is unused, so don't leak its exporter.
+        tracer_provider.shutdown()
+
+
+def apply_defaults(
+    config: LambdaWorkerConfig,
+    options: OtelOptions | None = None,
+) -> None:
+    """Configure OTel metrics and tracing with AWS Lambda defaults.
+
+    Sets up Core SDK metrics export via a :py:class:`temporalio.runtime.Runtime` with an
+    :py:class:`temporalio.runtime.OpenTelemetryConfig` pointing at the OTLP collector, and adds the
+    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` for distributed tracing with
+    workflow sandbox passthrough.
+
+    Creates a replay-safe ``TracerProvider`` (with X-Ray ID generator and OTLP gRPC exporter if
+    available) and sets it as the global OpenTelemetry tracer provider. The
+    :py:class:`temporalio.contrib.opentelemetry.OpenTelemetryPlugin` uses the global provider, so
+    it must be set before the worker starts. The provider is created once per process: when this
+    is called again on a warm Lambda invocation, the installed provider is reused.
+
+    The collector endpoint defaults to ``http://localhost:4317``, which is the endpoint expected by
+    the ADOT collector Lambda layer.
+
+    Registers a per-invocation ``ForceFlush`` shutdown hook for the global ``TracerProvider`` so
+    pending traces are exported before each Lambda invocation completes.
+
+    Metrics are exported on the ``metric_periodicity`` interval by the runtime's internal thread.
+    There is no explicit flush API for these metrics; set ``metric_periodicity`` short enough to
+    ensure at least one export per invocation.
+
+    Args:
+        config: The :py:class:`LambdaWorkerConfig` to configure.
+        options: Optional overrides for service name, endpoint, etc.
+    """
+    if options is None:
+        options = OtelOptions()
+
+    endpoint = _resolve_endpoint(options)
+    service_name = _resolve_service_name(options)
+
+    telemetry_config = build_metrics_telemetry_config(
+        endpoint=endpoint,
+        service_name=service_name,
+        metric_periodicity=options.metric_periodicity,
+    )
+    runtime = Runtime(telemetry=telemetry_config)
+    config.client_connect_config["runtime"] = runtime
+
+    _ensure_tracer_provider(endpoint, service_name)
 
     apply_tracing(config)
 
