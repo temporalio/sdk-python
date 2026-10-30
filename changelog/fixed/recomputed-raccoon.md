@@ -1,0 +1,1 @@
+`temporalio.contrib.pydantic`: the Pydantic payload converter now serializes with `round_trip=True`, so models with computed fields and `extra="forbid"`, and models with `Json[...]` fields, can be decoded from its payloads; computed fields are no longer written to payloads.
