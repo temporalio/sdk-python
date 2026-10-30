@@ -1,0 +1,1 @@
+Experimental: a Temporal operation handler can now send only one signal (including signal-with-start) per invocation through `TemporalNexusClient.client`; a second raises a `BAD_REQUEST` error, unless the first signal failed. Signals sent through `temporalio.nexus.client()` are not limited.
