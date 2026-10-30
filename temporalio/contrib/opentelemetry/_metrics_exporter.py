@@ -12,7 +12,6 @@ from typing import Generic, TypeVar
 import opentelemetry.metrics
 import opentelemetry.util.types
 
-import temporalio.common
 import temporalio.runtime
 
 logger = logging.getLogger(__name__)
@@ -55,15 +54,6 @@ class _GaugeState:
         frozenset[tuple[str, opentelemetry.util.types.AttributeValue]],
         tuple[Mapping[str, opentelemetry.util.types.AttributeValue], int | float],
     ] = field(default_factory=dict)
-
-
-@dataclass(slots=True)
-class _ConvertedAttributes:
-    attributes: Mapping[str, opentelemetry.util.types.AttributeValue]
-    # Only gauges key on it, so it is built on the first gauge update.
-    gauge_key: frozenset[tuple[str, opentelemetry.util.types.AttributeValue]] | None = (
-        None
-    )
 
 
 @dataclass
@@ -180,9 +170,6 @@ class MetricsExporter:
         self._instruments_by_metric: _IdCache[
             temporalio.runtime.BufferedMetric, _Instrument
         ] = _IdCache(_ID_CACHE_SIZE)
-        self._attributes_cache: _IdCache[
-            temporalio.common.MetricAttributes, _ConvertedAttributes
-        ] = _IdCache(_ID_CACHE_SIZE)
         self._started = False
         self._shutdown_event = asyncio.Event()
         self._run_complete_event = asyncio.Event()
@@ -264,21 +251,21 @@ class MetricsExporter:
 
     def _apply_update(self, update: temporalio.runtime.BufferedMetricUpdate) -> None:
         instrument = self._get_or_create_instrument(update.metric)
-        converted = self._get_or_create_attributes(update.attributes)
+        attributes: dict[str, opentelemetry.util.types.AttributeValue] = dict(
+            update.attributes
+        )
 
         if instrument.kind == temporalio.runtime.BUFFERED_METRIC_KIND_COUNTER:
             assert instrument.counter is not None
-            instrument.counter.add(update.value, attributes=converted.attributes)
+            instrument.counter.add(update.value, attributes=attributes)
         elif instrument.kind == temporalio.runtime.BUFFERED_METRIC_KIND_HISTOGRAM:
             assert instrument.histogram is not None
-            instrument.histogram.record(update.value, attributes=converted.attributes)
+            instrument.histogram.record(update.value, attributes=attributes)
         elif instrument.kind == temporalio.runtime.BUFFERED_METRIC_KIND_GAUGE:
             assert instrument.gauge_state is not None
-            if converted.gauge_key is None:
-                converted.gauge_key = frozenset(converted.attributes.items())
             with instrument.gauge_state.lock:
-                instrument.gauge_state.last_values[converted.gauge_key] = (
-                    converted.attributes,
+                instrument.gauge_state.last_values[frozenset(attributes.items())] = (
+                    attributes,
                     update.value,
                 )
         else:
@@ -322,13 +309,3 @@ class MetricsExporter:
         self._instruments[key] = instrument
         self._instruments_by_metric.put(metric, instrument)
         return instrument
-
-    def _get_or_create_attributes(
-        self, attributes: temporalio.common.MetricAttributes
-    ) -> _ConvertedAttributes:
-        converted = self._attributes_cache.get(attributes)
-        if converted is not None:
-            return converted
-        converted = _ConvertedAttributes(dict(attributes))
-        self._attributes_cache.put(attributes, converted)
-        return converted

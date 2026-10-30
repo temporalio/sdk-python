@@ -160,7 +160,9 @@ async def test_metrics_exporter_instruments_created_per_call():
     } == {model: (1, latency_ms) for model, _, latency_ms in calls}
 
 
-async def test_metrics_exporter_caches_are_bounded(monkeypatch: pytest.MonkeyPatch):
+async def test_metrics_exporter_instrument_cache_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(_metrics_exporter, "_ID_CACHE_SIZE", 2)
     runtime, _, _, reader, exporter = _make_runtime_and_exporter()
 
@@ -174,11 +176,10 @@ async def test_metrics_exporter_caches_are_bounded(monkeypatch: pytest.MonkeyPat
             counter.add(value)
             gauge.set(value)
         exporter._drain_once()
-        assert len(exporter._attributes_cache) <= 2
         assert len(exporter._instruments_by_metric) <= 2
 
-    # Every set was evicted before its second update, so this also checks
-    # that an evicted object is looked up again correctly.
+    # Every instrument was evicted before its second update, so this also
+    # checks that an evicted metric is looked up again correctly.
     metrics = _collect_metrics_by_name(reader)
     assert {
         p.attributes["n"]: p.value for p in metrics["bounded-counter"].data.data_points
