@@ -730,7 +730,31 @@ async def test_replayer_session_workflows(
         workflows=[workflow_cls], session_config=REPLAY_SESSION_CONFIGS[replay_config]
     ).replay_workflow(history, raise_on_replay_failure=False)
     if session_activities and replay_config == "no_session":
-        # Session workflows only replay on session workers, like they only run there
+        # The workflow code requests a session, so replay needs a session worker
+        assert result.replay_failure is not None
+        assert "session_worker_options is not enabled" in str(result.replay_failure)
+    else:
+        assert result.replay_failure is None
+
+
+@pytest.mark.parametrize("replay_config", list(REPLAY_SESSION_CONFIGS))
+async def test_replayer_recorded_session_history(replay_config: str) -> None:
+    # Recorded from SessionActivityWorkflow on a session-capable server
+    with Path(__file__).with_name("test_replayer_session_history.json").open() as f:
+        history = WorkflowHistory.from_json("fake", f.read())
+    scheduled = [
+        event.activity_task_scheduled_event_attributes
+        for event in history.events
+        if event.HasField("activity_task_scheduled_event_attributes")
+    ]
+    assert len(scheduled) == 1
+    assert scheduled[0].session_options.HasField("workflow_session")
+
+    result = await Replayer(
+        workflows=[SessionActivityWorkflow],
+        session_config=REPLAY_SESSION_CONFIGS[replay_config],
+    ).replay_workflow(history, raise_on_replay_failure=False)
+    if replay_config == "no_session":
         assert result.replay_failure is not None
         assert "session_worker_options is not enabled" in str(result.replay_failure)
     else:

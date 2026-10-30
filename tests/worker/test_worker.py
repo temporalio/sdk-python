@@ -334,7 +334,8 @@ async def test_session_worker_requires_fixed_activity_slots(client: Client):
 
 
 async def test_single_session_worker_bridge_config(client: Client):
-    # Replay exercises native extraction without polling a server for lifetime isolation.
+    # Capture the bridge config instead of creating a polling worker, then build a
+    # replay worker from it so Rust parses session_worker_options without a server.
     with patch.object(temporalio.bridge.worker.Worker, "create") as create:
         new_worker(
             client,

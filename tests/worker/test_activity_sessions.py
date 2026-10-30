@@ -91,22 +91,27 @@ async def run_labeled(label: str, task_queue: str | None = None) -> None:
 class SessionScopeWorkflow:
     def __init__(self) -> None:
         self._release_task = asyncio.Event()
-        self._signals_handled = 0
+        self._handlers_done = 0
 
     @workflow.run
     async def run(self, other_task_queue: str) -> None:
         with workflow.activity_session(IN_SESSION):
             await run_labeled("in_scope")
-            await run_labeled("in_scope_explicit_queue", workflow.info().task_queue)
+            await run_labeled(
+                "in_scope_explicit_same_queue", workflow.info().task_queue
+            )
             await run_labeled("in_scope_other_queue", other_task_queue)
-            with workflow.activity_session(IN_SESSION):
+            # A distinct but equal instance, so the test can tell which scope won
+            with workflow.activity_session(
+                ActivitySessionOptions(placement=UseWorkflowSession())
+            ):
                 await run_labeled("nested_scope")
             await run_labeled("after_nested_scope")
             task = asyncio.create_task(self._run_after_release())
         await run_labeled("after_scope")
         self._release_task.set()
         await task
-        await workflow.wait_condition(lambda: self._signals_handled == 2)
+        await workflow.wait_condition(lambda: self._handlers_done == 4)
 
     async def _run_after_release(self) -> None:
         await self._release_task.wait()
@@ -115,13 +120,24 @@ class SessionScopeWorkflow:
     @workflow.signal
     async def unscoped_signal(self) -> None:
         await run_labeled("unscoped_signal")
-        self._signals_handled += 1
+        self._handlers_done += 1
 
     @workflow.signal
     async def scoped_signal(self) -> None:
         with workflow.activity_session(IN_SESSION):
             await run_labeled("scoped_signal")
-        self._signals_handled += 1
+        self._handlers_done += 1
+
+    @workflow.update
+    async def unscoped_update(self) -> None:
+        await run_labeled("unscoped_update")
+        self._handlers_done += 1
+
+    @workflow.update
+    async def scoped_update(self) -> None:
+        with workflow.activity_session(IN_SESSION):
+            await run_labeled("scoped_update")
+        self._handlers_done += 1
 
 
 async def test_activity_session_scope_resolution(client: Client) -> None:
@@ -147,11 +163,14 @@ async def test_activity_session_scope_resolution(client: Client) -> None:
         )
         await handle.signal(SessionScopeWorkflow.unscoped_signal)
         await handle.signal(SessionScopeWorkflow.scoped_signal)
+        await handle.execute_update(SessionScopeWorkflow.unscoped_update)
+        await handle.execute_update(SessionScopeWorkflow.scoped_update)
         await handle.result()
 
-    assert resolved_session_options.pop(handle.id) == {
+    resolved = resolved_session_options.pop(handle.id)
+    assert resolved == {
         "in_scope": IN_SESSION,
-        "in_scope_explicit_queue": IN_SESSION,
+        "in_scope_explicit_same_queue": IN_SESSION,
         "in_scope_other_queue": None,
         "nested_scope": IN_SESSION,
         "after_nested_scope": IN_SESSION,
@@ -159,7 +178,12 @@ async def test_activity_session_scope_resolution(client: Client) -> None:
         "task_created_in_scope": IN_SESSION,
         "unscoped_signal": None,
         "scoped_signal": IN_SESSION,
+        "unscoped_update": None,
+        "scoped_update": IN_SESSION,
     }
+    # The innermost scope wins, and the outer scope is restored after it
+    assert resolved["nested_scope"] is not resolved["in_scope"]
+    assert resolved["after_nested_scope"] is resolved["in_scope"]
 
 
 @workflow.defn
@@ -170,7 +194,7 @@ class SingleScopedActivityWorkflow:
             await run_labeled("in_scope")
 
 
-async def last_workflow_task_failure(handle: WorkflowHandle) -> str:
+async def first_workflow_task_failure(handle: WorkflowHandle) -> str:
     async for event in handle.fetch_history_events():
         if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED:
             return event.workflow_task_failed_event_attributes.failure.message
@@ -190,10 +214,61 @@ async def test_activity_session_requires_session_worker(client: Client) -> None:
 
         async def session_worker_failure() -> bool:
             return "session_worker_options is not enabled" in (
-                await last_workflow_task_failure(handle)
+                await first_workflow_task_failure(handle)
             )
 
         await assert_eq_eventually(True, session_worker_failure)
+        await handle.terminate()
+
+
+class ForceSessionInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> type[WorkflowInboundInterceptor] | None:
+        return ForceSessionInboundInterceptor
+
+
+class ForceSessionInboundInterceptor(WorkflowInboundInterceptor):
+    def init(self, outbound: WorkflowOutboundInterceptor) -> None:
+        super().init(ForceSessionOutboundInterceptor(outbound))
+
+
+class ForceSessionOutboundInterceptor(WorkflowOutboundInterceptor):
+    def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle:
+        input.session_options = IN_SESSION
+        return super().start_activity(input)
+
+
+@workflow.defn
+class OtherQueueActivityWorkflow:
+    @workflow.run
+    async def run(self, other_task_queue: str) -> None:
+        await run_labeled("other_queue", other_task_queue)
+
+
+async def test_activity_session_requires_workflow_task_queue(client: Client) -> None:
+    # Scopes skip other queues, so only an interceptor can request this; Core
+    # rejects it
+    async with new_worker(
+        client,
+        OtherQueueActivityWorkflow,
+        activities=[session_test_activity],
+        interceptors=[ForceSessionInterceptor()],
+        session_config=WorkerSessionConfig(),
+    ) as worker:
+        handle = await client.start_workflow(
+            OtherQueueActivityWorkflow.run,
+            f"other-{uuid.uuid4()}",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def task_queue_failure() -> bool:
+            return f"must use '{worker.task_queue}'" in (
+                await first_workflow_task_failure(handle)
+            )
+
+        await assert_eq_eventually(True, task_queue_failure)
         await handle.terminate()
 
 
@@ -296,9 +371,14 @@ class SessionRetryWorkflow:
 async def test_session_activity_and_retry_stay_on_workflow_worker(
     client: Client, other_client: Client
 ) -> None:
+    # History only records the final attempt's start, so record every attempt
+    attempts: list[tuple[str, int, str]] = []
+
     @activity.defn
     async def retry_session_activity() -> None:
-        if activity.info().attempt == 1:
+        info = activity.info()
+        attempts.append((info.activity_id, info.attempt, activity.client().identity))
+        if info.attempt == 1:
             raise ApplicationError("retry once")
 
     async with (
@@ -337,6 +417,11 @@ async def test_session_activity_and_retry_stay_on_workflow_worker(
             client.identity,
             activity_ids={f"retry-{index}" for index in range(10)},
             activity_attempt=2,
+        )
+        assert sorted(attempts) == sorted(
+            (f"retry-{index}", attempt, client.identity)
+            for index in range(10)
+            for attempt in (1, 2)
         )
         assert all(
             event.activity_task_scheduled_event_attributes.session_options.HasField(
@@ -415,13 +500,10 @@ async def test_session_activity_backlog_waits_for_worker_capacity(
                     item.state == PendingActivityState.PENDING_ACTIVITY_STATE_STARTED
                     for item in pending
                 )
-                scheduled = sum(
-                    item.state == PendingActivityState.PENDING_ACTIVITY_STATE_SCHEDULED
-                    for item in pending
-                )
-                # A normal poll may reserve a slot, so full execution-slot utilization is not required.
+                # A normal poll may reserve a slot, so full execution-slot
+                # utilization is not required. Both workers share the blocking
+                # activity, so a leak to the other worker would exceed two.
                 assert 1 <= started <= 2
-                assert scheduled >= 2
 
             await assert_eventually(assert_backlog)
             release_activity.set()
