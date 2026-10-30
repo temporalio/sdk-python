@@ -1,0 +1,1 @@
+Fix the payload converter and failure converter losing their serialization context when external storage is configured. A converter that implements WithSerializationContext now gets the workflow, activity or other context whether or not external storage is enabled.
