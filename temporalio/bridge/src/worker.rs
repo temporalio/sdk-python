@@ -48,9 +48,9 @@ pub struct WorkerConfig {
     identity_override: Option<String>,
     max_cached_workflows: usize,
     tuner: TunerHolder,
-    workflow_task_poller_behavior: PollerBehavior,
+    workflow_task_poller_behavior: Option<PollerBehavior>,
     nonsticky_to_sticky_poll_ratio: f32,
-    activity_task_poller_behavior: PollerBehavior,
+    activity_task_poller_behavior: Option<PollerBehavior>,
     task_types: WorkerTaskTypes,
     sticky_queue_schedule_to_start_timeout_millis: u64,
     max_heartbeat_throttle_interval_millis: u64,
@@ -61,7 +61,7 @@ pub struct WorkerConfig {
     graceful_shutdown_period_millis: u64,
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
-    nexus_task_poller_behavior: PollerBehavior,
+    nexus_task_poller_behavior: Option<PollerBehavior>,
     plugins: Vec<String>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
@@ -724,10 +724,10 @@ fn convert_worker_config(
         .versioning_strategy(converted_versioning_strategy)
         .maybe_client_identity_override(conf.identity_override)
         .max_cached_workflows(conf.max_cached_workflows)
-        .workflow_task_poller_behavior(conf.workflow_task_poller_behavior.into())
+        .maybe_workflow_task_poller_behavior(conf.workflow_task_poller_behavior.map(Into::into))
         .tuner(Arc::new(converted_tuner))
         .nonsticky_to_sticky_poll_ratio(conf.nonsticky_to_sticky_poll_ratio)
-        .activity_task_poller_behavior(conf.activity_task_poller_behavior.into())
+        .maybe_activity_task_poller_behavior(conf.activity_task_poller_behavior.map(Into::into))
         .task_types(conf.task_types.into())
         .sticky_queue_schedule_to_start_timeout(Duration::from_millis(
             conf.sticky_queue_schedule_to_start_timeout_millis,
@@ -763,7 +763,7 @@ fn convert_worker_config(
                 })
                 .collect(),
         )
-        .nexus_task_poller_behavior(conf.nexus_task_poller_behavior.into())
+        .maybe_nexus_task_poller_behavior(conf.nexus_task_poller_behavior.map(Into::into))
         .plugins(
             conf.plugins
                 .into_iter()

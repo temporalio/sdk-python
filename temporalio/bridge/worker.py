@@ -42,9 +42,9 @@ class WorkerConfig:
     identity_override: str | None
     max_cached_workflows: int
     tuner: TunerHolder
-    workflow_task_poller_behavior: PollerBehavior
+    workflow_task_poller_behavior: PollerBehavior | None
     nonsticky_to_sticky_poll_ratio: float
-    activity_task_poller_behavior: PollerBehavior
+    activity_task_poller_behavior: PollerBehavior | None
     no_remote_activities: bool
     task_types: WorkerTaskTypes
     sticky_queue_schedule_to_start_timeout_millis: int
@@ -56,7 +56,7 @@ class WorkerConfig:
     graceful_shutdown_period_millis: int
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: set[str]
-    nexus_task_poller_behavior: PollerBehavior
+    nexus_task_poller_behavior: PollerBehavior | None
     plugins: Sequence[str]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
