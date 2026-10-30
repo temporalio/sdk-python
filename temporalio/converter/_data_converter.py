@@ -219,10 +219,18 @@ class DataConverter(WithSerializationContext):
         """Return an instance with ``store_ctx`` bound into :attr:`external_storage`."""
         if self.external_storage is None:
             return self
-        return dataclasses.replace(
-            self,
-            external_storage=self.external_storage._with_store_context(store_ctx),
+        # dataclasses.replace reruns __post_init__, which builds new payload and
+        # failure converters and drops the context set by with_context. Keep the
+        # current ones, like with_context does.
+        cloned = dataclasses.replace(self)
+        object.__setattr__(cloned, "payload_converter", self.payload_converter)
+        object.__setattr__(cloned, "failure_converter", self.failure_converter)
+        object.__setattr__(
+            cloned,
+            "external_storage",
+            self.external_storage._with_store_context(store_ctx),
         )
+        return cloned
 
     def _with_contexts(
         self,
