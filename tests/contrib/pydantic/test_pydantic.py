@@ -128,6 +128,38 @@ def test_to_json_options_exclude_unset_keeps_aliases():
     assert converter.from_payload(payload, AliasModel) == AliasModel(orderId=7)
 
 
+class ComputedFieldModel(BaseModel):
+    model_config = pydantic.ConfigDict(extra="forbid")
+    x: int
+
+    @pydantic.computed_field
+    @property
+    def double(self) -> int:
+        return self.x * 2
+
+
+@pytest.mark.parametrize(
+    "converter",
+    [
+        PydanticJSONPlainPayloadConverter(),
+        PydanticJSONPlainPayloadConverter(
+            temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=True)
+        ),
+    ],
+)
+def test_computed_fields_excluded_for_round_trip(
+    converter: PydanticJSONPlainPayloadConverter,
+):
+    # Computed fields are derived on read, so serializing them breaks models
+    # with extra="forbid" which reject them as unexpected input.
+    payload = converter.to_payload(ComputedFieldModel(x=21))
+    assert payload is not None
+    assert payload.data == b'{"x":21}'
+    assert converter.from_payload(payload, ComputedFieldModel) == ComputedFieldModel(
+        x=21
+    )
+
+
 async def test_pydantic_data_converter_pickle():
     restored = pickle.loads(pickle.dumps(pydantic_data_converter))
     value = {"a": 1}
