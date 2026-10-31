@@ -44,10 +44,13 @@ class _ReplaySafeSpan(Span):
         if (
             workflow.in_workflow()
             and self._exception is not None
+            and not workflow.unsafe.is_read_only()
             and not workflow.is_failure_exception(self._exception)
         ):
             # Skip ending spans with workflow task failures. Otherwise, each failure will create its own span
             # This may still occur for spans which were completed during failed workflow tasks.
+            # Queries and update validators run read-only and their exceptions
+            # never fail the workflow task, so their spans are always ended.
             return
 
         self._span.end(end_time=end_time)
