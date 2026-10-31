@@ -147,8 +147,12 @@ class ClientConfigTLS:
 
     @classmethod
     def from_dict(cls, d: ClientConfigTLSDict | None) -> Self | None:
-        """Create a ClientConfigTLS from a dictionary."""
-        if not d:
+        """Create a ClientConfigTLS from a dictionary.
+
+        ``None`` means there is no TLS table. An empty dictionary is a TLS table
+        with nothing set, so it gives a default ``ClientConfigTLS``.
+        """
+        if d is None:
             return None
         return cls(
             disabled=d.get("disabled"),
@@ -213,8 +217,8 @@ class ClientConfigProfile:
             d["namespace"] = self.namespace
         if self.api_key is not None:
             d["api_key"] = self.api_key
-        if self.tls and (tls_dict := self.tls.to_dict()):
-            d["tls"] = tls_dict
+        if self.tls is not None:
+            d["tls"] = self.tls.to_dict()
         if self.grpc_meta:
             d["grpc_meta"] = self.grpc_meta
         return d

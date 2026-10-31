@@ -2,6 +2,7 @@ import os
 import textwrap
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -692,6 +693,60 @@ def test_client_config_to_from_dict():
     assert empty_config_dict == {}
     new_empty_config = ClientConfig.from_dict(empty_config_dict)
     assert empty_config == new_empty_config
+
+
+def test_client_config_tls_empty_dict_is_not_missing():
+    """Test that an empty TLS table is distinct from no TLS table in both directions."""
+    empty_tls_profile = ClientConfigProfile(tls=ClientConfigTLS())
+    assert empty_tls_profile.to_dict() == {"tls": {}}
+    assert ClientConfigProfile.from_dict({"tls": {}}) == empty_tls_profile
+    assert ClientConfigTLS.from_dict({}) == ClientConfigTLS()
+    assert ClientConfigTLS.from_dict(None) is None
+
+
+@pytest.mark.parametrize(
+    ("toml_tls", "tls_dict", "connect_tls"),
+    [
+        pytest.param("", None, None, id="no-tls-table"),
+        pytest.param("[profile.default.tls]", {}, TLSConfig(), id="empty-tls-table"),
+        pytest.param(
+            "[profile.default.tls]\ndisabled = false",
+            {"disabled": False},
+            TLSConfig(),
+            id="disabled-false",
+        ),
+        pytest.param(
+            "[profile.default.tls]\ndisabled = true",
+            {"disabled": True},
+            False,
+            id="disabled-true",
+        ),
+    ],
+)
+def test_client_config_dict_round_trip_keeps_tls(
+    toml_tls: str,
+    tls_dict: dict[str, bool] | None,
+    connect_tls: bool | TLSConfig | None,
+):
+    """Test that dictionary round trips preserve TLS and the connect config."""
+    config = ClientConfig.load(
+        config_source=f"[profile.default]\naddress = 'some-address'\n{toml_tls}"
+    )
+    expected_profile: dict[str, Any] = {"address": "some-address"}
+    if tls_dict is not None:
+        expected_profile["tls"] = tls_dict
+
+    config_dict = config.to_dict()
+    assert config_dict == {"default": expected_profile}
+
+    new_config = ClientConfig.from_dict(config_dict)
+    assert new_config == config
+    connect_config = new_config.profiles["default"].to_client_connect_config()
+    assert connect_config == config.profiles["default"].to_client_connect_config()
+    if connect_tls is None:
+        assert "tls" not in connect_config
+    else:
+        assert connect_config.get("tls") == connect_tls
 
 
 def test_grpc_metadata_normalization_from_toml():
