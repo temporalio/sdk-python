@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from pydantic import TypeAdapter
-from pydantic_core import SchemaSerializer, to_json
+from pydantic_core import SchemaSerializer
 from pydantic_core.core_schema import any_schema
 
 import temporalio.api.common.v1
@@ -104,17 +104,24 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
     def to_payload(self, value: Any) -> temporalio.api.common.v1.Payload | None:
         """See base class.
 
-        Uses ``pydantic_core.to_json`` to serialize ``value`` to JSON.
+        Serializes ``value`` to JSON with a ``pydantic_core`` schema
+        serializer configured to match ``pydantic_core.to_json`` defaults.
 
-        See
-        https://docs.pydantic.dev/latest/api/pydantic_core/#pydantic_core.to_json.
+        Computed fields are excluded so payloads always round-trip, even for
+        models with ``extra="forbid"`` which would reject them on read.
         """
         data = (
             self._schema_serializer.to_json(
-                value, by_alias=True, exclude_unset=self._to_json_options.exclude_unset
+                value,
+                by_alias=True,
+                exclude_unset=self._to_json_options.exclude_unset,
+                exclude_computed_fields=True,
             )
             if self._to_json_options
-            else to_json(value)
+            # by_alias=True matches the pydantic_core.to_json default
+            else self._schema_serializer.to_json(
+                value, by_alias=True, exclude_computed_fields=True
+            )
         )
         return temporalio.api.common.v1.Payload(
             metadata={"encoding": self.encoding.encode()}, data=data
