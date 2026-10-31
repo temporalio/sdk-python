@@ -7,7 +7,7 @@ import pytest
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
 
-from temporalio.contrib.opentelemetry import MetricsExporter
+from temporalio.contrib.opentelemetry import MetricsExporter, _metrics_exporter
 from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
 
 
@@ -130,6 +130,63 @@ async def test_metrics_exporter_attributes_passthrough():
     points = list(metrics["attrs-counter"].data.data_points)
     assert len(points) == 1
     assert dict(points[0].attributes) == {"foo": "bar", "baz": 123}
+
+
+async def test_metrics_exporter_instruments_created_per_call():
+    runtime, _, _, reader, exporter = _make_runtime_and_exporter()
+
+    # Like an activity that creates its instruments on each call: each call
+    # brings new metric and attribute objects, and a cache keyed by id() that
+    # doesn't hold them would see their ids reused.
+    calls = [("model-a", 100, 900), ("model-b", 7, 40), ("model-c", 55, 300)]
+    for model, tokens, latency_ms in calls:
+        meter = runtime.metric_meter.with_additional_attributes({"model": model})
+        meter.create_counter("tokens").add(tokens)
+        meter.create_histogram("latency").record(latency_ms)
+        meter.create_gauge("last-tokens").set(tokens)
+        exporter._drain_once()
+
+    metrics = _collect_metrics_by_name(reader)
+    tokens_by_model = {model: tokens for model, tokens, _ in calls}
+    assert {
+        p.attributes["model"]: p.value for p in metrics["tokens"].data.data_points
+    } == tokens_by_model
+    assert {
+        p.attributes["model"]: p.value for p in metrics["last-tokens"].data.data_points
+    } == tokens_by_model
+    assert {
+        p.attributes["model"]: (p.count, p.sum)
+        for p in metrics["latency"].data.data_points
+    } == {model: (1, latency_ms) for model, _, latency_ms in calls}
+
+
+async def test_metrics_exporter_instrument_cache_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(_metrics_exporter, "_ID_CACHE_SIZE", 2)
+    runtime, _, _, reader, exporter = _make_runtime_and_exporter()
+
+    meters = [
+        runtime.metric_meter.with_additional_attributes({"n": n}) for n in range(5)
+    ]
+    counters = [meter.create_counter("bounded-counter") for meter in meters]
+    gauges = [meter.create_gauge("bounded-gauge") for meter in meters]
+    for value in (1, 2):
+        for counter, gauge in zip(counters, gauges):
+            counter.add(value)
+            gauge.set(value)
+        exporter._drain_once()
+        assert len(exporter._instruments_by_metric) <= 2
+
+    # Every instrument was evicted before its second update, so this also
+    # checks that an evicted metric is looked up again correctly.
+    metrics = _collect_metrics_by_name(reader)
+    assert {
+        p.attributes["n"]: p.value for p in metrics["bounded-counter"].data.data_points
+    } == {n: 3 for n in range(5)}
+    assert {
+        p.attributes["n"]: p.value for p in metrics["bounded-gauge"].data.data_points
+    } == {n: 2 for n in range(5)}
 
 
 async def test_metrics_exporter_buffer_not_attached_raises():
