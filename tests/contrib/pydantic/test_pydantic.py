@@ -128,6 +128,68 @@ def test_to_json_options_exclude_unset_keeps_aliases():
     assert converter.from_payload(payload, AliasModel) == AliasModel(orderId=7)
 
 
+class ForbidComputedModel(BaseModel):
+    model_config = pydantic.ConfigDict(extra="forbid")
+    text: str
+
+    @pydantic.computed_field  # type: ignore[prop-decorator]
+    @property
+    def length(self) -> int:
+        return len(self.text)
+
+
+class AllowComputedModel(BaseModel):
+    model_config = pydantic.ConfigDict(extra="allow")
+    text: str
+
+    @pydantic.computed_field  # type: ignore[prop-decorator]
+    @property
+    def length(self) -> int:
+        return len(self.text)
+
+
+class JsonFieldModel(BaseModel):
+    raw: pydantic.Json[dict[str, int]]
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        None,
+        temporalio.contrib.pydantic.ToJsonOptions(),
+        temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=True),
+    ],
+)
+@pytest.mark.parametrize(
+    ("value", "type_hint", "data"),
+    [
+        (ForbidComputedModel(text="hi"), ForbidComputedModel, b'{"text":"hi"}'),
+        (AllowComputedModel(text="hi"), AllowComputedModel, b'{"text":"hi"}'),
+        (
+            [ForbidComputedModel(text="hi")],
+            list[ForbidComputedModel],
+            b'[{"text":"hi"}]',
+        ),
+        (
+            JsonFieldModel.model_validate({"raw": '{"a":1}'}),
+            JsonFieldModel,
+            b'{"raw":"{\\"a\\":1}"}',
+        ),
+    ],
+)
+def test_payload_validates_back_to_value(
+    options: temporalio.contrib.pydantic.ToJsonOptions | None,
+    value: object,
+    type_hint: type,
+    data: bytes,
+):
+    converter = PydanticJSONPlainPayloadConverter(options)
+    payload = converter.to_payload(value)
+    assert payload is not None
+    assert converter.from_payload(payload, type_hint) == value
+    assert payload.data == data
+
+
 async def test_pydantic_data_converter_pickle():
     restored = pickle.loads(pickle.dumps(pydantic_data_converter))
     value = {"a": 1}
