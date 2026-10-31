@@ -27,7 +27,7 @@ classifiers = [
 [project.optional-dependencies]
 grpc = ["grpcio>=1.48.2,<2"]
 opentelemetry = ["opentelemetry-api>=1.26,<2", "opentelemetry-sdk>=1.26,<2"]
-pydantic = ["pydantic>=2.0.0,<3"]
+pydantic = ["pydantic>=2.11.0,<3"]
 openai-agents = ["temporalio-openai-agents>=1.0.0"]
 google-adk = ["temporalio-google-adk[mcp]>=0.0.1"]
 langgraph = ["temporalio-langgraph>=0.1.0"]
