@@ -3904,6 +3904,8 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
             if self._input.args
             else None
         )
+        # Without a memo, carry over the current one: Core fills an unset memo
+        # from the start of the run, which would drop upsert_memo changes
         memo_payloads = (
             {
                 k: self._instance._workflow_context_payload_converter.to_payloads(
@@ -3912,7 +3914,7 @@ class _ContinueAsNewError(temporalio.workflow.ContinueAsNewError):
                 for k, val in self._input.memo.items()
             }
             if self._input.memo
-            else None
+            else self._instance._info.raw_memo
         )
 
         command = self._instance._add_command()

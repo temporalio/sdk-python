@@ -2628,6 +2628,38 @@ async def test_workflow_continue_as_new(client: Client, env: WorkflowEnvironment
         )
 
 
+@workflow.defn
+class ContinueAsNewUpsertedMemoWorkflow:
+    @workflow.run
+    async def run(self, continued: bool) -> dict[str, Any]:
+        if not continued:
+            workflow.upsert_memo(
+                {"changed": "new value", "added": "added", "removed": None}
+            )
+            workflow.continue_as_new(True)
+        return dict(workflow.memo())
+
+
+async def test_workflow_continue_as_new_keeps_upserted_memo(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    async with new_worker(client, ContinueAsNewUpsertedMemoWorkflow) as worker:
+        handle = await client.start_workflow(
+            ContinueAsNewUpsertedMemoWorkflow.run,
+            False,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            memo={"changed": "old value", "removed": "removed", "kept": "kept"},
+        )
+        expected = {"changed": "new value", "added": "added", "kept": "kept"}
+        assert await handle.result() == expected
+        assert await (await handle.describe()).memo() == expected
+
+
 sa_prefix = "python_test_"
 
 
