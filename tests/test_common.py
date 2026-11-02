@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import pickle
+import sys
+import typing
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -84,6 +86,18 @@ def test_type_hints_from_func():
     assert_hints(MyCallableClass().annotated_method)
     assert_hints(MyCallableClass.aliased_self_method)
     assert_hints(MyCallableClass().aliased_self_method)
+
+
+def test_type_hints_from_func_typing_self():
+    if sys.version_info < (3, 11):
+        pytest.skip("typing.Self requires Python 3.11")
+
+    class Service:
+        def method(self: typing.Self, value: str) -> str:
+            return value
+
+    assert _type_hints_from_func(Service.method) == ([str], str)
+    assert _type_hints_from_func(Service().method) == ([str], str)
 
 
 def test_type_hints_from_func_preserves_annotated_self_argument():
