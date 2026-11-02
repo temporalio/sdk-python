@@ -6,6 +6,8 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from typing_extensions import Self
+from typing_extensions import Self as SelfAliasForTest
 
 from temporalio.api.common.v1 import Payload
 from temporalio.api.common.v1 import RetryPolicy as RetryPolicyProto
@@ -54,6 +56,12 @@ class MyCallableClass:
     def some_method(self, _foo: str) -> DefinedLater:
         raise NotImplementedError
 
+    def annotated_method(self: Self, _foo: str) -> DefinedLater:
+        raise NotImplementedError
+
+    def aliased_self_method(self: SelfAliasForTest, _foo: str) -> DefinedLater:
+        raise NotImplementedError
+
 
 @dataclass
 class DefinedLater:
@@ -72,6 +80,19 @@ def test_type_hints_from_func():
     assert_hints(MyCallableClass)
     assert_hints(MyCallableClass.some_method)
     assert_hints(MyCallableClass().some_method)
+    assert_hints(MyCallableClass.annotated_method)
+    assert_hints(MyCallableClass().annotated_method)
+    assert_hints(MyCallableClass.aliased_self_method)
+    assert_hints(MyCallableClass().aliased_self_method)
+
+
+def test_type_hints_from_func_preserves_annotated_self_argument():
+    def func(self: int, value: str) -> str:
+        return value
+
+    args, return_hint = _type_hints_from_func(func)
+    assert args == [int, str]
+    assert return_hint is str
 
 
 def test_raw_value_pickle():

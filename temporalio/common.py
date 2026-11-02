@@ -1389,7 +1389,8 @@ def _type_hints_from_func(  # type:ignore[reportUnusedFunction]
         Tuple containing parameter types and return type. The parameter types
         will be None if there are any non-positional parameters or if any of the
         parameters to not have an annotation that represents a class. If the
-        first parameter is "self" with no attribute, it is not included.
+        first parameter is "self" and is unannotated or annotated as Self, it is
+        not included.
     """
     # If this is a class instance with user-defined __call__, then use that as
     # the func. This mimics inspect logic inside Python.
@@ -1423,7 +1424,7 @@ def _type_hints_from_func(  # type:ignore[reportUnusedFunction]
             and value.name == "self"
             and (
                 value.annotation is inspect.Parameter.empty
-                or str(value.annotation) == "typing.Self"
+                or hints.get(value.name) is Self
             )
         ):
             continue
