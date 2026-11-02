@@ -25,6 +25,7 @@ use tokio::sync::mpsc::{channel, Sender};
 use tokio_stream::wrappers::ReceiverStream;
 use tracing::error;
 
+use crate::callbacks::Callbacks;
 use crate::client;
 use crate::runtime;
 
@@ -311,6 +312,7 @@ pub struct CustomSlotSupplier {
 struct CustomSlotSupplierOfType<SK: SlotKind> {
     inner: Arc<Py<PyAny>>,
     event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+    callbacks: Arc<Callbacks>,
     _phantom: PhantomData<SK>,
 }
 
@@ -344,16 +346,23 @@ impl CreatedTaskForSlotCallback {
 
 struct TaskCanceller {
     stored_task: Arc<OnceLock<Py<PyAny>>>,
+    callbacks: Arc<Callbacks>,
 }
 
 impl TaskCanceller {
-    fn new(stored_task: Arc<OnceLock<Py<PyAny>>>) -> Self {
-        TaskCanceller { stored_task }
+    fn new(stored_task: Arc<OnceLock<Py<PyAny>>>, callbacks: Arc<Callbacks>) -> Self {
+        TaskCanceller {
+            stored_task,
+            callbacks,
+        }
     }
 }
 
 impl Drop for TaskCanceller {
     fn drop(&mut self) {
+        let Some(_guard) = self.callbacks.enter_completion() else {
+            return;
+        };
         if let Some(task) = self.stored_task.get() {
             Python::attach(|py| {
                 task.call_method0(py, "cancel")
@@ -370,22 +379,28 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     async fn reserve_slot(&self, ctx: &dyn SlotReservationContext) -> SlotSupplierPermit {
         loop {
             let stored_task = Arc::new(OnceLock::new());
-            let _task_canceller = TaskCanceller::new(stored_task.clone());
-            let pypermit = match Python::attach(|py| {
-                let py_obj = self.inner.bind(py);
-                let called = py_obj.call_method1(
-                    "reserve_slot",
-                    (
-                        SlotReserveCtx::from_ctx(SK::kind(), ctx),
-                        CreatedTaskForSlotCallback { stored_task },
-                    ),
-                )?;
-                let tl = self
-                    .event_loop_task_locals
-                    .get()
-                    .expect("task locals must be set");
-                pyo3_async_runtimes::into_future_with_locals(tl, called)
-            }) {
+            let _task_canceller = TaskCanceller::new(stored_task.clone(), self.callbacks.clone());
+            let pypermit = {
+                let Some(_guard) = self.callbacks.enter_completion() else {
+                    return std::future::pending().await;
+                };
+                Python::attach(|py| {
+                    let py_obj = self.inner.bind(py);
+                    let called = py_obj.call_method1(
+                        "reserve_slot",
+                        (
+                            SlotReserveCtx::from_ctx(SK::kind(), ctx),
+                            CreatedTaskForSlotCallback { stored_task },
+                        ),
+                    )?;
+                    let tl = self
+                        .event_loop_task_locals
+                        .get()
+                        .expect("task locals must be set");
+                    pyo3_async_runtimes::into_future_with_locals(tl, called)
+                })
+            };
+            let pypermit = match pypermit {
                 Ok(f) => f,
                 Err(e) => {
                     error!("Unexpected error in custom slot supplier `reserve_slot`: {e}");
@@ -406,6 +421,7 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn try_reserve_slot(&self, ctx: &dyn SlotReservationContext) -> Option<SlotSupplierPermit> {
+        let _guard = self.callbacks.enter_completion()?;
         Python::attach(|py| {
             let py_obj = self.inner.bind(py);
             let pa = py_obj.call_method1(
@@ -427,6 +443,9 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn mark_slot_used(&self, ctx: &dyn SlotMarkUsedContext<SlotKind = Self::SlotKind>) {
+        let Some(_guard) = self.callbacks.enter_completion() else {
+            return;
+        };
         if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
@@ -448,6 +467,9 @@ impl<SK: SlotKind + Send + Sync> SlotSupplierTrait for CustomSlotSupplierOfType<
     }
 
     fn release_slot(&self, ctx: &dyn SlotReleaseContext<SlotKind = Self::SlotKind>) {
+        let Some(_guard) = self.callbacks.enter_completion() else {
+            return;
+        };
         if let Err(e) = Python::attach(|py| {
             let permit = ctx
                 .permit()
@@ -495,7 +517,11 @@ pub fn new_worker(
     enter_sync!(runtime_ref.runtime);
     runtime_ref.runtime.assert_same_process("create worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
-    let config = convert_worker_config(config, event_loop_task_locals.clone())?;
+    let config = convert_worker_config(
+        config,
+        event_loop_task_locals.clone(),
+        runtime_ref.runtime.callbacks.clone(),
+    )?;
     let worker = temporalio_sdk_core::init_worker(
         &runtime_ref.runtime.core,
         config,
@@ -519,7 +545,11 @@ pub fn new_replay_worker<'a>(
         .runtime
         .assert_same_process("create replay worker")?;
     let event_loop_task_locals = Arc::new(OnceLock::new());
-    let config = convert_worker_config(config, event_loop_task_locals.clone())?;
+    let config = convert_worker_config(
+        config,
+        event_loop_task_locals.clone(),
+        runtime_ref.runtime.callbacks.clone(),
+    )?;
     let (history_pusher, stream) = HistoryPusher::new(runtime_ref.runtime.clone());
     let worker = WorkerRef {
         worker: Some(Arc::new(
@@ -715,8 +745,9 @@ impl WorkerRef {
 fn convert_worker_config(
     conf: WorkerConfig,
     task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+    callbacks: Arc<Callbacks>,
 ) -> PyResult<temporalio_sdk_core::WorkerConfig> {
-    let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
+    let converted_tuner = convert_tuner_holder(conf.tuner, task_locals, callbacks)?;
     let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
     temporalio_sdk_core::WorkerConfig::builder()
         .namespace(conf.namespace)
@@ -787,6 +818,7 @@ fn convert_worker_config(
 fn convert_tuner_holder(
     holder: TunerHolder,
     task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+    callbacks: Arc<Callbacks>,
 ) -> PyResult<temporalio_sdk_core::TunerHolder> {
     // Verify all resource-based options are the same if any are set
     let maybe_wf_resource_opts =
@@ -844,18 +876,22 @@ fn convert_tuner_holder(
         .workflow_slot_options(convert_slot_supplier(
             holder.workflow_slot_supplier,
             task_locals.clone(),
+            callbacks.clone(),
         )?)
         .activity_slot_options(convert_slot_supplier(
             holder.activity_slot_supplier,
             task_locals.clone(),
+            callbacks.clone(),
         )?)
         .local_activity_slot_options(convert_slot_supplier(
             holder.local_activity_slot_supplier,
             task_locals.clone(),
+            callbacks.clone(),
         )?)
         .nexus_slot_options(convert_slot_supplier(
             holder.nexus_slot_supplier,
             task_locals,
+            callbacks,
         )?)
         .build()
         .map_err(|e| PyValueError::new_err(format!("Invalid tuner holder options: {e}")))?
@@ -866,6 +902,7 @@ fn convert_tuner_holder(
 fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
     supplier: SlotSupplier,
     task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+    callbacks: Arc<Callbacks>,
 ) -> PyResult<temporalio_sdk_core::SlotSupplierOptions<SK>> {
     Ok(match supplier {
         SlotSupplier::FixedSize(fs) => temporalio_sdk_core::SlotSupplierOptions::FixedSize {
@@ -884,6 +921,7 @@ fn convert_slot_supplier<SK: SlotKind + Send + Sync + 'static>(
             > {
                 inner: cs.inner,
                 event_loop_task_locals: task_locals,
+                callbacks,
                 _phantom: PhantomData,
             }))
         }

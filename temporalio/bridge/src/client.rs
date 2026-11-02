@@ -210,7 +210,7 @@ where
     match res {
         Ok(resp) => Ok(resp.get_ref().encode_to_vec()),
         Err(err) => {
-            Python::attach(move |py| {
+            runtime::with_python(move |py| {
                 // Create tuple of "status", "message", and optional "details"
                 let code = err.code() as u32;
                 let message = err.message().to_owned();

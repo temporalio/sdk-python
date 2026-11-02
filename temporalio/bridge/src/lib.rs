@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyTuple;
 
+mod callbacks;
 mod client;
 mod client_rpc_generated;
 mod envconfig;
@@ -77,6 +78,7 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     envconfig_module.add_function(wrap_pyfunction!(envconfig::load_client_connect_config, m)?)?;
     m.add_submodule(&envconfig_module)?;
 
+    runtime::register_callback_shutdown(py)?;
     Ok(())
 }
 

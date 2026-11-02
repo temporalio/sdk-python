@@ -2,12 +2,13 @@ use futures::channel::mpsc::Receiver;
 use pyo3::exceptions::{PyAssertionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::pythonize;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::{Duration, UNIX_EPOCH};
 use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
@@ -23,7 +24,71 @@ use tokio_stream::StreamExt;
 use tracing::Level;
 use url::Url;
 
+use crate::callbacks::{CallbackRegistry, Callbacks};
 use crate::metric::{convert_metric_events, BufferedMetricRef, BufferedMetricUpdate};
+
+static CALLBACK_REGISTRY: LazyLock<CallbackRegistry> = LazyLock::new(CallbackRegistry::default);
+
+thread_local! {
+    static CALLBACK_CONTEXT: RefCell<Option<Arc<Callbacks>>> = const { RefCell::new(None) };
+}
+
+struct CallbackContext(Option<Arc<Callbacks>>);
+
+impl CallbackContext {
+    fn enter(callbacks: Arc<Callbacks>) -> Self {
+        Self(CALLBACK_CONTEXT.with(|current| current.replace(Some(callbacks))))
+    }
+}
+
+impl Drop for CallbackContext {
+    fn drop(&mut self) {
+        CALLBACK_CONTEXT.with(|current| current.replace(self.0.take()));
+    }
+}
+
+fn current_callbacks() -> Arc<Callbacks> {
+    CALLBACK_CONTEXT
+        .with(|current| current.borrow().clone())
+        .or_else(|| CALLBACK_TASK.try_with(Clone::clone).ok())
+        .expect("Python bridge task must have a callback context")
+}
+
+fn shutdown_error() -> PyErr {
+    PyRuntimeError::new_err("Temporal runtime is shutting down")
+}
+
+pub(crate) fn with_python<F, T>(callback: F) -> PyResult<T>
+where
+    F: for<'py> FnOnce(Python<'py>) -> PyResult<T>,
+{
+    let callbacks = current_callbacks();
+    let _guard = callbacks.enter_completion().ok_or_else(shutdown_error)?;
+    Python::attach(callback)
+}
+
+#[pyclass]
+struct CallbackShutdown;
+
+#[pymethods]
+impl CallbackShutdown {
+    fn __call__(&self, py: Python<'_>) {
+        let callbacks = CALLBACK_REGISTRY.begin_shutdown();
+        // A callback may be waiting to reacquire the GIL after notifying its
+        // event loop. Let it return before CPython starts finalizing.
+        py.detach(move || {
+            for callback in callbacks {
+                callback.wait();
+            }
+        });
+    }
+}
+
+pub(crate) fn register_callback_shutdown(py: Python<'_>) -> PyResult<()> {
+    py.import("atexit")?
+        .call_method1("register", (Py::new(py, CallbackShutdown)?,))?;
+    Ok(())
+}
 
 #[pyclass]
 pub struct RuntimeRef {
@@ -34,6 +99,7 @@ pub struct RuntimeRef {
 pub(crate) struct Runtime {
     pub(crate) pid: u32,
     pub(crate) core: Arc<CoreRuntimeHandle>,
+    pub(crate) callbacks: Arc<Callbacks>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
 }
@@ -118,6 +184,7 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
+    let callbacks = CALLBACK_REGISTRY.register().ok_or_else(shutdown_error)?;
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
@@ -196,6 +263,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
     }
 
     // Start log forwarding if needed
+    let log_callbacks = callbacks.clone();
     let log_forwarder_handle = log_forwarding.map(|(stream, callback)| {
         Arc::new(core.tokio_handle().spawn(async move {
             let mut stream = std::pin::pin!(stream.chunks_timeout(
@@ -210,6 +278,9 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
                     .collect::<Vec<_>>();
                 // We silently swallow errors here because logging them could
                 // cause a bad loop and we don't want to assume console presence
+                let Some(_guard) = log_callbacks.enter() else {
+                    break;
+                };
                 let _ = Python::attach(|py| callback.call1(py, (entries,)));
             }
         }))
@@ -219,6 +290,7 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         runtime: Runtime {
             pid: std::process::id(),
             core: Arc::new(CoreRuntimeHandle(Some(core))),
+            callbacks,
             metrics_call_buffer,
             log_forwarder_handle,
         },
@@ -239,7 +311,12 @@ impl Runtime {
         F: Future<Output = PyResult<T>> + Send + 'static,
         T: for<'py> IntoPyObject<'py> + Send + 'static,
     {
+        self.assert_same_process("use runtime")?;
+        if CALLBACK_REGISTRY.is_closing() {
+            return Err(shutdown_error());
+        }
         let _guard = self.core.tokio_handle().enter();
+        let _callbacks = CallbackContext::enter(self.callbacks.clone());
         pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
     }
 
@@ -440,6 +517,7 @@ pub(crate) struct TokioRuntime;
 
 tokio::task_local! {
     static TASK_LOCALS: std::cell::OnceCell<pyo3_async_runtimes::TaskLocals>;
+    static CALLBACK_TASK: Arc<Callbacks>;
 }
 
 impl pyo3_async_runtimes::generic::Runtime for TokioRuntime {
@@ -450,14 +528,22 @@ impl pyo3_async_runtimes::generic::Runtime for TokioRuntime {
     where
         F: Future<Output = ()> + Send + 'static,
     {
-        tokio::runtime::Handle::current().spawn(fut)
+        let callbacks = current_callbacks();
+        tokio::runtime::Handle::current().spawn(CALLBACK_TASK.scope(callbacks, fut))
     }
 
     fn spawn_blocking<F>(f: F) -> Self::JoinHandle
     where
         F: FnOnce() + Send + 'static,
     {
-        tokio::runtime::Handle::current().spawn_blocking(f)
+        let callbacks = current_callbacks();
+        tokio::runtime::Handle::current().spawn_blocking(move || {
+            let Some(_guard) = callbacks.enter_completion() else {
+                return;
+            };
+            let _context = CallbackContext::enter(callbacks);
+            f();
+        })
     }
 }
 

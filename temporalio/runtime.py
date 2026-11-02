@@ -68,6 +68,12 @@ class Runtime:
     :py:meth:`prevent_default` and :py:meth:`set_default` to ensure each
     fork creates it's own runtime.
 
+    During normal interpreter exit, the SDK stops admitting native callbacks
+    into Python and waits for callbacks already executing to return before
+    Python finalizes. This does not replace shutting down workers or awaiting
+    application tasks. Creating runtimes or starting asynchronous SDK operations
+    after the SDK's interpreter-exit handler has run raises ``RuntimeError``.
+
     """
 
     @classmethod

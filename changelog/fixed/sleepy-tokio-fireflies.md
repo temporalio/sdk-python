@@ -1,0 +1,1 @@
+Drain native-to-Python callbacks before interpreter finalization to prevent process-exit crashes after completed client operations. Normal Python exit handlers still run; workers and application tasks must still be shut down by the application.
