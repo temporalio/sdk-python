@@ -641,7 +641,9 @@ class Worker:
                 maximum=max_activity_polls
             )
 
-        deduped_plugin_names = list({plugin.name() for plugin in self._plugins})
+        deduped_plugins = list(
+            {(plugin.name(), plugin.version()) for plugin in self._plugins}
+        )
         deduped_storage_driver_types = {
             driver.type() for driver in self._storage_drivers
         }
@@ -711,7 +713,7 @@ class Worker:
                 nexus_task_poller_behavior=config[
                     "nexus_task_poller_behavior"
                 ]._to_bridge(),  # type: ignore[reportTypedDictNotRequiredAccess,reportOptionalMemberAccess]
-                plugins=deduped_plugin_names,
+                plugins=deduped_plugins,
                 storage_drivers=deduped_storage_driver_types,
                 disable_payload_error_limit=config.get(
                     "disable_payload_error_limit", False

@@ -352,7 +352,9 @@ class Replayer:
                     nexus_task_poller_behavior=temporalio.bridge.worker.PollerBehaviorSimpleMaximum(
                         1
                     ),
-                    plugins=[plugin.name() for plugin in self.plugins],
+                    plugins=[
+                        (plugin.name(), plugin.version()) for plugin in self.plugins
+                    ],
                     storage_drivers=storage_driver_types,
                 ),
             )

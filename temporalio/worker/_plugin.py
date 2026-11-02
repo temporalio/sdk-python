@@ -33,6 +33,14 @@ class Plugin(abc.ABC):
         """
         return type(self).__module__ + "." + type(self).__qualname__
 
+    def version(self) -> str:
+        """Get the version of this plugin. Can be overridden to report a version in worker heartbeats.
+
+        Returns:
+            The version of the plugin. Empty by default.
+        """
+        return ""
+
     @abc.abstractmethod
     def configure_worker(self, config: WorkerConfig) -> WorkerConfig:
         """Hook called when creating a worker to allow modification of configuration.

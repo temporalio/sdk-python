@@ -41,6 +41,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
         self,
         name: str,
         *,
+        version: str = "",
         data_converter: PluginParameter[temporalio.converter.DataConverter] = None,
         interceptors: Sequence[
             temporalio.client.Interceptor | temporalio.worker.Interceptor
@@ -62,6 +63,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
 
         Args:
             name: The name of the plugin.
+            version: The version of the plugin, reported in worker heartbeats.
             data_converter: Data converter for serialization, or callable to customize existing one.
                 Applied to the Client and Replayer.
             interceptors: Interceptors to append.
@@ -85,6 +87,7 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
             A configured Plugin instance.
         """
         self._name = name
+        self._version = version
         self.data_converter = data_converter
         self.interceptors = interceptors
         self.activities = activities
@@ -97,6 +100,10 @@ class SimplePlugin(temporalio.client.Plugin, temporalio.worker.Plugin):
     def name(self) -> str:
         """See base class."""
         return self._name
+
+    def version(self) -> str:
+        """See base class."""
+        return self._version
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """See base class."""
