@@ -16,7 +16,12 @@ from opentelemetry.trace import (
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import (
+    Client,
+    WorkflowFailureError,
+    WorkflowQueryFailedError,
+    WorkflowUpdateFailedError,
+)
 from temporalio.contrib.opentelemetry import OpenTelemetryPlugin, create_tracer_provider
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
@@ -711,3 +716,80 @@ def test_replay_safe_span_delegates_extra_attributes():
         _ = wrapper.nonexistent_attribute_xyz
 
     inner_span.end()
+
+
+@workflow.defn
+class RejectingHandlersWorkflow:
+    def __init__(self) -> None:
+        self._value: int | None = None
+
+    @workflow.run
+    async def run(self) -> int | None:
+        await workflow.wait_condition(lambda: self._value is not None)
+        return self._value
+
+    @workflow.update
+    def set_value(self, value: int) -> None:
+        self._value = value
+
+    @set_value.validator
+    def validate_set_value(self, value: int) -> None:
+        if value < 0:
+            raise ValueError("value must not be negative")
+
+    @workflow.query
+    def failing_query(self) -> str:
+        raise ValueError("query failed")
+
+
+async def test_otel_tracing_rejected_update_and_failed_query(
+    client: Client,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(new_client, RejectingHandlersWorkflow) as worker:
+        handle = await new_client.start_workflow(
+            RejectingHandlersWorkflow.run,
+            id=f"rejecting-handlers-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        with pytest.raises(WorkflowUpdateFailedError):
+            await handle.execute_update(RejectingHandlersWorkflow.set_value, -1)
+        with pytest.raises(WorkflowQueryFailedError):
+            await handle.query(RejectingHandlersWorkflow.failing_query)
+        await handle.execute_update(RejectingHandlersWorkflow.set_value, 1)
+        assert await handle.result() == 1
+
+    spans = exporter.get_finished_spans()
+
+    # The rejected update and the failed query are still traced
+    expected_hierarchy = [
+        "StartWorkflow:RejectingHandlersWorkflow",
+        "  RunWorkflow:RejectingHandlersWorkflow",
+        "StartWorkflowUpdate:set_value",
+        "  ValidateUpdate:set_value",
+        "QueryWorkflow:failing_query",
+        "  HandleQuery:failing_query",
+        "StartWorkflowUpdate:set_value",
+        "  ValidateUpdate:set_value",
+        "  HandleUpdate:set_value",
+    ]
+    actual_hierarchy = dump_spans(spans, with_attributes=False)
+    assert actual_hierarchy == expected_hierarchy, (
+        f"Span hierarchy mismatch.\nExpected:\n{expected_hierarchy}\nActual:\n{actual_hierarchy}"
+    )
+    failed_spans = [
+        span
+        for span in spans
+        if span.name in ("ValidateUpdate:set_value", "HandleQuery:failing_query")
+        and span.status.status_code == opentelemetry.trace.StatusCode.ERROR
+    ]
+    assert len(failed_spans) == 2

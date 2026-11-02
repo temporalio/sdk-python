@@ -1,0 +1,1 @@
+Fix OpenTelemetryPlugin dropping the worker-side span for a rejected update or a failed query. An exception from an update validator or query handler does not fail the workflow task, so its span is now ended and exported with an error status.
