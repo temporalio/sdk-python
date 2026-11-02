@@ -7,7 +7,6 @@ import threading
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Generic, TypeVar
 
 import opentelemetry.metrics
 import opentelemetry.util.types
@@ -15,33 +14,6 @@ import opentelemetry.util.types
 import temporalio.runtime
 
 logger = logging.getLogger(__name__)
-
-_K = TypeVar("_K")
-_V = TypeVar("_V")
-
-
-class _IdCache(Generic[_K, _V]):
-    # Keyed by id() for speed. Each entry holds its object, so the id can't be
-    # reused by another object while the entry is cached. A full cache starts
-    # over, which bounds what it keeps alive.
-    def __init__(self, max_size: int) -> None:
-        self._max_size = max_size
-        self._entries: dict[int, tuple[_K, _V]] = {}
-
-    def get(self, obj: _K) -> _V | None:
-        entry = self._entries.get(id(obj))
-        return None if entry is None else entry[1]
-
-    def put(self, obj: _K, value: _V) -> None:
-        if len(self._entries) >= self._max_size:
-            self._entries.clear()
-        self._entries[id(obj)] = (obj, value)
-
-    def __len__(self) -> int:
-        return len(self._entries)
-
-
-_ID_CACHE_SIZE = 1000
 
 
 @dataclass
@@ -167,9 +139,6 @@ class MetricsExporter:
         self._instruments: dict[
             tuple[str, temporalio.runtime.BufferedMetricKind], _Instrument
         ] = {}
-        self._instruments_by_metric: _IdCache[
-            temporalio.runtime.BufferedMetric, _Instrument
-        ] = _IdCache(_ID_CACHE_SIZE)
         self._started = False
         self._shutdown_event = asyncio.Event()
         self._run_complete_event = asyncio.Event()
@@ -274,13 +243,9 @@ class MetricsExporter:
     def _get_or_create_instrument(
         self, metric: temporalio.runtime.BufferedMetric
     ) -> _Instrument:
-        instrument = self._instruments_by_metric.get(metric)
-        if instrument is not None:
-            return instrument
         key = (metric.name, metric.kind)
         instrument = self._instruments.get(key)
         if instrument is not None:
-            self._instruments_by_metric.put(metric, instrument)
             return instrument
 
         unit = metric.unit or ""
@@ -307,5 +272,4 @@ class MetricsExporter:
             raise ValueError(f"Unrecognized buffered metric kind: {metric.kind}")
 
         self._instruments[key] = instrument
-        self._instruments_by_metric.put(metric, instrument)
         return instrument
