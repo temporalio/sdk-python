@@ -950,9 +950,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             temporalio.nexus._operation_context._apply_nexus_context_to_start_workflow_update_request(
                 req
             )
-        temporalio.nexus._operation_context._apply_nexus_serialization_context_to_workflow_update_request(
-            req
-        )
+        else:
+            temporalio.nexus._operation_context._apply_nexus_serialization_context_to_workflow_update_request(
+                req
+            )
         if input.args:
             req.request.input.args.payloads.extend(
                 await data_converter.encode(input.args)
