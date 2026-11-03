@@ -52,6 +52,7 @@ from ._activities import (
 )
 from ._asyncio import (
     _FT,
+    TaskGroup,
     _release_waiter,
     _wait,
     as_completed,
@@ -195,6 +196,7 @@ __all__ = [
     "start_local_activity",
     "start_local_activity_class",
     "start_local_activity_method",
+    "TaskGroup",
     "as_completed",
     "wait",
     "Info",

@@ -1,15 +1,66 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Iterable, Iterator
+import sys
+from collections.abc import Awaitable, Iterable, Iterator, MutableSet
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
 from ..types import AnyType
 
 __all__ = [
+    "TaskGroup",
     "as_completed",
     "wait",
 ]
+
+
+class _OrderedTasks(MutableSet[asyncio.Task[Any]]):
+    def __init__(self) -> None:
+        self._items: dict[asyncio.Task[Any], None] = {}
+
+    def __contains__(self, task: object) -> bool:
+        return task in self._items
+
+    def __iter__(self) -> Iterator[asyncio.Task[Any]]:
+        return iter(self._items)
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def add(self, value: asyncio.Task[Any]) -> None:
+        self._items[value] = None
+
+    def discard(self, value: asyncio.Task[Any]) -> None:
+        self._items.pop(value, None)
+
+
+if sys.version_info >= (3, 11):
+    _TaskGroup = asyncio.TaskGroup
+else:
+
+    class _TaskGroup:  # pyright: ignore[reportUnreachable]
+        def __init__(self) -> None:
+            raise RuntimeError("workflow.TaskGroup requires Python 3.11 or newer")
+
+
+class TaskGroup(_TaskGroup):
+    """A deterministic version of :py:class:`asyncio.TaskGroup` for workflows.
+
+    Cancellation is requested for unfinished tasks in the order they were added
+    to the group. This does not guarantee the order in which their cleanup finishes.
+    All other behavior follows the running Python version's ``asyncio.TaskGroup``,
+    including waiting for tasks to finish and grouping their exceptions.
+
+    Requires Python 3.11 or newer. As with other workflow code, tasks must not
+    perform non-deterministic operations.
+    """
+
+    def __init__(self) -> None:
+        """Create a task group."""
+        super().__init__()
+        # Keep asyncio's version-specific cancellation and exception handling,
+        # but remove the set iteration that makes cancellation non-deterministic.
+        self._tasks = _OrderedTasks()  # type: ignore[assignment]
 
 
 def as_completed(

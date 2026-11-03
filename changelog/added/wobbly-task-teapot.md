@@ -1,1 +1,1 @@
-Warn when `asyncio.TaskGroup` is created in a sandboxed workflow because its non-deterministic task cancellation order can cause replay failures.
+Add `workflow.TaskGroup` for Python 3.11 and newer, a deterministic alternative to `asyncio.TaskGroup` that requests cancellation of unfinished tasks in the order they were added. Warn when `asyncio.TaskGroup` is created in a sandboxed workflow because its non-deterministic task cancellation order can cause replay failures.
