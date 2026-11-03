@@ -1,3 +1,8 @@
+import asyncio
+import sys
+
+import pytest
+
 import temporalio.workflow
 
 # Generated from temporalio.workflow on main
@@ -47,6 +52,7 @@ EXPECTED_WORKFLOW_EXPORTS = [
     "RootInfo",
     "SandboxImportNotificationPolicy",
     "SelfType",
+    "TaskGroup",
     "UnfinishedSignalHandlersWarning",
     "UnfinishedUpdateHandlersWarning",
     "UpdateInfo",
@@ -208,6 +214,16 @@ def test_workflow_module_exports_match_main() -> None:
         if not hasattr(temporalio.workflow, name)
     ]
     assert not missing
+
+
+def test_workflow_task_group_python_version() -> None:
+    if sys.version_info < (3, 11):
+        with pytest.raises(  # pyright: ignore[reportUnreachable]
+            RuntimeError, match="requires Python 3.11 or newer"
+        ):
+            temporalio.workflow.TaskGroup()
+    else:
+        assert issubclass(temporalio.workflow.TaskGroup, asyncio.TaskGroup)
 
 
 def test_workflow_module_drops_intentionally_removed_import_exports() -> None:
