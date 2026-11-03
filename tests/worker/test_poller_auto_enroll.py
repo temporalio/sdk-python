@@ -78,7 +78,6 @@ async def test_poller_autoscaling_auto_enroll(env: WorkflowEnvironment):
             )
         )
 
-        # No poller config: the namespace auto-enrolls the worker into autoscaling.
         async with new_worker(
             client, NoopWorkflow, activities=[noop_activity]
         ) as worker:
@@ -95,7 +94,6 @@ async def test_poller_autoscaling_auto_enroll(env: WorkflowEnvironment):
 
             await assert_eventually(assert_autoscaling)
 
-        # Explicit poller config opts out of auto-enroll.
         async with new_worker(
             client,
             NoopWorkflow,

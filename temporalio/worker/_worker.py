@@ -327,14 +327,11 @@ class Worker:
                 patch or ``False`` to leave it inactive.
                 WARNING: This is an experimental feature and may change in the future.
             workflow_task_poller_behavior: Specify the behavior of workflow task polling.
-                If unset, uses poller autoscaling when the namespace auto-enrolls workers
-                into it, otherwise a 5-poller maximum.
+                Defaults to a 5-poller maximum.
             activity_task_poller_behavior: Specify the behavior of activity task polling.
-                If unset, uses poller autoscaling when the namespace auto-enrolls workers
-                into it, otherwise a 5-poller maximum.
+                Defaults to a 5-poller maximum.
             nexus_task_poller_behavior: Specify the behavior of Nexus task polling.
-                If unset, uses poller autoscaling when the namespace auto-enrolls workers
-                into it, otherwise a 5-poller maximum.
+                Defaults to a 5-poller maximum.
             disable_payload_error_limit: If true, payload and memo error limit checks
                 are disabled in the worker, allowing payloads and memos that are above
                 the server error limit to be submitted to the Temporal server. If false,
@@ -1070,7 +1067,6 @@ class WorkerConfig(TypedDict, total=False):
 def _poller_behavior_to_bridge(
     behavior: PollerBehavior | None,
 ) -> temporalio.bridge.worker.PollerBehavior | None:
-    # None lets core pick the behavior from the namespace's auto-enroll capability.
     return None if behavior is None else behavior._to_bridge()
 
 
