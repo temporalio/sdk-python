@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1163,7 +1164,9 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     keyword_list_key = SearchAttributeKey.for_keyword_list("python_test_keyword_list")
-    await ensure_search_attributes_present(client, keyword_list_key)
+    # Cloud provisions this attribute with the namespace and denies Operator Service access.
+    if "TEMPORAL_IS_CLOUD_TESTS" not in os.environ:
+        await ensure_search_attributes_present(client, keyword_list_key)
 
     handle = await client.start_activity(
         increment,
