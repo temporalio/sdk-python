@@ -4199,8 +4199,6 @@ class _WorkflowLogicFlag(IntEnum):
     PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
 
 
-# TODO: Enable PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH by default after
-# two published SDK releases have recognized flag 2. When enabling it, remove the
-# explicit overrides for this flag from tests/worker/test_workflow.py, then remove
-# this reminder.
-_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
+_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
+    {_WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH}
+)
