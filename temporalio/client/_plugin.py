@@ -40,6 +40,17 @@ class Plugin(abc.ABC):
         """
         return type(self).__module__ + "." + type(self).__qualname__
 
+    def version(self) -> str:
+        """Get the version of this plugin. Can be overridden to provide a version.
+
+        Clients don't report plugin versions yet. A plugin that is also a
+        temporalio.worker.Plugin reports its version in worker heartbeats.
+
+        Returns:
+            The version of the plugin. Empty by default.
+        """
+        return ""
+
     @abstractmethod
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         """Hook called when creating a client to allow modification of configuration.

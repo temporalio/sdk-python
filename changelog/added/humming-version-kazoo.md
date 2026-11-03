@@ -1,1 +1,1 @@
-Worker plugins can report a version in worker heartbeats by overriding `Plugin.version()` or passing `version` to `SimplePlugin`.
+Client and worker plugins have a new `Plugin.version()` method. Worker plugins report it in worker heartbeats; override it or pass `version` to `SimplePlugin`.
