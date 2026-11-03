@@ -785,8 +785,9 @@ class Worker:
     def is_running(self) -> bool:
         """Whether the worker is running.
 
-        This is only ``True`` if the worker has been started and not yet
-        shut down.
+        This becomes ``True`` when worker validation begins, before polling
+        starts. It becomes ``False`` when shutdown completes or validation
+        fails.
         """
         return self._started and not self.is_shutdown
 
@@ -796,7 +797,8 @@ class Worker:
 
         This is only ``True`` if the worker was once started and then shutdown.
         This is not necessarily ``True`` after :py:meth:`shutdown` is first
-        called because the shutdown process can take a bit.
+        called because the shutdown process can take a bit. It also becomes
+        ``True`` if worker validation raises or is cancelled.
         """
         return self._shutdown_complete_event.is_set()
 
@@ -811,6 +813,10 @@ class Worker:
         :py:meth:`shutdown` does not need to be invoked in this case, it is
         harmless to do so. Otherwise, to shut down this worker, invoke
         :py:meth:`shutdown`.
+
+        This worker is single use. Calling this method again, including while
+        another call is starting or after validation fails, raises
+        ``RuntimeError("Already started")``.
 
         Technically this worker can be shutdown by issuing a cancel to this
         async function assuming that it is currently running. A cancel could
@@ -828,19 +834,21 @@ class Worker:
         await next_function(self)
 
     async def _run(self):
+        # Mark the worker started before the first await. A bridge worker can be
+        # validated only once: a second validation panics in the bridge, and after
+        # shutdown the bridge worker is gone. A repeated run() must stop here.
+        if self._started:
+            raise RuntimeError("Already started")
+        self._started = True
+
         # Eagerly validate which will do a namespace check in Core.
         try:
             await self._bridge_worker.validate()
         except BaseException:
-            # Nothing was started, so there is nothing to shut down. Mark
+            # No worker tasks were started, so there is nothing to shut down. Mark
             # shutdown complete or shutdown() and async with would wait forever.
-            if not self._started:
-                self._shutdown_complete_event.set()
+            self._shutdown_complete_event.set()
             raise
-
-        if self._started:
-            raise RuntimeError("Already started")
-        self._started = True
 
         # Create a task that raises when a shutdown is requested
         async def raise_on_shutdown():
