@@ -60,8 +60,6 @@ This file contains assembled releases only.
 
 ### Fixed
 
-- `temporalio.contrib.opentelemetry`: span and trace IDs generated inside a Workflow are now seeded from the run ID. After a reset, the spans of reapplied Signal and Update handlers no longer reuse IDs the original run already exported.
-
 - Fix `contrib.opentelemetry` `ReplaySafeLoggerProvider.get_logger()` raising `TypeError` with opentelemetry-api 1.45, where `Logger.enabled` became abstract. `enabled()` now returns `False` while replaying history events, matching `emit()`.
 
 - `contrib.google_adk_agents`: agents with an `output_schema` no longer fail every workflow task when calling the model. The schema type is now sent to the model activity as its JSON schema. Custom Pydantic schema generation is preserved. Integer-valued output enums are normalized to strings to match Google GenAI.

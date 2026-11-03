@@ -1,0 +1,1 @@
+`temporalio.contrib.opentelemetry`: span and trace IDs generated inside a Workflow are now seeded from the run ID. After a reset, the spans of reapplied Signal and Update handlers no longer reuse IDs the original run already exported.
