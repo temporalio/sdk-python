@@ -148,12 +148,11 @@ def check_proto_toolchain_versions():
 
     Due to issues with the Python protobuf 3.x vs protobuf 4.x libraries, we
     must require that grpcio tools be on 1.48.x and protobuf be on 3.x for
-    generation of protos. We can't check __version__ on the module (not
-    present), and we can't use importlib.metadata due to its absence in 3.7,
-    so we just run pip and check there.
+    generation of protos. This toolchain requires Python 3.10; use
+    poe gen-protos-docker to run it separately from the SDK environment.
     """
     proc = subprocess.run(
-        ["uv", "pip", "list", "--format", "freeze"],
+        ["uv", "pip", "list", "--python", sys.executable, "--format", "freeze"],
         check=True,
         capture_output=True,
         text=True,

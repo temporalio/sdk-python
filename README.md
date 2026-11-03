@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
-[![Python 3.10+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -2052,7 +2052,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.10 and newer. It is built using
+The Python SDK supports Python 3.11 through 3.15. It is built using
 [SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building
@@ -2248,18 +2248,18 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 
 #### Proto Generation and Testing
 
-If you have docker available, run
+Generate protobuf code with Docker:
 
 ```
 poe gen-protos-docker
 ```
 
-Alternatively: to generate protobuf code, you must be on Python <= 3.10, and then run `uv add
-"protobuf<4"` + `uv sync --all-extras`. Then the protobuf files can be generated via `poe
-gen-protos` followed by `poe format`. Do not commit `uv.lock` or `pyproject.toml` changes. To go
-back from this downgrade, restore both of those files and run `uv sync --all-extras`. Tests can be
-run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running
-tests.
+The Docker image keeps the legacy Python 3.10 protobuf compiler separate from the SDK's
+Python 3.11+ development environment. No project dependency downgrade is needed for generation.
+To test with protobuf version 3, temporarily run `uv remove --dev grpcio-tools`,
+`uv add --dev "googleapis-common-protos==1.70.0"`, and `uv add "protobuf<4"`, then set
+`TEMPORAL_TEST_PROTO3=1` when running tests. Restore `pyproject.toml` and `uv.lock`
+after testing and run `uv sync --all-extras`; do not commit these temporary downgrades.
 
 ### Style
 

@@ -20,7 +20,7 @@ inputs:
   python-image:
     description: "Alpine Python Docker image"
     required: false
-    default: "python:3.10-alpine"
+    default: "python:3.11-alpine"
 runs:
   using: composite
   steps:

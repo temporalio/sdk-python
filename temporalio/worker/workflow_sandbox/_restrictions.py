@@ -725,7 +725,9 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                 "token_urlsafe",
             }
         ),
-        "select": SandboxMatcher.all_uses_runtime,
+        # Python 3.15 probes kqueue while importing subprocess on macOS.
+        # kevent is an inert value that kqueue.control must receive unproxied.
+        "select": SandboxMatcher(use={"*"}, exclude={"kevent"}, only_runtime=True),
         "selectors": SandboxMatcher.all_uses_runtime,
         "shelve": SandboxMatcher.all_uses,
         "shutil": SandboxMatcher.all_uses,

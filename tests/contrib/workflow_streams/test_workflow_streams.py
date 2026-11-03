@@ -3,20 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 import uuid
+from asyncio import timeout as _async_timeout
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any, cast
 from unittest.mock import patch
-
-if sys.version_info >= (3, 11):
-    from asyncio import timeout as _async_timeout  # pyright: ignore[reportUnreachable]
-else:
-    from async_timeout import (  # pyright: ignore[reportUnreachable]
-        timeout as _async_timeout,
-    )
 
 import google.protobuf.duration_pb2
 import nexusrpc

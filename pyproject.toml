@@ -3,7 +3,7 @@ name = "temporalio"
 version = "1.35.0"
 description = "Temporal.io Python SDK"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -11,17 +11,16 @@ keywords = ["temporal", "workflow"]
 dependencies = [
   "nexus-rpc==1.5.0",
   "protobuf>=3.20,<8.0.0",
-  "python-dateutil>=2.8.2,<3 ; python_version < '3.11'",
   "types-protobuf>=3.20,<8.0.0",
   "typing-extensions>=4.2.0,<5",
 ]
 classifiers = [
   "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
 ]
 
 [project.optional-dependencies]
@@ -32,7 +31,7 @@ openai-agents = ["temporalio-openai-agents>=1.0.0"]
 google-adk = ["temporalio-google-adk[mcp]>=0.0.1"]
 langgraph = ["temporalio-langgraph>=0.1.0"]
 langsmith = ["temporalio-langsmith>=0.1.1"]
-deepagents = ["temporalio-deepagents>=0.0.1; python_version >= '3.11'"]
+deepagents = ["temporalio-deepagents>=0.0.1"]
 lambda-worker-otel = [
   "opentelemetry-api>=1.26,<2",
   "opentelemetry-sdk>=1.26,<2",
@@ -68,7 +67,6 @@ dev = [
   "cryptography>=46",
   "grpcio-tools>=1.48.2,<2",
   "mypy==1.18.2",
-  "mypy-protobuf>=3.3.0,<4",
   "psutil>=5.9.3,<6",
   "pydocstyle>=6.3.0,<7",
   "pydoctor>=25.10.1,<26",
@@ -94,7 +92,6 @@ dev = [
   "opentelemetry-semantic-conventions>=0.40b0,<1",
   "opentelemetry-sdk-extension-aws>=2.0.0,<3",
   "pytest-flakefinder>=1.1.0",
-  "async-timeout>=4.0,<6; python_version < '3.11'",
 ]
 
 [tool.poe.tasks]
@@ -162,7 +159,7 @@ filterwarnings = [
 
 [tool.cibuildwheel]
 before-all = "pip install protoc-wheel-0"
-build = "cp310-win_amd64 cp310-manylinux_x86_64 cp310-manylinux_aarch64 cp310-musllinux_x86_64 cp310-musllinux_aarch64 cp310-macosx_x86_64 cp310-macosx_arm64"
+build = "cp311-win_amd64 cp311-manylinux_x86_64 cp311-manylinux_aarch64 cp311-musllinux_x86_64 cp311-musllinux_aarch64 cp311-macosx_x86_64 cp311-macosx_arm64"
 build-verbosity = 1
 
 [tool.cibuildwheel.macos]
@@ -263,7 +260,7 @@ exclude = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]

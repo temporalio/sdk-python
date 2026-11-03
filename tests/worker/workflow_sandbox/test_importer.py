@@ -1,6 +1,7 @@
 import dataclasses
 import importlib
 import importlib.machinery
+import select
 import subprocess
 import sys
 import textwrap
@@ -39,6 +40,25 @@ def test_workflow_sandbox_importer_path_in_place_division():
         assert str(original) == "root"
         with pytest.raises(RestrictedWorkflowAccessError):
             path.exists()
+
+
+@pytest.mark.skipif(not hasattr(select, "kevent"), reason="Requires kqueue support")
+def test_workflow_sandbox_importer_subprocess_kqueue_probe():
+    context = RestrictionContext()
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        passthrough_modules=SandboxRestrictions.passthrough_modules_with_temporal,
+    )
+    with Importer(restrictions, context).applied():
+        import select as sandboxed_select
+        import subprocess as sandboxed_subprocess
+
+        assert type(sandboxed_select.kevent(1)) is sandboxed_select.kevent
+        context.is_runtime = True
+        with pytest.raises(RestrictedWorkflowAccessError):
+            sandboxed_select.kqueue()
+        with pytest.raises(RestrictedWorkflowAccessError):
+            sandboxed_subprocess.run(["unused"])
 
 
 @pytest.mark.parametrize(

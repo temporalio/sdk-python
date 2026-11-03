@@ -121,7 +121,7 @@ Reviewers will look for:
 
 ## Notes
 
-* The SDK supports Python 3.10 and newer.
+* The SDK supports Python 3.11 through 3.15.
 * Generated protobuf and bridge files have specific regeneration workflows; see
   `README.md` before changing them.
 * The Rust bridge uses SDK Core from `temporalio/bridge/sdk-core`.
