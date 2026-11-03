@@ -60,6 +60,9 @@ async def create() -> None:
                 name=namespace_name,
                 regions=["aws-ca-central-1"],
                 retention_days=1,
+                search_attributes={
+                    "python_test_keyword_list": NamespaceSpec.SEARCH_ATTRIBUTE_TYPE_KEYWORD_LIST,
+                },
                 mtls_auth=MtlsAuthSpec(
                     accepted_client_ca=Path(
                         os.environ["TEMPORAL_CLOUD_CLIENT_CA_PATH"]
