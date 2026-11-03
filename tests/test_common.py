@@ -88,10 +88,10 @@ def test_type_hints_from_func():
     assert_hints(MyCallableClass().aliased_self_method)
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11), reason="typing.Self requires Python 3.11"
+)
 def test_type_hints_from_func_typing_self():
-    if sys.version_info < (3, 11):
-        pytest.skip("typing.Self requires Python 3.11")
-
     class Service:
         def method(self: typing.Self, value: str) -> str:
             return value
@@ -101,12 +101,12 @@ def test_type_hints_from_func_typing_self():
 
 
 def test_type_hints_from_func_preserves_annotated_self_argument():
-    def func(self: int, value: str) -> str:
-        return value
+    def func(self: int) -> int:  # pyright: ignore[reportUnusedParameter]
+        raise NotImplementedError
 
     args, return_hint = _type_hints_from_func(func)
-    assert args == [int, str]
-    assert return_hint is str
+    assert args == [int]
+    assert return_hint is int
 
 
 def test_raw_value_pickle():
