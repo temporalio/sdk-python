@@ -889,7 +889,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if resp.HasField("outcome"):
             handle._known_outcome = resp.outcome
         if input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
-            await handle._poll_until_outcome()
+            await handle._poll_until_outcome(
+                rpc_metadata=input.rpc_metadata, rpc_timeout=input.rpc_timeout
+            )
         return handle
 
     async def _build_update_workflow_execution_request(
@@ -1097,7 +1099,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             result_type=update_input.ret_type,
         )
         if update_input.wait_for_stage == WorkflowUpdateStage.COMPLETED:
-            await handle._poll_until_outcome()
+            await handle._poll_until_outcome(
+                rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout
+            )
 
         return handle
 

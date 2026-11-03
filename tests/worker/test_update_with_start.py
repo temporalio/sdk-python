@@ -7,14 +7,16 @@ from dataclasses import dataclass
 from datetime import timedelta
 from enum import Enum, IntEnum
 from typing import Any
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 import temporalio.api.common.v1
+import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
 import temporalio.worker
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import UpdateWorkflowExecutionLifecycleStage
 from temporalio.client import (
     Client,
     Interceptor,
@@ -33,7 +35,7 @@ from temporalio.common import (
 )
 from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
-from temporalio.service import RPCError, RPCStatusCode
+from temporalio.service import RPCError, RPCStatusCode, ServiceClient
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
     new_worker,
@@ -1292,3 +1294,87 @@ async def test_update_with_start_rpc_metadata_and_timeout_forwarded(client: Clie
     assert captured_metadata.get("original-key") == "original-value"
     # The caller's timeout should have been forwarded
     assert captured_timeout == [timedelta(seconds=42)]
+
+
+async def test_update_with_start_rpc_metadata_and_timeout_apply_to_the_result_poll():
+    calls: list[tuple[str, Mapping[str, str | bytes], timedelta | None]] = []
+
+    class AcceptThenPollService:
+        """Starts the workflow and accepts the update without its outcome, so the
+        client polls for it."""
+
+        async def execute_multi_operation(
+            self,
+            req: temporalio.api.workflowservice.v1.ExecuteMultiOperationRequest,
+            *,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
+            **_kwargs: Any,
+        ) -> temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse:
+            calls.append(("execute_multi_operation", metadata, timeout))
+            update_req = req.operations[1].update_workflow
+            return temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse(
+                responses=[
+                    temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse.Response(
+                        start_workflow=temporalio.api.workflowservice.v1.StartWorkflowExecutionResponse(
+                            run_id="run", started=True
+                        )
+                    ),
+                    temporalio.api.workflowservice.v1.ExecuteMultiOperationResponse.Response(
+                        update_workflow=temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse(
+                            update_ref=temporalio.api.update.v1.UpdateRef(
+                                workflow_execution=temporalio.api.common.v1.WorkflowExecution(
+                                    workflow_id=update_req.workflow_execution.workflow_id,
+                                    run_id="run",
+                                ),
+                                update_id=update_req.request.meta.update_id,
+                            ),
+                            stage=UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
+                        )
+                    ),
+                ]
+            )
+
+        async def poll_workflow_execution_update(
+            self,
+            _req: temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest,
+            *,
+            metadata: Mapping[str, str | bytes] = {},
+            timeout: timedelta | None = None,
+            **_kwargs: Any,
+        ) -> temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse:
+            calls.append(("poll_workflow_execution_update", metadata, timeout))
+            return temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse(
+                outcome=temporalio.api.update.v1.Outcome(
+                    success=temporalio.api.common.v1.Payloads(
+                        payloads=DataConverter.default.payload_converter.to_payloads(
+                            ["done"]
+                        )
+                    )
+                )
+            )
+
+    service_client = Mock(spec=ServiceClient)
+    service_client.workflow_service = AcceptThenPollService()
+    service_client.config = Mock(identity="test-identity")
+    client = Client(service_client=service_client, namespace="test-namespace")
+
+    result = await client.execute_update_with_start_workflow(
+        UpdateWithStartInterceptorWorkflow.my_update,
+        "update-arg",
+        start_workflow_operation=WithStartWorkflowOperation(
+            UpdateWithStartInterceptorWorkflow.run,
+            "wf-arg",
+            id=f"wf-{uuid.uuid4()}",
+            task_queue="tq",
+            id_conflict_policy=WorkflowIDConflictPolicy.FAIL,
+        ),
+        rpc_metadata={"key": "value"},
+        rpc_timeout=timedelta(seconds=42),
+    )
+
+    assert result == "done"
+    assert calls == [
+        ("execute_multi_operation", {"key": "value"}, timedelta(seconds=42)),
+        ("poll_workflow_execution_update", {"key": "value"}, timedelta(seconds=42)),
+    ]

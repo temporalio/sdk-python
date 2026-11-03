@@ -16,6 +16,7 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -30,6 +31,7 @@ from temporalio.api.enums.v1 import (
     StartChildWorkflowExecutionFailedCause,
     TaskQueueKind,
     TimeoutType,
+    UpdateWorkflowExecutionLifecycleStage,
     WorkflowIdReusePolicy,
     WorkflowTaskFailedCause,
 )
@@ -87,6 +89,7 @@ from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import (
     RPCError,
     RPCStatusCode,
+    ServiceClient,
 )
 from temporalio.testing import WorkflowEnvironment
 from tests.helpers import (
@@ -1624,6 +1627,68 @@ def test_client_connect_config_matches_connect_params():
         f"Missing from config: {connect_params - config_keys}. "
         f"Extra in config: {config_keys - connect_params}."
     )
+
+
+class _AcceptThenPollUpdateService:
+    """Accepts an update without its outcome, so the client polls for it, and records
+    the RPC options of each call."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Mapping[str, str | bytes], timedelta | None]] = []
+
+    async def update_workflow_execution(
+        self,
+        req: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest,
+        *,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+        **_kwargs: Any,
+    ) -> temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse:
+        self.calls.append(("update_workflow_execution", metadata, timeout))
+        return temporalio.api.workflowservice.v1.UpdateWorkflowExecutionResponse(
+            update_ref=temporalio.api.update.v1.UpdateRef(
+                workflow_execution=req.workflow_execution,
+                update_id=req.request.meta.update_id,
+            ),
+            stage=UpdateWorkflowExecutionLifecycleStage.UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_ACCEPTED,
+        )
+
+    async def poll_workflow_execution_update(
+        self,
+        _req: temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateRequest,
+        *,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+        **_kwargs: Any,
+    ) -> temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse:
+        self.calls.append(("poll_workflow_execution_update", metadata, timeout))
+        return temporalio.api.workflowservice.v1.PollWorkflowExecutionUpdateResponse(
+            outcome=temporalio.api.update.v1.Outcome(
+                success=temporalio.api.common.v1.Payloads(
+                    payloads=DataConverter.default.payload_converter.to_payloads(
+                        ["done"]
+                    )
+                )
+            )
+        )
+
+
+async def test_execute_update_rpc_options_apply_to_the_result_poll():
+    service = _AcceptThenPollUpdateService()
+    service_client = mock.Mock(spec=ServiceClient)
+    service_client.workflow_service = service
+    service_client.config = mock.Mock(identity="test-identity")
+    client = Client(service_client=service_client, namespace="test-namespace")
+
+    result = await client.get_workflow_handle("wf").execute_update(
+        "update", rpc_metadata={"key": "value"}, rpc_timeout=timedelta(seconds=42)
+    )
+
+    assert result == "done"
+    assert service.calls == [
+        ("update_workflow_execution", {"key": "value"}, timedelta(seconds=42)),
+        ("poll_workflow_execution_update", {"key": "value"}, timedelta(seconds=42)),
+    ]
 
 
 class TestForkUseClient(_TestFork):

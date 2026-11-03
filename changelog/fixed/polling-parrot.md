@@ -1,0 +1,1 @@
+Waiting for an update to complete, with `execute_update()`, `execute_update_with_start_workflow()` or `wait_for_stage=WorkflowUpdateStage.COMPLETED`, now sends the `rpc_metadata` and `rpc_timeout` of the call on the requests that poll for the update outcome too, not only on the first request.
