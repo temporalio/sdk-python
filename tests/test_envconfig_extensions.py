@@ -3,6 +3,7 @@ import math
 import os
 import textwrap
 from collections.abc import Awaitable, Callable
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -111,8 +112,10 @@ def test_load_profile_ext_value_conversion():
             inf = -inf
             bool = true
             datetime = 1979-05-27T07:32:00Z
+            offset_datetime = 1979-05-27T00:32:00.999999999-07:00
+            local_datetime = 1979-05-27T07:32:00
             local_date = 1979-05-27
-            local_time = 07:32:00
+            local_time = 07:32:00.5
             array = [1, "two", 1979-05-27]
             nested = { key = "nested_value" }
             """
@@ -127,10 +130,14 @@ def test_load_profile_ext_value_conversion():
         "float": 1.5,
         "inf": -math.inf,
         "bool": True,
-        "datetime": "1979-05-27T07:32:00Z",
-        "local_date": "1979-05-27",
-        "local_time": "07:32:00",
-        "array": [1, "two", "1979-05-27"],
+        "datetime": datetime(1979, 5, 27, 7, 32, tzinfo=timezone.utc),
+        "offset_datetime": datetime(
+            1979, 5, 27, 0, 32, 0, 999999, tzinfo=timezone(timedelta(hours=-7))
+        ),
+        "local_datetime": datetime(1979, 5, 27, 7, 32),
+        "local_date": date(1979, 5, 27),
+        "local_time": time(7, 32, 0, 500000),
+        "array": [1, "two", date(1979, 5, 27)],
         "nested": {"key": "nested_value"},
     }
 

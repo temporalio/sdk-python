@@ -204,8 +204,9 @@ class ClientConfigProfile:
     ext: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     """Raw extension config from ``profile.<profile>.ext``, keyed by extension
     name. Each extension decodes its own table, which should be treated as
-    read-only. TOML datetimes are ISO 8601 strings. Not modified by
-    environment variables.
+    read-only. Values are converted as by :py:mod:`tomllib`, so TOML datetimes
+    are :py:class:`datetime.datetime`, :py:class:`datetime.date`, or
+    :py:class:`datetime.time` objects. Not modified by environment variables.
 
     .. warning::
        This API is experimental and unstable.
