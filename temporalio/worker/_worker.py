@@ -830,19 +830,19 @@ class Worker:
         await next_function(self)
 
     async def _run(self):
+        # Check before the first await: a bridge worker can only be validated once
+        if self._started:
+            raise RuntimeError("Already started")
+        self._started = True
+
         # Eagerly validate which will do a namespace check in Core.
         try:
             await self._bridge_worker.validate()
         except BaseException:
             # Nothing was started, so there is nothing to shut down. Mark
             # shutdown complete or shutdown() and async with would wait forever.
-            if not self._started:
-                self._shutdown_complete_event.set()
+            self._shutdown_complete_event.set()
             raise
-
-        if self._started:
-            raise RuntimeError("Already started")
-        self._started = True
 
         # Create a task that raises when a shutdown is requested
         async def raise_on_shutdown():

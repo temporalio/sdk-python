@@ -267,6 +267,86 @@ class WaitOnSignalWorkflow:
         workflow.logger.info(f"Signal: {value}")
 
 
+async def test_worker_run_while_running_raises_already_started(client: Client):
+    async with new_worker(
+        client, WaitOnSignalWorkflow, activities=[say_hello]
+    ) as worker:
+
+        async def complete_workflow() -> None:
+            handle = await client.start_workflow(
+                WaitOnSignalWorkflow.run,
+                id=f"wf-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle.signal(WaitOnSignalWorkflow.my_signal, "finish")
+            await handle.result()
+
+        # is_running includes validation, so complete work before testing this state.
+        await complete_workflow()
+        with pytest.raises(RuntimeError, match="^Already started$"):
+            await worker.run()
+        await complete_workflow()
+        assert worker.is_running
+
+
+async def test_worker_run_after_shutdown_raises_already_started(client: Client):
+    worker = create_worker(client)
+    async with worker:
+
+        async def is_running() -> None:
+            assert worker.is_running
+
+        await assert_eventually(is_running)
+    assert worker.is_shutdown
+    with pytest.raises(RuntimeError, match="^Already started$"):
+        await worker.run()
+
+
+async def test_worker_run_before_validation_finishes_raises_already_started(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    worker = new_worker(client, WaitOnSignalWorkflow, activities=[say_hello])
+    original_validate = worker._bridge_worker.validate
+    validated = asyncio.Event()
+    continue_run = asyncio.Event()
+
+    async def validate() -> Any:
+        result = await original_validate()
+        validated.set()
+        await continue_run.wait()
+        return result
+
+    # Hold validation's return so the calls overlap even with a fast server.
+    monkeypatch.setattr(worker._bridge_worker, "validate", validate)
+    first_run = asyncio.create_task(worker.run())
+    try:
+        await asyncio.wait_for(validated.wait(), 10)
+        with pytest.raises(RuntimeError, match="^Already started$"):
+            await worker.run()
+        assert worker.is_running and not worker.is_shutdown
+        continue_run.set()
+
+        # The first run is unaffected and still completes a workflow
+        handle = await client.start_workflow(
+            WaitOnSignalWorkflow.run,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(WaitOnSignalWorkflow.my_signal, "finish")
+        await handle.result()
+    finally:
+        continue_run.set()
+        await worker.shutdown()
+        await first_run
+
+
+async def test_worker_run_inside_async_with_raises_already_started(client: Client):
+    # `async with` already runs the worker in the background
+    with pytest.raises(RuntimeError, match="^Already started$"):
+        async with create_worker(client) as worker:
+            await worker.run()
+
+
 async def test_worker_validate_fail(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server does not appear to fail on invalid namespace")
@@ -297,7 +377,9 @@ async def test_worker_validate_fail_does_not_hang_shutdown(
     with pytest.raises(RuntimeError, match="^Worker validation failed"):
         await worker.run()
     await asyncio.wait_for(worker.shutdown(), 10)
-    assert worker.is_shutdown
+    assert worker.is_shutdown and not worker.is_running
+    with pytest.raises(RuntimeError, match="^Already started$"):
+        await worker.run()
 
     # async with should raise the validation error instead of hanging
     async def run_in_context() -> None:
