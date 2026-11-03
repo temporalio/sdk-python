@@ -192,14 +192,21 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import uuid\nuuid.uuid4()",
         ]
 
-        # We can only validate this restriction prior to 3.14 because we had to exempt it due to
+        # We can only validate this restriction prior to 3.13.12 because we had to exempt it due to
         # https://github.com/python/cpython/issues/140228
-        if sys.version_info < (3, 14):
+        if sys.version_info < (3, 13, 12):
             invalid_code_to_check.append("import os.path\nos.path.abspath('foo')")  # type: ignore[reportUnreachable]
 
         # uuid7 was only added to the stdlib in 3.14
         if sys.version_info >= (3, 14):
             invalid_code_to_check.append("import uuid\nuuid.uuid7()")  # type: ignore[reportUnreachable]
+
+        # clock_gettime is not available on every platform (e.g. Windows)
+        if hasattr(time, "clock_gettime"):
+            invalid_code_to_check += [
+                "import time\ntime.clock_gettime(time.CLOCK_REALTIME)",
+                "import time\ntime.clock_gettime_ns(time.CLOCK_REALTIME)",
+            ]
 
         for code in invalid_code_to_check:
             with pytest.raises(WorkflowFailureError) as err:

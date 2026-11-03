@@ -778,6 +778,7 @@ class SchedulePatch(google.protobuf.message.Message):
     BACKFILL_REQUEST_FIELD_NUMBER: builtins.int
     PAUSE_FIELD_NUMBER: builtins.int
     UNPAUSE_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
     @property
     def trigger_immediately(self) -> global___TriggerImmediatelyRequest:
         """If set, trigger one action immediately."""
@@ -796,6 +797,13 @@ class SchedulePatch(google.protobuf.message.Message):
     notes field to the value of the string.
     """
     unpause: builtins.str
+    @property
+    def time_skipping_config(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
+        """If set, applies the specified time-skipping configuration to this schedule,
+        replacing any existing time-skipping configuration.
+        """
     def __init__(
         self,
         *,
@@ -804,11 +812,16 @@ class SchedulePatch(google.protobuf.message.Message):
         | None = ...,
         pause: builtins.str = ...,
         unpause: builtins.str = ...,
+        time_skipping_config: temporalio.api.common.v1.message_pb2.TimeSkippingConfig
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "trigger_immediately", b"trigger_immediately"
+            "time_skipping_config",
+            b"time_skipping_config",
+            "trigger_immediately",
+            b"trigger_immediately",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -818,6 +831,8 @@ class SchedulePatch(google.protobuf.message.Message):
             b"backfill_request",
             "pause",
             b"pause",
+            "time_skipping_config",
+            b"time_skipping_config",
             "trigger_immediately",
             b"trigger_immediately",
             "unpause",
@@ -842,6 +857,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     UPDATE_TIME_FIELD_NUMBER: builtins.int
     INVALID_SCHEDULE_ERROR_FIELD_NUMBER: builtins.int
     STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    TIME_SKIPPING_INFO_FIELD_NUMBER: builtins.int
     action_count: builtins.int
     """Number of actions taken so far."""
     missed_catchup_window: builtins.int
@@ -890,6 +906,13 @@ class ScheduleInfo(google.protobuf.message.Message):
     """Deprecated."""
     state_size_bytes: builtins.int
     """Size of the schedule's internal state (including payloads) in bytes."""
+    @property
+    def time_skipping_info(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.TimeSkippingInfo:
+        """Information about time skipping for this schedule.
+        If the schedule has never enabled time skipping, this will be unset.
+        """
     def __init__(
         self,
         *,
@@ -912,11 +935,18 @@ class ScheduleInfo(google.protobuf.message.Message):
         update_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         invalid_schedule_error: builtins.str = ...,
         state_size_bytes: builtins.int = ...,
+        time_skipping_info: temporalio.api.common.v1.message_pb2.TimeSkippingInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing_extensions.Literal[
-            "create_time", b"create_time", "update_time", b"update_time"
+            "create_time",
+            b"create_time",
+            "time_skipping_info",
+            b"time_skipping_info",
+            "update_time",
+            b"update_time",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -944,6 +974,8 @@ class ScheduleInfo(google.protobuf.message.Message):
             b"running_workflows",
             "state_size_bytes",
             b"state_size_bytes",
+            "time_skipping_info",
+            b"time_skipping_info",
             "update_time",
             b"update_time",
         ],

@@ -1997,20 +1997,25 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         markers = _capture_event_group_markers(event_groups)
-        ctxvars = contextvars.copy_context()
-
-        async def in_context():
-            _TimerOptionsCtxVar.set(
-                _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
-            )
-            await asyncio.wait_for(fut, timeout)
-
+        # asyncio.wait_for() starts its timer from this task, so the options are
+        # set in the task's context and reset once the wait ends
+        token = _TimerOptionsCtxVar.set(
+            _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
+        )
         try:
-            await ctxvars.run(in_context)
+            await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
             if cancellation_arrived():
                 raise asyncio.CancelledError()
             raise
+        finally:
+            try:
+                _TimerOptionsCtxVar.reset(token)
+            except ValueError:
+                # Closing rather than resuming a coroutine suspended here
+                # unwinds it in another context, and the one the options were
+                # set in is being discarded anyway
+                pass
         if cancellation_arrived():
             raise asyncio.CancelledError()
 

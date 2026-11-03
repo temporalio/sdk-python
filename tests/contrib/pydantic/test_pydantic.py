@@ -86,6 +86,48 @@ def test_pydantic_json_converter_pickle(populate_cache: bool):
     assert restored._type_adapter.cache_info().hits == 1
 
 
+class AliasModel(BaseModel):
+    order_id: int = pydantic.Field(default=-1, alias="orderId")
+    note: str = ""
+    ratio: float = 1.0
+    wait: datetime.timedelta = datetime.timedelta(seconds=1)
+    data: bytes = b"data"
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        AliasModel(orderId=7),
+        float("inf"),
+        float("-inf"),
+        float("nan"),
+        [float("inf"), 1.5, float("nan")],
+        {"ratio": float("inf")},
+        {"wait": datetime.timedelta(minutes=1), "data": b"data"},
+    ],
+)
+def test_to_json_options_wire_format_matches_default(value: object):
+    default_payload = PydanticJSONPlainPayloadConverter().to_payload(value)
+    for options in (
+        temporalio.contrib.pydantic.ToJsonOptions(),
+        temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=False),
+    ):
+        options_payload = PydanticJSONPlainPayloadConverter(options).to_payload(value)
+        assert default_payload is not None
+        assert options_payload is not None
+        assert options_payload.data == default_payload.data
+
+
+def test_to_json_options_exclude_unset_keeps_aliases():
+    converter = PydanticJSONPlainPayloadConverter(
+        temporalio.contrib.pydantic.ToJsonOptions(exclude_unset=True)
+    )
+    payload = converter.to_payload(AliasModel(orderId=7))
+    assert payload is not None
+    assert payload.data == b'{"orderId":7}'
+    assert converter.from_payload(payload, AliasModel) == AliasModel(orderId=7)
+
+
 async def test_pydantic_data_converter_pickle():
     restored = pickle.loads(pickle.dumps(pydantic_data_converter))
     value = {"a": 1}

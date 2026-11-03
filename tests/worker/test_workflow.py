@@ -8350,6 +8350,54 @@ async def test_concurrent_sleeps_use_proper_options(
         await handle.query("__temporal_workflow_metadata")
 
 
+@workflow.defn
+class WaitConditionThenSleepWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        with workflow.create_event_group("wait").scope():
+            try:
+                await workflow.wait_condition(
+                    lambda: False, timeout=0.01, timeout_summary="wait_condition"
+                )
+            except asyncio.TimeoutError:
+                pass
+        await asyncio.sleep(0.01)
+        with workflow.create_event_group("later").scope():
+            await asyncio.sleep(0.01)
+
+
+async def test_wait_condition_timer_options_not_used_by_later_timers(
+    client: Client, env: WorkflowEnvironment
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
+        )
+    async with new_worker(client, WaitConditionThenSleepWorkflow) as worker:
+        handle = await client.start_workflow(
+            WaitConditionThenSleepWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+        timers = [
+            e
+            async for e in handle.fetch_history_events()
+            if e.event_type == EventType.EVENT_TYPE_TIMER_STARTED
+        ]
+        assert [
+            PayloadConverter.default.from_payload(t.user_metadata.summary)
+            if t.user_metadata.HasField("summary")
+            else "<no summ>"
+            for t in timers
+        ] == ["wait_condition", "<no summ>", "<no summ>"]
+        assert [[m.label.id for m in t.event_group_markers] for t in timers] == [
+            ["wait"],
+            [],
+            ["later"],
+        ]
+
+
 class BadFailureConverterError(Exception):
     pass
 

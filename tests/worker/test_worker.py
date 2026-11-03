@@ -44,10 +44,8 @@ from temporalio.runtime import (
 from temporalio.service import RPCError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
-    ActivitySlotInfo,
     CustomSlotSupplier,
     FixedSizeSlotSupplier,
-    LocalActivitySlotInfo,
     NexusSlotInfo,
     PollerBehaviorAutoscaling,
     ResourceBasedSlotConfig,
@@ -448,6 +446,11 @@ class CustomSlotSupplierWorkflow:
             versioning_intent=VersioningIntent.DEFAULT,
             start_to_close_timeout=timedelta(seconds=5),
         )
+        await workflow.execute_local_activity(
+            say_hello,
+            "hi",
+            start_to_close_timeout=timedelta(seconds=5),
+        )
         nexus_client = workflow.create_nexus_client(
             endpoint=make_nexus_endpoint_name(workflow.info().task_queue),
             service=SayHelloService,
@@ -469,9 +472,19 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         pytest.skip("Nexus tests don't work under Java test server")
 
     class MyPermit(SlotPermit):
-        def __init__(self, pnum: int):
+        def __init__(self, pnum: int, slot_type: str):
             super().__init__()
             self.pnum = pnum
+            self.slot_type = slot_type
+
+    # Activity and local activity slot infos have the same shape, so the slot
+    # type recorded on the permit at reservation is used to tell them apart.
+    def slot_info_fields(permit: MyPermit, info: Any) -> tuple[Any, ...]:
+        if isinstance(info, WorkflowSlotInfo):
+            return (permit.slot_type, info.workflow_type, info.is_sticky)
+        if isinstance(info, NexusSlotInfo):
+            return (permit.slot_type, info.service, info.operation)
+        return (permit.slot_type, info.activity_type)
 
     class MySlotSupplier(CustomSlotSupplier):
         reserves = 0
@@ -480,7 +493,8 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
         used = 0
         seen_sticky_kinds = set()
         seen_slot_kinds = set()
-        seen_used_slot_kinds = set()
+        used_slot_infos = set()
+        released_slot_infos = set()
         seen_release_info_empty = False
         seen_release_info_nonempty = False
 
@@ -489,7 +503,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             # Verify an async call doesn't bungle things
             await asyncio.sleep(0.01)
             self.reserves += 1
-            return MyPermit(self.reserves)
+            return MyPermit(self.reserves, ctx.slot_type)
 
         def try_reserve_slot(self, ctx: SlotReserveContext) -> SlotPermit | None:
             self.reserve_asserts(ctx)
@@ -500,14 +514,7 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
             assert isinstance(ctx.permit, MyPermit)
             assert ctx.permit.pnum is not None
             assert ctx.slot_info is not None
-            if isinstance(ctx.slot_info, WorkflowSlotInfo):
-                self.seen_used_slot_kinds.add("wf")
-            elif isinstance(ctx.slot_info, ActivitySlotInfo):
-                self.seen_used_slot_kinds.add("a")
-            elif isinstance(ctx.slot_info, LocalActivitySlotInfo):
-                self.seen_used_slot_kinds.add("la")
-            elif isinstance(ctx.slot_info, NexusSlotInfo):
-                self.seen_used_slot_kinds.add("nx")
+            self.used_slot_infos.add(slot_info_fields(ctx.permit, ctx.slot_info))
             self.used += 1
 
         def release_slot(self, ctx: SlotReleaseContext) -> None:
@@ -522,6 +529,9 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
                 self.seen_release_info_empty = True
             else:
                 self.seen_release_info_nonempty = True
+                self.released_slot_infos.add(
+                    slot_info_fields(ctx.permit, ctx.slot_info)
+                )
             self.releases += 1
 
         def reserve_asserts(self, ctx: SlotReserveContext) -> None:
@@ -562,10 +572,19 @@ async def test_custom_slot_supplier(client: Client, env: WorkflowEnvironment):
     # This isn't solvable without redoing a chunk of pyo3-asyncio. So we only check
     # that the permits passed to release line up.
     assert ss.highest_seen_reserve_on_release >= ss.releases
-    assert ss.used == 5
+    assert ss.used == 6
     assert ss.seen_sticky_kinds == {True, False}
     assert ss.seen_slot_kinds == {"workflow", "activity", "local-activity", "nexus"}
-    assert ss.seen_used_slot_kinds == {"wf", "a", "nx"}
+    # Callback exceptions are logged and swallowed by the worker, so the slot
+    # info fields are checked here rather than inside the supplier.
+    assert ss.used_slot_infos == {
+        ("workflow", "CustomSlotSupplierWorkflow", False),
+        ("workflow", "CustomSlotSupplierWorkflow", True),
+        ("activity", "say_hello"),
+        ("local-activity", "say_hello"),
+        ("nexus", "SayHelloService", "say_hello"),
+    }
+    assert ss.released_slot_infos == ss.used_slot_infos
     assert ss.seen_release_info_empty
     assert ss.seen_release_info_nonempty
 

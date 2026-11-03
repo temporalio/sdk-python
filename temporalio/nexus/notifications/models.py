@@ -17,6 +17,11 @@ SourceContextT = typing.TypeVar("SourceContextT")
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteRequest(typing.Generic[OutputT, SourceContextT]):
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     result: OnCompleteRequestResult[OutputT]
     source_context: SourceContextT
 
@@ -93,6 +98,11 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class OnCompleteResponse:
+    """
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
     pass
 
 

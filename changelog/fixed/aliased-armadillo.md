@@ -1,0 +1,1 @@
+`temporalio.contrib.pydantic`: setting `ToJsonOptions` on the Pydantic payload converter no longer drops field aliases or serializes `inf`/`nan` as `null`; the JSON output now matches the default converter apart from the options themselves.

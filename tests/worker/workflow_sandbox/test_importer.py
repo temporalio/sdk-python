@@ -4,6 +4,7 @@ import importlib.machinery
 import subprocess
 import sys
 import textwrap
+import time
 import types
 from typing import Any
 
@@ -38,6 +39,34 @@ def test_workflow_sandbox_importer_path_in_place_division():
         assert str(original) == "root"
         with pytest.raises(RestrictedWorkflowAccessError):
             path.exists()
+
+
+@pytest.mark.parametrize(
+    ("function", "args"),
+    [
+        ("time", ""),
+        ("monotonic", ""),
+        ("clock_gettime", "time.CLOCK_REALTIME"),
+        ("clock_gettime_ns", "time.CLOCK_REALTIME"),
+    ],
+    ids=["time", "monotonic", "clock_gettime", "clock_gettime_ns"],
+)
+def test_workflow_sandbox_importer_clock_restricted_at_runtime_only(
+    function: str, args: str
+):
+    if not hasattr(time, function):
+        pytest.skip(f"time.{function} is not available on this platform")
+    call = f"time.{function}({args})"
+    context = RestrictionContext()
+    with Importer(SandboxRestrictions.default, context).applied():
+        import time as sandboxed_time
+
+        # Allowed while the workflow module is being imported
+        eval(call, {"time": sandboxed_time})
+        context.is_runtime = True
+        with pytest.raises(RestrictedWorkflowAccessError) as err:
+            eval(call, {"time": sandboxed_time})
+        assert err.value.qualified_name == f"time.{function}.__call__"
 
 
 @pytest.mark.parametrize("first", ["host", "sandbox"])

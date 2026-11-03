@@ -8,6 +8,10 @@ from ._decorators import (
     temporal_operation,
     workflow_run_operation,
 )
+from ._notification import (
+    CompletionCallback,
+    create_completion_callback,
+)
 from ._operation_context import (
     Info,
     LoggerAdapter,
@@ -38,6 +42,7 @@ __all__ = (
     "CancelActivityOptions",
     "CancelWorkflowRunOptions",
     "CancelUpdateWorkflowOptions",
+    "CompletionCallback",
     "Info",
     "LoggerAdapter",
     "NexusCallback",
@@ -45,6 +50,7 @@ __all__ = (
     "TemporalCancelOperationContext",
     "TemporalStartOperationContext",
     "client",
+    "create_completion_callback",
     "in_operation",
     "info",
     "is_worker_shutdown",

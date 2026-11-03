@@ -1,7 +1,6 @@
 from .activity_result_pb2 import (
     ActivityExecutionResult,
     ActivityResolution,
-    ActivityTaskFailedCause,
     Cancellation,
     DoBackoff,
     Failure,
@@ -12,7 +11,6 @@ from .activity_result_pb2 import (
 __all__ = [
     "ActivityExecutionResult",
     "ActivityResolution",
-    "ActivityTaskFailedCause",
     "Cancellation",
     "DoBackoff",
     "Failure",

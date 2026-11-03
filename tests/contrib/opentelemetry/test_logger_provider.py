@@ -1,10 +1,11 @@
 """Unit tests for ReplaySafeLoggerProvider."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from typing import Any
 from unittest.mock import patch
 
+import pytest
 from opentelemetry._logs import (
     Logger,
     LoggerProvider,
@@ -17,7 +18,6 @@ from opentelemetry.sdk._logs.export import (
     InMemoryLogRecordExporter,
     SimpleLogRecordProcessor,
 )
-from opentelemetry.util.types import _ExtendedAttributes
 
 from temporalio import workflow
 from temporalio.contrib.opentelemetry import ReplaySafeLoggerProvider
@@ -45,7 +45,13 @@ def test_replay_safe_logger_provider_emit_passes_through_outside_workflow():
     assert records[1].attributes and dict(records[1].attributes) == {"attr": "val"}
 
 
-def test_replay_safe_logger_provider_delegates_get_logger_arguments():
+@pytest.mark.parametrize(
+    "attributes",
+    [None, {"attr": "val"}, {"nested": {"values": [1, b"bytes", None]}}],
+)
+def test_replay_safe_logger_provider_delegates_get_logger_arguments(
+    attributes: Mapping[str, Any] | None,
+):
     class RecordingLoggerProvider(LoggerProvider):
         def __init__(self) -> None:
             self.calls: list[tuple] = []
@@ -56,7 +62,7 @@ def test_replay_safe_logger_provider_delegates_get_logger_arguments():
             name: str,
             version: str | None = None,
             schema_url: str | None = None,
-            attributes: _ExtendedAttributes | None = None,
+            attributes: Mapping[str, Any] | None = None,
         ) -> Logger:
             self.calls.append((name, version, schema_url, attributes))
             return self._inner.get_logger(name, version, schema_url, attributes)
@@ -67,11 +73,11 @@ def test_replay_safe_logger_provider_delegates_get_logger_arguments():
         "test-logger",
         version="1.2.3",
         schema_url="https://example.com/schema",
-        attributes={"attr": "val"},
+        attributes=attributes,
     )
 
     assert inner_provider.calls == [
-        ("test-logger", "1.2.3", "https://example.com/schema", {"attr": "val"})
+        ("test-logger", "1.2.3", "https://example.com/schema", attributes)
     ]
 
 

@@ -44,6 +44,7 @@ from temporalio.converter import (
     DefaultFailureConverter,
     DefaultPayloadConverter,
     EncodingPayloadConverter,
+    ExternalStorage,
     JSONPlainPayloadConverter,
     NexusSerializationContext,
     PayloadCodec,
@@ -56,6 +57,7 @@ from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
 from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from tests.test_extstore import InMemoryTestDriver
 
 
 @dataclass
@@ -192,8 +194,10 @@ class PayloadConversionWorkflow:
         return data
 
 
+@pytest.mark.parametrize("use_external_storage", [False, True])
 async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
     client: Client,
+    use_external_storage: bool,
 ):
     workflow_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
@@ -202,6 +206,12 @@ async def test_payload_conversion_calls_follow_expected_sequence_and_contexts(
     config["data_converter"] = dataclasses.replace(
         DataConverter.default,
         payload_converter_class=SerializationContextCompositePayloadConverter,
+        # External storage must not drop the context
+        external_storage=(
+            ExternalStorage(drivers=[InMemoryTestDriver()])
+            if use_external_storage
+            else None
+        ),
     )
     client = Client(**config)
 

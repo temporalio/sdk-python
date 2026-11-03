@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import operator
 import pathlib
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
@@ -177,3 +178,15 @@ def test_workflow_sandbox_restricted_proxy():
 
     # Unfortunately, we can't intercept the type() call
     assert type(obj.foo) is _RestrictedProxy
+
+
+def test_os_path_is_allowed_where_traceback_formatting_needs_it():
+    # Formatting a traceback calls os.path (via linecache) from inside the
+    # sandbox on Python 3.14+ and on 3.13.12+, where the linecache rewrite
+    # (https://github.com/python/cpython/issues/133253) was backported. See
+    # https://github.com/python/cpython/issues/140228.
+    context = RestrictionContext()
+    context.is_runtime = True
+    matcher = SandboxRestrictions.invalid_module_members_default
+    restricted = matcher.match_access(context, "os", "path", "isabs", include_use=True)
+    assert restricted == (sys.version_info < (3, 13, 12))

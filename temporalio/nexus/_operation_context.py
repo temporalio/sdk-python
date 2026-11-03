@@ -877,7 +877,7 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
     This is a no-op outside a Nexus operation context. Within one, it attaches
     the Nexus request ID and configures conflict handling to preserve the Nexus
     metadata. Inbound links are attached to the completion callback when the
-    activity backs the operation and to the request otherwise.
+    activity backs the operation and has a callback, and to the request otherwise.
     on_conflict_options is populated only when there are links or callbacks to
     attach.
     """
@@ -905,7 +905,7 @@ def _apply_nexus_context_to_start_activity_request(  # pyright: ignore[reportUnu
                 )
                 for callback in callbacks
             )
-        else:
+        if not callbacks:
             req.links.extend(request_links)
 
         if request_links or callbacks:

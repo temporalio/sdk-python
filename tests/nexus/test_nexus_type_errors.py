@@ -10,7 +10,9 @@ from unittest.mock import Mock
 
 import nexusrpc
 
+import temporalio.common
 import temporalio.nexus
+import temporalio.nexus.notifications
 from temporalio import activity, workflow
 from temporalio.client import Client, NexusOperationHandle
 from temporalio.nexus import TemporalOperationStartHandlerFunc
@@ -25,6 +27,297 @@ class MyInput:
 @dataclass
 class MyOutput:
     pass
+
+
+@dataclass
+class NotificationSourceContext:
+    value: str
+
+
+@nexusrpc.handler.service_handler(
+    name="temporal.notificationservice.v1.NotificationService"
+)
+class NotificationHandler:
+    @nexusrpc.handler.sync_operation(name="OnComplete")
+    async def on_complete(
+        self,
+        _context: nexusrpc.handler.StartOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            MyOutput, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.notifications.OnCompleteResponse:
+        return temporalio.nexus.notifications.OnCompleteResponse()
+
+
+@nexusrpc.handler.service_handler(name="raw-value.notification.service")
+class RawValueNotificationHandler:
+    @nexusrpc.handler.sync_operation(name="OnRawComplete")
+    async def on_raw_complete(
+        self,
+        _context: nexusrpc.handler.StartOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            temporalio.common.RawValue, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.notifications.OnCompleteResponse:
+        return temporalio.nexus.notifications.OnCompleteResponse()
+
+
+@nexusrpc.handler.service_handler(name="kinds.notification.service")
+class OperationKindsNotificationHandler:
+    @nexusrpc.handler.sync_operation
+    def def_on_complete(
+        self,
+        _ctx: nexusrpc.handler.StartOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            MyOutput, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.notifications.OnCompleteResponse:
+        return temporalio.nexus.notifications.OnCompleteResponse()
+
+    @nexusrpc.handler.sync_operation
+    def def_on_raw_complete(
+        self,
+        _ctx: nexusrpc.handler.StartOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            temporalio.common.RawValue, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.notifications.OnCompleteResponse:
+        return temporalio.nexus.notifications.OnCompleteResponse()
+
+    @temporalio.nexus.workflow_run_operation
+    async def workflow_run_on_complete(
+        self,
+        _ctx: temporalio.nexus.WorkflowRunOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            MyOutput, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.WorkflowHandle[
+        temporalio.nexus.notifications.OnCompleteResponse
+    ]:
+        raise NotImplementedError
+
+    @temporalio.nexus.workflow_run_operation
+    async def workflow_run_on_raw_complete(
+        self,
+        _ctx: temporalio.nexus.WorkflowRunOperationContext,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            temporalio.common.RawValue, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.WorkflowHandle[
+        temporalio.nexus.notifications.OnCompleteResponse
+    ]:
+        raise NotImplementedError
+
+    @temporalio.nexus.temporal_operation
+    async def temporal_on_complete(
+        self,
+        _ctx: temporalio.nexus.TemporalStartOperationContext,
+        _client: temporalio.nexus.TemporalNexusClient,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            MyOutput, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.TemporalOperationResult[
+        temporalio.nexus.notifications.OnCompleteResponse
+    ]:
+        raise NotImplementedError
+
+    @temporalio.nexus.temporal_operation
+    async def temporal_on_raw_complete(
+        self,
+        _ctx: temporalio.nexus.TemporalStartOperationContext,
+        _client: temporalio.nexus.TemporalNexusClient,
+        _input: temporalio.nexus.notifications.OnCompleteRequest[
+            temporalio.common.RawValue, NotificationSourceContext
+        ],
+    ) -> temporalio.nexus.TemporalOperationResult[
+        temporalio.nexus.notifications.OnCompleteResponse
+    ]:
+        raise NotImplementedError
+
+
+@nexusrpc.service(name="definition.notification.service")
+class NotificationDefinition:
+    on_complete: nexusrpc.Operation[
+        temporalio.nexus.notifications.OnCompleteRequest[
+            MyOutput, NotificationSourceContext
+        ],
+        temporalio.nexus.notifications.OnCompleteResponse,
+    ]
+    on_raw_complete: nexusrpc.Operation[
+        temporalio.nexus.notifications.OnCompleteRequest[
+            temporalio.common.RawValue, NotificationSourceContext
+        ],
+        temporalio.nexus.notifications.OnCompleteResponse,
+    ]
+
+
+# The declared types are wrong, so each error message shows the inferred type.
+def completion_callback_type_inference() -> None:
+    # overloads infer the handler's output type
+    # assert-type-error-pyright: 'Type "CompletionCallback\[MyOutput\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=NotificationHandler.on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[MyOutput\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=NotificationDefinition.on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[Any\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=RawValueNotificationHandler.on_raw_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[Any\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        service="named.notification.service",
+        operation="OnComplete",
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # def sync_operation, workflow_run_operation, and temporal_operation handler
+    # methods are supported
+    # assert-type-error-pyright: 'Type "CompletionCallback\[MyOutput\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.def_on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[Any\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.def_on_raw_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[MyOutput\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.workflow_run_on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[Any\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.workflow_run_on_raw_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[MyOutput\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.temporal_on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+    # assert-type-error-pyright: 'Type "CompletionCallback\[Any\]" is not assignable to declared type "None"'
+    _: None = temporalio.nexus.create_completion_callback(  # type: ignore
+        operation=OperationKindsNotificationHandler.temporal_on_raw_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+
+
+# These calls fail at runtime, so they are only type checked.
+def invalid_completion_callbacks() -> None:
+    # source_context must match the handler's source context type
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=NotificationHandler.on_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=NotificationDefinition.on_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=NotificationDefinition.on_raw_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=RawValueNotificationHandler.on_raw_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.def_on_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.def_on_raw_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.workflow_run_on_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.workflow_run_on_raw_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.temporal_on_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(
+        operation=OperationKindsNotificationHandler.temporal_on_raw_complete,  # type: ignore[arg-type]
+        task_queue="notifications",
+        # assert-type-error-pyright: 'Argument of type "MyInput" cannot be assigned to parameter "source_context"'
+        source_context=MyInput(),  # type: ignore
+    )
+
+    # operation names require a service name
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(  # type: ignore[call-overload]
+        # assert-type-error-pyright: 'Argument of type "Literal\['OnComplete'\]" cannot be assigned to parameter "operation"'
+        operation="OnComplete",  # type: ignore
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+
+    # operations other than names already identify their service
+    temporalio.nexus.create_completion_callback(
+        service="named.notification.service",
+        # assert-type-error-pyright: 'cannot be assigned to parameter "operation" of type "str"'
+        operation=NotificationHandler.on_complete,  # type: ignore
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
+
+    # all arguments are keyword arguments
+    # assert-type-error-pyright: 'No overloads for "create_completion_callback" match'
+    temporalio.nexus.create_completion_callback(  # type: ignore[call-overload]
+        NotificationHandler.on_complete,
+        task_queue="notifications",
+        source_context=NotificationSourceContext(value="ok"),
+    )
 
 
 @workflow.defn
@@ -787,6 +1080,190 @@ async def standalone_operation_type_tests():
         start_to_close_timeout=timedelta(seconds=2),
     )
     _defn_handle_output: MyOutput = await _defn_handle.result()
+
+    # completion callback output types must match the started operation
+    _callback_handle: NexusOperationHandle[
+        MyOutput
+    ] = await nexus_client.start_operation(
+        MyService.my_sync_operation,
+        MyInput(),
+        id="op-with-callback",
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    _mixed_callback_handle: NexusOperationHandle[
+        MyOutput
+    ] = await nexus_client.start_operation(
+        MyService.my_sync_operation,
+        MyInput(),
+        id="op-with-mixed-callbacks",
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+            # RawValue handlers accept the output of any operation
+            temporalio.nexus.create_completion_callback(
+                operation=RawValueNotificationHandler.on_raw_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # RawValue and by-name callbacks are compatible with any output type
+    await nexus_client.start_operation(
+        MyService.my_temporal_operation,
+        0,
+        id="op-with-any-output-callbacks",
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=RawValueNotificationHandler.on_raw_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+            # operation names have no handler signature, so they accept any output type
+            temporalio.nexus.create_completion_callback(
+                service="named.notification.service",
+                operation="OnComplete",
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await nexus_client.start_operation(  # type: ignore
+        MyService.my_temporal_operation,
+        0,
+        id="op-with-wrong-callback",
+        completion_callbacks=[  # type: ignore[arg-type]
+            # assert-type-error-pyright: '"list\[CompletionCallback\[MyOutput\]\]" cannot be assigned to parameter "completion_callbacks"'
+            temporalio.nexus.create_completion_callback(  # type: ignore
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    _callback_output: MyOutput = await nexus_client.execute_operation(
+        MyService.my_sync_operation,
+        MyInput(),
+        id="execute-with-callback",
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+            temporalio.nexus.create_completion_callback(
+                operation=RawValueNotificationHandler.on_raw_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await nexus_client.execute_operation(  # type: ignore
+        MyService.my_temporal_operation,
+        0,
+        id="execute-with-wrong-callback",
+        completion_callbacks=[  # type: ignore[arg-type]
+            # assert-type-error-pyright: '"list\[CompletionCallback\[MyOutput\]\]" cannot be assigned to parameter "completion_callbacks"'
+            temporalio.nexus.create_completion_callback(  # type: ignore
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+
+    # with a string operation name, callbacks must accept result_type
+    _str_callback_handle: NexusOperationHandle[
+        MyOutput
+    ] = await nexus_client.start_operation(
+        "my_sync_operation",
+        MyInput(),
+        id="str-op-with-callbacks",
+        result_type=MyOutput,
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+            temporalio.nexus.create_completion_callback(
+                operation=RawValueNotificationHandler.on_raw_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    _str_callback_output: MyOutput = await nexus_client.execute_operation(
+        "my_sync_operation",
+        MyInput(),
+        id="str-execute-with-callbacks",
+        result_type=MyOutput,
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+            temporalio.nexus.create_completion_callback(
+                operation=RawValueNotificationHandler.on_raw_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # without result_type, any callback is accepted
+    await nexus_client.start_operation(
+        "my_sync_operation",
+        MyInput(),
+        id="str-op-without-result-type",
+        completion_callbacks=[
+            temporalio.nexus.create_completion_callback(
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # assert-type-error-pyright: 'No overloads for "start_operation" match'
+    await nexus_client.start_operation(  # type: ignore
+        "my_sync_operation",
+        MyInput(),
+        id="str-op-with-wrong-callback",
+        result_type=str,
+        completion_callbacks=[  # type: ignore[arg-type]
+            # assert-type-error-pyright: '"list\[CompletionCallback\[MyOutput\]\]" cannot be assigned to parameter "completion_callbacks"'
+            temporalio.nexus.create_completion_callback(  # type: ignore
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
+    # assert-type-error-pyright: 'No overloads for "execute_operation" match'
+    await nexus_client.execute_operation(  # type: ignore
+        "my_sync_operation",
+        MyInput(),
+        id="str-execute-with-wrong-callback",
+        result_type=str,
+        completion_callbacks=[  # type: ignore[arg-type]
+            # assert-type-error-pyright: '"list\[CompletionCallback\[MyOutput\]\]" cannot be assigned to parameter "completion_callbacks"'
+            temporalio.nexus.create_completion_callback(  # type: ignore
+                operation=NotificationHandler.on_complete,
+                task_queue="notifications",
+                source_context=NotificationSourceContext(value="ok"),
+            ),
+        ],
+    )
 
     # result_type is not allowed when an operation is provided
     await nexus_client.start_operation(

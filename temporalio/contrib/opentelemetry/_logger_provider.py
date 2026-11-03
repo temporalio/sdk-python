@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from collections.abc import Mapping
+from typing import Any
 
 # The OpenTelemetry Logs API specification is stable, but opentelemetry-python
 # exposes the logs bridge API only under the private opentelemetry._logs
@@ -12,11 +13,6 @@ from typing import TYPE_CHECKING, Any
 from opentelemetry._logs import Logger, LoggerProvider
 
 from temporalio import workflow
-
-if TYPE_CHECKING:
-    # _ExtendedAttributes is the annotation OpenTelemetry's own public
-    # get_logger signature uses; there is no public alias.
-    from opentelemetry.util.types import _ExtendedAttributes
 
 
 def _skip_emitting() -> bool:
@@ -123,7 +119,7 @@ class ReplaySafeLoggerProvider(LoggerProvider):
         name: str,
         version: str | None = None,
         schema_url: str | None = None,
-        attributes: _ExtendedAttributes | None = None,
+        attributes: Mapping[str, Any] | None = None,
     ) -> Logger:
         """Get a replay-safe logger from the underlying provider.
 
@@ -132,6 +128,8 @@ class ReplaySafeLoggerProvider(LoggerProvider):
             version: The version string of the instrumenting library.
             schema_url: The schema URL for the logger.
             attributes: Instrumentation scope attributes for the logger.
+                Values are typed permissively to support different OpenTelemetry
+                attribute types across supported versions.
 
         Returns:
             A replay-safe logger instance.
