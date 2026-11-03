@@ -16,13 +16,9 @@ def _get_workflow_random() -> random.Random | None:
     ):
         instance = temporalio.workflow.instance()
         if getattr(instance, "__temporal_otel_id_random", None) is None:
-            # Seeded from the run ID rather than the workflow's randomness seed.
-            # Replays of a run see the same run ID, so span and trace IDs stay
-            # deterministic, and every run gets its own sequence. A reset run
-            # keeps the original run's randomness seed until core reseeds it at
-            # the reset point, and signal or update handlers reapplied by the
-            # reset run before that point: seeding from the randomness seed let
-            # their spans reuse IDs the original run had already exported.
+            # Seeded from the run ID: constant across replays of a run, so IDs
+            # stay deterministic, and unique per run, so a reset run cannot
+            # reuse IDs the original run already exported.
             setattr(
                 instance,
                 "__temporal_otel_id_random",

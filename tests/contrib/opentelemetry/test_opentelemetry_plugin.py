@@ -527,30 +527,20 @@ class ResetUpdateWorkflow:
 
     @workflow.run
     async def run(self) -> str:
-        await workflow.execute_activity(
-            simple_no_context_activity, start_to_close_timeout=timedelta(seconds=10)
-        )
         await workflow.wait_condition(lambda: self._approved)
         return "done"
 
     @workflow.update
-    async def approve(self) -> str:
+    async def approve(self) -> None:
         self._approved = True
-        return "approved"
 
 
-async def test_otel_tracing_reset_reapplied_update_ids_unique(
+async def test_otel_tracing_reset_does_not_reuse_span_ids(
     client: Client,
     env: WorkflowEnvironment,
     reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
 ):
-    """A reset run must not reuse span IDs the original run already exported.
-
-    The reset run keeps the original run's randomness seed until core reseeds
-    it at the reset point, and a reapplied update handler runs before that, so
-    a generator seeded from the randomness seed gave the reapplied HandleUpdate
-    span the original run's first span ID (its RunWorkflow span).
-    """
+    """Spans of a reset run must not reuse IDs the original run exported."""
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support reset")
 
@@ -564,26 +554,22 @@ async def test_otel_tracing_reset_reapplied_update_ids_unique(
     new_client = Client(**new_config)
 
     async with new_worker(
-        new_client,
-        ResetUpdateWorkflow,
-        activities=[simple_no_context_activity],
-        max_cached_workflows=0,
+        new_client, ResetUpdateWorkflow, max_cached_workflows=0
     ) as worker:
         handle = await new_client.start_workflow(
             ResetUpdateWorkflow.run,
             id=f"otel-reset-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        assert await handle.execute_update(ResetUpdateWorkflow.approve) == "approved"
+        await handle.execute_update(ResetUpdateWorkflow.approve)
         assert await handle.result() == "done"
 
-        # Reset to the first workflow task; the completed update is reapplied.
-        first_task_completed = 0
-        async for event in handle.fetch_history_events():
-            if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
-                first_task_completed = event.event_id
-                break
-        assert first_task_completed
+        # Reset to the first workflow task, reapplying the update.
+        first_task_completed = await anext(
+            event.event_id
+            async for event in handle.fetch_history_events()
+            if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        )
         await new_client.workflow_service.reset_workflow_execution(
             ResetWorkflowExecutionRequest(
                 namespace=new_client.namespace,
@@ -600,17 +586,8 @@ async def test_otel_tracing_reset_reapplied_update_ids_unique(
     names = [span.name for span in spans]
     assert names.count("RunWorkflow:ResetUpdateWorkflow") == 2
     assert names.count("HandleUpdate:approve") == 2
-    span_ids = [span.context.span_id for span in spans if span.context]
-    duplicates = {
-        format(span_id, "016x"): sorted(
-            span.name
-            for span in spans
-            if span.context and span.context.span_id == span_id
-        )
-        for span_id in span_ids
-        if span_ids.count(span_id) > 1
-    }
-    assert not duplicates, f"span IDs reused across runs: {duplicates}"
+    ids = [span.context.span_id for span in spans if span.context]
+    assert len(set(ids)) == len(ids), f"span IDs reused across runs: {names}"
 
 
 @workflow.defn(sandboxed=False)
