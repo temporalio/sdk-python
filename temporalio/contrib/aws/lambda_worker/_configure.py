@@ -41,10 +41,11 @@ class LambdaWorkerConfig:
             ``graceful_shutdown_timeout + 2s``. If you change
             ``graceful_shutdown_timeout`` in ``worker_config``, adjust this
             accordingly.
-        shutdown_hooks: Functions called at the end of each Lambda invocation,
-            after the worker has stopped. Run in list order. Each may be sync
-            or async. Use this to flush telemetry providers or release other
-            per-process resources.
+        shutdown_hooks: Functions called at invocation exit, including failure
+            or cancellation, after configuration setup and task queue validation
+            succeed. Run in list order, after the worker stops (if started) and
+            before configure teardown. Each may be sync or async. Use this to
+            flush telemetry providers or release other per-process resources.
     """
 
     client_connect_config: ClientConnectConfig = field(
