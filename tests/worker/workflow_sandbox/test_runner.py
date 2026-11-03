@@ -484,6 +484,31 @@ async def test_workflow_sandbox_bad_asyncio(client: Client):
         assert "asyncio.wait()" in str(warnings[1].message)
 
 
+@workflow.defn
+class UnsupportedTaskGroupWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        async with asyncio.TaskGroup() as group:
+            task = group.create_task(asyncio.sleep(0, result="done"))
+        return task.result()
+
+
+@pytest.mark.skipif(sys.version_info < (3, 11), reason="TaskGroup requires Python 3.11")
+async def test_workflow_sandbox_task_group_warning(client: Client):
+    async with new_worker(client, UnsupportedTaskGroupWorkflow) as worker:
+        with pytest.warns(
+            UserWarning,
+            match=r"asyncio\.TaskGroup is not supported in workflows.*cancellation order",
+        ) as warnings:
+            result = await client.execute_workflow(
+                UnsupportedTaskGroupWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert result == "done"
+        assert len(warnings) == 1
+
+
 def new_worker(
     client: Client,
     *workflows: type,
