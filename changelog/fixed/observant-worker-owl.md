@@ -1,1 +1,1 @@
-A second `Worker.run()` on the same worker now raises `RuntimeError("Already started")`, instead of a Rust `PanicException` while the worker starts or runs and an `AttributeError` after it has shut down.
+Calling `Worker.run()` again on the same worker now raises `RuntimeError("Already started")` instead of a bridge panic.
