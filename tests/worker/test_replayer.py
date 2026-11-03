@@ -584,9 +584,6 @@ async def test_replayer_unflagged_history_uses_legacy_async_ordering() -> None:
         workflows=[ActivityAndSignalsWhileWorkflowDown],
         interceptors=[WorkerWorkflowResultInterceptor()],
     )
-    replayer._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-    )
     await replayer.replay_workflow(history)
     assert test_replayer_workflow_res == [
         "act-start",

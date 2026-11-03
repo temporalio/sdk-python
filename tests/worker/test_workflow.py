@@ -1479,10 +1479,10 @@ _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
 )
 
 
-def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
+def test_single_batch_workflow_activation_jobs_default_enabled() -> None:
     assert (
         _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG
-        not in temporalio.worker._workflow_instance._DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+        in temporalio.worker._workflow_instance._DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
     )
 
 
@@ -1515,7 +1515,7 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
         task_queue=task_queue,
     )
 
-    async with new_worker(
+    worker = new_worker(
         client,
         EnableWorkflowLogicFlagAfterReplayWorkflow,
         task_queue=task_queue,
@@ -1523,7 +1523,12 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
         # task after its timeout, so keep events sent after this worker stops on
         # the normal queue.
         max_cached_workflows=0,
-    ):
+    )
+    # Start under the legacy ordering so the first task does not record the flag
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=False
+    )
+    async with worker:
 
         async def ready() -> bool:
             return await handle.query(EnableWorkflowLogicFlagAfterReplayWorkflow.ready)
@@ -1538,9 +1543,6 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
         EnableWorkflowLogicFlagAfterReplayWorkflow,
         task_queue=task_queue,
         workflow_runner=runner,
-    )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
     )
     async with worker:
         assert await handle.result() == "done"
@@ -1580,10 +1582,9 @@ async def test_workflow_cancel_before_run(client: Client, single_batch: bool):
     await handle.cancel()
     # Start worker and wait for result
     worker = new_worker(client, TrapCancelWorkflow, task_queue=task_queue)
-    if single_batch:
-        worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-        )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+    )
     async with worker:
         assert "cancelled" == await handle.result()
 
@@ -1651,9 +1652,6 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         # the normal queue.
         max_cached_workflows=0,
     )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-    )
     async with worker:
 
         async def ready() -> bool:
@@ -1671,9 +1669,6 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         CancelAtWaitConditionWorkflow,
         task_queue=task_queue,
         workflow_runner=runner,
-    )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
     )
     async with worker:
 
@@ -1750,9 +1745,6 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
         CompleteChildOnSignalWorkflow,
         task_queue=child_task_queue,
     )
-    child_worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-    )
     async with child_worker:
         handle = await client.start_workflow(
             CancelAtChildCompletionWorkflow.run,
@@ -1769,9 +1761,6 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
             # sticky task after its timeout, so keep events sent after this
             # worker stops on the normal queue.
             max_cached_workflows=0,
-        )
-        parent_worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
         )
         async with parent_worker:
 
@@ -1801,9 +1790,6 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
             CancelAtChildCompletionWorkflow,
             task_queue=parent_task_queue,
             workflow_runner=runner,
-        )
-        parent_worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
         )
         async with parent_worker:
             with pytest.raises(WorkflowFailureError) as err:
@@ -4789,10 +4775,9 @@ async def test_workflow_query_does_not_run_condition(
     client: Client, single_batch: bool
 ):
     worker = new_worker(client, QueryAffectConditionWorkflow)
-    if single_batch:
-        worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-        )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+    )
     async with worker:
         handle = await client.start_workflow(
             QueryAffectConditionWorkflow.run,
@@ -8558,9 +8543,6 @@ async def test_async_loop_ordering(client: Client, env: WorkflowEnvironment):
         SignalsActivitiesTimersUpdatesTracingWorkflow,
         activities=[say_hello],
         task_queue=task_queue,
-    )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
     )
     async with worker:
         await asyncio.sleep(0.2)

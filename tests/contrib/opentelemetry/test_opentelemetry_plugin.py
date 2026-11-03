@@ -16,6 +16,9 @@ from opentelemetry.trace import (
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
+from temporalio.api.common.v1 import WorkflowExecution
+from temporalio.api.enums.v1 import EventType, ResetReapplyType
+from temporalio.api.workflowservice.v1 import ResetWorkflowExecutionRequest
 from temporalio.client import (
     Client,
     WorkflowFailureError,
@@ -28,7 +31,7 @@ from temporalio.testing import WorkflowEnvironment
 
 # Import the dump_spans function from the original opentelemetry test
 from tests.contrib.opentelemetry.test_opentelemetry import dump_spans
-from tests.helpers import new_worker
+from tests.helpers import assert_eventually, new_worker
 from tests.helpers.nexus import make_nexus_endpoint_name
 
 logger = logging.getLogger(__name__)
@@ -793,3 +796,90 @@ async def test_otel_tracing_rejected_update_and_failed_query(
         and span.status.status_code == opentelemetry.trace.StatusCode.ERROR
     ]
     assert len(failed_spans) == 2
+
+
+@workflow.defn
+class ResetReapplyUpdateWorkflow:
+    def __init__(self) -> None:
+        self._approved = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.execute_activity(
+            simple_no_context_activity, start_to_close_timeout=timedelta(seconds=10)
+        )
+        await workflow.wait_condition(lambda: self._approved)
+        return "done"
+
+    @workflow.update
+    async def approve(self) -> None:
+        self._approved = True
+
+
+async def test_otel_tracing_reset_reapplied_update_span_id(
+    client: Client,
+    env: WorkflowEnvironment,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    """A reapplied update after a reset must not reuse another span's ID.
+
+    The random seed update arrives in the same activation as the reapplied
+    update, so the handler must only run once the new seed is applied.
+    """
+    if env.supports_time_skipping_v1:
+        pytest.skip("Java test server doesn't support reset")
+
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        ResetReapplyUpdateWorkflow,
+        activities=[simple_no_context_activity],
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await new_client.start_workflow(
+            ResetReapplyUpdateWorkflow.run,
+            id=f"otel-reset-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        # Let the first workflow task complete before sending the update so the
+        # original run handles the update in a later task.
+        async def first_task_completed() -> int:
+            async for event in handle.fetch_history_events():
+                if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
+                    return event.event_id
+            raise AssertionError("First workflow task has not completed")
+
+        reset_point = await assert_eventually(first_task_completed)
+        await handle.execute_update(ResetReapplyUpdateWorkflow.approve)
+        assert await handle.result() == "done"
+
+        # Reset to the first workflow task, reapplying the update.
+        await new_client.workflow_service.reset_workflow_execution(
+            ResetWorkflowExecutionRequest(
+                namespace=new_client.namespace,
+                workflow_execution=WorkflowExecution(workflow_id=handle.id),
+                reason="test",
+                reset_reapply_type=ResetReapplyType.RESET_REAPPLY_TYPE_ALL_ELIGIBLE,
+                request_id=str(uuid.uuid4()),
+                workflow_task_finish_event_id=reset_point,
+            )
+        )
+        assert await new_client.get_workflow_handle(handle.id).result() == "done"
+
+    spans = exporter.get_finished_spans()
+    assert [span.name for span in spans].count("HandleUpdate:approve") == 2
+    names_by_span_id: dict[int, set[str]] = {}
+    for span in spans:
+        assert span.context is not None
+        names_by_span_id.setdefault(span.context.span_id, set()).add(span.name)
+    shared = {k: v for k, v in names_by_span_id.items() if len(v) > 1}
+    assert not shared, f"different spans share a span ID: {shared}"
