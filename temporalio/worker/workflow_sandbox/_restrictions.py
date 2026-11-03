@@ -15,6 +15,7 @@ import math
 import operator
 import random
 import sys
+import threading
 import types
 import warnings
 from collections.abc import Callable, Mapping, Sequence
@@ -39,6 +40,13 @@ import temporalio.exceptions
 import temporalio.workflow
 
 logger = logging.getLogger(__name__)
+
+
+class _WarningLogging(threading.local):
+    active = False
+
+
+_warning_logging = _WarningLogging()
 
 LOG_TRACE = False
 
@@ -851,7 +859,15 @@ class _RestrictionState:
         if not matcher:
             return
 
-        logger.warning("%s on %s restricted", name, self.name)
+        # Creating a log record asks multiprocessing for the process name. If the
+        # workflow imported multiprocessing that call is restricted too, so each
+        # warning would log another one until the recursion limit
+        if not _warning_logging.active:
+            _warning_logging.active = True
+            try:
+                logger.warning("%s on %s restricted", name, self.name)
+            finally:
+                _warning_logging.active = False
         # Issue warning instead of error if configured to do so
         if matcher.leaf_warning:
             warnings.warn(

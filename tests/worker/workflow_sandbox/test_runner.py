@@ -4,6 +4,7 @@ import asyncio
 import dataclasses
 import functools
 import inspect
+import logging
 import os
 import sys
 import time
@@ -34,7 +35,7 @@ from temporalio.worker.workflow_sandbox import (
     UnintentionalPassthroughError,
 )
 from temporalio.workflow import SandboxImportNotificationPolicy
-from tests.helpers import assert_eq_eventually
+from tests.helpers import LogHandler, assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 
@@ -185,6 +186,7 @@ async def test_workflow_sandbox_restrictions(client: Client):
             "import random\nrandom.choice(['foo', 'bar'])",
             "import secrets\nsecrets.choice(['foo', 'bar'])",
             "import threading\nthreading.current_thread()",
+            "import multiprocessing\nmultiprocessing.current_process()",
             "import time\ntime.sleep(1)",
             "import concurrent.futures\nconcurrent.futures.ThreadPoolExecutor()",
             "import urllib.request\nurllib.request.urlopen('example.com')",
@@ -442,6 +444,56 @@ async def test_workflow_sandbox_known_issues(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+
+
+@workflow.defn
+class LogAfterImportingMultiprocessingWorkflow:
+    @workflow.run
+    async def run(self, import_multiprocessing: bool, count: int) -> int:
+        if import_multiprocessing:
+            # A library the workflow imports can do this. The logging module
+            # then asks the restricted multiprocessing for the process name
+            # whenever it creates a log record
+            import multiprocessing  #  type:ignore[reportUnusedImport] # noqa: F401
+
+        for i in range(count):
+            logging.getLogger(__name__).warning("line %d", i)
+        return count
+
+
+@pytest.mark.parametrize("import_multiprocessing", [False, True])
+async def test_workflow_sandbox_restriction_warning_does_not_recurse(
+    client: Client, monkeypatch: pytest.MonkeyPatch, import_multiprocessing: bool
+):
+    messages: list[str] = []
+
+    class MessageHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            messages.append(record.getMessage())
+
+    restrictions_logger = logging.getLogger(
+        "temporalio.worker.workflow_sandbox._restrictions"
+    )
+    # Keeps what the unfixed code logs out of the output of a failed test
+    monkeypatch.setattr(restrictions_logger, "propagate", False)
+    log_calls = 3
+    with LogHandler.apply(restrictions_logger, MessageHandler()):
+        async with new_worker(
+            client, LogAfterImportingMultiprocessingWorkflow
+        ) as worker:
+            assert log_calls == await client.execute_workflow(
+                LogAfterImportingMultiprocessingWorkflow.run,
+                args=[import_multiprocessing, log_calls],
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+
+    if not import_multiprocessing:
+        assert not messages
+    else:
+        # The lower bound also catches a guard that is never cleared.
+        assert log_calls <= len(messages) <= 2 * log_calls
+        assert "multiprocessing.current_process" in messages[0]
 
 
 @workflow.defn
