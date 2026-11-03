@@ -885,6 +885,10 @@ deterministic:
 * `asyncio.as_completed()` - use `workflow.as_completed()`
 * `asyncio.wait()` - use `workflow.wait()`
 
+`asyncio.TaskGroup` is not supported in workflows because it internally uses a `set()` to track tasks,
+making task cancellation order non-deterministic. This can cause replay failures even if the workflow
+catches the task group's exception and completes successfully. The sandbox warns when a task group is created.
+
 #### Asyncio Cancellation
 
 Cancellation is done using `asyncio` [task cancellation](https://docs.python.org/3/library/asyncio-task.html#task-cancellation).
