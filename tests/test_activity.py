@@ -1,5 +1,4 @@
 import asyncio
-import os
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1149,7 +1148,9 @@ async def test_id_reuse_policy_allow_duplicate(
     assert handle1.run_id != handle2.run_id
 
 
-async def test_search_attributes(client: Client, env: WorkflowEnvironment):
+async def test_search_attributes(
+    client: Client, env: WorkflowEnvironment, env_type: str
+):
     if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
@@ -1164,8 +1165,8 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
     keyword_list_key = SearchAttributeKey.for_keyword_list("python_test_keyword_list")
-    # Cloud provisions this attribute with the namespace and denies Operator Service access.
-    if "TEMPORAL_IS_CLOUD_TESTS" not in os.environ:
+    # Externally managed servers must provision this attribute before running tests.
+    if env_type in ("local", "time-skipping-v2"):
         await ensure_search_attributes_present(client, keyword_list_key)
 
     handle = await client.start_activity(
