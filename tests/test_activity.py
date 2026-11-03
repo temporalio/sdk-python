@@ -31,7 +31,11 @@ from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.service import RPCError, RPCStatusCode
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from tests.helpers import assert_eq_eventually, assert_eventually
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    ensure_search_attributes_present,
+)
 
 
 @activity.defn
@@ -1144,7 +1148,9 @@ async def test_id_reuse_policy_allow_duplicate(
     assert handle1.run_id != handle2.run_id
 
 
-async def test_search_attributes(client: Client, env: WorkflowEnvironment):
+async def test_search_attributes(
+    client: Client, env: WorkflowEnvironment, env_type: str
+):
     if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2741"
@@ -1158,9 +1164,10 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
 
     activity_id = str(uuid.uuid4())
     task_queue = str(uuid.uuid4())
-    temporal_change_version_key = SearchAttributeKey.for_keyword_list(
-        "TemporalChangeVersion"
-    )
+    keyword_list_key = SearchAttributeKey.for_keyword_list("python_test_keyword_list")
+    # Externally managed servers must provision this attribute before running tests.
+    if env_type in ("local", "time-skipping-v2"):
+        await ensure_search_attributes_present(client, keyword_list_key)
 
     handle = await client.start_activity(
         increment,
@@ -1169,12 +1176,12 @@ async def test_search_attributes(client: Client, env: WorkflowEnvironment):
         task_queue=task_queue,
         schedule_to_close_timeout=timedelta(seconds=60),
         search_attributes=TypedSearchAttributes(
-            [SearchAttributePair(temporal_change_version_key, ["test-1", "test-2"])]
+            [SearchAttributePair(keyword_list_key, ["test-1", "test-2"])]
         ),
     )
 
     desc = await handle.describe()
-    assert desc.typed_search_attributes[temporal_change_version_key] == [
+    assert desc.typed_search_attributes[keyword_list_key] == [
         "test-1",
         "test-2",
     ]
