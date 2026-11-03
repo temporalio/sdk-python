@@ -367,7 +367,7 @@ jobs:
     name: Required PR Checks
     # Without always(), this job would be skipped when a dependency fails, and GitHub
     # treats a skipped required check as passing.
-    if: always()
+    if: ${{ always() && github.event_name == 'pull_request' }}
     needs:
       - build-lint-test
       - check-protos
