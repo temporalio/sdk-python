@@ -24,6 +24,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode, get_tracer
 
+import temporalio.client
 from temporalio import activity, nexus, workflow
 from temporalio.client import Client, WithStartWorkflowOperation, WorkflowUpdateStage
 from temporalio.common import RetryPolicy, WorkflowIDConflictPolicy
@@ -533,6 +534,141 @@ async def test_opentelemetry_tracing_update_with_start(
         "  MyCustomSpan",
         "  CompleteWorkflow:TracingWorkflow",
     ]
+
+
+@workflow.defn
+class FailingHandlersWorkflow:
+    def __init__(self) -> None:
+        self._released = False
+
+    @workflow.run
+    async def run(self, fail: bool) -> None:
+        await workflow.wait_condition(lambda: self._released)
+        if fail:
+            raise ApplicationError("workflow failed", non_retryable=True)
+
+    @workflow.signal
+    def release(self) -> None:
+        self._released = True
+
+    @workflow.signal
+    def fail_in_signal(self) -> None:
+        raise ApplicationError("signal failed", non_retryable=True)
+
+    @workflow.update
+    def failing_update(self) -> None:
+        raise ApplicationError("update failed", non_retryable=True)
+
+    @workflow.update
+    def rejected_update(self) -> None:
+        pass
+
+    @rejected_update.validator
+    def reject_update(self) -> None:
+        raise ApplicationError("update rejected", non_retryable=True)
+
+
+def complete_workflow_spans(exporter: InMemorySpanExporter) -> list[ReadableSpan]:
+    return [
+        span
+        for span in exporter.get_finished_spans()
+        if span.name.startswith("CompleteWorkflow:")
+    ]
+
+
+@pytest.mark.parametrize(
+    "client_traces", [True, False], ids=["client-and-worker", "worker-only"]
+)
+async def test_opentelemetry_failed_update_is_not_workflow_completion(
+    client: Client, env: WorkflowEnvironment, client_traces: bool
+):
+    if env.supports_time_skipping_v1:
+        pytest.skip(
+            "Java test server: https://github.com/temporalio/sdk-java/issues/1424"
+        )
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    # Updates sent without a tracing client carry no span header, so the worker
+    # has to be told to create workflow spans without a parent
+    interceptor = TracingInterceptor(
+        tracer, always_create_workflow_spans=not client_traces
+    )
+    if client_traces:
+        client_config = client.config()
+        client_config["interceptors"] = [interceptor]
+        client = Client(**client_config)
+
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[FailingHandlersWorkflow],
+        interceptors=[] if client_traces else [interceptor],
+    ) as worker:
+        handle = await client.start_workflow(
+            FailingHandlersWorkflow.run,
+            False,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        for update in (
+            FailingHandlersWorkflow.failing_update,
+            FailingHandlersWorkflow.rejected_update,
+        ):
+            with pytest.raises(
+                temporalio.client.WorkflowUpdateFailedError
+            ) as update_err:
+                await handle.execute_update(update)
+            assert isinstance(update_err.value.cause, ApplicationError)
+
+        description = await handle.describe()
+        assert description.status == temporalio.client.WorkflowExecutionStatus.RUNNING
+        span_names = [span.name for span in exporter.get_finished_spans()]
+        assert "HandleUpdate:failing_update" in span_names
+        assert "ValidateUpdate:rejected_update" in span_names
+        assert [span.name for span in complete_workflow_spans(exporter)] == []
+
+        await handle.signal(FailingHandlersWorkflow.release)
+        await handle.result()
+
+    (completion,) = complete_workflow_spans(exporter)
+    assert not completion.events
+
+
+@pytest.mark.parametrize("failing", ["workflow", "signal"])
+async def test_opentelemetry_failed_workflow_is_workflow_completion(
+    client: Client, failing: str
+):
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = get_tracer(__name__, tracer_provider=provider)
+    client_config = client.config()
+    client_config["interceptors"] = [TracingInterceptor(tracer)]
+    client = Client(**client_config)
+
+    async with Worker(
+        client,
+        task_queue=f"task_queue_{uuid.uuid4()}",
+        workflows=[FailingHandlersWorkflow],
+    ) as worker:
+        handle = await client.start_workflow(
+            FailingHandlersWorkflow.run,
+            failing == "workflow",
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal(
+            FailingHandlersWorkflow.release
+            if failing == "workflow"
+            else FailingHandlersWorkflow.fail_in_signal
+        )
+        with pytest.raises(temporalio.client.WorkflowFailureError):
+            await handle.result()
+
+    (completion,) = complete_workflow_spans(exporter)
+    assert [event.name for event in completion.events] == ["exception"]
 
 
 @pytest.mark.requires_local_server

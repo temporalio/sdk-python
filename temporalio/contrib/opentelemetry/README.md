@@ -128,6 +128,10 @@ class MyWorkflow:
 - **No Direct OpenTelemetry Usage**: Cannot use standard OpenTelemetry APIs within workflows
 - **Limited Workflow Span Creation**: Must use `temporalio.contrib.opentelemetry.workflow.completed_span()`
 
+Failed or rejected updates do not emit a `CompleteWorkflow` span. The legacy
+`HandleUpdate` and `ValidateUpdate` spans do not record an exception event or an
+error status for the update failure.
+
 #### Usage Example:
 ```python
 @workflow.defn  

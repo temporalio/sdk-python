@@ -576,7 +576,9 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             link_context_carrier = self.payload_converter.from_payloads(
                 [link_context_header]
             )[0]
-        with self._top_level_workflow_context(success_is_complete=False):
+        with self._top_level_workflow_context(
+            success_is_complete=False, failure_is_complete=False
+        ):
             self._completed_span(
                 f"ValidateUpdate:{input.update}",
                 link_context_carrier=link_context_carrier,
@@ -596,7 +598,9 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
             link_context_carrier = self.payload_converter.from_payloads(
                 [link_context_header]
             )[0]
-        with self._top_level_workflow_context(success_is_complete=False):
+        with self._top_level_workflow_context(
+            success_is_complete=False, failure_is_complete=False
+        ):
             self._completed_span(
                 f"HandleUpdate:{input.update}",
                 link_context_carrier=link_context_carrier,
@@ -617,7 +621,7 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
 
     @contextmanager
     def _top_level_workflow_context(
-        self, *, success_is_complete: bool
+        self, *, success_is_complete: bool, failure_is_complete: bool = True
     ) -> Iterator[None]:
         # Load context only if there is a carrier, otherwise use empty context
         context_carrier = self._load_workflow_context_carrier()
@@ -638,9 +642,10 @@ class TracingWorkflowInboundInterceptor(temporalio.worker.WorkflowInboundInterce
                 yield None
                 success = True
             except temporalio.exceptions.FailureError as err:
-                # We only record the failure errors since those are the only ones
-                # that lead to workflow completions
-                exception = err
+                # Update failures do not complete the workflow, so those callers
+                # opt out of the completion span.
+                if failure_is_complete:
+                    exception = err
                 raise
             finally:
                 # Create a completed span before detaching context
