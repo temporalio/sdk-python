@@ -16,6 +16,10 @@ from opentelemetry.trace import (
 
 import temporalio.contrib.opentelemetry.workflow
 from temporalio import activity, nexus, workflow
+from temporalio.api.common.v1.message_pb2 import WorkflowExecution
+from temporalio.api.enums.v1 import EventType
+from temporalio.api.enums.v1.reset_pb2 import ResetReapplyType
+from temporalio.api.workflowservice.v1 import ResetWorkflowExecutionRequest
 from temporalio.client import (
     Client,
     WorkflowFailureError,
@@ -514,6 +518,99 @@ async def test_otel_tracing_with_added_spans(
 
 
 task_fail_once_workflow_has_failed = False
+
+
+@workflow.defn
+class ResetUpdateWorkflow:
+    def __init__(self) -> None:
+        self._approved = False
+
+    @workflow.run
+    async def run(self) -> str:
+        await workflow.execute_activity(
+            simple_no_context_activity, start_to_close_timeout=timedelta(seconds=10)
+        )
+        await workflow.wait_condition(lambda: self._approved)
+        return "done"
+
+    @workflow.update
+    async def approve(self) -> str:
+        self._approved = True
+        return "approved"
+
+
+async def test_otel_tracing_reset_reapplied_update_ids_unique(
+    client: Client,
+    env: WorkflowEnvironment,
+    reset_otel_tracer_provider: Any,  # type: ignore[reportUnusedParameter]
+):
+    """A reset run must not reuse span IDs the original run already exported.
+
+    The reset run keeps the original run's randomness seed until core reseeds
+    it at the reset point, and a reapplied update handler runs before that, so
+    a generator seeded from the randomness seed gave the reapplied HandleUpdate
+    span the original run's first span ID (its RunWorkflow span).
+    """
+    if env.supports_time_skipping_v1:
+        pytest.skip("Java test server doesn't support reset")
+
+    exporter = InMemorySpanExporter()
+    provider = create_tracer_provider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    opentelemetry.trace.set_tracer_provider(provider)
+
+    new_config = client.config()
+    new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
+    new_client = Client(**new_config)
+
+    async with new_worker(
+        new_client,
+        ResetUpdateWorkflow,
+        activities=[simple_no_context_activity],
+        max_cached_workflows=0,
+    ) as worker:
+        handle = await new_client.start_workflow(
+            ResetUpdateWorkflow.run,
+            id=f"otel-reset-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.execute_update(ResetUpdateWorkflow.approve) == "approved"
+        assert await handle.result() == "done"
+
+        # Reset to the first workflow task; the completed update is reapplied.
+        first_task_completed = 0
+        async for event in handle.fetch_history_events():
+            if event.event_type is EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED:
+                first_task_completed = event.event_id
+                break
+        assert first_task_completed
+        await new_client.workflow_service.reset_workflow_execution(
+            ResetWorkflowExecutionRequest(
+                namespace=new_client.namespace,
+                workflow_execution=WorkflowExecution(workflow_id=handle.id),
+                reason="test",
+                reset_reapply_type=ResetReapplyType.RESET_REAPPLY_TYPE_ALL_ELIGIBLE,
+                request_id=str(uuid.uuid4()),
+                workflow_task_finish_event_id=first_task_completed,
+            )
+        )
+        assert await new_client.get_workflow_handle(handle.id).result() == "done"
+
+    spans = exporter.get_finished_spans()
+    names = [span.name for span in spans]
+    assert names.count("RunWorkflow:ResetUpdateWorkflow") == 2
+    assert names.count("HandleUpdate:approve") == 2
+    span_ids = [span.context.span_id for span in spans if span.context]
+    duplicates = {
+        format(span_id, "016x"): sorted(
+            span.name
+            for span in spans
+            if span.context and span.context.span_id == span_id
+        )
+        for span_id in span_ids
+        if span_ids.count(span_id) > 1
+    }
+    assert not duplicates, f"span IDs reused across runs: {duplicates}"
 
 
 @workflow.defn(sandboxed=False)
