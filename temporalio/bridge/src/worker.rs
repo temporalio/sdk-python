@@ -62,7 +62,7 @@ pub struct WorkerConfig {
     nondeterminism_as_workflow_fail: bool,
     nondeterminism_as_workflow_fail_for_types: HashSet<String>,
     nexus_task_poller_behavior: PollerBehavior,
-    plugins: Vec<String>,
+    plugins: Vec<(String, String)>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
 }
@@ -767,10 +767,7 @@ fn convert_worker_config(
         .plugins(
             conf.plugins
                 .into_iter()
-                .map(|name| PluginInfo {
-                    name,
-                    version: String::new(),
-                })
+                .map(|(name, version)| PluginInfo { name, version })
                 .collect(),
         )
         .storage_drivers(

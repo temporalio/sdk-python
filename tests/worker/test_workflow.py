@@ -102,6 +102,7 @@ from temporalio.exceptions import (
     TimeoutError,
     WorkflowAlreadyStartedError,
 )
+from temporalio.plugin import SimplePlugin
 from temporalio.runtime import (
     BUFFERED_METRIC_KIND_COUNTER,
     BUFFERED_METRIC_KIND_HISTOGRAM,
@@ -5740,7 +5741,10 @@ async def test_workflow_buffered_metrics_worker_heartbeat(env: WorkflowEnvironme
     )
     client = await env.connect_client(runtime=runtime)
     async with new_worker(
-        client, CustomMetricsWorkflow, activities=[custom_metrics_activity]
+        client,
+        CustomMetricsWorkflow,
+        activities=[custom_metrics_activity],
+        plugins=[SimplePlugin("heartbeat-plugin", version="1.2.3")],
     ) as worker:
         await client.execute_workflow(
             CustomMetricsWorkflow.run,
@@ -5772,6 +5776,9 @@ async def test_workflow_buffered_metrics_worker_heartbeat(env: WorkflowEnvironme
             assert heartbeat.local_activity_slots_info.current_available_slots > 0
             assert heartbeat.workflow_poller_info.current_pollers > 0
             assert heartbeat.activity_poller_info.current_pollers > 0
+            assert [(p.name, p.version) for p in heartbeat.plugins] == [
+                ("heartbeat-plugin", "1.2.3")
+            ]
 
         # Do not drain the buffer: heartbeats must not depend on initializing Python attributes.
         await assert_eventually(assert_worker_heartbeat)

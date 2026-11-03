@@ -57,7 +57,7 @@ class WorkerConfig:
     nondeterminism_as_workflow_fail: bool
     nondeterminism_as_workflow_fail_for_types: set[str]
     nexus_task_poller_behavior: PollerBehavior
-    plugins: Sequence[str]
+    plugins: Sequence[tuple[str, str]]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
 
