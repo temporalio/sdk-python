@@ -231,7 +231,6 @@ jobs:
       - name: Check generation unchanged
         run: |
           [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
-      # Runtime compatibility is separate from the legacy generator in Docker.
       - run: uv add --dev --python 3.11 "googleapis-common-protos==1.70.0"
       - run: uv add --python 3.11 "protobuf<4"
       - run: uv sync --all-extras
