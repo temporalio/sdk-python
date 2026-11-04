@@ -2256,8 +2256,8 @@ poe gen-protos-docker
 
 The Docker image keeps the legacy Python 3.10 protobuf compiler separate from the SDK's
 Python 3.11+ development environment. No project dependency downgrade is needed for generation.
-To test with protobuf version 3, temporarily run `uv remove --dev grpcio-tools`,
-`uv add --dev "googleapis-common-protos==1.70.0"`, and `uv add "protobuf<4"`, then set
+To test with protobuf version 3, temporarily run
+`uv add --dev "googleapis-common-protos==1.70.0"` and `uv add "protobuf<4"`, then set
 `TEMPORAL_TEST_PROTO3=1` when running tests. Restore `pyproject.toml` and `uv.lock`
 after testing and run `uv sync --all-extras`; do not commit these temporary downgrades.
 

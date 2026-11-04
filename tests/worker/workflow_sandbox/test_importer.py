@@ -53,10 +53,11 @@ def test_workflow_sandbox_importer_subprocess_kqueue_probe():
         import select as sandboxed_select
         import subprocess as sandboxed_subprocess
 
-        assert type(sandboxed_select.kevent(1)) is sandboxed_select.kevent
+        kevent = getattr(sandboxed_select, "kevent")
+        assert type(kevent(1)) is kevent
         context.is_runtime = True
         with pytest.raises(RestrictedWorkflowAccessError):
-            sandboxed_select.kqueue()
+            getattr(sandboxed_select, "kqueue")()
         with pytest.raises(RestrictedWorkflowAccessError):
             sandboxed_subprocess.run(["unused"])
 

@@ -69,8 +69,7 @@ def nex_gen_command() -> list[str]:
 def build_descriptor_set(descriptor_path: Path) -> None:
     subprocess.check_call(
         [
-            sys.executable,
-            "-mgrpc_tools.protoc",
+            "protoc",
             f"--proto_path={gen_protos.api_proto_dir}",
             f"--proto_path={gen_protos.proto_dir}",
             "--include_imports",
