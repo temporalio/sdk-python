@@ -23,6 +23,7 @@ import temporalio.bridge.worker
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._extstore
+import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
@@ -73,6 +74,29 @@ def _set_external_storage_metrics(
     target.total_size_bytes = metrics.total_size
     target.total_duration.FromTimedelta(metrics.total_duration)
     target.driver_names.extend(sorted(metrics.driver_names))
+
+
+def _take_nexus_previous_run_outcome(
+    init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
+) -> temporalio.bridge.proto.workflow_activation.InitializeWorkflow | None:
+    """Move a Nexus-started workflow's previous run outcome out of ``init``.
+
+    A retried or cron run of a workflow started by a Nexus operation handler receives the previous
+    run's failure and result, which that run encoded with the Nexus context. The rest of ``init``,
+    such as the input and memo, keeps the workflow context.
+    """
+    if not init.HasField("propagated_nexus_serialization_context") or not (
+        init.HasField("continued_failure") or init.HasField("last_completion_result")
+    ):
+        return None
+    outcome = temporalio.bridge.proto.workflow_activation.InitializeWorkflow()
+    if init.HasField("continued_failure"):
+        outcome.continued_failure.CopyFrom(init.continued_failure)
+        init.ClearField("continued_failure")
+    if init.HasField("last_completion_result"):
+        outcome.last_completion_result.CopyFrom(init.last_completion_result)
+        init.ClearField("last_completion_result")
+    return outcome
 
 
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
@@ -382,12 +406,21 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     workflow_context_dc=data_converter,
                     workflow_context=workflow_context,
                 )
+            previous_run_outcome = (
+                _take_nexus_previous_run_outcome(init_job)
+                if not workflow and init_job
+                else None
+            )
             download_metrics = await temporalio.bridge.worker.decode_activation(
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
                 storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
             )
+            if init_job and previous_run_outcome:
+                await self._decode_nexus_previous_run_outcome(
+                    act.run_id, init_job, previous_run_outcome, download_metrics
+                )
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
@@ -656,6 +689,40 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 logger.debug("Shutting down worker on eviction hook exception")
                 self._bridge_worker().initiate_shutdown()
 
+    async def _decode_nexus_previous_run_outcome(
+        self,
+        run_id: str,
+        init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
+        outcome: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
+        download_metrics: temporalio.converter._extstore.StorageOperationMetrics,
+    ) -> None:
+        """Decode an outcome from :py:func:`_take_nexus_previous_run_outcome` and restore it."""
+        nexus_context = temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+            init
+        )
+        assert nexus_context
+        act = temporalio.bridge.proto.workflow_activation.WorkflowActivation(
+            run_id=run_id,
+            jobs=[
+                temporalio.bridge.proto.workflow_activation.WorkflowActivationJob(
+                    initialize_workflow=outcome
+                )
+            ],
+        )
+        metrics = await temporalio.bridge.worker.decode_activation(
+            act,
+            self._data_converter.with_context(nexus_context),
+            decode_headers=self._encode_headers,
+            storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
+        )
+        download_metrics.merge(metrics)
+        # Constructing the activation copied the outcome, so read the decoded fields from it
+        decoded = act.jobs[0].initialize_workflow
+        if decoded.HasField("continued_failure"):
+            init.continued_failure.CopyFrom(decoded.continued_failure)
+        if decoded.HasField("last_completion_result"):
+            init.last_completion_result.CopyFrom(decoded.last_completion_result)
+
     def _create_workflow_instance(
         self,
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
@@ -741,6 +808,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             last_completion_result=init.last_completion_result,
             last_failure=last_failure,
             default_workflow_logic_flags=frozenset(self._default_workflow_logic_flags),
+            nexus_serialization_context=temporalio.converter._serialization_context._propagated_nexus_serialization_context(
+                init
+            ),
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)
