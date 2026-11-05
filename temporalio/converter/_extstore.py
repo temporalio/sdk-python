@@ -71,6 +71,13 @@ class StorageOperationMetrics:
         self._spans.append((start, end))
         self.driver_names.update(driver_names)
 
+    def merge(self, other: StorageOperationMetrics) -> None:
+        """Add the metrics from another set of storage operations."""
+        self.payload_count += other.payload_count
+        self.total_size += other.total_size
+        self._spans.extend(other._spans)
+        self.driver_names.update(other.driver_names)
+
     @contextlib.contextmanager
     def track(self) -> Generator[Self, None, None]:
         """Set this instance as the current metrics context and reset on exit."""

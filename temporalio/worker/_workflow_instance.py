@@ -298,7 +298,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             workflow_context
         )
         # A workflow started by a Nexus operation handler returns its result and closing failure to
-        # the Nexus caller, which decodes them with the handler's Nexus context.
+        # the Nexus caller, which decodes them with the handler's Nexus context. A retried or cron run
+        # reads the previous run's result and failure with the same context.
         self._nexus_serialization_context = det.nexus_serialization_context
         if self._nexus_serialization_context:
             self._result_payload_converter = self._payload_converter_with_context(
@@ -2071,18 +2072,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             return None
 
         if type_hint is None:
-            return self._workflow_context_payload_converter.from_payload(
+            return self._result_payload_converter.from_payload(
                 self._last_completion_result.payloads[0]
             )
         else:
-            return self._workflow_context_payload_converter.from_payload(
+            return self._result_payload_converter.from_payload(
                 self._last_completion_result.payloads[0], type_hint
             )
 
     def workflow_last_failure(self) -> BaseException | None:
         if self._last_failure:
-            return self._workflow_context_failure_converter.from_failure(
-                self._last_failure, self._workflow_context_payload_converter
+            return self._result_failure_converter.from_failure(
+                self._last_failure, self._result_payload_converter
             )
 
         return None

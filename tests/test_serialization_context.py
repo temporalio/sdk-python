@@ -23,9 +23,11 @@ from pydantic import BaseModel
 from typing_extensions import Never
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.api.history.v1
 import temporalio.api.nexus.v1
+import temporalio.api.taskqueue.v1
 import temporalio.api.workflowservice.v1
 from temporalio import activity, nexus, workflow
 from temporalio.client import (
@@ -37,6 +39,7 @@ from temporalio.client import (
     NexusOperationFailureError,
     OutboundInterceptor,
     WorkflowFailureError,
+    WorkflowHistory,
     WorkflowUpdateFailedError,
 )
 from temporalio.common import RetryPolicy
@@ -2582,6 +2585,17 @@ class NexusStartedWorkflow:
         return input.value
 
 
+@workflow.defn
+class NexusRetriedWorkflow:
+    @workflow.run
+    async def run(self, input: NexusStartedInput) -> str:
+        if workflow.info().attempt == 1:
+            raise ApplicationError("retry", "retry-detail")
+        last_failure = workflow.get_last_failure()
+        assert isinstance(last_failure, ApplicationError)
+        return f"{input.value}:{last_failure.details[0]}"
+
+
 nexus_started_activity_contexts: list[NexusSerializationContext | None] = []
 nexus_started_async_completions: list[
     tuple[bytes, NexusSerializationContext | None]
@@ -2619,6 +2633,22 @@ class NexusStartedExecutionHandler:
         input: NexusStartedInput,
     ) -> nexus.TemporalOperationResult[str]:
         return await client.start_workflow(NexusStartedWorkflow.run, input, id=input.id)
+
+    @nexus.temporal_operation
+    async def start_retried_workflow(
+        self,
+        _ctx: nexus.TemporalStartOperationContext,
+        client: nexus.TemporalNexusClient,
+        input: NexusStartedInput,
+    ) -> nexus.TemporalOperationResult[str]:
+        return await client.start_workflow(
+            NexusRetriedWorkflow.run,
+            input,
+            id=input.id,
+            retry_policy=RetryPolicy(
+                initial_interval=timedelta(milliseconds=100), maximum_attempts=2
+            ),
+        )
 
     @nexus.temporal_operation
     async def start_activity(
@@ -2790,6 +2820,222 @@ async def test_nexus_started_workflow_uses_nexus_context(
                 close_event.workflow_execution_completed_event_attributes.result.payloads
             )
             assert _marker(result) == b"nexus"
+
+
+@pytest.mark.requires_local_server
+async def test_nexus_started_workflow_retry_reads_last_failure_with_nexus_context(
+    env: WorkflowEnvironment,
+):
+    """The retried run decodes the failure the previous run encoded with the Nexus context."""
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    task_queue = str(uuid.uuid4())
+    endpoint_name = make_nexus_endpoint_name(task_queue)
+    client = _nexus_started_client(
+        env, _nexus_started_context(endpoint_name, "start_retried_workflow")
+    )
+
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[NexusRetriedWorkflow],
+        nexus_service_handlers=[NexusStartedExecutionHandler()],
+    ):
+        await env.create_nexus_endpoint(endpoint_name, task_queue)
+        nexus_client = client.create_nexus_client(
+            NexusStartedExecutionHandler, endpoint_name
+        )
+        # Decoding with the wrong context fails every workflow task of the retried run, which
+        # never completes
+        result = await asyncio.wait_for(
+            nexus_client.execute_operation(
+                NexusStartedExecutionHandler.start_retried_workflow,
+                NexusStartedInput(
+                    id=f"nexus-retried-workflow-{uuid.uuid4()}", value="nexus-value"
+                ),
+                id=str(uuid.uuid4()),
+            ),
+            timeout=30,
+        )
+        assert result == "nexus-value:retry-detail"
+
+
+class _DecodeRecordingPayloadCodec(PayloadCodec, WithSerializationContext):
+    """Records the context each payload's data is decoded with."""
+
+    def __init__(
+        self,
+        seen: dict[bytes, SerializationContext | None],
+        context: SerializationContext | None = None,
+    ):
+        self.seen = seen
+        self.context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> _DecodeRecordingPayloadCodec:
+        return _DecodeRecordingPayloadCodec(self.seen, context)
+
+    async def encode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        return list(payloads)
+
+    async def decode(
+        self, payloads: Sequence[temporalio.api.common.v1.Payload]
+    ) -> list[temporalio.api.common.v1.Payload]:
+        for payload in payloads:
+            self.seen[payload.data] = self.context
+        return list(payloads)
+
+
+previous_run_converter_contexts: dict[Any, SerializationContext | None] = {}
+
+
+class _FromPayloadRecordingJSONConverter(
+    JSONPlainPayloadConverter, WithSerializationContext
+):
+    """Records the context each JSON value is converted with."""
+
+    def __init__(self, context: SerializationContext | None = None):
+        super().__init__()
+        self.context = context
+
+    def with_context(
+        self, context: SerializationContext
+    ) -> _FromPayloadRecordingJSONConverter:
+        return _FromPayloadRecordingJSONConverter(context)
+
+    def from_payload(
+        self,
+        payload: temporalio.api.common.v1.Payload,
+        type_hint: type | None = None,
+    ) -> Any:
+        value = super().from_payload(payload, type_hint)
+        previous_run_converter_contexts[value] = self.context
+        return value
+
+
+class _FromPayloadRecordingPayloadConverter(
+    CompositePayloadConverter, WithSerializationContext
+):
+    def __init__(self):
+        super().__init__(_FromPayloadRecordingJSONConverter())
+
+
+@workflow.defn
+class PreviousRunOutcomeWorkflow:
+    @workflow.run
+    async def run(self, _input: str) -> None:
+        workflow.get_last_completion_result()
+        workflow.get_last_failure()
+
+
+def _json_payload(value: str) -> temporalio.api.common.v1.Payload:
+    return temporalio.api.common.v1.Payload(
+        metadata={"encoding": b"json/plain"}, data=json.dumps(value).encode()
+    )
+
+
+@pytest.mark.parametrize("with_nexus_context", [True, False])
+async def test_previous_run_outcome_decodes_with_nexus_context(
+    with_nexus_context: bool,
+):
+    """A retried or cron run decodes the previous run's failure and result with the Nexus context
+    when the workflow was started by a Nexus handler, and its input and memo with the workflow
+    context."""
+    nexus_context = NexusSerializationContext(
+        endpoint="endpoint", service="service", operation="operation"
+    )
+    started = temporalio.api.history.v1.WorkflowExecutionStartedEventAttributes(
+        workflow_type=temporalio.api.common.v1.WorkflowType(
+            name="PreviousRunOutcomeWorkflow"
+        ),
+        task_queue=temporalio.api.taskqueue.v1.TaskQueue(name="task-queue"),
+        input=temporalio.api.common.v1.Payloads(payloads=[_json_payload("input")]),
+        memo=temporalio.api.common.v1.Memo(
+            fields={"memo-key": _json_payload("memo-value")}
+        ),
+        continued_failure=temporalio.api.failure.v1.Failure(
+            message="previous-failure",
+            application_failure_info=temporalio.api.failure.v1.ApplicationFailureInfo(
+                details=temporalio.api.common.v1.Payloads(
+                    payloads=[_json_payload("previous-failure-detail")]
+                )
+            ),
+        ),
+        last_completion_result=temporalio.api.common.v1.Payloads(
+            payloads=[_json_payload("previous-result")]
+        ),
+        attempt=2,
+    )
+    if with_nexus_context:
+        started.propagated_nexus_serialization_context.CopyFrom(
+            temporalio.api.nexus.v1.PropagatedSerializationContext(
+                endpoint=nexus_context.endpoint,
+                service=nexus_context.service,
+                operation=nexus_context.operation,
+            )
+        )
+    history = WorkflowHistory(
+        workflow_id="workflow-id",
+        events=[
+            temporalio.api.history.v1.HistoryEvent(
+                event_id=1,
+                event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_EXECUTION_STARTED,
+                workflow_execution_started_event_attributes=started,
+            ),
+            temporalio.api.history.v1.HistoryEvent(
+                event_id=2,
+                event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED,
+                workflow_task_scheduled_event_attributes=temporalio.api.history.v1.WorkflowTaskScheduledEventAttributes(),
+            ),
+            temporalio.api.history.v1.HistoryEvent(
+                event_id=3,
+                event_type=temporalio.api.enums.v1.EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED,
+                workflow_task_started_event_attributes=temporalio.api.history.v1.WorkflowTaskStartedEventAttributes(
+                    scheduled_event_id=2
+                ),
+            ),
+        ],
+    )
+    for event in history.events:
+        event.event_time.FromSeconds(1_700_000_000)
+    codec_contexts: dict[bytes, SerializationContext | None] = {}
+    previous_run_converter_contexts.clear()
+
+    await Replayer(
+        workflows=[PreviousRunOutcomeWorkflow],
+        data_converter=DataConverter(
+            payload_converter_class=_FromPayloadRecordingPayloadConverter,
+            payload_codec=_DecodeRecordingPayloadCodec(codec_contexts),
+        ),
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ).replay_workflow(history)
+
+    previous_run_context_type = (
+        NexusSerializationContext
+        if with_nexus_context
+        else WorkflowSerializationContext
+    )
+    for value in ["previous-failure-detail", "previous-result"]:
+        assert isinstance(
+            codec_contexts[json.dumps(value).encode()], previous_run_context_type
+        )
+        assert isinstance(
+            previous_run_converter_contexts[value], previous_run_context_type
+        )
+    if with_nexus_context:
+        assert codec_contexts[b'"previous-result"'] == nexus_context
+        assert previous_run_converter_contexts["previous-result"] == nexus_context
+    for value in ["input", "memo-value"]:
+        assert isinstance(
+            codec_contexts[json.dumps(value).encode()], WorkflowSerializationContext
+        )
+    assert isinstance(
+        previous_run_converter_contexts["input"], WorkflowSerializationContext
+    )
 
 
 @pytest.mark.requires_local_server
