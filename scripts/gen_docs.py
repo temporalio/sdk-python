@@ -1,3 +1,4 @@
+import ast
 import shutil
 from pathlib import Path
 
@@ -7,7 +8,13 @@ base_dir = Path(__file__).parent.parent
 
 
 class ProtobufSystem(model.System):
-    """Use static protobuf stubs for types created dynamically by the runtime."""
+    """Expose dynamic protobuf types as names without documenting their internals.
+
+    Pydoctor discovers .py files, not adjacent .pyi stubs. The generated .py
+    files create types through runtime builder calls that its static analysis
+    cannot resolve. Read public top-level class names from the stubs and register
+    them as attributes so links resolve without generating full class pages.
+    """
 
     def addModule(self, path: Path, parent: model.Package | None) -> None:
         super().addModule(path, parent)
@@ -16,11 +23,18 @@ class ProtobufSystem(model.System):
             name = f"{parent.fullName()}.{path.stem}" if parent else path.stem
             module = self.allobjects[name]
             assert isinstance(module, model.Module)
-            module.source_path = stub
-            # These docstrings contain upstream proto comments, not Google-style Python docs.
-            module.docformat = "plaintext"
-            module.source_href = None
-            self.setSourceHref(module, stub)
+            for node in ast.parse(stub.read_text(encoding="utf-8")).body:
+                if isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+                    attribute = self.Attribute(self, node.name, module, stub)
+                    attribute.kind = model.DocumentableKind.VARIABLE
+                    attribute.parentMod = module
+                    attribute.setLineNumber(node.lineno)
+                    # The declaration is in the stub, not the runtime module.
+                    if source_href := self._formatSourceHref(stub):
+                        attribute.source_href = self.options.htmlsourcetemplate.format(
+                            mod_source_href=source_href, lineno=str(node.lineno)
+                        )
+                    self.addObject(attribute)
 
 
 if __name__ == "__main__":

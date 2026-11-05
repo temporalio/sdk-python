@@ -1,16 +1,16 @@
 from pathlib import Path
 
-from pydoctor import epydoc2stan, model  # type: ignore[reportMissingTypeStubs]
+from pydoctor import model  # type: ignore[reportMissingTypeStubs]
 from pydoctor.options import Options  # type: ignore[reportMissingTypeStubs]
 
 from scripts.gen_docs import ProtobufSystem
 
 
-def test_protobuf_docs_use_static_stubs(tmp_path: Path) -> None:
+def test_protobuf_docs_expose_names_without_class_details(tmp_path: Path) -> None:
     package = tmp_path / "example"
     package.mkdir()
     (package / "__init__.py").write_text(
-        'from .message_pb2 import Payload\n__all__ = ["Payload"]\n'
+        'from .message_pb2 import Payload, Status\n__all__ = ["Payload", "Status"]\n'
     )
     (package / "message_pb2.py").write_text(
         'raise RuntimeError("Documentation must not import generated modules")\n'
@@ -20,6 +20,10 @@ def test_protobuf_docs_use_static_stubs(tmp_path: Path) -> None:
         "class Payload:\n"
         '    """An upstream proto comment with `non-Python link text`."""\n'
         "    data: bytes\n"
+        "class _Status:\n"
+        "    ValueType = int\n"
+        "class Status(_Status):\n"
+        "    ACTIVE: int\n"
     )
     options = Options.from_args(
         [
@@ -33,15 +37,24 @@ def test_protobuf_docs_use_static_stubs(tmp_path: Path) -> None:
     builder.addModule(package)
     builder.buildModules()
 
-    payload = system.find_object("example.Payload")
-    assert isinstance(payload, model.Class)
+    for name, lineno in (("Payload", 1), ("Status", 6)):
+        attribute = system.find_object(f"example.{name}")
+        assert isinstance(attribute, model.Attribute)
+        assert attribute.kind == model.DocumentableKind.VARIABLE
+        assert attribute.source_path == stub
+        assert attribute.linenumber == lineno
+        assert attribute.source_href == (
+            f"https://example.com/source/example/message_pb2.pyi#L{lineno}"
+        )
+        assert attribute.docstring is None
+        assert not attribute.contents
+        assert attribute.isVisible
     module = system.allobjects["example.message_pb2"]
     assert isinstance(module, model.Module)
-    assert module.source_path == stub
-    assert module.docformat == "plaintext"
-    assert module.source_href == "https://example.com/source/example/message_pb2.pyi"
-    assert "data" in payload.contents
-    epydoc2stan.format_docstring(payload)
+    assert module.source_path == package / "message_pb2.py"
+    assert module.docformat is None
+    assert module.source_href == "https://example.com/source/example/message_pb2.py"
+    assert system.objForFullName("example.message_pb2._Status") is None
     assert system.violations == 0
 
 
