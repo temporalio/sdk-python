@@ -4,6 +4,7 @@ from .activity_task_pb2 import (
     ActivityTask,
     Cancel,
     Start,
+    WorkflowTaskAttempt,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "ActivityTask",
     "Cancel",
     "Start",
+    "WorkflowTaskAttempt",
 ]
