@@ -767,7 +767,10 @@ def _apply_nexus_context_to_start_workflow_update_request(  # pyright: ignore[re
     This is a no-op unless the update is backing the current Nexus operation.
     """
     nexus_ctx = _try_start_operation_context()
-    if nexus_ctx is not None and _in_nexus_backing_start_context():
+    if nexus_ctx is None:
+        return
+    _apply_nexus_serialization_context_to_workflow_update_request(req)
+    if _in_nexus_backing_start_context():
         request_links = nexus_ctx._get_request_links()
         req.request.request_id = nexus_ctx.nexus_context.request_id
         req.request.links.extend(request_links)
@@ -790,6 +793,18 @@ def _apply_nexus_context_to_start_workflow_update_request(  # pyright: ignore[re
             )
             for callback in callbacks
         )
+
+
+def _apply_nexus_serialization_context_to_workflow_update_request(  # pyright: ignore[reportUnusedFunction]
+    req: temporalio.api.workflowservice.v1.UpdateWorkflowExecutionRequest,
+) -> None:
+    """Send the current Nexus operation's serialization context with a Workflow Update request.
+
+    This is a no-op outside a Nexus operation context.
+    """
+    context = _current_propagated_nexus_serialization_context()
+    if context is not None:
+        req.request.propagated_nexus_serialization_context.CopyFrom(context)
 
 
 def _apply_start_workflow_update_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
