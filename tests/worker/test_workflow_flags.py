@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -130,7 +131,7 @@ class DatetimeSignalWorkflow:
             await temporalio.workflow.wait_condition(
                 lambda: bool(self.when), timeout=timedelta(milliseconds=200)
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             return "dropped"
         await temporalio.workflow.sleep(0.01)
         # An extra command makes processing a formerly dropped signal detectable on replay.
