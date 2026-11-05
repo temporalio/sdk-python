@@ -67,7 +67,10 @@ from temporalio.converter import (
 from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
-from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from temporalio.worker._workflow_instance import (
+    UnsandboxedWorkflowRunner,
+    _WorkflowInstanceImpl,
+)
 from tests.helpers import assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver
@@ -1345,6 +1348,59 @@ async def test_codec_with_context(client: Client):
         ),
     ]
     del test_traces[workflow_id]
+
+
+async def test_command_context_resolved_only_with_codec_or_external_storage(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    """Context resolution calls into the workflow instance, which is costly in the
+    sandbox, so workers skip it when no codec or external storage can use it."""
+    lookups = 0
+    get_serialization_context = _WorkflowInstanceImpl.get_serialization_context
+
+    def counting_get_serialization_context(self, command_info):  # type: ignore[reportMissingParameterType]
+        nonlocal lookups
+        lookups += 1
+        return get_serialization_context(self, command_info)
+
+    monkeypatch.setattr(
+        _WorkflowInstanceImpl,
+        "get_serialization_context",
+        counting_get_serialization_context,
+    )
+
+    async def run_workflow(data_converter: DataConverter) -> int:
+        nonlocal lookups
+        lookups = 0
+        workflow_id = str(uuid.uuid4())
+        task_queue = str(uuid.uuid4())
+        client_config = client.config()
+        client_config["data_converter"] = data_converter
+        converter_client = Client(**client_config)
+        async with Worker(
+            converter_client,
+            task_queue=task_queue,
+            workflows=[CodecTestWorkflow],
+            workflow_runner=UnsandboxedWorkflowRunner(),
+        ):
+            await converter_client.execute_workflow(
+                CodecTestWorkflow.run,
+                "data",
+                id=workflow_id,
+                task_queue=task_queue,
+            )
+        test_traces.pop(workflow_id, None)
+        return lookups
+
+    assert await run_workflow(DataConverter.default) == 0
+    assert (
+        await run_workflow(
+            dataclasses.replace(
+                DataConverter.default, payload_codec=PayloadCodecWithContext()
+            )
+        )
+        > 0
+    )
 
 
 # Local activity codec test

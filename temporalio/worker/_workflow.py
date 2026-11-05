@@ -399,7 +399,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     ),
                 ),
             )
-            if workflow:
+            # Resolving a command's context calls into the workflow instance (the
+            # sandbox, when sandboxed) for every payload sequence, and only a codec
+            # or external storage can use it.
+            if workflow and data_converter._has_codec_or_external_storage:
                 data_converter = _CommandAwareDataConverter.create(
                     instance=workflow.instance,
                     context_free_dc=self._data_converter,
@@ -516,7 +519,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         completion.run_id = act.run_id
 
         # Encode completion
-        if workflow:
+        if workflow and self._data_converter._has_codec_or_external_storage:
             workflow_context = temporalio.converter.WorkflowSerializationContext(
                 namespace=self._namespace,
                 workflow_id=workflow.workflow_id,
