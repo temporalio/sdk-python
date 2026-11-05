@@ -162,10 +162,11 @@ def test_load_profile_from_data_env_overrides():
         ("envconfig", True),
         ("local", False),
         ("time-skipping", False),
+        (None, False),
     ],
 )
 def test_envconfig_server_selection(
-    env_type: str,
+    env_type: str | None,
     expected: bool,
 ):
     assert conftest._uses_envconfig_server(env_type) is expected

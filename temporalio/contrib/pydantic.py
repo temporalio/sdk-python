@@ -91,7 +91,7 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore state with an empty type adapter cache."""
-        self.__dict__.update(state)
+        vars(self).update(state)
         self._type_adapter = functools.lru_cache(maxsize=state["_type_adapter"])(
             TypeAdapter
         )

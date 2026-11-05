@@ -59,7 +59,7 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
     )
 
 
-def _uses_envconfig_server(env_type: str) -> bool:
+def _uses_envconfig_server(env_type: str | None) -> bool:
     return env_type == "envconfig"
 
 

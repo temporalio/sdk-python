@@ -67,7 +67,7 @@ dev = [
   "psutil>=5.9.3,<6",
   "pydocstyle>=6.3.0,<7",
   "pydoctor>=25.10.1,<26",
-  "pyright==1.1.403",
+  "pyright==1.1.414",
   "pytest~=9.0",
   "pytest-asyncio>=0.21,<0.22",
   "pytest-timeout~=2.2",
@@ -124,7 +124,7 @@ lint-docs = "uv run pydocstyle --ignore-decorators=overload"
 lint-types = [
   { cmd = "uv run pyright" },
   { cmd = "uv run mypy --namespace-packages --check-untyped-defs ." },
-  { cmd = "uv run basedpyright" },
+  { cmd = "uv run basedpyright --project basedpyrightconfig.json" },
 ]
 run-bench = "uv run python scripts/run_bench.py"
 test = "uv run pytest -n auto --dist=worksteal"
@@ -221,17 +221,12 @@ warnings-as-errors = true
 
 [tool.pyright]
 enableTypeIgnoreComments = true
-reportAny = "none"
 reportCallInDefaultInitializer = "none"
-reportExplicitAny = "none"
-reportIgnoreCommentWithoutRule = "none"
-reportImplicitAbstractClass = "none"
 reportImplicitOverride = "none"
 reportImplicitStringConcatenation = "none"
 reportImportCycles = "none"
 reportMissingTypeArgument = "none"
 reportPrivateUsage = "none"
-reportUnannotatedClassAttribute = "none"
 reportUnknownArgumentType = "none"
 reportUnknownMemberType = "none"
 reportUnknownParameterType = "none"
