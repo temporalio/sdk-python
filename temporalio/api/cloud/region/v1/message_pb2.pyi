@@ -18,6 +18,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class Region(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -30,7 +31,7 @@ class Region(google.protobuf.message.Message):
             Region._CloudProvider.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         CLOUD_PROVIDER_UNSPECIFIED: Region._CloudProvider.ValueType  # 0
         CLOUD_PROVIDER_AWS: Region._CloudProvider.ValueType  # 1
@@ -76,7 +77,7 @@ class Region(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cloud_provider",
             b"cloud_provider",
             "cloud_provider_deprecated",

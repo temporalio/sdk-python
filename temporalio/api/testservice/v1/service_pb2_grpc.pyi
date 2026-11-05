@@ -25,11 +25,24 @@ THE SOFTWARE.
 """
 
 import abc
+import collections.abc
+import typing
 
 import google.protobuf.empty_pb2
 import grpc
+import grpc.aio
 
 import temporalio.api.testservice.v1.request_response_pb2
+
+_T = typing.TypeVar("_T")
+
+class _MaybeAsyncIterator(
+    collections.abc.AsyncIterator[_T],
+    collections.abc.Iterator[_T],
+    metaclass=abc.ABCMeta,
+): ...
+class _ServicerContext(grpc.ServicerContext, grpc.aio.ServicerContext):  # type: ignore[misc, type-arg]
+    ...
 
 class TestServiceStub:
     """TestService API defines an interface supported only by the Temporal Test Server.
@@ -38,7 +51,9 @@ class TestServiceStub:
     This is an EXPERIMENTAL API.
     """
 
-    def __init__(self, channel: grpc.Channel) -> None: ...
+    def __init__(
+        self, channel: typing.Union[grpc.Channel, grpc.aio.Channel]
+    ) -> None: ...
     LockTimeSkipping: grpc.UnaryUnaryMultiCallable[
         temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
         temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
@@ -51,6 +66,7 @@ class TestServiceStub:
 
     LockTimeSkipping and UnlockTimeSkipping calls are counted.
     """
+
     UnlockTimeSkipping: grpc.UnaryUnaryMultiCallable[
         temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
         temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
@@ -63,6 +79,7 @@ class TestServiceStub:
 
     Time Locking Counter can't be negative, unbalanced calls to UnlockTimeSkipping will lead to rpc call failure
     """
+
     Sleep: grpc.UnaryUnaryMultiCallable[
         temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
         temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
@@ -70,6 +87,7 @@ class TestServiceStub:
     """This call returns only when the Test Server Time advances by the specified duration.
     This is an EXPERIMENTAL API.
     """
+
     SleepUntil: grpc.UnaryUnaryMultiCallable[
         temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
         temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
@@ -78,6 +96,7 @@ class TestServiceStub:
     If the current Test Server Time is beyond the specified timestamp, returns immediately.
     This is an EXPERIMENTAL API.
     """
+
     UnlockTimeSkippingWithSleep: grpc.UnaryUnaryMultiCallable[
         temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
         temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
@@ -92,7 +111,82 @@ class TestServiceStub:
       - 1, it will lead to fast forwarding of the time by the duration specified in the request and quick return of this rpc call.
       - 0 will lead to rpc call failure same way as an unbalanced UnlockTimeSkipping.
     """
+
     GetCurrentTime: grpc.UnaryUnaryMultiCallable[
+        google.protobuf.empty_pb2.Empty,
+        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
+    ]
+    """GetCurrentTime returns the current Temporal Test Server time
+
+    This time might not be equal to {@link System#currentTimeMillis()} due to time skipping.
+    """
+
+class TestServiceAsyncStub:
+    """TestService API defines an interface supported only by the Temporal Test Server.
+    It provides functionality needed or supported for testing purposes only.
+
+    This is an EXPERIMENTAL API.
+    """
+
+    LockTimeSkipping: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
+        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
+    ]
+    """LockTimeSkipping increments Time Locking Counter by one.
+
+    If Time Locking Counter is positive, time skipping is locked (disabled).
+    When time skipping is disabled, the time in test server is moving normally, with a real time pace.
+    Test Server is typically started with locked time skipping and Time Locking Counter = 1.
+
+    LockTimeSkipping and UnlockTimeSkipping calls are counted.
+    """
+
+    UnlockTimeSkipping: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
+        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
+    ]
+    """UnlockTimeSkipping decrements Time Locking Counter by one.
+
+    If the counter reaches 0, it unlocks time skipping and fast forwards time.
+    LockTimeSkipping and UnlockTimeSkipping calls are counted. Calling UnlockTimeSkipping does not
+    guarantee that time is going to be fast forwarded as another lock can be holding it.
+
+    Time Locking Counter can't be negative, unbalanced calls to UnlockTimeSkipping will lead to rpc call failure
+    """
+
+    Sleep: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
+    """This call returns only when the Test Server Time advances by the specified duration.
+    This is an EXPERIMENTAL API.
+    """
+
+    SleepUntil: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
+    """This call returns only when the Test Server Time advances to the specified timestamp.
+    If the current Test Server Time is beyond the specified timestamp, returns immediately.
+    This is an EXPERIMENTAL API.
+    """
+
+    UnlockTimeSkippingWithSleep: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+    ]
+    """UnlockTimeSkippingWhileSleep decreases time locking counter by one and increases it back
+    once the Test Server Time advances by the duration specified in the request.
+
+    This call returns only when the Test Server Time advances by the specified duration.
+
+    If it is called when Time Locking Counter is
+      - more than 1 and no other unlocks are coming in, rpc call will block for the specified duration, time will not be fast forwarded.
+      - 1, it will lead to fast forwarding of the time by the duration specified in the request and quick return of this rpc call.
+      - 0 will lead to rpc call failure same way as an unbalanced UnlockTimeSkipping.
+    """
+
+    GetCurrentTime: grpc.aio.UnaryUnaryMultiCallable[
         google.protobuf.empty_pb2.Empty,
         temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
     ]
@@ -112,8 +206,13 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
     def LockTimeSkipping(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.LockTimeSkippingResponse
+        ],
+    ]:
         """LockTimeSkipping increments Time Locking Counter by one.
 
         If Time Locking Counter is positive, time skipping is locked (disabled).
@@ -122,12 +221,18 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
 
         LockTimeSkipping and UnlockTimeSkipping calls are counted.
         """
+
     @abc.abstractmethod
     def UnlockTimeSkipping(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.UnlockTimeSkippingResponse
+        ],
+    ]:
         """UnlockTimeSkipping decrements Time Locking Counter by one.
 
         If the counter reaches 0, it unlocks time skipping and fast forwards time.
@@ -136,31 +241,49 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
 
         Time Locking Counter can't be negative, unbalanced calls to UnlockTimeSkipping will lead to rpc call failure
         """
+
     @abc.abstractmethod
     def Sleep(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
+        ],
+    ]:
         """This call returns only when the Test Server Time advances by the specified duration.
         This is an EXPERIMENTAL API.
         """
+
     @abc.abstractmethod
     def SleepUntil(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepUntilRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
+        ],
+    ]:
         """This call returns only when the Test Server Time advances to the specified timestamp.
         If the current Test Server Time is beyond the specified timestamp, returns immediately.
         This is an EXPERIMENTAL API.
         """
+
     @abc.abstractmethod
     def UnlockTimeSkippingWithSleep(
         self,
         request: temporalio.api.testservice.v1.request_response_pb2.SleepRequest,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.SleepResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.SleepResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.SleepResponse
+        ],
+    ]:
         """UnlockTimeSkippingWhileSleep decreases time locking counter by one and increases it back
         once the Test Server Time advances by the duration specified in the request.
 
@@ -171,17 +294,23 @@ class TestServiceServicer(metaclass=abc.ABCMeta):
           - 1, it will lead to fast forwarding of the time by the duration specified in the request and quick return of this rpc call.
           - 0 will lead to rpc call failure same way as an unbalanced UnlockTimeSkipping.
         """
+
     @abc.abstractmethod
     def GetCurrentTime(
         self,
         request: google.protobuf.empty_pb2.Empty,
-        context: grpc.ServicerContext,
-    ) -> temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse:
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse,
+        collections.abc.Awaitable[
+            temporalio.api.testservice.v1.request_response_pb2.GetCurrentTimeResponse
+        ],
+    ]:
         """GetCurrentTime returns the current Temporal Test Server time
 
         This time might not be equal to {@link System#currentTimeMillis()} due to time skipping.
         """
 
 def add_TestServiceServicer_to_server(
-    servicer: TestServiceServicer, server: grpc.Server
+    servicer: TestServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]
 ) -> None: ...

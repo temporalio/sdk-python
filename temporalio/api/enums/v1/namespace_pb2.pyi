@@ -26,7 +26,7 @@ class _NamespaceStateEnumTypeWrapper(
         _NamespaceState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NAMESPACE_STATE_UNSPECIFIED: _NamespaceState.ValueType  # 0
     NAMESPACE_STATE_REGISTERED: _NamespaceState.ValueType  # 1
@@ -50,7 +50,7 @@ class _ArchivalStateEnumTypeWrapper(
         _ArchivalState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ARCHIVAL_STATE_UNSPECIFIED: _ArchivalState.ValueType  # 0
     ARCHIVAL_STATE_DISABLED: _ArchivalState.ValueType  # 1
@@ -72,7 +72,7 @@ class _ReplicationStateEnumTypeWrapper(
         _ReplicationState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     REPLICATION_STATE_UNSPECIFIED: _ReplicationState.ValueType  # 0
     REPLICATION_STATE_NORMAL: _ReplicationState.ValueType  # 1

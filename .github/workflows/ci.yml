@@ -232,13 +232,11 @@ jobs:
         run: |
           [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
       - run: uv add --dev --python 3.11 "googleapis-common-protos==1.70.0"
-      - run: uv add --python 3.11 "protobuf<4"
+      - run: uv add --python 3.11 "protobuf==4.21.12"
       - run: uv sync --all-extras
       - run: poe build-develop
-      - name: Test with protobuf 3.x
+      - name: Test with minimum protobuf runtime
         run: poe test -s
-        env:
-          TEMPORAL_TEST_PROTO3: 1
 
   test-latest-deps:
     timeout-minutes: 30

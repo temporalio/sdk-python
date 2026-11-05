@@ -26,7 +26,7 @@ class _NexusHandlerErrorRetryBehaviorEnumTypeWrapper(
         _NexusHandlerErrorRetryBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_HANDLER_ERROR_RETRY_BEHAVIOR_UNSPECIFIED: (
         _NexusHandlerErrorRetryBehavior.ValueType
@@ -71,7 +71,7 @@ class _NexusOperationExecutionStatusEnumTypeWrapper(
         _NexusOperationExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_EXECUTION_STATUS_UNSPECIFIED: (
         _NexusOperationExecutionStatus.ValueType
@@ -150,7 +150,7 @@ class _NexusOperationWaitStageEnumTypeWrapper(
         _NexusOperationWaitStage.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_WAIT_STAGE_UNSPECIFIED: _NexusOperationWaitStage.ValueType  # 0
     NEXUS_OPERATION_WAIT_STAGE_STARTED: _NexusOperationWaitStage.ValueType  # 1
@@ -179,7 +179,7 @@ class _NexusOperationIdReusePolicyEnumTypeWrapper(
         _NexusOperationIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_ID_REUSE_POLICY_UNSPECIFIED: (
         _NexusOperationIdReusePolicy.ValueType
@@ -238,7 +238,7 @@ class _NexusOperationIdConflictPolicyEnumTypeWrapper(
         _NexusOperationIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_ID_CONFLICT_POLICY_UNSPECIFIED: (
         _NexusOperationIdConflictPolicy.ValueType

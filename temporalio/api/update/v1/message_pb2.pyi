@@ -5,7 +5,7 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -16,13 +16,9 @@ import temporalio.api.enums.v1.update_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.nexus.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WaitPolicy(google.protobuf.message.Message):
     """Specifies client's intent to wait for Update results."""
 
@@ -42,12 +38,12 @@ class WaitPolicy(google.protobuf.message.Message):
         lifecycle_stage: temporalio.api.enums.v1.update_pb2.UpdateWorkflowExecutionLifecycleStage.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["lifecycle_stage", b"lifecycle_stage"],
+        self, field_name: typing.Literal["lifecycle_stage", b"lifecycle_stage"]
     ) -> None: ...
 
 global___WaitPolicy = WaitPolicy
 
+@typing.final
 class UpdateRef(google.protobuf.message.Message):
     """The data needed by a client to refer to a previously invoked Workflow Update."""
 
@@ -55,11 +51,11 @@ class UpdateRef(google.protobuf.message.Message):
 
     WORKFLOW_EXECUTION_FIELD_NUMBER: builtins.int
     UPDATE_ID_FIELD_NUMBER: builtins.int
+    update_id: builtins.str
     @property
     def workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
-    update_id: builtins.str
     def __init__(
         self,
         *,
@@ -68,20 +64,18 @@ class UpdateRef(google.protobuf.message.Message):
         update_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "workflow_execution", b"workflow_execution"
-        ],
+        self, field_name: typing.Literal["workflow_execution", b"workflow_execution"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "update_id", b"update_id", "workflow_execution", b"workflow_execution"
         ],
     ) -> None: ...
 
 global___UpdateRef = UpdateRef
 
+@typing.final
 class Outcome(google.protobuf.message.Message):
     """The outcome of a Workflow Update: success or failure."""
 
@@ -101,22 +95,23 @@ class Outcome(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure", b"failure", "success", b"success", "value", b"value"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure", b"failure", "success", b"success", "value", b"value"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["value", b"value"]
-    ) -> typing_extensions.Literal["success", "failure"] | None: ...
+        self, oneof_group: typing.Literal["value", b"value"]
+    ) -> typing.Literal["success", "failure"] | None: ...
 
 global___Outcome = Outcome
 
+@typing.final
 class Meta(google.protobuf.message.Message):
     """Metadata about a Workflow Update."""
 
@@ -136,29 +131,30 @@ class Meta(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "identity", b"identity", "update_id", b"update_id"
-        ],
+        field_name: typing.Literal["identity", b"identity", "update_id", b"update_id"],
     ) -> None: ...
 
 global___Meta = Meta
 
+@typing.final
 class Input(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     HEADER_FIELD_NUMBER: builtins.int
     NAME_FIELD_NUMBER: builtins.int
     ARGS_FIELD_NUMBER: builtins.int
+    name: builtins.str
+    """The name of the Update handler to invoke on the target Workflow."""
     @property
     def header(self) -> temporalio.api.common.v1.message_pb2.Header:
         """Headers that are passed with the Update from the requesting entity.
         These can include things like auth or tracing tokens.
         """
-    name: builtins.str
-    """The name of the Update handler to invoke on the target Workflow."""
+
     @property
     def args(self) -> temporalio.api.common.v1.message_pb2.Payloads:
         """The arguments to pass to the named Update handler."""
+
     def __init__(
         self,
         *,
@@ -167,18 +163,18 @@ class Input(google.protobuf.message.Message):
         args: temporalio.api.common.v1.message_pb2.Payloads | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["args", b"args", "header", b"header"],
+        self, field_name: typing.Literal["args", b"args", "header", b"header"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "args", b"args", "header", b"header", "name", b"name"
         ],
     ) -> None: ...
 
 global___Input = Input
 
+@typing.final
 class Request(google.protobuf.message.Message):
     """The client request that triggers a Workflow Update."""
 
@@ -190,12 +186,12 @@ class Request(google.protobuf.message.Message):
     COMPLETION_CALLBACKS_FIELD_NUMBER: builtins.int
     LINKS_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    request_id: builtins.str
+    """The request ID of the request."""
     @property
     def meta(self) -> global___Meta: ...
     @property
     def input(self) -> global___Input: ...
-    request_id: builtins.str
-    """The request ID of the request."""
     @property
     def completion_callbacks(
         self,
@@ -203,6 +199,7 @@ class Request(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.Callback
     ]:
         """Callbacks to be called by the server when this update reaches a terminal state."""
+
     @property
     def links(
         self,
@@ -210,11 +207,13 @@ class Request(google.protobuf.message.Message):
         temporalio.api.common.v1.message_pb2.Link
     ]:
         """Links to be associated with this update."""
+
     @property
     def propagated_nexus_serialization_context(
         self,
     ) -> temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext:
         """Serialization context propagated from the Nexus caller that started this update."""
+
     def __init__(
         self,
         *,
@@ -232,7 +231,7 @@ class Request(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "input",
             b"input",
             "meta",
@@ -243,7 +242,7 @@ class Request(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "completion_callbacks",
             b"completion_callbacks",
             "input",
@@ -261,6 +260,7 @@ class Request(google.protobuf.message.Message):
 
 global___Request = Request
 
+@typing.final
 class Rejection(google.protobuf.message.Message):
     """An Update protocol message indicating that a Workflow Update has been rejected."""
 
@@ -286,13 +286,13 @@ class Rejection(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure", b"failure", "rejected_request", b"rejected_request"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure",
             b"failure",
             "rejected_request",
@@ -306,6 +306,7 @@ class Rejection(google.protobuf.message.Message):
 
 global___Rejection = Rejection
 
+@typing.final
 class Acceptance(google.protobuf.message.Message):
     """An Update protocol message indicating that a Workflow Update has
     been accepted (i.e. passed the worker-side validation phase).
@@ -328,12 +329,11 @@ class Acceptance(google.protobuf.message.Message):
         accepted_request: global___Request | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["accepted_request", b"accepted_request"],
+        self, field_name: typing.Literal["accepted_request", b"accepted_request"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "accepted_request",
             b"accepted_request",
             "accepted_request_message_id",
@@ -345,6 +345,7 @@ class Acceptance(google.protobuf.message.Message):
 
 global___Acceptance = Acceptance
 
+@typing.final
 class Response(google.protobuf.message.Message):
     """An Update protocol message indicating that a Workflow Update has
     completed with the contained outcome.
@@ -365,12 +366,10 @@ class Response(google.protobuf.message.Message):
         outcome: global___Outcome | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["meta", b"meta", "outcome", b"outcome"],
+        self, field_name: typing.Literal["meta", b"meta", "outcome", b"outcome"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["meta", b"meta", "outcome", b"outcome"],
+        self, field_name: typing.Literal["meta", b"meta", "outcome", b"outcome"]
     ) -> None: ...
 
 global___Response = Response

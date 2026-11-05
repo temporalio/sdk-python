@@ -26,7 +26,7 @@ class _ResetReapplyExcludeTypeEnumTypeWrapper(
         _ResetReapplyExcludeType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_EXCLUDE_TYPE_UNSPECIFIED: _ResetReapplyExcludeType.ValueType  # 0
     RESET_REAPPLY_EXCLUDE_TYPE_SIGNAL: _ResetReapplyExcludeType.ValueType  # 1
@@ -63,7 +63,7 @@ class _ResetReapplyTypeEnumTypeWrapper(
         _ResetReapplyType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_REAPPLY_TYPE_UNSPECIFIED: _ResetReapplyType.ValueType  # 0
     RESET_REAPPLY_TYPE_SIGNAL: _ResetReapplyType.ValueType  # 1
@@ -95,7 +95,7 @@ class _ResetType:
 class _ResetTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_ResetType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESET_TYPE_UNSPECIFIED: _ResetType.ValueType  # 0
     RESET_TYPE_FIRST_WORKFLOW_TASK: _ResetType.ValueType  # 1

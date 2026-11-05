@@ -37,22 +37,6 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         f"Expected {temporalio.__file__} to be in {sys.prefix}"
     )
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x/6.x/7.x lib
-import google.protobuf
-
-protobuf_version = google.protobuf.__version__
-if os.getenv("TEMPORAL_TEST_PROTO3"):
-    assert protobuf_version.startswith("3."), (
-        f"Expected protobuf 3.x, got {protobuf_version}"
-    )
-else:
-    assert (
-        protobuf_version.startswith("4.")
-        or protobuf_version.startswith("5.")
-        or protobuf_version.startswith("6.")
-        or protobuf_version.startswith("7.")
-    ), f"Expected protobuf 4.x/5.x/6.x/7.x, got {protobuf_version}"
-
 
 def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
     """Print a newline so that custom printed output starts on new line."""

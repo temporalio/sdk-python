@@ -4,25 +4,22 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
 import temporalio.api.callback.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class CallbackInfo(google.protobuf.message.Message):
     """CallbackInfo contains the state of a callback attached to a standalone Nexus operation."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class OperationCompleted(google.protobuf.message.Message):
         """Trigger for when the Nexus operation is completed, covering both success cases as
         well as any type of failure.
@@ -34,6 +31,7 @@ class CallbackInfo(google.protobuf.message.Message):
             self,
         ) -> None: ...
 
+    @typing.final
     class Trigger(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -47,28 +45,30 @@ class CallbackInfo(google.protobuf.message.Message):
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "operation_completed", b"operation_completed", "variant", b"variant"
             ],
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "operation_completed", b"operation_completed", "variant", b"variant"
             ],
         ) -> None: ...
         def WhichOneof(
-            self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-        ) -> typing_extensions.Literal["operation_completed"] | None: ...
+            self, oneof_group: typing.Literal["variant", b"variant"]
+        ) -> typing.Literal["operation_completed"] | None: ...
 
     TRIGGER_FIELD_NUMBER: builtins.int
     INFO_FIELD_NUMBER: builtins.int
     @property
     def trigger(self) -> global___CallbackInfo.Trigger:
         """Trigger for this callback."""
+
     @property
     def info(self) -> temporalio.api.callback.v1.message_pb2.CallbackInfo:
         """Common callback info."""
+
     def __init__(
         self,
         *,
@@ -76,16 +76,15 @@ class CallbackInfo(google.protobuf.message.Message):
         info: temporalio.api.callback.v1.message_pb2.CallbackInfo | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["info", b"info", "trigger", b"trigger"],
+        self, field_name: typing.Literal["info", b"info", "trigger", b"trigger"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["info", b"info", "trigger", b"trigger"],
+        self, field_name: typing.Literal["info", b"info", "trigger", b"trigger"]
     ) -> None: ...
 
 global___CallbackInfo = CallbackInfo
 
+@typing.final
 class OnConflictOptions(google.protobuf.message.Message):
     """When StartNexusOperationExecutionRequest uses the conflict policy NEXUS_OPERATION_ID_CONFLICT_POLICY_USE_EXISTING
     and there is already an existing, running standalone Nexus operation, OnConflictOptions defines actions to be
@@ -112,7 +111,7 @@ class OnConflictOptions(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attach_completion_callbacks",
             b"attach_completion_callbacks",
             "attach_links",

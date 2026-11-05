@@ -27,6 +27,15 @@ from temporalio.worker.workflow_sandbox._restrictions import (
 from .testmodules import restrictions
 
 
+@pytest.mark.parametrize("fromlist", [None, (), ("urlparse",)])
+def test_workflow_sandbox_importer_optional_fromlist(fromlist: tuple[str, ...] | None):
+    importer = Importer(SandboxRestrictions.default, RestrictionContext())
+    with importer.applied():
+        module = importer.import_func("urllib.parse", fromlist=fromlist)
+
+    assert module.__name__ == ("urllib.parse" if fromlist else "urllib")
+
+
 def test_workflow_sandbox_importer_path_in_place_division():
     context = RestrictionContext()
     context.is_runtime = True

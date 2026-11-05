@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -22,19 +21,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n$temporal/api/compute/v1/scaler.proto\x12\x17temporal.api.compute.v1\x1a$temporal/api/common/v1/message.proto"O\n\rComputeScaler\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\x30\n\x07\x64\x65tails\x18\x02 \x01(\x0b\x32\x1f.temporal.api.common.v1.PayloadB\x8d\x01\n\x1aio.temporal.api.compute.v1B\x0bScalerProtoP\x01Z%go.temporal.io/api/compute/v1;compute\xaa\x02\x19Temporalio.Api.Compute.V1\xea\x02\x1cTemporalio::Api::Compute::V1b\x06proto3'
 )
 
-
-_COMPUTESCALER = DESCRIPTOR.message_types_by_name["ComputeScaler"]
-ComputeScaler = _reflection.GeneratedProtocolMessageType(
-    "ComputeScaler",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _COMPUTESCALER,
-        "__module__": "temporalio.api.compute.v1.scaler_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeScaler)
-    },
-)
-_sym_db.RegisterMessage(ComputeScaler)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.compute.v1B\013ScalerProtoP\001Z%go.temporal.io/api/compute/v1;compute\252\002\031Temporalio.Api.Compute.V1\352\002\034Temporalio::Api::Compute::V1"

@@ -4,7 +4,7 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
@@ -12,13 +12,9 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.workflow_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WorkflowExecutionFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -34,13 +30,12 @@ class WorkflowExecutionFilter(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "workflow_id", b"workflow_id"
-        ],
+        field_name: typing.Literal["run_id", b"run_id", "workflow_id", b"workflow_id"],
     ) -> None: ...
 
 global___WorkflowExecutionFilter = WorkflowExecutionFilter
 
+@typing.final
 class WorkflowTypeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -51,12 +46,11 @@ class WorkflowTypeFilter(google.protobuf.message.Message):
         *,
         name: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
 
 global___WorkflowTypeFilter = WorkflowTypeFilter
 
+@typing.final
 class StartTimeFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -74,19 +68,20 @@ class StartTimeFilter(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "earliest_time", b"earliest_time", "latest_time", b"latest_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "earliest_time", b"earliest_time", "latest_time", b"latest_time"
         ],
     ) -> None: ...
 
 global___StartTimeFilter = StartTimeFilter
 
+@typing.final
 class StatusFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -97,8 +92,6 @@ class StatusFilter(google.protobuf.message.Message):
         *,
         status: temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["status", b"status"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["status", b"status"]) -> None: ...
 
 global___StatusFilter = StatusFilter

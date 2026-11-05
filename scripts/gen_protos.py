@@ -1,4 +1,17 @@
+# /// script
+# requires-python = "==3.11.*"
+# dependencies = [
+#   "grpcio-tools==1.49.1",
+#   "protobuf==4.25.9",
+#   "mypy-protobuf==3.6.0",
+#   "setuptools<82",
+# ]
+# [tool.uv]
+# extra-build-dependencies = { grpcio-tools = ["setuptools<82"] }
+# ///
+
 import collections
+import importlib.metadata
 import re
 import shutil
 import subprocess
@@ -29,7 +42,11 @@ proto_paths = [
     and not "google" in str(v)
 ]
 proto_paths.extend(test_proto_dir.glob("**/*.proto"))
-proto_paths.extend(additional_proto_dir.glob("**/*.proto"))
+proto_paths.extend(
+    v
+    for v in additional_proto_dir.glob("**/*.proto")
+    if ".venv" not in v.relative_to(additional_proto_dir).parts
+)
 
 api_out_dir = base_dir / "temporalio" / "api"
 sdk_out_dir = base_dir / "temporalio" / "bridge" / "proto"
@@ -50,13 +67,12 @@ py_fixes = [
     partial(
         re.compile(r"from temporal\.sdk\.core\.").sub, r"from temporalio.bridge.proto."
     ),
+    # Pickle must use the installed module, not the upstream proto namespace.
     partial(
-        re.compile(r"'__module__' : 'temporal\.api\.").sub,
-        r"'__module__' : 'temporalio.api.",
-    ),
-    partial(
-        re.compile(r"'__module__' : 'nexusannotations\.").sub,
-        r"'__module__' : 'temporalio.api.dependencies.nexusannotations.",
+        re.compile(
+            r"(_builder\.BuildTopDescriptorsAndMessages\(DESCRIPTOR, )'[^']+'"
+        ).sub,
+        r"\1__name__",
     ),
 ]
 
@@ -92,12 +108,15 @@ def fix_generated_output(base_path: Path):
             with p.open(encoding="utf8") as f:
                 content = f.read()
                 if p.suffix == ".py":
-                    # Defs in .py, classes in .pyi
                     imports[p.stem] += find_def_re.findall(content)
+                    # gRPC .pyi files also declare type-only classes.
+                    if p.stem.endswith("_grpc"):
+                        imports[p.stem] += find_class_re.findall(content)
                     for fix in py_fixes:
                         content = fix(content)
                 else:
-                    imports[p.stem] += find_class_re.findall(content)
+                    if not p.stem.endswith("_grpc"):
+                        imports[p.stem] += find_class_re.findall(content)
                     for fix in pyi_fixes:
                         content = fix(content)
             with p.open("w") as f:
@@ -143,32 +162,14 @@ def fix_generated_output(base_path: Path):
 
 
 def check_proto_toolchain_versions():
-    """
-    Check protobuf and grpcio versions.
-
-    Due to issues with the Python protobuf 3.x vs protobuf 4.x libraries, we
-    must require that grpcio tools be on 1.48.x and protobuf be on 3.x for
-    generation of protos. This toolchain requires Python 3.10; use
-    poe gen-protos-docker to run it separately from the SDK environment.
-    """
-    proc = subprocess.run(
-        ["uv", "pip", "list", "--python", sys.executable, "--format", "freeze"],
-        check=True,
-        capture_output=True,
-        text=True,
+    """Keep generated runtime requirements aligned with the package minimums."""
+    proto_version = importlib.metadata.version("protobuf")
+    grpcio_tools_version = importlib.metadata.version("grpcio-tools")
+    assert proto_version.startswith("4."), (
+        f"expected 4.x protobuf, found {proto_version}"
     )
-    proto_version = ""
-    grpcio_tools_version = ""
-    for line in proc.stdout.splitlines():
-        if line.startswith("protobuf"):
-            _, _, proto_version = line.partition("==")
-        elif line.startswith("grpcio-tools"):
-            _, _, grpcio_tools_version = line.partition("==")
-    assert proto_version.startswith("3."), (
-        f"expected 3.x protobuf, found {proto_version}"
-    )
-    assert grpcio_tools_version.startswith("1.48."), (
-        f"expected 1.48.x grpcio-tools, found {grpcio_tools_version}"
+    assert grpcio_tools_version == "1.49.1", (
+        f"expected 1.49.1 grpcio-tools, found {grpcio_tools_version}"
     )
 
 

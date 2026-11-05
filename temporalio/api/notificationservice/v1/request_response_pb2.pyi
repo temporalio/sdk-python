@@ -4,7 +4,7 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
@@ -12,13 +12,9 @@ import google.protobuf.message
 import temporalio.api.common.v1.message_pb2
 import temporalio.api.failure.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class OnCompleteRequest(google.protobuf.message.Message):
     """OnCompleteRequest is the request type to the NotificationService's OnComplete operation,
     allowing for defining completion handlers for arbitrary operations.
@@ -37,12 +33,15 @@ class OnCompleteRequest(google.protobuf.message.Message):
     @property
     def success(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """The operation was successful, and resulted in the given payload."""
+
     @property
     def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
         """The operation failed. Includes timeout, cancellation, and application errors."""
+
     @property
     def source_context(self) -> temporalio.api.common.v1.message_pb2.Payload:
         """User-supplied data which was added to the source invocation. (As applicable.)"""
+
     def __init__(
         self,
         *,
@@ -52,7 +51,7 @@ class OnCompleteRequest(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure",
             b"failure",
             "result",
@@ -65,7 +64,7 @@ class OnCompleteRequest(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "failure",
             b"failure",
             "result",
@@ -77,11 +76,12 @@ class OnCompleteRequest(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["result", b"result"]
-    ) -> typing_extensions.Literal["success", "failure"] | None: ...
+        self, oneof_group: typing.Literal["result", b"result"]
+    ) -> typing.Literal["success", "failure"] | None: ...
 
 global___OnCompleteRequest = OnCompleteRequest
 
+@typing.final
 class OnCompleteResponse(google.protobuf.message.Message):
     """OnCompleteResponse is the return type of the OnComplete operation."""
 

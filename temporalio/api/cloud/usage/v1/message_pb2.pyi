@@ -28,7 +28,7 @@ class _RecordType:
 class _RecordTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RecordType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RECORD_TYPE_UNSPECIFIED: _RecordType.ValueType  # 0
     RECORD_TYPE_ACTIONS: _RecordType.ValueType  # 1
@@ -50,7 +50,7 @@ class _RecordUnit:
 class _RecordUnitEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RecordUnit.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RECORD_UNIT_UNSPECIFIED: _RecordUnit.ValueType  # 0
     RECORD_UNIT_NUMBER: _RecordUnit.ValueType  # 1
@@ -70,7 +70,7 @@ class _GroupByKey:
 class _GroupByKeyEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_GroupByKey.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     GROUP_BY_KEY_UNSPECIFIED: _GroupByKey.ValueType  # 0
     GROUP_BY_KEY_NAMESPACE: _GroupByKey.ValueType  # 1
@@ -81,6 +81,7 @@ GROUP_BY_KEY_UNSPECIFIED: GroupByKey.ValueType  # 0
 GROUP_BY_KEY_NAMESPACE: GroupByKey.ValueType  # 1
 global___GroupByKey = GroupByKey
 
+@typing.final
 class Summary(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -88,12 +89,18 @@ class Summary(google.protobuf.message.Message):
     END_TIME_FIELD_NUMBER: builtins.int
     RECORD_GROUPS_FIELD_NUMBER: builtins.int
     INCOMPLETE_FIELD_NUMBER: builtins.int
+    incomplete: builtins.bool
+    """True if data for given time window is not fully available yet (e.g. delays)
+    When true, records for the given time range could still be added/updated in the future (until false)
+    """
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Start of UTC day for now (inclusive)"""
+
     @property
     def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """End of UTC day for now (exclusive)"""
+
     @property
     def record_groups(
         self,
@@ -101,10 +108,7 @@ class Summary(google.protobuf.message.Message):
         global___RecordGroup
     ]:
         """Records grouped by namespace"""
-    incomplete: builtins.bool
-    """True if data for given time window is not fully available yet (e.g. delays)
-    When true, records for the given time range could still be added/updated in the future (until false)
-    """
+
     def __init__(
         self,
         *,
@@ -115,13 +119,13 @@ class Summary(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "end_time", b"end_time", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "end_time",
             b"end_time",
             "incomplete",
@@ -135,6 +139,7 @@ class Summary(google.protobuf.message.Message):
 
 global___Summary = Summary
 
+@typing.final
 class RecordGroup(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -147,6 +152,7 @@ class RecordGroup(google.protobuf.message.Message):
         global___GroupBy
     ]:
         """GroupBy keys and their values for this record group. Multiple fields are combined with logical AND."""
+
     @property
     def records(
         self,
@@ -161,13 +167,12 @@ class RecordGroup(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "group_bys", b"group_bys", "records", b"records"
-        ],
+        field_name: typing.Literal["group_bys", b"group_bys", "records", b"records"],
     ) -> None: ...
 
 global___RecordGroup = RecordGroup
 
+@typing.final
 class GroupBy(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -182,11 +187,12 @@ class GroupBy(google.protobuf.message.Message):
         value: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["key", b"key", "value", b"value"]
+        self, field_name: typing.Literal["key", b"key", "value", b"value"]
     ) -> None: ...
 
 global___GroupBy = GroupBy
 
+@typing.final
 class Record(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -205,9 +211,7 @@ class Record(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "type", b"type", "unit", b"unit", "value", b"value"
-        ],
+        field_name: typing.Literal["type", b"type", "unit", b"unit", "value", b"value"],
     ) -> None: ...
 
 global___Record = Record

@@ -4,7 +4,7 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -15,13 +15,9 @@ import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.nexus_pb2
 import temporalio.api.enums.v1.workflow_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ApplicationFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -32,6 +28,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
     CATEGORY_FIELD_NUMBER: builtins.int
     type: builtins.str
     non_retryable: builtins.bool
+    category: temporalio.api.enums.v1.common_pb2.ApplicationErrorCategory.ValueType
     @property
     def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     @property
@@ -41,7 +38,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
         still be subject to the maximum retries limit and total time limit
         defined by the policy.
         """
-    category: temporalio.api.enums.v1.common_pb2.ApplicationErrorCategory.ValueType
+
     def __init__(
         self,
         *,
@@ -53,13 +50,13 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "details", b"details", "next_retry_delay", b"next_retry_delay"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "category",
             b"category",
             "details",
@@ -75,6 +72,7 @@ class ApplicationFailureInfo(google.protobuf.message.Message):
 
 global___ApplicationFailureInfo = ApplicationFailureInfo
 
+@typing.final
 class TimeoutFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -94,13 +92,11 @@ class TimeoutFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "last_heartbeat_details", b"last_heartbeat_details"
-        ],
+        field_name: typing.Literal["last_heartbeat_details", b"last_heartbeat_details"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_heartbeat_details",
             b"last_heartbeat_details",
             "timeout_type",
@@ -110,15 +106,16 @@ class TimeoutFailureInfo(google.protobuf.message.Message):
 
 global___TimeoutFailureInfo = TimeoutFailureInfo
 
+@typing.final
 class CanceledFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     DETAILS_FIELD_NUMBER: builtins.int
     IDENTITY_FIELD_NUMBER: builtins.int
-    @property
-    def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     identity: builtins.str
     """The identity of the worker or client that requested the cancellation."""
+    @property
+    def details(self) -> temporalio.api.common.v1.message_pb2.Payloads: ...
     def __init__(
         self,
         *,
@@ -126,17 +123,15 @@ class CanceledFailureInfo(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["details", b"details"]
+        self, field_name: typing.Literal["details", b"details"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "details", b"details", "identity", b"identity"
-        ],
+        self, field_name: typing.Literal["details", b"details", "identity", b"identity"]
     ) -> None: ...
 
 global___CanceledFailureInfo = CanceledFailureInfo
 
+@typing.final
 class TerminatedFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -149,11 +144,12 @@ class TerminatedFailureInfo(google.protobuf.message.Message):
         identity: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["identity", b"identity"]
+        self, field_name: typing.Literal["identity", b"identity"]
     ) -> None: ...
 
 global___TerminatedFailureInfo = TerminatedFailureInfo
 
+@typing.final
 class ServerFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -165,11 +161,12 @@ class ServerFailureInfo(google.protobuf.message.Message):
         non_retryable: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["non_retryable", b"non_retryable"]
+        self, field_name: typing.Literal["non_retryable", b"non_retryable"]
     ) -> None: ...
 
 global___ServerFailureInfo = ServerFailureInfo
 
+@typing.final
 class ResetWorkflowFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -186,19 +183,16 @@ class ResetWorkflowFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "last_heartbeat_details", b"last_heartbeat_details"
-        ],
+        field_name: typing.Literal["last_heartbeat_details", b"last_heartbeat_details"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "last_heartbeat_details", b"last_heartbeat_details"
-        ],
+        field_name: typing.Literal["last_heartbeat_details", b"last_heartbeat_details"],
     ) -> None: ...
 
 global___ResetWorkflowFailureInfo = ResetWorkflowFailureInfo
 
+@typing.final
 class ActivityFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -211,10 +205,10 @@ class ActivityFailureInfo(google.protobuf.message.Message):
     scheduled_event_id: builtins.int
     started_event_id: builtins.int
     identity: builtins.str
-    @property
-    def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
     activity_id: builtins.str
     retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType
+    @property
+    def activity_type(self) -> temporalio.api.common.v1.message_pb2.ActivityType: ...
     def __init__(
         self,
         *,
@@ -226,11 +220,11 @@ class ActivityFailureInfo(google.protobuf.message.Message):
         retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["activity_type", b"activity_type"]
+        self, field_name: typing.Literal["activity_type", b"activity_type"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_id",
             b"activity_id",
             "activity_type",
@@ -248,6 +242,7 @@ class ActivityFailureInfo(google.protobuf.message.Message):
 
 global___ActivityFailureInfo = ActivityFailureInfo
 
+@typing.final
 class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -258,15 +253,15 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
     STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
     RETRY_STATE_FIELD_NUMBER: builtins.int
     namespace: builtins.str
+    initiated_event_id: builtins.int
+    started_event_id: builtins.int
+    retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType
     @property
     def workflow_execution(
         self,
     ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution: ...
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType: ...
-    initiated_event_id: builtins.int
-    started_event_id: builtins.int
-    retry_state: temporalio.api.enums.v1.workflow_pb2.RetryState.ValueType
     def __init__(
         self,
         *,
@@ -280,7 +275,7 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "workflow_execution",
             b"workflow_execution",
             "workflow_type",
@@ -289,7 +284,7 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "initiated_event_id",
             b"initiated_event_id",
             "namespace",
@@ -307,6 +302,7 @@ class ChildWorkflowExecutionFailureInfo(google.protobuf.message.Message):
 
 global___ChildWorkflowExecutionFailureInfo = ChildWorkflowExecutionFailureInfo
 
+@typing.final
 class NexusOperationFailureInfo(google.protobuf.message.Message):
     """Representation of the Temporal SDK NexusOperationError object that is returned to workflow callers."""
 
@@ -345,7 +341,7 @@ class NexusOperationFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "endpoint",
             b"endpoint",
             "operation",
@@ -363,6 +359,7 @@ class NexusOperationFailureInfo(google.protobuf.message.Message):
 
 global___NexusOperationFailureInfo = NexusOperationFailureInfo
 
+@typing.final
 class NexusHandlerFailureInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -384,13 +381,14 @@ class NexusHandlerFailureInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "retry_behavior", b"retry_behavior", "type", b"type"
         ],
     ) -> None: ...
 
 global___NexusHandlerFailureInfo = NexusHandlerFailureInfo
 
+@typing.final
 class Failure(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -433,6 +431,7 @@ class Failure(google.protobuf.message.Message):
         - If there's demand, we could allow overriding the default SDK implementation to encode other opaque Failure attributes.
         (-- api-linter: core::0203::optional=disabled --)
         """
+
     @property
     def cause(self) -> global___Failure: ...
     @property
@@ -482,7 +481,7 @@ class Failure(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_failure_info",
             b"activity_failure_info",
             "application_failure_info",
@@ -513,7 +512,7 @@ class Failure(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_failure_info",
             b"activity_failure_info",
             "application_failure_info",
@@ -549,9 +548,9 @@ class Failure(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["failure_info", b"failure_info"]
+        self, oneof_group: typing.Literal["failure_info", b"failure_info"]
     ) -> (
-        typing_extensions.Literal[
+        typing.Literal[
             "application_failure_info",
             "timeout_failure_info",
             "canceled_failure_info",
@@ -568,6 +567,7 @@ class Failure(google.protobuf.message.Message):
 
 global___Failure = Failure
 
+@typing.final
 class MultiOperationExecutionAborted(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

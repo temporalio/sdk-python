@@ -26,7 +26,7 @@ class _BatchOperationTypeEnumTypeWrapper(
         _BatchOperationType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BATCH_OPERATION_TYPE_UNSPECIFIED: _BatchOperationType.ValueType  # 0
     BATCH_OPERATION_TYPE_TERMINATE: _BatchOperationType.ValueType  # 1
@@ -98,7 +98,7 @@ class _BatchOperationStateEnumTypeWrapper(
         _BatchOperationState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BATCH_OPERATION_STATE_UNSPECIFIED: _BatchOperationState.ValueType  # 0
     BATCH_OPERATION_STATE_RUNNING: _BatchOperationState.ValueType  # 1

@@ -313,6 +313,7 @@ try:
     import grpc
 
     from .service_pb2_grpc import (
+        CloudService,
         CloudServiceServicer,
         CloudServiceStub,
         add_CloudServiceServicer_to_server,
@@ -320,6 +321,7 @@ try:
 
     __all__.extend(
         [
+            "CloudService",
             "CloudServiceServicer",
             "CloudServiceStub",
             "add_CloudServiceServicer_to_server",

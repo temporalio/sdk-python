@@ -10,8 +10,8 @@ license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
   "nexus-rpc==1.5.0",
-  "protobuf>=3.20,<8.0.0",
-  "types-protobuf>=3.20,<8.0.0",
+  "protobuf>=4.21.12,<8.0.0",
+  "types-protobuf>=4.24,<8.0.0",
   "typing-extensions>=4.2.0,<5",
 ]
 classifiers = [
@@ -24,7 +24,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-grpc = ["grpcio>=1.48.2,<2"]
+grpc = ["grpcio>=1.49.1,<2"]
 opentelemetry = ["opentelemetry-api>=1.26,<2", "opentelemetry-sdk>=1.26,<2"]
 pydantic = ["pydantic>=2.0.0,<3"]
 openai-agents = ["temporalio-openai-agents>=1.0.0"]
@@ -43,10 +43,8 @@ cloud-run-worker-otel = [
   "opentelemetry-api>=1.26,<2",
   "opentelemetry-sdk>=1.26,<2",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
-  # The OTLP exporter's generated protobuf code is not compatible with
-  # protobuf 7.x yet; cap it so `uv lock --upgrade` (test-latest-deps) does not
-  # downgrade the exporter to an ancient version to pull protobuf 7. A low
-  # exporter floor is kept so the protobuf<4 check-protos job can still resolve.
+  # Keep dependency upgrades from selecting an older OTLP exporter solely
+  # because its protobuf constraint permits version 7.
   "protobuf<7",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
@@ -65,7 +63,7 @@ dev = [
   "basedpyright==1.34.0",
   "cibuildwheel>=2.22.0,<3",
   "cryptography>=46",
-  "mypy==1.18.2",
+  "mypy==2.4.0",
   "psutil>=5.9.3,<6",
   "pydocstyle>=6.3.0,<7",
   "pydoctor>=25.10.1,<26",
@@ -107,14 +105,7 @@ format = [
 gen-docs = "uv run scripts/gen_docs.py"
 gen-nexus-system-api = "uv run scripts/gen_nexus_system_api.py"
 gen-protos = [
-  { cmd = "uv run scripts/gen_protos.py" },
-  { ref = "gen-nexus-system-api" },
-  { cmd = "uv run scripts/gen_payload_visitor.py" },
-  { cmd = "uv run scripts/gen_bridge_client.py" },
-  { ref = "format" },
-]
-gen-protos-docker = [
-  { cmd = "uv run scripts/gen_protos_docker.py" },
+  { cmd = "uv run --locked scripts/gen_protos.py" },
   { ref = "gen-nexus-system-api" },
   { cmd = "uv run scripts/gen_payload_visitor.py" },
   { cmd = "uv run scripts/gen_bridge_client.py" },

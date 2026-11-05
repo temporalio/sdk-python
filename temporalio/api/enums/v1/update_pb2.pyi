@@ -26,7 +26,7 @@ class _UpdateWorkflowExecutionLifecycleStageEnumTypeWrapper(
         _UpdateWorkflowExecutionLifecycleStage.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UPDATE_WORKFLOW_EXECUTION_LIFECYCLE_STAGE_UNSPECIFIED: (
         _UpdateWorkflowExecutionLifecycleStage.ValueType
@@ -101,7 +101,7 @@ class _UpdateAdmittedEventOriginEnumTypeWrapper(
         _UpdateAdmittedEventOrigin.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UPDATE_ADMITTED_EVENT_ORIGIN_UNSPECIFIED: _UpdateAdmittedEventOrigin.ValueType  # 0
     UPDATE_ADMITTED_EVENT_ORIGIN_REAPPLY: _UpdateAdmittedEventOrigin.ValueType  # 1

@@ -4,18 +4,14 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class S3Spec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -45,7 +41,7 @@ class S3Spec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "aws_account_id",
             b"aws_account_id",
             "bucket_name",
@@ -61,6 +57,7 @@ class S3Spec(google.protobuf.message.Message):
 
 global___S3Spec = S3Spec
 
+@typing.final
 class GCSSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -86,7 +83,7 @@ class GCSSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "bucket_name",
             b"bucket_name",
             "gcp_project_id",
@@ -100,6 +97,7 @@ class GCSSpec(google.protobuf.message.Message):
 
 global___GCSSpec = GCSSpec
 
+@typing.final
 class KinesisSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -121,7 +119,7 @@ class KinesisSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "destination_uri",
             b"destination_uri",
             "region",
@@ -133,6 +131,7 @@ class KinesisSpec(google.protobuf.message.Message):
 
 global___KinesisSpec = KinesisSpec
 
+@typing.final
 class PubSubSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -154,7 +153,7 @@ class PubSubSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "gcp_project_id",
             b"gcp_project_id",
             "service_account_id",
