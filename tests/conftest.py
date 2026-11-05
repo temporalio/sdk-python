@@ -116,11 +116,13 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
-    def get_child_watcher(self):
-        return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
+    if sys.version_info < (3, 14):
 
-    def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
-        return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
+        def get_child_watcher(self):
+            return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
+
+        def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
+            return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
 
 
 @pytest.fixture(scope="session")
