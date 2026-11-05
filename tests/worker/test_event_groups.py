@@ -1103,11 +1103,14 @@ async def test_timer_commands_carry_markers(client: Client, env: WorkflowEnviron
     _require_event_groups_server(env)
 
     async with new_worker(client, TimerCommandsWorkflow) as worker:
-        handle = await client.start_workflow(
-            TimerCommandsWorkflow.run,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
+        # The test needs the long timer to remain pending until the workflow
+        # cancels it; automatic skipping can otherwise fire it first.
+        with env.with_time_skipping_disabled():
+            handle = await client.start_workflow(
+                TimerCommandsWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
         await handle.result()
         events = await _fetch_events(handle)
         both = (
