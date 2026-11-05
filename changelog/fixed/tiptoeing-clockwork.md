@@ -1,0 +1,1 @@
+Fix datetime decoding failures in sandboxed workflows, including datetime values nested in collections or dataclasses and datetime-typed signals being dropped. Existing workflow histories retain their original decoding behavior during replay.
