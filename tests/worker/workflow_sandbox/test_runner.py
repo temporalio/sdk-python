@@ -498,7 +498,7 @@ async def test_workflow_sandbox_task_group_warning(client: Client):
     async with new_worker(client, UnsupportedTaskGroupWorkflow) as worker:
         with pytest.warns(
             UserWarning,
-            match=r"asyncio\.TaskGroup is not supported in workflows.*cancellation order",
+            match=r"asyncio\.TaskGroup\(\) has non-deterministic task cancellation order",
         ) as warnings:
             result = await client.execute_workflow(
                 UnsupportedTaskGroupWorkflow.run,
