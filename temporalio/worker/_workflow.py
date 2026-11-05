@@ -30,6 +30,10 @@ from temporalio.bridge.worker import PollShutdownError
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
+from .._workflow_context import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    _WorkflowLogicFlag,
+)
 from . import _command_aware_visitor
 from ._debugger import (
     _install_workflow_breakpoint_hook,
@@ -41,13 +45,11 @@ from ._interceptor import (
     WorkflowInterceptorClassInput,
 )
 from ._workflow_instance import (
-    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
     PatchActivationInput,
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
     _WorkflowExternFunctions,
-    _WorkflowLogicFlag,
 )
 
 logger = logging.getLogger(__name__)

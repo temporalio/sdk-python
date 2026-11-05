@@ -37,6 +37,10 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.types
+from temporalio._workflow_context import (
+    _current_workflow_flags,
+    _WorkflowLogicFlag,
+)
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
@@ -794,6 +798,21 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
+def _is_datetime_hint(hint: type) -> bool:
+    if hint is datetime:
+        return True
+    context = _current_workflow_flags.get()
+    if context is None or not context.is_flag_enabled(
+        _WorkflowLogicFlag.DECODE_DATETIME_PROXIES
+    ):
+        return False
+
+    # Importing the worker package during converter initialization creates a cycle.
+    from temporalio.worker.workflow_sandbox._restrictions import RestrictionContext
+
+    return RestrictionContext.unwrap_if_proxied(hint) is datetime
+
+
 def _get_iso_datetime_parser() -> Callable[[str], datetime]:
     """Return the ISO datetime parser.
 
@@ -836,7 +855,7 @@ def value_to_type(
     # Any or primitives
     if hint is Any:
         return value
-    elif hint is datetime:
+    elif _is_datetime_hint(hint):
         if isinstance(value, str):
             try:
                 return _get_iso_datetime_parser()(value)
