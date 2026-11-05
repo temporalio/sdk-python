@@ -23,13 +23,13 @@ import temporalio.nexus
 from temporalio.nexus._operation_context import (
     TemporalCancelOperationContext,
     TemporalStartOperationContext,
+    _SignalSlot,
     _temporal_cancel_operation_context,
+    _temporal_operation_signal_slot,
 )
 from temporalio.nexus._temporal_client import (
     TemporalNexusClient,
     TemporalOperationResult,
-    _SignalSlot,
-    _temporal_operation_signal_slot,
     _TemporalNexusClient,
 )
 from temporalio.nexus._token import OperationToken, OperationTokenType, WorkflowHandle
@@ -172,6 +172,10 @@ class CancelActivityOptions:
 class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
     """Operation handler for Nexus operations that interact with Temporal.
     Implementations override the start_operation method.
+
+    Signals sent during the start reuse the Nexus request ID, so retried Nexus tasks don't
+    deliver them twice. Only one signal (including signal-with-start) may be sent per start;
+    another raises a ``BAD_REQUEST`` :py:class:`nexusrpc.HandlerError` unless the first failed.
 
     .. warning::
        This API is experimental and unstable.

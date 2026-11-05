@@ -1,1 +1,1 @@
-Experimental: signals and signal-with-start sent through `TemporalNexusClient.client` in a Temporal operation handler now reuse the Nexus operation request ID, so a retried Nexus task no longer delivers the same signal twice. Signals sent through `temporalio.nexus.client()` are unchanged.
+Experimental: signals and signal-with-start sent from a Temporal operation handler now reuse the Nexus operation request ID, so a retried Nexus task no longer delivers the same signal twice.

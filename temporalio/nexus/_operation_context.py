@@ -74,10 +74,34 @@ _temporal_nexus_backing_start_context: ContextVar[bool] = ContextVar(
     "temporal-nexus-backing-start-context"
 )
 
-# Set while a signal is sent through TemporalNexusClient.client so the request reuses
-# the Nexus request ID and the server deduplicates it when the Nexus task is retried.
-_temporal_operation_signal_context: ContextVar[bool] = ContextVar(
-    "temporal-operation-signal-context"
+
+class _SignalSlot:
+    """Allows one in-flight or successful signal per Temporal operation handler invocation."""
+
+    def __init__(self) -> None:
+        self._taken = False
+
+    @contextmanager
+    def reserve(self) -> Generator[None]:
+        # Every signal from the handler carries the operation's request ID, so the server
+        # would deduplicate a second one against the first and report it delivered.
+        if self._taken:
+            raise nexusrpc.HandlerError(
+                "Only one signal can be sent per Temporal operation handler invocation",
+                type=nexusrpc.HandlerErrorType.BAD_REQUEST,
+            )
+        self._taken = True
+        try:
+            yield
+        except BaseException:
+            self._taken = False
+            raise
+
+
+# Set for the duration of a Temporal operation handler's start so its signals reuse the
+# Nexus request ID and are not delivered twice when the Nexus task is retried.
+_temporal_operation_signal_slot: ContextVar[_SignalSlot | None] = ContextVar(
+    "temporal-operation-signal-slot", default=None
 )
 
 
@@ -210,19 +234,6 @@ def _nexus_backing_start_context() -> Generator[None]:
 
 def _in_nexus_backing_start_context() -> bool:  # type:ignore[reportUnusedClass]
     return _temporal_nexus_backing_start_context.get(False)
-
-
-@contextmanager
-def _operation_signal_context() -> Generator[None]:  # pyright: ignore[reportUnusedFunction]
-    token = _temporal_operation_signal_context.set(True)
-    try:
-        yield
-    finally:
-        _temporal_operation_signal_context.reset(token)
-
-
-def _in_operation_signal_context() -> bool:
-    return _temporal_operation_signal_context.get(False)
 
 
 _OperationCtxT = TypeVar("_OperationCtxT", bound=OperationContext)
@@ -843,15 +854,36 @@ def _apply_query_workflow_response_to_nexus_context(  # pyright: ignore[reportUn
         nexus_ctx._add_response_link(resp.link)
 
 
-def _apply_nexus_context_to_signal_workflow_request(  # pyright: ignore[reportUnusedFunction]
-    req: temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest,
-) -> None:
-    """Apply the current Nexus operation context to a workflow signal request."""
+@contextmanager
+def _signal_request_nexus_context(  # pyright: ignore[reportUnusedFunction]
+    req: (
+        temporalio.api.workflowservice.v1.SignalWorkflowExecutionRequest
+        | temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest
+    ),
+) -> Generator[None]:
+    """Apply the current Nexus operation context to a signal or signal-with-start RPC.
+
+    Inside a Temporal operation handler, the request reuses the Nexus request ID and takes
+    the invocation's only signal, which is released if the RPC fails.
+    """
     nexus_ctx = _try_start_operation_context()
-    if nexus_ctx is not None:
-        req.links.extend(nexus_ctx._get_request_links())
-        if _in_operation_signal_context():
-            req.request_id = nexus_ctx.nexus_context.request_id
+    if nexus_ctx is None or (
+        isinstance(
+            req,
+            temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
+        )
+        and _in_nexus_backing_start_context()
+    ):
+        yield
+        return
+    req.links.extend(nexus_ctx._get_request_links())
+    slot = _temporal_operation_signal_slot.get()
+    if slot is None:
+        yield
+        return
+    req.request_id = nexus_ctx.nexus_context.request_id
+    with slot.reserve():
+        yield
 
 
 def _apply_signal_workflow_response_to_nexus_context(  # pyright: ignore[reportUnusedFunction]
@@ -861,17 +893,6 @@ def _apply_signal_workflow_response_to_nexus_context(  # pyright: ignore[reportU
     nexus_ctx = _try_start_operation_context()
     if nexus_ctx is not None and resp.HasField("link"):
         nexus_ctx._add_response_link(resp.link)
-
-
-def _apply_nexus_context_to_signal_with_start_workflow_request(  # pyright: ignore[reportUnusedFunction]
-    req: temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
-) -> None:
-    """Apply the current Nexus operation context to a signal-with-start request."""
-    nexus_ctx = _try_start_operation_context()
-    if nexus_ctx is not None and not _in_nexus_backing_start_context():
-        req.links.extend(nexus_ctx._get_request_links())
-        if _in_operation_signal_context():
-            req.request_id = nexus_ctx.nexus_context.request_id
 
 
 def _apply_nexus_context_to_start_workflow_request(  # pyright: ignore[reportUnusedFunction]

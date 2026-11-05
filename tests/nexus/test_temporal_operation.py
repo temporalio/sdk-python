@@ -10,8 +10,10 @@ from nexusrpc import HandlerErrorType, Operation, service
 from nexusrpc.handler import (
     CancelOperationContext,
     OperationTaskCancellation,
+    StartOperationContext,
     operation_handler,
     service_handler,
+    sync_operation,
 )
 from typing_extensions import override
 
@@ -20,13 +22,14 @@ import temporalio.service
 from temporalio import activity, nexus, workflow
 from temporalio.api.activity.v1 import ActivityExecutionInfo
 from temporalio.api.common.v1 import Link
+from temporalio.api.workflowservice.v1 import (
+    SignalWorkflowExecutionRequest,
+    SignalWorkflowExecutionResponse,
+)
 from temporalio.client import (
     ActivityExecutionStatus,
     Client,
-    Interceptor,
     NexusOperationFailureError,
-    OutboundInterceptor,
-    SignalWorkflowInput,
     WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowUpdateStage,
@@ -38,7 +41,6 @@ from temporalio.common import (
 )
 from temporalio.nexus._token import OperationToken, OperationTokenType
 from temporalio.testing import WorkflowEnvironment
-from temporalio.testing._workflow import _client_with_interceptors
 from temporalio.worker import Worker
 from tests.helpers import EventType, assert_event_subsequence, assert_eventually
 from tests.helpers.nexus import (
@@ -334,10 +336,10 @@ class TestServiceHandler:
     async def query_op(
         self,
         _ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
+        _client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[bool]:
-        handle = client.client.get_workflow_handle(input)
+        handle = nexus.client().get_workflow_handle(input)
         result = await handle.query(BlockingWorkflow.query_done)
         return nexus.TemporalOperationResult.sync(result)
 
@@ -432,18 +434,20 @@ class TestServiceHandler:
     async def double_signal(
         self,
         _ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
+        _client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[None]:
-        await client.client.start_workflow(
+        await nexus.client().start_workflow(
             SignalCountWorkflow.run,
             id=input,
             task_queue=nexus.info().task_queue,
             start_signal="my_signal",
         )
         # Rejected even though it targets a different workflow.
-        await client.client.get_workflow_handle(f"{input}-other").signal(
-            SignalCountWorkflow.my_signal
+        await (
+            nexus.client()
+            .get_workflow_handle(f"{input}-other")
+            .signal(SignalCountWorkflow.my_signal)
         )
         raise RuntimeError("Expected second signal to be rejected")
 
@@ -451,10 +455,10 @@ class TestServiceHandler:
     async def concurrent_signal(
         self,
         _ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
+        _client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[None]:
-        handle = client.client.get_workflow_handle(input)
+        handle = nexus.client().get_workflow_handle(input)
         self.concurrent_signal_results = list(
             await asyncio.gather(
                 handle.signal(SignalCountWorkflow.my_signal),
@@ -464,29 +468,20 @@ class TestServiceHandler:
         )
         return nexus.TemporalOperationResult.sync(None)
 
-    @nexus.temporal_operation
-    async def unlimited_signals(
-        self,
-        _ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
-        input: str,
-    ) -> nexus.TemporalOperationResult[None]:
-        await client.client.get_workflow_handle(input).signal(
-            SignalCountWorkflow.my_signal
-        )
+    @sync_operation
+    async def unlimited_signals(self, _ctx: StartOperationContext, input: str) -> None:
         handle = nexus.client().get_workflow_handle(input)
-        await handle.signal(SignalCountWorkflow.my_signal)
-        await handle.signal(SignalCountWorkflow.my_signal)
-        return nexus.TemporalOperationResult.sync(None)
+        for _ in range(3):
+            await handle.signal(SignalCountWorkflow.my_signal)
 
     @nexus.temporal_operation
     async def signal_after_failed_signal(
         self,
         _ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
+        _client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[None]:
-        handle = client.client.get_workflow_handle(input)
+        handle = nexus.client().get_workflow_handle(input)
         try:
             await handle.signal(SignalCountWorkflow.my_signal)
         except temporalio.service.RPCError:
@@ -498,10 +493,10 @@ class TestServiceHandler:
     async def signal_handler_retry(
         self,
         ctx: nexus.TemporalStartOperationContext,
-        client: nexus.TemporalNexusClient,
+        _client: nexus.TemporalNexusClient,
         input: str,
     ) -> nexus.TemporalOperationResult[None]:
-        await client.client.start_workflow(
+        await nexus.client().start_workflow(
             SignalCountWorkflow.run,
             id=input,
             task_queue=nexus.info().task_queue,
@@ -1365,7 +1360,7 @@ async def test_temporal_operation_double_signal_raises_handler_err(
         assert isinstance(err.value.cause, nexusrpc.HandlerError)
         assert err.value.cause.type == HandlerErrorType.BAD_REQUEST
         assert (
-            "Only one signal can be sent per operation handler invocation"
+            "Only one signal can be sent per Temporal operation handler invocation"
             in err.value.cause.message
         )
 
@@ -1406,7 +1401,7 @@ async def test_temporal_operation_concurrent_signal_raises_handler_err(
         assert await handle.result() == 1
 
 
-async def test_temporal_operation_nexus_client_signals_not_limited(
+async def test_sync_operation_signals_not_limited(
     client: Client, env: WorkflowEnvironment
 ):
     if env.supports_time_skipping_v1:
@@ -1433,37 +1428,12 @@ async def test_temporal_operation_nexus_client_signals_not_limited(
             TestService.unlimited_signals, handle.id, id=str(uuid.uuid4())
         )
 
-        # A shared request ID would have deduplicated all three into one.
         await handle.signal(SignalCountWorkflow.finish)
         assert await handle.result() == 3
 
 
-class _LoseFirstSignalResponseInterceptor(Interceptor):
-    """Applies the first signal, then raises as if its response were lost."""
-
-    def __init__(self) -> None:
-        super().__init__()
-        self.lost = False
-
-    def intercept_client(self, next: OutboundInterceptor) -> OutboundInterceptor:
-        interceptor = self
-
-        class _Outbound(OutboundInterceptor):
-            async def signal_workflow(self, input: SignalWorkflowInput) -> None:
-                await self.next.signal_workflow(input)
-                if not interceptor.lost:
-                    interceptor.lost = True
-                    raise temporalio.service.RPCError(
-                        "lost response",
-                        temporalio.service.RPCStatusCode.DEADLINE_EXCEEDED,
-                        b"",
-                    )
-
-        return _Outbound(next)
-
-
 async def test_temporal_operation_failed_signal_allows_retry(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, monkeypatch: pytest.MonkeyPatch
 ):
     if env.supports_time_skipping_v1:
         pytest.skip(
@@ -1473,8 +1443,28 @@ async def test_temporal_operation_failed_signal_allows_retry(
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
     await env.create_nexus_endpoint(endpoint_name, task_queue)
+
+    workflow_service = env.client.workflow_service
+    signal_workflow_execution = workflow_service.signal_workflow_execution
+    lost = False
+
+    async def lose_first_signal_response(
+        req: SignalWorkflowExecutionRequest, *args: Any, **kwargs: Any
+    ) -> SignalWorkflowExecutionResponse:
+        nonlocal lost
+        resp = await signal_workflow_execution(req, *args, **kwargs)
+        if not lost:
+            lost = True
+            raise temporalio.service.RPCError(
+                "lost response", temporalio.service.RPCStatusCode.DEADLINE_EXCEEDED, b""
+            )
+        return resp
+
+    monkeypatch.setattr(
+        workflow_service, "signal_workflow_execution", lose_first_signal_response
+    )
     async with Worker(
-        _client_with_interceptors(env.client, _LoseFirstSignalResponseInterceptor()),
+        env.client,
         task_queue=task_queue,
         nexus_service_handlers=[TestServiceHandler()],
         workflows=[SignalCountWorkflow],
