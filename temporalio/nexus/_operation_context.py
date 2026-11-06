@@ -10,7 +10,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import timedelta
@@ -80,6 +80,15 @@ class _SignalSlot:
 
     def __init__(self) -> None:
         self._taken = False
+
+    @staticmethod
+    @contextmanager
+    def scope() -> Generator[None]:
+        token = _temporal_operation_signal_slot.set(_SignalSlot())
+        try:
+            yield
+        finally:
+            _temporal_operation_signal_slot.reset(token)
 
     @contextmanager
     def reserve(self) -> Generator[None]:
