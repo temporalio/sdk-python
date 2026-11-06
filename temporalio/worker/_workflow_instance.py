@@ -513,7 +513,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._single_batch_activation = self._workflow_logic_flag_enabled(
             _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
         )
-        # Record this before queries can arrive, even when no input needs decoding.
+        # Check this flag before queries can arrive,
+        # even when no input needs decoding.
         self._workflow_logic_flag_enabled(_WorkflowLogicFlag.DECODE_DATETIME_PROXIES)
         activation_err: Exception | None = None
         try:
