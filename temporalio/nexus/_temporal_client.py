@@ -99,12 +99,19 @@ class TemporalOperationResult(Generic[_ResultT]):
 class TemporalNexusClient(ABC):
     """Nexus-aware wrapper around a Temporal Client.
 
-    Use :py:func:`temporalio.nexus.client` for other workflow interactions, such as
-    queries and signals.
-
     .. warning::
        This API is experimental and unstable.
     """
+
+    @property
+    @abstractmethod
+    def client(self) -> temporalio.client.Client:
+        """The underlying Temporal Client
+
+        .. warning::
+           This API is experimental and unstable.
+        """
+        ...
 
     # Overload for no-param workflow
     @overload
@@ -585,11 +592,16 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
         self._temporal_context = _TemporalStartOperationContext.get()
         self._started_async = False
 
+    @property
+    def client(self) -> temporalio.client.Client:
+        """Return the Temporal client for the active Nexus operation."""
+        return self._temporal_context.client
+
     @contextmanager
     def _reserve_async_start(self) -> Iterator[None]:
         if self._started_async:
             raise HandlerError(
-                "Only one async operation can be started per operation handler invocation. Use temporalio.nexus.client() for additional workflow interactions",
+                "Only one async operation can be started per operation handler invocation. Use TemporalNexusClient.client for additional workflow interactions",
                 type=HandlerErrorType.BAD_REQUEST,
             )
 
