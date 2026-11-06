@@ -867,22 +867,22 @@ def _signal_request_nexus_context(  # pyright: ignore[reportUnusedFunction]
     the invocation's only signal, which is released if the RPC fails.
     """
     nexus_ctx = _try_start_operation_context()
-    if nexus_ctx is None or (
+    is_backing_start = (
         isinstance(
             req,
             temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
         )
         and _in_nexus_backing_start_context()
-    ):
-        yield
-        return
-    req.links.extend(nexus_ctx._get_request_links())
-    slot = _temporal_operation_signal_slot.get()
-    if slot is None:
-        yield
-        return
-    req.request_id = nexus_ctx.nexus_context.request_id
-    with slot.reserve():
+    )
+
+    slot = None
+    if nexus_ctx is not None and not is_backing_start:
+        req.links.extend(nexus_ctx._get_request_links())
+        slot = _temporal_operation_signal_slot.get()
+        if slot is not None:
+            req.request_id = nexus_ctx.nexus_context.request_id
+
+    with slot.reserve() if slot is not None else nullcontext():
         yield
 
 
