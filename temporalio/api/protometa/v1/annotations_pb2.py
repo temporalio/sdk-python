@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -20,22 +19,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n+temporal/api/protometa/v1/annotations.proto\x12\x19temporal.api.protometa.v1\x1a google/protobuf/descriptor.proto"8\n\x17RequestHeaderAnnotation\x12\x0e\n\x06header\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:m\n\x0erequest_header\x12\x1e.google.protobuf.MethodOptions\x18\xd1\xc3\xb9\x03 \x03(\x0b\x32\x32.temporal.api.protometa.v1.RequestHeaderAnnotationB\x9c\x01\n\x1cio.temporal.api.protometa.v1B\x10\x41nnotationsProtoP\x01Z)go.temporal.io/api/protometa/v1;protometa\xaa\x02\x1bTemporalio.Api.Protometa.V1\xea\x02\x1eTemporalio::Api::Protometa::V1b\x06proto3'
 )
 
-
-REQUEST_HEADER_FIELD_NUMBER = 7234001
-request_header = DESCRIPTOR.extensions_by_name["request_header"]
-
-_REQUESTHEADERANNOTATION = DESCRIPTOR.message_types_by_name["RequestHeaderAnnotation"]
-RequestHeaderAnnotation = _reflection.GeneratedProtocolMessageType(
-    "RequestHeaderAnnotation",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _REQUESTHEADERANNOTATION,
-        "__module__": "temporalio.api.protometa.v1.annotations_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.protometa.v1.RequestHeaderAnnotation)
-    },
-)
-_sym_db.RegisterMessage(RequestHeaderAnnotation)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     google_dot_protobuf_dot_descriptor__pb2.MethodOptions.RegisterExtension(
         request_header

@@ -24,7 +24,7 @@ class _EventType:
 class _EventTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_EventType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     EVENT_TYPE_UNSPECIFIED: _EventType.ValueType  # 0
     """Place holder and should never appear in a Workflow execution history"""

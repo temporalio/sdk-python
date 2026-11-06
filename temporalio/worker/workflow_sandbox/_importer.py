@@ -181,7 +181,7 @@ class Importer:
         name: str,
         globals: Mapping[str, object] | None = None,
         locals: Mapping[str, object] | None = None,
-        fromlist: Sequence[str] = (),
+        fromlist: Sequence[str] | None = (),
         level: int = 0,
     ) -> types.ModuleType:
         _trace("Importing %s (fromlist: %s, level: %s)", name, fromlist, level)
@@ -197,9 +197,10 @@ class Importer:
         name: str,
         globals: Mapping[str, object] | None = None,
         locals: Mapping[str, object] | None = None,
-        fromlist: Sequence[str] = (),
+        fromlist: Sequence[str] | None = (),
         level: int = 0,
     ) -> types.ModuleType:
+        fromlist = fromlist or ()
         # We have to resolve the full name, it can be relative at different
         # levels
         full_name = _resolve_module_name(name, globals, level)

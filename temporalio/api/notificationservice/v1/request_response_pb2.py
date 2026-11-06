@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -25,31 +24,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n:temporal/api/notificationservice/v1/request_response.proto\x12#temporal.api.notificationservice.v1\x1a$temporal/api/common/v1/message.proto\x1a%temporal/api/failure/v1/message.proto"\xbf\x01\n\x11OnCompleteRequest\x12\x32\n\x07success\x18\x01 \x01(\x0b\x32\x1f.temporal.api.common.v1.PayloadH\x00\x12\x33\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32 .temporal.api.failure.v1.FailureH\x00\x12\x37\n\x0esource_context\x18\x03 \x01(\x0b\x32\x1f.temporal.api.common.v1.PayloadB\x08\n\x06result"\x14\n\x12OnCompleteResponseB\xd2\x01\n&io.temporal.api.notificationservice.v1B\x14RequestResponseProtoP\x01Z=go.temporal.io/api/notificationservice/v1;notificationservice\xaa\x02%Temporalio.Api.NotificationService.V1\xea\x02(Temporalio::Api::NotificationService::V1b\x06proto3'
 )
 
-
-_ONCOMPLETEREQUEST = DESCRIPTOR.message_types_by_name["OnCompleteRequest"]
-_ONCOMPLETERESPONSE = DESCRIPTOR.message_types_by_name["OnCompleteResponse"]
-OnCompleteRequest = _reflection.GeneratedProtocolMessageType(
-    "OnCompleteRequest",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ONCOMPLETEREQUEST,
-        "__module__": "temporalio.api.notificationservice.v1.request_response_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.notificationservice.v1.OnCompleteRequest)
-    },
-)
-_sym_db.RegisterMessage(OnCompleteRequest)
-
-OnCompleteResponse = _reflection.GeneratedProtocolMessageType(
-    "OnCompleteResponse",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ONCOMPLETERESPONSE,
-        "__module__": "temporalio.api.notificationservice.v1.request_response_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.notificationservice.v1.OnCompleteResponse)
-    },
-)
-_sym_db.RegisterMessage(OnCompleteResponse)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n&io.temporal.api.notificationservice.v1B\024RequestResponseProtoP\001Z=go.temporal.io/api/notificationservice/v1;notificationservice\252\002%Temporalio.Api.NotificationService.V1\352\002(Temporalio::Api::NotificationService::V1"

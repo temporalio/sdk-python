@@ -9,14 +9,7 @@ import pytest
 @pytest.mark.parametrize(
     "legacy,canonical,submodules",
     [
-        pytest.param(
-            "deepagents",
-            "deepagents",
-            ("testing", "workflow"),
-            marks=pytest.mark.skipif(
-                sys.version_info < (3, 11), reason="Deep Agents requires Python 3.11"
-            ),
-        ),
+        ("deepagents", "deepagents", ("testing", "workflow")),
         ("google_adk_agents", "google_adk", ("workflow",)),
         ("google_genai", "google_genai", ("testing", "workflow")),
         ("langgraph", "langgraph", ()),

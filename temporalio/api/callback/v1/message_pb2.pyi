@@ -4,7 +4,7 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.message
@@ -14,13 +14,9 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.common_pb2
 import temporalio.api.failure.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class CallbackInfo(google.protobuf.message.Message):
     """Common callback information. Specific CallbackInfo messages should embed this and may include additional fields."""
 
@@ -35,33 +31,38 @@ class CallbackInfo(google.protobuf.message.Message):
     NEXT_ATTEMPT_SCHEDULE_TIME_FIELD_NUMBER: builtins.int
     BLOCKED_REASON_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
-    @property
-    def callback(self) -> temporalio.api.common.v1.message_pb2.Callback:
-        """Information on how this callback should be invoked (e.g. its URL and type)."""
-    @property
-    def registration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the callback was registered."""
     state: temporalio.api.enums.v1.common_pb2.CallbackState.ValueType
     """The current state of the callback."""
     attempt: builtins.int
     """The number of attempts made to deliver the callback.
     This number represents a minimum bound since the attempt is incremented after the callback request completes.
     """
-    @property
-    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the last attempt completed."""
-    @property
-    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The last attempt's failure, if any."""
-    @property
-    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The time when the next attempt is scheduled."""
     blocked_reason: builtins.str
     """If the state is BLOCKED, blocked reason provides additional information."""
     request_id: builtins.str
     """Server-generated request ID used as an idempotency token when invoking callbacks.
     It has no relation to caller-side request_id sent in operations like StartNexusOperationExecutionRequest.
     """
+    @property
+    def callback(self) -> temporalio.api.common.v1.message_pb2.Callback:
+        """Information on how this callback should be invoked (e.g. its URL and type)."""
+
+    @property
+    def registration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the callback was registered."""
+
+    @property
+    def last_attempt_complete_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the last attempt completed."""
+
+    @property
+    def last_attempt_failure(self) -> temporalio.api.failure.v1.message_pb2.Failure:
+        """The last attempt's failure, if any."""
+
+    @property
+    def next_attempt_schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The time when the next attempt is scheduled."""
+
     def __init__(
         self,
         *,
@@ -80,7 +81,7 @@ class CallbackInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "callback",
             b"callback",
             "last_attempt_complete_time",
@@ -95,7 +96,7 @@ class CallbackInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attempt",
             b"attempt",
             "blocked_reason",

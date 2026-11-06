@@ -105,7 +105,7 @@ The command does not stage or commit changes or resolve Rust API
 compatibility issues. If dependency refresh fails, inspect the updated pin,
 fragments, and manifest before retrying.
 
-If Core protobuf definitions changed, run `poe gen-protos-docker` and include the
+If Core protobuf definitions changed, run `poe gen-protos` and include the
 regenerated bindings in the update PR.
 
 ## Things to Avoid

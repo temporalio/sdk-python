@@ -25,6 +25,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class WorkerPollerInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -33,10 +34,10 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     IS_AUTOSCALING_FIELD_NUMBER: builtins.int
     current_pollers: builtins.int
     """Number of polling RPCs that are currently in flight."""
-    @property
-    def last_successful_poll_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     is_autoscaling: builtins.bool
     """Set true if the number of concurrent pollers is auto-scaled"""
+    @property
+    def last_successful_poll_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
         self,
         *,
@@ -46,13 +47,13 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_successful_poll_time", b"last_successful_poll_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_pollers",
             b"current_pollers",
             "is_autoscaling",
@@ -64,6 +65,7 @@ class WorkerPollerInfo(google.protobuf.message.Message):
 
 global___WorkerPollerInfo = WorkerPollerInfo
 
+@typing.final
 class WorkerSlotsInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -110,7 +112,7 @@ class WorkerSlotsInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_available_slots",
             b"current_available_slots",
             "current_used_slots",
@@ -130,6 +132,7 @@ class WorkerSlotsInfo(google.protobuf.message.Message):
 
 global___WorkerSlotsInfo = WorkerSlotsInfo
 
+@typing.final
 class WorkerHostInfo(google.protobuf.message.Message):
     """Holds everything needed to identify the worker host/process context"""
 
@@ -170,7 +173,7 @@ class WorkerHostInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_host_cpu_usage",
             b"current_host_cpu_usage",
             "current_host_mem_usage",
@@ -186,6 +189,7 @@ class WorkerHostInfo(google.protobuf.message.Message):
 
 global___WorkerHostInfo = WorkerHostInfo
 
+@typing.final
 class WorkerHeartbeat(google.protobuf.message.Message):
     """Worker info message, contains information about the worker and its current state.
     All information is provided by the worker itself.
@@ -228,32 +232,42 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     """Worker identity, set by the client, may not be unique.
     Usually host_name+(user group name)+process_id, but can be overwritten by the user.
     """
-    @property
-    def host_info(self) -> global___WorkerHostInfo:
-        """Worker host information."""
     task_queue: builtins.str
     """Task queue this worker is polling for tasks."""
-    @property
-    def deployment_version(
-        self,
-    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
     sdk_name: builtins.str
     sdk_version: builtins.str
     status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType
     """Worker status. Defined by SDK."""
+    total_sticky_cache_hit: builtins.int
+    """A Workflow Task found a cached Workflow Execution to run against."""
+    total_sticky_cache_miss: builtins.int
+    """A Workflow Task did not find a cached Workflow execution to run against."""
+    current_sticky_cache_size: builtins.int
+    """Current cache size, expressed in number of Workflow Executions."""
+    @property
+    def host_info(self) -> global___WorkerHostInfo:
+        """Worker host information."""
+
+    @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Worker start time.
         It can be used to determine worker uptime. (current time - start time)
         """
+
     @property
     def heartbeat_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamp of this heartbeat, coming from the worker. Worker should set it to "now".
         Note that this timestamp comes directly from the worker and is subject to workers' clock skew.
         """
+
     @property
     def elapsed_since_last_heartbeat(self) -> google.protobuf.duration_pb2.Duration:
         """Elapsed time since the last heartbeat from the worker."""
+
     @property
     def workflow_task_slots_info(self) -> global___WorkerSlotsInfo: ...
     @property
@@ -270,12 +284,6 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     def activity_poller_info(self) -> global___WorkerPollerInfo: ...
     @property
     def nexus_poller_info(self) -> global___WorkerPollerInfo: ...
-    total_sticky_cache_hit: builtins.int
-    """A Workflow Task found a cached Workflow Execution to run against."""
-    total_sticky_cache_miss: builtins.int
-    """A Workflow Task did not find a cached Workflow execution to run against."""
-    current_sticky_cache_size: builtins.int
-    """Current cache size, expressed in number of Workflow Executions."""
     @property
     def plugins(
         self,
@@ -283,6 +291,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         global___PluginInfo
     ]:
         """Plugins currently in use by this SDK."""
+
     @property
     def drivers(
         self,
@@ -290,9 +299,11 @@ class WorkerHeartbeat(google.protobuf.message.Message):
         global___StorageDriverInfo
     ]:
         """Storage drivers in use by this SDK."""
+
     @property
     def environment(self) -> global___EnvironmentInfo:
         """Information about the environment this SDK is running in."""
+
     def __init__(
         self,
         *,
@@ -326,7 +337,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_poller_info",
             b"activity_poller_info",
             "activity_task_slots_info",
@@ -359,7 +370,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity_poller_info",
             b"activity_poller_info",
             "activity_task_slots_info",
@@ -415,6 +426,7 @@ class WorkerHeartbeat(google.protobuf.message.Message):
 
 global___WorkerHeartbeat = WorkerHeartbeat
 
+@typing.final
 class WorkerInfo(google.protobuf.message.Message):
     """Detailed worker information."""
 
@@ -429,16 +441,15 @@ class WorkerInfo(google.protobuf.message.Message):
         worker_heartbeat: global___WorkerHeartbeat | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
+        self, field_name: typing.Literal["worker_heartbeat", b"worker_heartbeat"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["worker_heartbeat", b"worker_heartbeat"],
+        self, field_name: typing.Literal["worker_heartbeat", b"worker_heartbeat"]
     ) -> None: ...
 
 global___WorkerInfo = WorkerInfo
 
+@typing.final
 class WorkerListInfo(google.protobuf.message.Message):
     """Limited worker information returned in the list response.
     When adding fields here, ensure that it is also added to WorkerInfo (as it carries the full worker information).
@@ -469,19 +480,10 @@ class WorkerListInfo(google.protobuf.message.Message):
     """
     task_queue: builtins.str
     """Task queue this worker is polling for tasks."""
-    @property
-    def deployment_version(
-        self,
-    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
     sdk_name: builtins.str
     sdk_version: builtins.str
     status: temporalio.api.enums.v1.common_pb2.WorkerStatus.ValueType
     """Worker status. Defined by SDK."""
-    @property
-    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Worker start time.
-        It can be used to determine worker uptime. (current time - start time)
-        """
     host_name: builtins.str
     """Worker host identifier."""
     worker_grouping_key: builtins.str
@@ -494,12 +496,23 @@ class WorkerListInfo(google.protobuf.message.Message):
     within one host (so using e.g. a unix pid would be appropriate).
     """
     @property
+    def deployment_version(
+        self,
+    ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentVersion: ...
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Worker start time.
+        It can be used to determine worker uptime. (current time - start time)
+        """
+
+    @property
     def plugins(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         global___PluginInfo
     ]:
         """Plugins currently in use by this SDK."""
+
     @property
     def drivers(
         self,
@@ -507,6 +520,7 @@ class WorkerListInfo(google.protobuf.message.Message):
         global___StorageDriverInfo
     ]:
         """Storage drivers in use by this SDK."""
+
     def __init__(
         self,
         *,
@@ -527,13 +541,13 @@ class WorkerListInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "deployment_version", b"deployment_version", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "deployment_version",
             b"deployment_version",
             "drivers",
@@ -565,6 +579,7 @@ class WorkerListInfo(google.protobuf.message.Message):
 
 global___WorkerListInfo = WorkerListInfo
 
+@typing.final
 class PluginInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -581,12 +596,12 @@ class PluginInfo(google.protobuf.message.Message):
         version: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["name", b"name", "version", b"version"],
+        self, field_name: typing.Literal["name", b"name", "version", b"version"]
     ) -> None: ...
 
 global___PluginInfo = PluginInfo
 
+@typing.final
 class StorageDriverInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -598,12 +613,11 @@ class StorageDriverInfo(google.protobuf.message.Message):
         *,
         type: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["type", b"type"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["type", b"type"]) -> None: ...
 
 global___StorageDriverInfo = StorageDriverInfo
 
+@typing.final
 class EnvironmentInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -616,7 +630,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
             EnvironmentInfo._Architecture.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         ARCHITECTURE_UNSPECIFIED: EnvironmentInfo._Architecture.ValueType  # 0
         ARCHITECTURE_AMD64: EnvironmentInfo._Architecture.ValueType  # 1
@@ -627,6 +641,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
     ARCHITECTURE_AMD64: EnvironmentInfo.Architecture.ValueType  # 1
     ARCHITECTURE_ARM64: EnvironmentInfo.Architecture.ValueType  # 2
 
+    @typing.final
     class Runtime(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -639,7 +654,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
                 EnvironmentInfo.Runtime._RuntimeType.ValueType
             ],
             builtins.type,
-        ):  # noqa: F821
+        ):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             RUNTIME_TYPE_UNSPECIFIED: (
                 EnvironmentInfo.Runtime._RuntimeType.ValueType
@@ -703,12 +718,10 @@ class EnvironmentInfo(google.protobuf.message.Message):
             version: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal[
-                "type", b"type", "version", b"version"
-            ],
+            self, field_name: typing.Literal["type", b"type", "version", b"version"]
         ) -> None: ...
 
+    @typing.final
     class HostingEnvironment(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -721,7 +734,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
                 EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
             ],
             builtins.type,
-        ):  # noqa: F821
+        ):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             HOSTING_ENVIRONMENT_TYPE_UNSPECIFIED: (
                 EnvironmentInfo.HostingEnvironment._HostingEnvironmentType.ValueType
@@ -831,12 +844,10 @@ class EnvironmentInfo(google.protobuf.message.Message):
             version: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal[
-                "type", b"type", "version", b"version"
-            ],
+            self, field_name: typing.Literal["type", b"type", "version", b"version"]
         ) -> None: ...
 
+    @typing.final
     class Platform(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -858,7 +869,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "linux",
                 b"linux",
                 "macos",
@@ -871,7 +882,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "linux",
                 b"linux",
                 "macos",
@@ -883,9 +894,10 @@ class EnvironmentInfo(google.protobuf.message.Message):
             ],
         ) -> None: ...
         def WhichOneof(
-            self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-        ) -> typing_extensions.Literal["linux", "macos", "windows"] | None: ...
+            self, oneof_group: typing.Literal["variant", b"variant"]
+        ) -> typing.Literal["linux", "macos", "windows"] | None: ...
 
+    @typing.final
     class LinuxPlatform(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -898,7 +910,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
                 EnvironmentInfo.LinuxPlatform._Libc.ValueType
             ],
             builtins.type,
-        ):  # noqa: F821
+        ):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             LIBC_UNSPECIFIED: EnvironmentInfo.LinuxPlatform._Libc.ValueType  # 0
             LIBC_GLIBC: EnvironmentInfo.LinuxPlatform._Libc.ValueType  # 1
@@ -927,11 +939,12 @@ class EnvironmentInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "architecture", b"architecture", "libc", b"libc", "version", b"version"
             ],
         ) -> None: ...
 
+    @typing.final
     class MacOSPlatform(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -949,11 +962,12 @@ class EnvironmentInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "architecture", b"architecture", "version", b"version"
             ],
         ) -> None: ...
 
+    @typing.final
     class WindowsPlatform(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -966,7 +980,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
                 EnvironmentInfo.WindowsPlatform._Crt.ValueType
             ],
             builtins.type,
-        ):  # noqa: F821
+        ):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             CRT_UNSPECIFIED: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 0
             CRT_UCRT: EnvironmentInfo.WindowsPlatform._Crt.ValueType  # 1
@@ -999,7 +1013,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "architecture", b"architecture", "crt", b"crt", "version", b"version"
             ],
         ) -> None: ...
@@ -1014,6 +1028,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
         global___EnvironmentInfo.Runtime
     ]:
         """The runtime(s) the SDK is operating in."""
+
     @property
     def hosting_environments(
         self,
@@ -1021,9 +1036,11 @@ class EnvironmentInfo(google.protobuf.message.Message):
         global___EnvironmentInfo.HostingEnvironment
     ]:
         """The hosting environment(s) the SDK is operating in. Repeated to allow for layering (ex: Docker inside k8s)."""
+
     @property
     def platform(self) -> global___EnvironmentInfo.Platform:
         """The platform the SDK is operating on."""
+
     def __init__(
         self,
         *,
@@ -1036,11 +1053,11 @@ class EnvironmentInfo(google.protobuf.message.Message):
         platform: global___EnvironmentInfo.Platform | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["platform", b"platform"]
+        self, field_name: typing.Literal["platform", b"platform"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "hosting_environments",
             b"hosting_environments",
             "platform",
@@ -1052,6 +1069,7 @@ class EnvironmentInfo(google.protobuf.message.Message):
 
 global___EnvironmentInfo = EnvironmentInfo
 
+@typing.final
 class WorkerCommand(google.protobuf.message.Message):
     """A command sent from the server to a worker."""
 
@@ -1067,22 +1085,23 @@ class WorkerCommand(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["type", b"type"]
-    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+        self, oneof_group: typing.Literal["type", b"type"]
+    ) -> typing.Literal["cancel_activity"] | None: ...
 
 global___WorkerCommand = WorkerCommand
 
+@typing.final
 class CancelActivityCommand(google.protobuf.message.Message):
     """Cancel an activity if it is still running. Otherwise, do nothing."""
 
@@ -1096,11 +1115,12 @@ class CancelActivityCommand(google.protobuf.message.Message):
         task_token: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["task_token", b"task_token"]
+        self, field_name: typing.Literal["task_token", b"task_token"]
     ) -> None: ...
 
 global___CancelActivityCommand = CancelActivityCommand
 
+@typing.final
 class WorkerCommandResult(google.protobuf.message.Message):
     """The result of executing a WorkerCommand."""
 
@@ -1116,22 +1136,23 @@ class WorkerCommandResult(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancel_activity", b"cancel_activity", "type", b"type"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["type", b"type"]
-    ) -> typing_extensions.Literal["cancel_activity"] | None: ...
+        self, oneof_group: typing.Literal["type", b"type"]
+    ) -> typing.Literal["cancel_activity"] | None: ...
 
 global___WorkerCommandResult = WorkerCommandResult
 
+@typing.final
 class CancelActivityResult(google.protobuf.message.Message):
     """Result of a CancelActivityCommand.
     Treat both successful cancellation and no-op (activity is no longer running) as success.

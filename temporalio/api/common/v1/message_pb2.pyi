@@ -5,7 +5,7 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -18,13 +18,9 @@ import temporalio.api.enums.v1.common_pb2
 import temporalio.api.enums.v1.event_type_pb2
 import temporalio.api.enums.v1.reset_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class DataBlob(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -40,13 +36,12 @@ class DataBlob(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "data", b"data", "encoding_type", b"encoding_type"
-        ],
+        field_name: typing.Literal["data", b"data", "encoding_type", b"encoding_type"],
     ) -> None: ...
 
 global___DataBlob = DataBlob
 
+@typing.final
 class Payloads(google.protobuf.message.Message):
     """See `Payload`"""
 
@@ -65,11 +60,12 @@ class Payloads(google.protobuf.message.Message):
         payloads: collections.abc.Iterable[global___Payload] | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["payloads", b"payloads"]
+        self, field_name: typing.Literal["payloads", b"payloads"]
     ) -> None: ...
 
 global___Payloads = Payloads
 
+@typing.final
 class Payload(google.protobuf.message.Message):
     """Represents some binary (byte array) data (ex: activity input parameters or workflow result) with
     metadata which describes this binary data (format, encoding, encryption, etc). Serialization
@@ -78,6 +74,7 @@ class Payload(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class MetadataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -92,10 +89,10 @@ class Payload(google.protobuf.message.Message):
             value: builtins.bytes = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
     class ExternalPayloadDetails(google.protobuf.message.Message):
         """Describes an externally stored object referenced by this payload."""
 
@@ -110,19 +107,19 @@ class Payload(google.protobuf.message.Message):
             size_bytes: builtins.int = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing_extensions.Literal["size_bytes", b"size_bytes"]
+            self, field_name: typing.Literal["size_bytes", b"size_bytes"]
         ) -> None: ...
 
     METADATA_FIELD_NUMBER: builtins.int
     DATA_FIELD_NUMBER: builtins.int
     EXTERNAL_PAYLOADS_FIELD_NUMBER: builtins.int
+    data: builtins.bytes
     @property
     def metadata(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[
         builtins.str, builtins.bytes
     ]: ...
-    data: builtins.bytes
     @property
     def external_payloads(
         self,
@@ -130,6 +127,7 @@ class Payload(google.protobuf.message.Message):
         global___Payload.ExternalPayloadDetails
     ]:
         """Details about externally stored payloads associated with this payload."""
+
     def __init__(
         self,
         *,
@@ -142,7 +140,7 @@ class Payload(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "data",
             b"data",
             "external_payloads",
@@ -154,6 +152,7 @@ class Payload(google.protobuf.message.Message):
 
 global___Payload = Payload
 
+@typing.final
 class SearchAttributes(google.protobuf.message.Message):
     """A user-defined set of *indexed* fields that are used/exposed when listing/searching workflows.
     The payload is not serialized in a user-defined way.
@@ -161,6 +160,7 @@ class SearchAttributes(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class IndexedFieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -176,11 +176,10 @@ class SearchAttributes(google.protobuf.message.Message):
             value: global___Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     INDEXED_FIELDS_FIELD_NUMBER: builtins.int
@@ -197,16 +196,18 @@ class SearchAttributes(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["indexed_fields", b"indexed_fields"]
+        self, field_name: typing.Literal["indexed_fields", b"indexed_fields"]
     ) -> None: ...
 
 global___SearchAttributes = SearchAttributes
 
+@typing.final
 class Memo(google.protobuf.message.Message):
     """A user-defined set of *unindexed* fields that are exposed when listing/searching workflows"""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class FieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -222,11 +223,10 @@ class Memo(google.protobuf.message.Message):
             value: global___Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     FIELDS_FIELD_NUMBER: builtins.int
@@ -241,12 +241,11 @@ class Memo(google.protobuf.message.Message):
         *,
         fields: collections.abc.Mapping[builtins.str, global___Payload] | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["fields", b"fields"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fields", b"fields"]) -> None: ...
 
 global___Memo = Memo
 
+@typing.final
 class Header(google.protobuf.message.Message):
     """Contains metadata that can be attached to a variety of requests, like starting a workflow, and
     can be propagated between, for example, workflows and activities.
@@ -254,6 +253,7 @@ class Header(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class FieldsEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -269,11 +269,10 @@ class Header(google.protobuf.message.Message):
             value: global___Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     FIELDS_FIELD_NUMBER: builtins.int
@@ -288,12 +287,11 @@ class Header(google.protobuf.message.Message):
         *,
         fields: collections.abc.Mapping[builtins.str, global___Payload] | None = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["fields", b"fields"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["fields", b"fields"]) -> None: ...
 
 global___Header = Header
 
+@typing.final
 class WorkflowExecution(google.protobuf.message.Message):
     """Identifies a specific workflow within a namespace. Practically speaking, because run_id is a
     uuid, a workflow execution is globally unique. Note that many commands allow specifying an empty
@@ -314,13 +312,12 @@ class WorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "run_id", b"run_id", "workflow_id", b"workflow_id"
-        ],
+        field_name: typing.Literal["run_id", b"run_id", "workflow_id", b"workflow_id"],
     ) -> None: ...
 
 global___WorkflowExecution = WorkflowExecution
 
+@typing.final
 class Execution(google.protobuf.message.Message):
     """Identifies a specific execution within a namespace."""
 
@@ -341,13 +338,14 @@ class Execution(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "business_id", b"business_id", "run_id", b"run_id", "type", b"type"
         ],
     ) -> None: ...
 
 global___Execution = Execution
 
+@typing.final
 class WorkflowType(google.protobuf.message.Message):
     """Represents the identifier used by a workflow author to define the workflow. Typically, the
     name of a function. This is sometimes referred to as the workflow's "name"
@@ -362,12 +360,11 @@ class WorkflowType(google.protobuf.message.Message):
         *,
         name: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
 
 global___WorkflowType = WorkflowType
 
+@typing.final
 class ActivityType(google.protobuf.message.Message):
     """Represents the identifier used by a activity author to define the activity. Typically, the
     name of a function. This is sometimes referred to as the activity's "name"
@@ -382,12 +379,11 @@ class ActivityType(google.protobuf.message.Message):
         *,
         name: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["name", b"name"]) -> None: ...
 
 global___ActivityType = ActivityType
 
+@typing.final
 class RetryPolicy(google.protobuf.message.Message):
     """How retries ought to be handled, usable by both workflows and activities"""
 
@@ -398,23 +394,25 @@ class RetryPolicy(google.protobuf.message.Message):
     MAXIMUM_INTERVAL_FIELD_NUMBER: builtins.int
     MAXIMUM_ATTEMPTS_FIELD_NUMBER: builtins.int
     NON_RETRYABLE_ERROR_TYPES_FIELD_NUMBER: builtins.int
-    @property
-    def initial_interval(self) -> google.protobuf.duration_pb2.Duration:
-        """Interval of the first retry. If retryBackoffCoefficient is 1.0 then it is used for all retries."""
     backoff_coefficient: builtins.float
     """Coefficient used to calculate the next retry interval.
     The next retry interval is previous interval multiplied by the coefficient.
     Must be 1 or larger.
     """
+    maximum_attempts: builtins.int
+    """Maximum number of attempts. When exceeded the retries stop even if not expired yet.
+    1 disables retries. 0 means unlimited (up to the timeouts)
+    """
+    @property
+    def initial_interval(self) -> google.protobuf.duration_pb2.Duration:
+        """Interval of the first retry. If retryBackoffCoefficient is 1.0 then it is used for all retries."""
+
     @property
     def maximum_interval(self) -> google.protobuf.duration_pb2.Duration:
         """Maximum interval between retries. Exponential backoff leads to interval increase.
         This value is the cap of the increase. Default is 100x of the initial interval.
         """
-    maximum_attempts: builtins.int
-    """Maximum number of attempts. When exceeded the retries stop even if not expired yet.
-    1 disables retries. 0 means unlimited (up to the timeouts)
-    """
+
     @property
     def non_retryable_error_types(
         self,
@@ -422,6 +420,7 @@ class RetryPolicy(google.protobuf.message.Message):
         """Non-Retryable errors types. Will stop retrying if the error type matches this list. Note that
         this is not a substring match, the error *type* (not message) must match exactly.
         """
+
     def __init__(
         self,
         *,
@@ -433,7 +432,7 @@ class RetryPolicy(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "initial_interval",
             b"initial_interval",
             "maximum_interval",
@@ -442,7 +441,7 @@ class RetryPolicy(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff_coefficient",
             b"backoff_coefficient",
             "initial_interval",
@@ -458,6 +457,7 @@ class RetryPolicy(google.protobuf.message.Message):
 
 global___RetryPolicy = RetryPolicy
 
+@typing.final
 class MeteringMetadata(google.protobuf.message.Message):
     """Metadata relevant for metering purposes"""
 
@@ -479,7 +479,7 @@ class MeteringMetadata(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "nonfirst_local_activity_execution_attempts",
             b"nonfirst_local_activity_execution_attempts",
         ],
@@ -487,6 +487,7 @@ class MeteringMetadata(google.protobuf.message.Message):
 
 global___MeteringMetadata = MeteringMetadata
 
+@typing.final
 class WorkerVersionStamp(google.protobuf.message.Message):
     """Deprecated. This message is replaced with `Deployment` and `VersioningBehavior`.
     Identifies the version(s) of a worker that processed a task
@@ -512,13 +513,14 @@ class WorkerVersionStamp(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id", b"build_id", "use_versioning", b"use_versioning"
         ],
     ) -> None: ...
 
 global___WorkerVersionStamp = WorkerVersionStamp
 
+@typing.final
 class WorkerVersionCapabilities(google.protobuf.message.Message):
     """Identifies the version that a worker is compatible with when polling or identifying itself,
     and whether or not this worker is opting into the build-id based versioning feature. This is
@@ -548,7 +550,7 @@ class WorkerVersionCapabilities(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id",
             b"build_id",
             "deployment_series_name",
@@ -560,6 +562,7 @@ class WorkerVersionCapabilities(google.protobuf.message.Message):
 
 global___WorkerVersionCapabilities = WorkerVersionCapabilities
 
+@typing.final
 class ResetOptions(google.protobuf.message.Message):
     """Describes where and how to reset a workflow, used for batch reset currently
     and may be used for single-workflow reset later.
@@ -574,12 +577,6 @@ class ResetOptions(google.protobuf.message.Message):
     RESET_REAPPLY_TYPE_FIELD_NUMBER: builtins.int
     CURRENT_RUN_ONLY_FIELD_NUMBER: builtins.int
     RESET_REAPPLY_EXCLUDE_TYPES_FIELD_NUMBER: builtins.int
-    @property
-    def first_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
-        """Resets to the first workflow task completed or started event."""
-    @property
-    def last_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
-        """Resets to the last workflow task completed or started event."""
     workflow_task_id: builtins.int
     """The id of a specific `WORKFLOW_TASK_COMPLETED`,`WORKFLOW_TASK_TIMED_OUT`, `WORKFLOW_TASK_FAILED`, or
     `WORKFLOW_TASK_STARTED` event to reset to.
@@ -601,12 +598,21 @@ class ResetOptions(google.protobuf.message.Message):
     possibly others in the future.)
     """
     @property
+    def first_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
+        """Resets to the first workflow task completed or started event."""
+
+    @property
+    def last_workflow_task(self) -> google.protobuf.empty_pb2.Empty:
+        """Resets to the last workflow task completed or started event."""
+
+    @property
     def reset_reapply_exclude_types(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[
         temporalio.api.enums.v1.reset_pb2.ResetReapplyExcludeType.ValueType
     ]:
         """Event types not to be reapplied"""
+
     def __init__(
         self,
         *,
@@ -623,7 +629,7 @@ class ResetOptions(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id",
             b"build_id",
             "first_workflow_task",
@@ -638,7 +644,7 @@ class ResetOptions(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id",
             b"build_id",
             "current_run_only",
@@ -658,9 +664,9 @@ class ResetOptions(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["target", b"target"]
+        self, oneof_group: typing.Literal["target", b"target"]
     ) -> (
-        typing_extensions.Literal[
+        typing.Literal[
             "first_workflow_task", "last_workflow_task", "workflow_task_id", "build_id"
         ]
         | None
@@ -668,11 +674,13 @@ class ResetOptions(google.protobuf.message.Message):
 
 global___ResetOptions = ResetOptions
 
+@typing.final
 class Callback(google.protobuf.message.Message):
     """Callback to attach to various events in the system, e.g. workflow run completion."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class Nexus(google.protobuf.message.Message):
         """Nexus callbacks are used to delivery Nexus operation completions, as defined in the Nexus RPC spec:
         https://github.com/nexus-rpc/api/blob/main/SPEC.md#callback-urls
@@ -680,6 +688,7 @@ class Callback(google.protobuf.message.Message):
 
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+        @typing.final
         class HeaderEntry(google.protobuf.message.Message):
             DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -694,8 +703,7 @@ class Callback(google.protobuf.message.Message):
                 value: builtins.str = ...,
             ) -> None: ...
             def ClearField(
-                self,
-                field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+                self, field_name: typing.Literal["key", b"key", "value", b"value"]
             ) -> None: ...
 
         URL_FIELD_NUMBER: builtins.int
@@ -707,6 +715,7 @@ class Callback(google.protobuf.message.Message):
             self,
         ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
             """Header to attach to callback request."""
+
         def __init__(
             self,
             *,
@@ -714,10 +723,10 @@ class Callback(google.protobuf.message.Message):
             header: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["header", b"header", "url", b"url"],
+            self, field_name: typing.Literal["header", b"header", "url", b"url"]
         ) -> None: ...
 
+    @typing.final
     class Internal(google.protobuf.message.Message):
         """Callbacks to be delivered internally within the system.
         This variant is not settable in the API and will be rejected by the service with an INVALID_ARGUMENT error.
@@ -735,10 +744,9 @@ class Callback(google.protobuf.message.Message):
             *,
             data: builtins.bytes = ...,
         ) -> None: ...
-        def ClearField(
-            self, field_name: typing_extensions.Literal["data", b"data"]
-        ) -> None: ...
+        def ClearField(self, field_name: typing.Literal["data", b"data"]) -> None: ...
 
+    @typing.final
     class NexusHandler(google.protobuf.message.Message):
         """NexusHandler callbacks are requests to invoke a specific shape of Nexus operation on a Temporal worker.
         The specified Nexus operation must have the following:
@@ -778,6 +786,7 @@ class Callback(google.protobuf.message.Message):
             total sum of all source context payloads attached to an execution. See dynamic configuration:
             "callback.nexusHandler.sourceContext.maxSize", "callback.nexusHandler.sourceContext.aggregateMaxSize".
             """
+
         def __init__(
             self,
             *,
@@ -787,12 +796,11 @@ class Callback(google.protobuf.message.Message):
             source_context: global___Payload | None = ...,
         ) -> None: ...
         def HasField(
-            self,
-            field_name: typing_extensions.Literal["source_context", b"source_context"],
+            self, field_name: typing.Literal["source_context", b"source_context"]
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "operation",
                 b"operation",
                 "service",
@@ -823,6 +831,7 @@ class Callback(google.protobuf.message.Message):
         """Links associated with the callback. It can be used to link to underlying resources of the
         callback.
         """
+
     def __init__(
         self,
         *,
@@ -833,7 +842,7 @@ class Callback(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "internal",
             b"internal",
             "nexus",
@@ -846,7 +855,7 @@ class Callback(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "internal",
             b"internal",
             "links",
@@ -860,11 +869,12 @@ class Callback(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
-    ) -> typing_extensions.Literal["nexus", "internal", "nexus_handler"] | None: ...
+        self, oneof_group: typing.Literal["variant", b"variant"]
+    ) -> typing.Literal["nexus", "internal", "nexus_handler"] | None: ...
 
 global___Callback = Callback
 
+@typing.final
 class Link(google.protobuf.message.Message):
     """Link can be associated with history events. It might contain information about an external entity
     related to the history event. For example, workflow A makes a Nexus call that starts workflow B:
@@ -874,9 +884,11 @@ class Link(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class WorkflowEvent(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+        @typing.final
         class EventReference(google.protobuf.message.Message):
             """EventReference is a direct reference to a history event through the event ID."""
 
@@ -894,11 +906,12 @@ class Link(google.protobuf.message.Message):
             ) -> None: ...
             def ClearField(
                 self,
-                field_name: typing_extensions.Literal[
+                field_name: typing.Literal[
                     "event_id", b"event_id", "event_type", b"event_type"
                 ],
             ) -> None: ...
 
+        @typing.final
         class RequestIdReference(google.protobuf.message.Message):
             """RequestIdReference is a indirect reference to a history event through the request ID."""
 
@@ -916,7 +929,7 @@ class Link(google.protobuf.message.Message):
             ) -> None: ...
             def ClearField(
                 self,
-                field_name: typing_extensions.Literal[
+                field_name: typing.Literal[
                     "event_type", b"event_type", "request_id", b"request_id"
                 ],
             ) -> None: ...
@@ -944,7 +957,7 @@ class Link(google.protobuf.message.Message):
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "event_ref",
                 b"event_ref",
                 "reference",
@@ -955,7 +968,7 @@ class Link(google.protobuf.message.Message):
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "event_ref",
                 b"event_ref",
                 "namespace",
@@ -971,9 +984,10 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
         def WhichOneof(
-            self, oneof_group: typing_extensions.Literal["reference", b"reference"]
-        ) -> typing_extensions.Literal["event_ref", "request_id_ref"] | None: ...
+            self, oneof_group: typing.Literal["reference", b"reference"]
+        ) -> typing.Literal["event_ref", "request_id_ref"] | None: ...
 
+    @typing.final
     class BatchJob(google.protobuf.message.Message):
         """A link to a built-in batch job.
         Batch jobs can be used to perform operations on a set of workflows (e.g. terminate, signal, cancel, etc).
@@ -990,9 +1004,10 @@ class Link(google.protobuf.message.Message):
             job_id: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self, field_name: typing_extensions.Literal["job_id", b"job_id"]
+            self, field_name: typing.Literal["job_id", b"job_id"]
         ) -> None: ...
 
+    @typing.final
     class Activity(google.protobuf.message.Message):
         """A link to an activity."""
 
@@ -1013,7 +1028,7 @@ class Link(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "activity_id",
                 b"activity_id",
                 "namespace",
@@ -1023,6 +1038,7 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing.final
     class NexusOperation(google.protobuf.message.Message):
         """A link to a standalone Nexus operation."""
 
@@ -1043,7 +1059,7 @@ class Link(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "namespace",
                 b"namespace",
                 "operation_id",
@@ -1053,6 +1069,7 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing.final
     class Workflow(google.protobuf.message.Message):
         """A link to a workflow execution. This is a more general version of WorkflowEvent that doesn't specify a
         particular event within the workflow, useful when you want to link to a workflow but there is no particular event to link to,
@@ -1079,7 +1096,7 @@ class Link(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "namespace",
                 b"namespace",
                 "reason",
@@ -1091,6 +1108,7 @@ class Link(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing.final
     class Callback(google.protobuf.message.Message):
         """A link to a worker callback attached to an execution. An execution (e.g. standalone Nexus operation) can have
         multiple callbacks attached, and will be differentiated by the request_id used when the callback is invoked.
@@ -1103,6 +1121,8 @@ class Link(google.protobuf.message.Message):
         COMPONENT_PATH_FIELD_NUMBER: builtins.int
         REQUEST_ID_FIELD_NUMBER: builtins.int
         namespace: builtins.str
+        request_id: builtins.str
+        """Server-generate request ID sent when the callback was dispatched."""
         @property
         def execution(self) -> global___Execution: ...
         @property
@@ -1115,8 +1135,7 @@ class Link(google.protobuf.message.Message):
             been attached some child component of that execution. e.g. a workflow update. The component path describes
             the unique component as applicable, typically ending with a unique ID. e.g. ["Update", $workflowUpdateId ]
             """
-        request_id: builtins.str
-        """Server-generate request ID sent when the callback was dispatched."""
+
         def __init__(
             self,
             *,
@@ -1126,11 +1145,11 @@ class Link(google.protobuf.message.Message):
             request_id: builtins.str = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["execution", b"execution"]
+            self, field_name: typing.Literal["execution", b"execution"]
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "component_path",
                 b"component_path",
                 "execution",
@@ -1172,7 +1191,7 @@ class Link(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity",
             b"activity",
             "batch_job",
@@ -1191,7 +1210,7 @@ class Link(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "activity",
             b"activity",
             "batch_job",
@@ -1209,9 +1228,9 @@ class Link(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["variant", b"variant"]
+        self, oneof_group: typing.Literal["variant", b"variant"]
     ) -> (
-        typing_extensions.Literal[
+        typing.Literal[
             "workflow_event",
             "batch_job",
             "activity",
@@ -1224,6 +1243,7 @@ class Link(google.protobuf.message.Message):
 
 global___Link = Link
 
+@typing.final
 class Principal(google.protobuf.message.Message):
     """Principal is an authenticated caller identity computed by the server from trusted
     authentication context.
@@ -1244,11 +1264,12 @@ class Principal(google.protobuf.message.Message):
         name: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["name", b"name", "type", b"type"]
+        self, field_name: typing.Literal["name", b"name", "type", b"type"]
     ) -> None: ...
 
 global___Principal = Principal
 
+@typing.final
 class ResolvedPrincipal(google.protobuf.message.Message):
     """ResolvedPrincipal is a principal returned to an API caller."""
 
@@ -1274,13 +1295,14 @@ class ResolvedPrincipal(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "name_at_write_time", b"name_at_write_time", "type", b"type"
         ],
     ) -> None: ...
 
 global___ResolvedPrincipal = ResolvedPrincipal
 
+@typing.final
 class Priority(google.protobuf.message.Message):
     """Priority contains metadata that controls relative ordering of task processing
     when tasks are backed up in a queue. Initially, Priority will be used in
@@ -1379,7 +1401,7 @@ class Priority(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "fairness_key",
             b"fairness_key",
             "fairness_weight",
@@ -1391,6 +1413,7 @@ class Priority(google.protobuf.message.Message):
 
 global___Priority = Priority
 
+@typing.final
 class WorkerSelector(google.protobuf.message.Message):
     """This is used to send commands to a specific worker or a group of workers.
     Right now, it is used to send commands to a specific worker instance.
@@ -1409,22 +1432,23 @@ class WorkerSelector(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "selector", b"selector", "worker_instance_key", b"worker_instance_key"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "selector", b"selector", "worker_instance_key", b"worker_instance_key"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["selector", b"selector"]
-    ) -> typing_extensions.Literal["worker_instance_key"] | None: ...
+        self, oneof_group: typing.Literal["selector", b"selector"]
+    ) -> typing.Literal["worker_instance_key"] | None: ...
 
 global___WorkerSelector = WorkerSelector
 
+@typing.final
 class OnConflictOptions(google.protobuf.message.Message):
     """When starting an execution with a conflict policy that uses an existing execution and there is already an existing
     running execution, OnConflictOptions defines actions to be taken on the existing running execution.
@@ -1450,7 +1474,7 @@ class OnConflictOptions(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attach_completion_callbacks",
             b"attach_completion_callbacks",
             "attach_links",
@@ -1462,6 +1486,7 @@ class OnConflictOptions(google.protobuf.message.Message):
 
 global___OnConflictOptions = OnConflictOptions
 
+@typing.final
 class TimeSkippingConfig(google.protobuf.message.Message):
     """The configuration for time skipping of an execution.
     When time skipping is enabled, virtual time advances automatically whenever there is no in-flight work.
@@ -1488,9 +1513,6 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     MAX_SESSION_SKIP_COUNT_FIELD_NUMBER: builtins.int
     enabled: builtins.bool
     """Enables or disables time skipping for this workflow execution."""
-    @property
-    def fast_forward_config(self) -> global___FastForwardConfig:
-        """An optional opt-in to control time-skipping behavior through fast-forward; see its definition for details."""
     disable_propagation: builtins.bool
     """By default, executions started by another execution (e.g. a child workflow of a parent workflow or
     a schedule with the time-skipping policy enabled) inherit the "enabled" flag and skip time when possible.
@@ -1509,6 +1531,10 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     If this field is not set, the server applies a large default value (e.g. 100). The default can
     be changed through dynamic config, and is overridden by this field when set.
     """
+    @property
+    def fast_forward_config(self) -> global___FastForwardConfig:
+        """An optional opt-in to control time-skipping behavior through fast-forward; see its definition for details."""
+
     def __init__(
         self,
         *,
@@ -1518,14 +1544,11 @@ class TimeSkippingConfig(google.protobuf.message.Message):
         max_session_skip_count: builtins.int = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "fast_forward_config", b"fast_forward_config"
-        ],
+        self, field_name: typing.Literal["fast_forward_config", b"fast_forward_config"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "disable_propagation",
             b"disable_propagation",
             "enabled",
@@ -1539,6 +1562,7 @@ class TimeSkippingConfig(google.protobuf.message.Message):
 
 global___TimeSkippingConfig = TimeSkippingConfig
 
+@typing.final
 class FastForwardConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1561,6 +1585,7 @@ class FastForwardConfig(google.protobuf.message.Message):
         If this duration exceeds the remaining execution timeout, time will not pass beyond the end
         of the execution, and the fast-forward won't have a chance to complete.
         """
+
     def __init__(
         self,
         *,
@@ -1568,15 +1593,15 @@ class FastForwardConfig(google.protobuf.message.Message):
         duration: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["duration", b"duration"]
+        self, field_name: typing.Literal["duration", b"duration"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["duration", b"duration", "id", b"id"],
+        self, field_name: typing.Literal["duration", b"duration", "id", b"id"]
     ) -> None: ...
 
 global___FastForwardConfig = FastForwardConfig
 
+@typing.final
 class TimeSkippingStatePropagation(google.protobuf.message.Message):
     """The time-skipping state that needs to be propagated from one execution to another, or through a chain of runs
     within the same execution.
@@ -1587,16 +1612,18 @@ class TimeSkippingStatePropagation(google.protobuf.message.Message):
     INITIAL_SKIPPED_DURATION_FIELD_NUMBER: builtins.int
     FAST_FORWARD_TARGET_TIME_FIELD_NUMBER: builtins.int
     INITIAL_SKIP_COUNT_FIELD_NUMBER: builtins.int
+    initial_skip_count: builtins.int
+    """The initial skip count. It only propagates across a chain of runs within the same execution."""
     @property
     def initial_skipped_duration(self) -> google.protobuf.duration_pb2.Duration:
         """The time skipped by the previous run. It is propagated both to executions started by the
         current execution and through a chain of runs (CaN, cron, retry).
         """
+
     @property
     def fast_forward_target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The fast-forward target time. It only propagates across a chain of runs within the same execution."""
-    initial_skip_count: builtins.int
-    """The initial skip count. It only propagates across a chain of runs within the same execution."""
+
     def __init__(
         self,
         *,
@@ -1606,7 +1633,7 @@ class TimeSkippingStatePropagation(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "fast_forward_target_time",
             b"fast_forward_target_time",
             "initial_skipped_duration",
@@ -1615,7 +1642,7 @@ class TimeSkippingStatePropagation(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "fast_forward_target_time",
             b"fast_forward_target_time",
             "initial_skip_count",
@@ -1627,6 +1654,7 @@ class TimeSkippingStatePropagation(google.protobuf.message.Message):
 
 global___TimeSkippingStatePropagation = TimeSkippingStatePropagation
 
+@typing.final
 class TimeSkippingInfo(google.protobuf.message.Message):
     """Describes the current time-skipping state of a workflow execution."""
 
@@ -1636,11 +1664,16 @@ class TimeSkippingInfo(google.protobuf.message.Message):
     EFFECTIVE_CONFIG_FIELD_NUMBER: builtins.int
     FAST_FORWARD_INFO_FIELD_NUMBER: builtins.int
     CURRENT_SESSION_SKIP_COUNT_FIELD_NUMBER: builtins.int
+    current_session_skip_count: builtins.int
+    """The number of skips accumulated in the current session, bounded by `max_session_skip_count`.
+    A new session begins — and this resets to 0 — each time `max_session_skip_count` is updated.
+    """
     @property
     def current_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Current virtual time of the execution. If the execution hasn't skipped
         any time yet, it will be the same as wall clock time.
         """
+
     @property
     def effective_config(self) -> global___TimeSkippingConfig:
         """The current effective time-skipping config, which can differ from the config the user last set:
@@ -1648,13 +1681,11 @@ class TimeSkippingInfo(google.protobuf.message.Message):
         skipping time — e.g. it is set to false once `max_session_skip_count` is reached, the fast-forward
         completes, or a client call disables time skipping.
         """
+
     @property
     def fast_forward_info(self) -> global___TimeSkippingFastForwardInfo:
         """The execution's current fast-forward, if any. Unset if time skipping is enabled without a fast-forward."""
-    current_session_skip_count: builtins.int
-    """The number of skips accumulated in the current session, bounded by `max_session_skip_count`.
-    A new session begins — and this resets to 0 — each time `max_session_skip_count` is updated.
-    """
+
     def __init__(
         self,
         *,
@@ -1665,7 +1696,7 @@ class TimeSkippingInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_time",
             b"current_time",
             "effective_config",
@@ -1676,7 +1707,7 @@ class TimeSkippingInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current_session_skip_count",
             b"current_session_skip_count",
             "current_time",
@@ -1690,6 +1721,7 @@ class TimeSkippingInfo(google.protobuf.message.Message):
 
 global___TimeSkippingInfo = TimeSkippingInfo
 
+@typing.final
 class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
     """TimeSkippingFastForwardInfo describes the current time-skipping fast-forward on an execution."""
 
@@ -1699,16 +1731,18 @@ class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
     FAST_FORWARD_ID_FIELD_NUMBER: builtins.int
     TARGET_TIME_FIELD_NUMBER: builtins.int
     HAS_COMPLETED_FIELD_NUMBER: builtins.int
+    fast_forward_id: builtins.str
+    """The client-supplied ID set alongside `fast_forward` duration."""
+    has_completed: builtins.bool
+    """True once `target_time` has been reached."""
     @property
     def fast_forward_duration(self) -> google.protobuf.duration_pb2.Duration:
         """The client-supplied `fast_forward` duration."""
-    fast_forward_id: builtins.str
-    """The client-supplied ID set alongside `fast_forward` duration."""
+
     @property
     def target_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The target virtual time at which the fast-forward completes."""
-    has_completed: builtins.bool
-    """True once `target_time` has been reached."""
+
     def __init__(
         self,
         *,
@@ -1719,7 +1753,7 @@ class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "fast_forward_duration",
             b"fast_forward_duration",
             "target_time",
@@ -1728,7 +1762,7 @@ class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "fast_forward_duration",
             b"fast_forward_duration",
             "fast_forward_id",

@@ -26,7 +26,7 @@ class _DeploymentReachabilityEnumTypeWrapper(
         _DeploymentReachability.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     DEPLOYMENT_REACHABILITY_UNSPECIFIED: _DeploymentReachability.ValueType  # 0
     """Reachability level is not specified."""
@@ -79,7 +79,7 @@ class _VersionDrainageStatusEnumTypeWrapper(
         _VersionDrainageStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     VERSION_DRAINAGE_STATUS_UNSPECIFIED: _VersionDrainageStatus.ValueType  # 0
     """Drainage Status is not specified."""
@@ -126,7 +126,7 @@ class _WorkerVersioningModeEnumTypeWrapper(
         _WorkerVersioningMode.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_VERSIONING_MODE_UNSPECIFIED: _WorkerVersioningMode.ValueType  # 0
     WORKER_VERSIONING_MODE_UNVERSIONED: _WorkerVersioningMode.ValueType  # 1
@@ -194,7 +194,7 @@ class _WorkerDeploymentVersionStatusEnumTypeWrapper(
         _WorkerDeploymentVersionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_DEPLOYMENT_VERSION_STATUS_UNSPECIFIED: (
         _WorkerDeploymentVersionStatus.ValueType

@@ -4,19 +4,15 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class SomeMessage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -29,10 +25,10 @@ class SomeMessage(google.protobuf.message.Message):
         some_duration: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["some_duration", b"some_duration"]
+        self, field_name: typing.Literal["some_duration", b"some_duration"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["some_duration", b"some_duration"]
+        self, field_name: typing.Literal["some_duration", b"some_duration"]
     ) -> None: ...
 
 global___SomeMessage = SomeMessage

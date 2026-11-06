@@ -5,7 +5,7 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
@@ -14,13 +14,9 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.common_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ReleaseInfo(google.protobuf.message.Message):
     """ReleaseInfo contains information about specific version of temporal."""
 
@@ -30,9 +26,9 @@ class ReleaseInfo(google.protobuf.message.Message):
     RELEASE_TIME_FIELD_NUMBER: builtins.int
     NOTES_FIELD_NUMBER: builtins.int
     version: builtins.str
+    notes: builtins.str
     @property
     def release_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    notes: builtins.str
     def __init__(
         self,
         *,
@@ -41,17 +37,18 @@ class ReleaseInfo(google.protobuf.message.Message):
         notes: builtins.str = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["release_time", b"release_time"]
+        self, field_name: typing.Literal["release_time", b"release_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "notes", b"notes", "release_time", b"release_time", "version", b"version"
         ],
     ) -> None: ...
 
 global___ReleaseInfo = ReleaseInfo
 
+@typing.final
 class Alert(google.protobuf.message.Message):
     """Alert contains notification and severity."""
 
@@ -68,14 +65,12 @@ class Alert(google.protobuf.message.Message):
         severity: temporalio.api.enums.v1.common_pb2.Severity.ValueType = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "message", b"message", "severity", b"severity"
-        ],
+        self, field_name: typing.Literal["message", b"message", "severity", b"severity"]
     ) -> None: ...
 
 global___Alert = Alert
 
+@typing.final
 class VersionInfo(google.protobuf.message.Message):
     """VersionInfo contains details about current and recommended release versions as well as alerts and upgrade instructions."""
 
@@ -86,11 +81,11 @@ class VersionInfo(google.protobuf.message.Message):
     INSTRUCTIONS_FIELD_NUMBER: builtins.int
     ALERTS_FIELD_NUMBER: builtins.int
     LAST_UPDATE_TIME_FIELD_NUMBER: builtins.int
+    instructions: builtins.str
     @property
     def current(self) -> global___ReleaseInfo: ...
     @property
     def recommended(self) -> global___ReleaseInfo: ...
-    instructions: builtins.str
     @property
     def alerts(
         self,
@@ -110,7 +105,7 @@ class VersionInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "current",
             b"current",
             "last_update_time",
@@ -121,7 +116,7 @@ class VersionInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "alerts",
             b"alerts",
             "current",

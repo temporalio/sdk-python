@@ -744,6 +744,46 @@ async def test_workflow_bad_signal_param(client: Client):
 
 
 @workflow.defn
+class TaskSchedulingWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        loop = cast(
+            temporalio.worker._workflow_instance._WorkflowInstanceImpl,
+            asyncio.get_running_loop(),
+        )
+        completed = []
+
+        async def child() -> None:
+            completed.append(True)
+
+        for eager_start in (None, False):
+            completed.clear()
+            task = loop.create_task(child(), eager_start=eager_start)
+            assert not completed
+            await task
+            assert completed == [True]
+
+        coro = child()
+        try:
+            loop.create_task(coro, eager_start=True)
+        except NotImplementedError:
+            pass
+        else:
+            raise AssertionError("Eager task execution should be rejected")
+        finally:
+            coro.close()
+
+
+async def test_workflow_task_scheduling(client: Client):
+    async with new_worker(client, TaskSchedulingWorkflow) as worker:
+        await client.execute_workflow(
+            TaskSchedulingWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+
+@workflow.defn
 class AsyncUtilWorkflow:
     def __init__(self) -> None:
         self._status = "starting"
@@ -5431,28 +5471,27 @@ async def test_workflow_queries_doing_bad_things(client: Client):
         await assert_bad_query("signal_external_handle")
 
 
-# typing.Self only in 3.11+
-if sys.version_info >= (3, 11):
+@dataclass
+class AnnotatedWithSelfParam:
+    some_str: str
 
-    @dataclass
-    class AnnotatedWithSelfParam:
-        some_str: str
 
-    @workflow.defn
-    class WorkflowAnnotatedWithSelf:
-        @workflow.run
-        async def run(self: typing.Self, some_arg: AnnotatedWithSelfParam) -> str:
-            assert isinstance(some_arg, AnnotatedWithSelfParam)
-            return some_arg.some_str
+@workflow.defn
+class WorkflowAnnotatedWithSelf:
+    @workflow.run
+    async def run(self: typing.Self, some_arg: AnnotatedWithSelfParam) -> str:
+        assert isinstance(some_arg, AnnotatedWithSelfParam)
+        return some_arg.some_str
 
-    async def test_workflow_annotated_with_self(client: Client):
-        async with new_worker(client, WorkflowAnnotatedWithSelf) as worker:
-            assert "foo" == await client.execute_workflow(
-                WorkflowAnnotatedWithSelf.run,
-                AnnotatedWithSelfParam(some_str="foo"),
-                id=f"wf-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
+
+async def test_workflow_annotated_with_self(client: Client):
+    async with new_worker(client, WorkflowAnnotatedWithSelf) as worker:
+        assert "foo" == await client.execute_workflow(
+            WorkflowAnnotatedWithSelf.run,
+            AnnotatedWithSelfParam(some_str="foo"),
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
 
 
 @activity.defn
@@ -6477,8 +6516,6 @@ async def test_workflow_update_timeout_or_cancel(client: Client):
 class TimeoutSupportWorkflow:
     @workflow.run
     async def run(self, approach: str) -> None:
-        if sys.version_info < (3, 11):
-            raise RuntimeError("Timeout only in >= 3.11")
         if approach == "timeout":
             async with asyncio.timeout(0.2):
                 await workflow.execute_activity(
@@ -6522,8 +6559,6 @@ class TimeoutSupportWorkflow:
     "approach", ["timeout", "timeout_at", "wait_for", "call_later", "call_at"]
 )
 async def test_workflow_timeout_support(client: Client, approach: str):
-    if sys.version_info < (3, 11):
-        pytest.skip("Timeout only in >= 3.11")
     async with new_worker(
         client, TimeoutSupportWorkflow, activities=[wait_cancel]
     ) as worker:
@@ -8945,18 +8980,15 @@ class TimeoutErrorWorkflow:
         elif scenario == "asyncio.wait_for":
             await asyncio.wait_for(asyncio.sleep(1000), timeout=0.01)
         elif scenario == "asyncio.timeout":
-            if sys.version_info >= (3, 11):
-                async with asyncio.timeout(0.1):
-                    await asyncio.sleep(1000)
+            async with asyncio.timeout(0.1):
+                await asyncio.sleep(1000)
         else:
             raise RuntimeError("Unrecognized scenario")
 
 
 async def test_workflow_timeout_error(client: Client):
     async with new_worker(client, TimeoutErrorWorkflow) as worker:
-        scenarios = ["workflow.wait_condition", "asyncio.wait_for"]
-        if sys.version_info >= (3, 11):
-            scenarios.append("asyncio.timeout")
+        scenarios = ["workflow.wait_condition", "asyncio.wait_for", "asyncio.timeout"]
 
         for scenario in scenarios:
             with pytest.raises(WorkflowFailureError) as err:

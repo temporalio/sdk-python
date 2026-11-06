@@ -4,7 +4,7 @@ isort:skip_file
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -15,13 +15,9 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.failed_cause_pb2
 import temporalio.api.failure.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class ActivityExecutionResult(google.protobuf.message.Message):
     """Used to report activity completions to core"""
 
@@ -49,7 +45,7 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -64,7 +60,7 @@ class ActivityExecutionResult(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "cancelled",
             b"cancelled",
             "completed",
@@ -78,16 +74,14 @@ class ActivityExecutionResult(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["status", b"status"]
+        self, oneof_group: typing.Literal["status", b"status"]
     ) -> (
-        typing_extensions.Literal[
-            "completed", "failed", "cancelled", "will_complete_async"
-        ]
-        | None
+        typing.Literal["completed", "failed", "cancelled", "will_complete_async"] | None
     ): ...
 
 global___ActivityExecutionResult = ActivityExecutionResult
 
+@typing.final
 class ActivityResolution(google.protobuf.message.Message):
     """Used to report activity resolutions to lang. IE: This is what the activities are resolved with
     in the workflow.
@@ -117,7 +111,7 @@ class ActivityResolution(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff",
             b"backoff",
             "cancelled",
@@ -132,7 +126,7 @@ class ActivityResolution(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff",
             b"backoff",
             "cancelled",
@@ -146,13 +140,12 @@ class ActivityResolution(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["status", b"status"]
-    ) -> (
-        typing_extensions.Literal["completed", "failed", "cancelled", "backoff"] | None
-    ): ...
+        self, oneof_group: typing.Literal["status", b"status"]
+    ) -> typing.Literal["completed", "failed", "cancelled", "backoff"] | None: ...
 
 global___ActivityResolution = ActivityResolution
 
+@typing.final
 class Success(google.protobuf.message.Message):
     """Used to report successful completion either when executing or resolving"""
 
@@ -167,14 +160,13 @@ class Success(google.protobuf.message.Message):
         result: temporalio.api.common.v1.message_pb2.Payload | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
+        self, field_name: typing.Literal["result", b"result"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["result", b"result"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["result", b"result"]) -> None: ...
 
 global___Success = Success
 
+@typing.final
 class Failure(google.protobuf.message.Message):
     """Used to report activity failure either when executing or resolving"""
 
@@ -182,12 +174,12 @@ class Failure(google.protobuf.message.Message):
 
     FAILURE_FIELD_NUMBER: builtins.int
     CAUSE_FIELD_NUMBER: builtins.int
-    @property
-    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType
     """Only meaningful on ActivityExecutionResult (lang -> core); ignored on ActivityResolution,
     which reuses this message.
     """
+    @property
+    def failure(self) -> temporalio.api.failure.v1.message_pb2.Failure: ...
     def __init__(
         self,
         *,
@@ -195,15 +187,15 @@ class Failure(google.protobuf.message.Message):
         cause: temporalio.api.enums.v1.failed_cause_pb2.ActivityTaskFailedCause.ValueType = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["cause", b"cause", "failure", b"failure"],
+        self, field_name: typing.Literal["cause", b"cause", "failure", b"failure"]
     ) -> None: ...
 
 global___Failure = Failure
 
+@typing.final
 class Cancellation(google.protobuf.message.Message):
     """
     Used to report cancellation from both Core and Lang.
@@ -223,14 +215,13 @@ class Cancellation(google.protobuf.message.Message):
         failure: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
+        self, field_name: typing.Literal["failure", b"failure"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["failure", b"failure"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["failure", b"failure"]) -> None: ...
 
 global___Cancellation = Cancellation
 
+@typing.final
 class WillCompleteAsync(google.protobuf.message.Message):
     """
     Used in ActivityExecutionResult to notify Core that this Activity will complete asynchronously.
@@ -245,6 +236,7 @@ class WillCompleteAsync(google.protobuf.message.Message):
 
 global___WillCompleteAsync = WillCompleteAsync
 
+@typing.final
 class DoBackoff(google.protobuf.message.Message):
     """
     Issued when a local activity needs to retry but also wants to back off more than would be
@@ -272,6 +264,7 @@ class DoBackoff(google.protobuf.message.Message):
         """The time the first attempt of this local activity was scheduled. Must be passed with attempt
         to the retry LA.
         """
+
     def __init__(
         self,
         *,
@@ -281,7 +274,7 @@ class DoBackoff(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backoff_duration",
             b"backoff_duration",
             "original_schedule_time",
@@ -290,7 +283,7 @@ class DoBackoff(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "attempt",
             b"attempt",
             "backoff_duration",

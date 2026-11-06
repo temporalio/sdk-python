@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -21,31 +20,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n,temporal/api/cloud/auditlog/v1/message.proto\x12\x1etemporal.api.cloud.auditlog.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/protobuf/struct.proto"\x9f\x02\n\tLogRecord\x12-\n\temit_time\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x11\n\toperation\x18\x05 \x01(\t\x12\x0e\n\x06status\x18\x07 \x01(\t\x12\x0f\n\x07version\x18\t \x01(\x05\x12\x0e\n\x06log_id\x18\n \x01(\t\x12<\n\tprincipal\x18\x0c \x01(\x0b\x32).temporal.api.cloud.auditlog.v1.Principal\x12,\n\x0braw_details\x18\r \x01(\x0b\x32\x17.google.protobuf.Struct\x12\x17\n\x0fx_forwarded_for\x18\x0e \x01(\t\x12\x1a\n\x12\x61sync_operation_id\x18\x0f \x01(\t"G\n\tPrincipal\x12\x0c\n\x04type\x18\x01 \x01(\t\x12\n\n\x02id\x18\x02 \x01(\t\x12\x0c\n\x04name\x18\x03 \x01(\t\x12\x12\n\napi_key_id\x18\x04 \x01(\tB\xac\x01\n!io.temporal.api.cloud.auditlog.v1B\x0cMessageProtoP\x01Z-go.temporal.io/api/cloud/auditlog/v1;auditlog\xaa\x02 Temporalio.Api.Cloud.AuditLog.V1\xea\x02$Temporalio::Api::Cloud::AuditLog::V1b\x06proto3'
 )
 
-
-_LOGRECORD = DESCRIPTOR.message_types_by_name["LogRecord"]
-_PRINCIPAL = DESCRIPTOR.message_types_by_name["Principal"]
-LogRecord = _reflection.GeneratedProtocolMessageType(
-    "LogRecord",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _LOGRECORD,
-        "__module__": "temporalio.api.cloud.auditlog.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.cloud.auditlog.v1.LogRecord)
-    },
-)
-_sym_db.RegisterMessage(LogRecord)
-
-Principal = _reflection.GeneratedProtocolMessageType(
-    "Principal",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _PRINCIPAL,
-        "__module__": "temporalio.api.cloud.auditlog.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.cloud.auditlog.v1.Principal)
-    },
-)
-_sym_db.RegisterMessage(Principal)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n!io.temporal.api.cloud.auditlog.v1B\014MessageProtoP\001Z-go.temporal.io/api/cloud/auditlog/v1;auditlog\252\002 Temporalio.Api.Cloud.AuditLog.V1\352\002$Temporalio::Api::Cloud::AuditLog::V1"

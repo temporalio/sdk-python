@@ -3,7 +3,6 @@ import dataclasses
 import json
 import multiprocessing
 import multiprocessing.context
-import os
 import threading
 import uuid
 from collections.abc import Mapping
@@ -847,8 +846,6 @@ async def test_schedule_basics(
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Java test server doesn't support schedules")
-    elif os.getenv("TEMPORAL_TEST_PROTO3"):
-        pytest.skip("Older proto library cannot compare repeated fields")
     # Create a schedule with a lot of stuff
     schedule = Schedule(
         action=ScheduleActionStartWorkflow(

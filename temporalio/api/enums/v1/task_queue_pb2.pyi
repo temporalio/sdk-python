@@ -26,7 +26,7 @@ class _TaskQueueKindEnumTypeWrapper(
         _TaskQueueKind.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_QUEUE_KIND_UNSPECIFIED: _TaskQueueKind.ValueType  # 0
     """Tasks from any non workflow task may be unspecified.
@@ -102,7 +102,7 @@ class _TaskQueueTypeEnumTypeWrapper(
         _TaskQueueType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_QUEUE_TYPE_UNSPECIFIED: _TaskQueueType.ValueType  # 0
     TASK_QUEUE_TYPE_WORKFLOW: _TaskQueueType.ValueType  # 1
@@ -132,7 +132,7 @@ class _TaskReachabilityEnumTypeWrapper(
         _TaskReachability.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TASK_REACHABILITY_UNSPECIFIED: _TaskReachability.ValueType  # 0
     TASK_REACHABILITY_NEW_WORKFLOWS: _TaskReachability.ValueType  # 1
@@ -184,7 +184,7 @@ class _BuildIdTaskReachabilityEnumTypeWrapper(
         _BuildIdTaskReachability.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     BUILD_ID_TASK_REACHABILITY_UNSPECIFIED: _BuildIdTaskReachability.ValueType  # 0
     """Task reachability is not reported"""
@@ -246,7 +246,7 @@ class _DescribeTaskQueueModeEnumTypeWrapper(
         _DescribeTaskQueueMode.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     DESCRIBE_TASK_QUEUE_MODE_UNSPECIFIED: _DescribeTaskQueueMode.ValueType  # 0
     """Unspecified means legacy behavior."""
@@ -272,7 +272,7 @@ class _RateLimitSourceEnumTypeWrapper(
         _RateLimitSource.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RATE_LIMIT_SOURCE_UNSPECIFIED: _RateLimitSource.ValueType  # 0
     RATE_LIMIT_SOURCE_API: _RateLimitSource.ValueType  # 1
@@ -303,7 +303,7 @@ class _RoutingConfigUpdateStateEnumTypeWrapper(
         _RoutingConfigUpdateState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED: _RoutingConfigUpdateState.ValueType  # 0
     ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS: _RoutingConfigUpdateState.ValueType  # 1

@@ -26,7 +26,7 @@ class _QueryResultTypeEnumTypeWrapper(
         _QueryResultType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     QUERY_RESULT_TYPE_UNSPECIFIED: _QueryResultType.ValueType  # 0
     QUERY_RESULT_TYPE_ANSWERED: _QueryResultType.ValueType  # 1
@@ -48,7 +48,7 @@ class _QueryRejectConditionEnumTypeWrapper(
         _QueryRejectCondition.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     QUERY_REJECT_CONDITION_UNSPECIFIED: _QueryRejectCondition.ValueType  # 0
     QUERY_REJECT_CONDITION_NONE: _QueryRejectCondition.ValueType  # 1

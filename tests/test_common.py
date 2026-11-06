@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pickle
-import sys
 import typing
 from dataclasses import dataclass
 from datetime import timedelta
@@ -88,15 +87,13 @@ def test_type_hints_from_func():
     assert_hints(MyCallableClass().aliased_self_method)
 
 
-if sys.version_info >= (3, 11):
+def test_type_hints_from_func_typing_self():
+    class Service:
+        def method(self: typing.Self, value: str) -> str:
+            return value
 
-    def test_type_hints_from_func_typing_self():  # pyright: ignore[reportUnreachable]
-        class Service:
-            def method(self: typing.Self, value: str) -> str:
-                return value
-
-        assert _type_hints_from_func(Service.method) == ([str], str)
-        assert _type_hints_from_func(Service().method) == ([str], str)
+    assert _type_hints_from_func(Service.method) == ([str], str)
+    assert _type_hints_from_func(Service().method) == ([str], str)
 
 
 def test_type_hints_from_func_preserves_annotated_self_argument():
