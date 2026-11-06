@@ -12,10 +12,6 @@ from temporalio.client import Client
 from temporalio.worker import Replayer, Worker
 from temporalio.workflow._asyncio import _OrderedTasks
 
-pytestmark = pytest.mark.skipif(
-    sys.version_info < (3, 11), reason="TaskGroup requires Python 3.11"
-)
-
 
 @pytest.mark.parametrize("failure_in_body", [False, True])
 async def test_task_group_cancellation_order(failure_in_body: bool):
@@ -32,20 +28,19 @@ async def test_task_group_cancellation_order(failure_in_body: bool):
         raise ValueError("planned failure")
 
     tasks = []
-    if sys.version_info >= (3, 11):
-        with pytest.raises(ExceptionGroup) as exc:
-            async with workflow.TaskGroup() as group:
-                tasks = [group.create_task(wait(index)) for index in range(3)]
-                await asyncio.sleep(0)
-                if failure_in_body:
-                    raise ValueError("planned failure")
-                group.create_task(fail())
-                await asyncio.Future()
-        assert [str(error) for error in exc.value.exceptions] == ["planned failure"]
-        assert all(task.done() for task in tasks)
-        assert cancelled == [0, 1, 2]
-        # An internal cancellation must not leak out after the exception is caught.
-        await asyncio.sleep(0)
+    with pytest.raises(ExceptionGroup) as exc:
+        async with workflow.TaskGroup() as group:
+            tasks = [group.create_task(wait(index)) for index in range(3)]
+            await asyncio.sleep(0)
+            if failure_in_body:
+                raise ValueError("planned failure")
+            group.create_task(fail())
+            await asyncio.Future()
+    assert [str(error) for error in exc.value.exceptions] == ["planned failure"]
+    assert all(task.done() for task in tasks)
+    assert cancelled == [0, 1, 2]
+    # An internal cancellation must not leak out after the exception is caught.
+    await asyncio.sleep(0)
 
 
 async def test_task_group_ordered_registry():
@@ -114,19 +109,19 @@ async def test_task_group_nested_failure():
             group.create_task(wait("inner"))
             group.create_task(fail())
 
-    if sys.version_info >= (3, 11):
-        with pytest.raises(ExceptionGroup) as exc:
-            async with workflow.TaskGroup() as group:
-                group.create_task(wait("outer"))
-                group.create_task(inner())
-        assert cancelled == ["inner", "outer"]
-        nested = exc.value.exceptions[0]
-        assert isinstance(nested, ExceptionGroup)
-        assert isinstance(nested.exceptions[0], ValueError)
+    with pytest.raises(ExceptionGroup) as exc:
+        async with workflow.TaskGroup() as group:
+            group.create_task(wait("outer"))
+            group.create_task(inner())
+    assert cancelled == ["inner", "outer"]
+    nested = exc.value.exceptions[0]
+    assert isinstance(nested, ExceptionGroup)
+    assert isinstance(nested.exceptions[0], ValueError)
 
 
 @pytest.mark.skipif(
-    sys.version_info < (3, 13), reason="Cancellation preservation requires Python 3.13"
+    sys.version_info < (3, 13),
+    reason="asyncio.TaskGroup preserves simultaneous external cancellation on Python 3.13+",
 )
 async def test_task_group_failure_preserves_external_cancellation():
     cleanup_started = asyncio.Event()

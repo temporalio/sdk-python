@@ -884,7 +884,7 @@ deterministic:
 
 * `asyncio.as_completed()` - use `workflow.as_completed()`
 * `asyncio.wait()` - use `workflow.wait()`
-* `asyncio.TaskGroup` - use `workflow.TaskGroup` (Python 3.11+)
+* `asyncio.TaskGroup` - use `workflow.TaskGroup`
 
 #### Asyncio Cancellation
 
