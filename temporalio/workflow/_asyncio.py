@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import sys
 from collections.abc import Awaitable, Iterable, Iterator, MutableSet
 from typing import TYPE_CHECKING, Any, TypeVar, overload
 
@@ -34,16 +33,7 @@ class _OrderedTasks(MutableSet[asyncio.Task[Any]]):
         self._items.pop(value, None)
 
 
-if sys.version_info >= (3, 11):
-    _TaskGroup = asyncio.TaskGroup
-else:
-
-    class _TaskGroup:  # pyright: ignore[reportUnreachable]
-        def __init__(self) -> None:
-            raise RuntimeError("workflow.TaskGroup requires Python 3.11 or newer")
-
-
-class TaskGroup(_TaskGroup):
+class TaskGroup(asyncio.TaskGroup):
     """A deterministic version of :py:class:`asyncio.TaskGroup` for workflows.
 
     Cancellation is requested for unfinished tasks in the order they were added
@@ -51,8 +41,7 @@ class TaskGroup(_TaskGroup):
     All other behavior follows the running Python version's ``asyncio.TaskGroup``,
     including waiting for tasks to finish and grouping their exceptions.
 
-    Requires Python 3.11 or newer. As with other workflow code, tasks must not
-    perform non-deterministic operations.
+    As with other workflow code, tasks must not perform non-deterministic operations.
     """
 
     def __init__(self) -> None:
