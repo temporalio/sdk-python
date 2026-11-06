@@ -879,15 +879,12 @@ as normal. Some asyncio features are disabled such as:
 * Calls that use anything external such as networking, subprocesses, disk IO, etc
 
 Also, there are some `asyncio` utilities that internally use `set()` which can make them non-deterministic from one
-worker to the next. Therefore the following `asyncio` functions have `workflow`-module alternatives that are
+worker to the next. Therefore the following `asyncio` utilities have `workflow`-module alternatives that are
 deterministic:
 
 * `asyncio.as_completed()` - use `workflow.as_completed()`
 * `asyncio.wait()` - use `workflow.wait()`
-
-`asyncio.TaskGroup` tracks tasks in a `set()`, so cancellation order can differ between execution and replay.
-This can cause non-determinism errors, even if the workflow catches the task group's exception and completes
-successfully. The sandbox warns when a task group is created.
+* `asyncio.TaskGroup` - use `workflow.TaskGroup`
 
 #### Asyncio Cancellation
 

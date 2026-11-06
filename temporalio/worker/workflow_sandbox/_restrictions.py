@@ -580,7 +580,7 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                             match_self=True,
                             leaf_warning=UserWarning,
                             leaf_message=(
-                                "asyncio.TaskGroup() has non-deterministic task cancellation order"
+                                "asyncio.TaskGroup() has non-deterministic task cancellation order, use workflow.TaskGroup instead"
                             ),
                         )
                     },

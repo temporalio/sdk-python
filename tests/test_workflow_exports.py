@@ -47,6 +47,7 @@ EXPECTED_WORKFLOW_EXPORTS = [
     "RootInfo",
     "SandboxImportNotificationPolicy",
     "SelfType",
+    "TaskGroup",
     "UnfinishedSignalHandlersWarning",
     "UnfinishedUpdateHandlersWarning",
     "UpdateInfo",
