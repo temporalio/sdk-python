@@ -493,7 +493,6 @@ class UnsupportedTaskGroupWorkflow:
         return task.result()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 11), reason="TaskGroup requires Python 3.11")
 async def test_workflow_sandbox_task_group_warning(client: Client):
     async with new_worker(client, UnsupportedTaskGroupWorkflow) as worker:
         with pytest.warns(
