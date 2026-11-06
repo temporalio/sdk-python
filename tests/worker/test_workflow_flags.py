@@ -78,9 +78,9 @@ async def test_datetime_arguments_respect_workflow_flag(
         # Fail decoding errors immediately instead of retrying workflow tasks forever.
         workflow_failure_exception_types=[Exception],
     )
-    if not datetime_decoding_enabled:
+    if datetime_decoding_enabled:
         worker._set_default_workflow_logic_flag(
-            _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=False
+            _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=True
         )
     async with worker:
         handle = await client.start_workflow(
@@ -150,6 +150,9 @@ async def test_datetime_signal_records_workflow_flag(
         client,
         task_queue=str(uuid.uuid4()),
         workflows=[DatetimeSignalWorkflow],
+    )
+    worker._set_default_workflow_logic_flag(
+        _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=True
     )
     when = datetime(2021, 1, 2, tzinfo=timezone.utc)
     handle = await client.start_workflow(
@@ -262,9 +265,9 @@ async def test_workflow_flag_applies_to_typed_memo(
         workflows=[DatetimeMemoWorkflow],
         workflow_failure_exception_types=[Exception],
     )
-    if not datetime_decoding_enabled:
+    if datetime_decoding_enabled:
         worker._set_default_workflow_logic_flag(
-            _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=False
+            _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=True
         )
     when = datetime(2021, 1, 2, tzinfo=timezone.utc)
     async with worker:
@@ -331,13 +334,16 @@ class DatetimeQueryWorkflow:
         self.finished = True
 
 
-async def test_new_workflow_records_default_flags_before_first_datetime_query(
+async def test_enabled_datetime_flag_is_recorded_before_first_datetime_query(
     client: temporalio.client.Client,
 ) -> None:
     worker = temporalio.worker.Worker(
         client,
         task_queue=str(uuid.uuid4()),
         workflows=[DatetimeQueryWorkflow],
+    )
+    worker._set_default_workflow_logic_flag(
+        _WorkflowLogicFlag.DECODE_DATETIME_PROXIES, enabled=True
     )
     when = datetime(2021, 1, 2, tzinfo=timezone.utc)
     async with worker:

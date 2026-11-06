@@ -16,15 +16,24 @@ if TYPE_CHECKING:
 class _WorkflowLogicFlag(IntEnum):
     """Flags recorded in workflow task metadata to preserve replay behavior."""
 
+    # Raise cancellation errors even when the activity result is already available.
+    # Added in version 1.13.0.
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
+    # Process all activation jobs in one batch instead of separate batches by job type.
+    # Added in version 1.31.0.
     PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
+    # Recognize sandbox proxies for datetime type hints during payload decoding.
+    # Added on 2026-11-05.
     DECODE_DATETIME_PROXIES = 3
 
 
+# TODO: Enable DECODE_DATETIME_PROXIES by default in the release after the first
+# release that supports DECODE_DATETIME_PROXIES. Remove the explicit overrides
+# for this flag from tests/worker/test_workflow_flags.py when enabling it.
+# Then remove this reminder.
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
     {
         _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH,
-        _WorkflowLogicFlag.DECODE_DATETIME_PROXIES,
     }
 )
 
