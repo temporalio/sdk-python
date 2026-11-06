@@ -6,13 +6,16 @@ and environment variables.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import os
+from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, TypeAlias, cast
 
 from typing_extensions import Self, TypedDict
 
+import temporalio.client
 import temporalio.service
 from temporalio.bridge.temporal_sdk_bridge import envconfig as _bridge_envconfig
 
@@ -40,6 +43,7 @@ class ClientConfigProfileDict(TypedDict, total=False):
     api_key: str
     tls: ClientConfigTLSDict
     grpc_meta: Mapping[str, str]
+    ext: Mapping[str, Mapping[str, Any]]
 
 
 def _from_dict_to_source(d: Mapping[str, Any] | None) -> DataSource | None:
@@ -175,6 +179,7 @@ class ClientConnectConfig(TypedDict, total=False):
     api_key: str
     tls: bool | temporalio.service.TLSConfig
     rpc_metadata: Mapping[str, str]
+    plugins: Sequence[temporalio.client.Plugin]
 
 
 @dataclass(frozen=True)
@@ -196,6 +201,16 @@ class ClientConfigProfile:
     """TLS configuration."""
     grpc_meta: Mapping[str, str] = field(default_factory=dict)
     """gRPC metadata."""
+    ext: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    """Raw extension config from ``profile.<profile>.ext``, keyed by extension
+    name. Each extension decodes its own table, which should be treated as
+    read-only. Values are converted as by :py:mod:`tomllib`, so TOML datetimes
+    are :py:class:`datetime.datetime`, :py:class:`datetime.date`, or
+    :py:class:`datetime.time` objects. Not modified by environment variables.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
 
     @classmethod
     def from_dict(cls, d: ClientConfigProfileDict) -> Self:
@@ -206,6 +221,7 @@ class ClientConfigProfile:
             api_key=d.get("api_key"),
             tls=ClientConfigTLS.from_dict(d.get("tls")),
             grpc_meta=d.get("grpc_meta") or {},
+            ext=d.get("ext") or {},
         )
 
     def to_dict(self) -> ClientConfigProfileDict:
@@ -221,6 +237,8 @@ class ClientConfigProfile:
             d["tls"] = self.tls.to_dict()
         if self.grpc_meta:
             d["grpc_meta"] = self.grpc_meta
+        if self.ext:
+            d["ext"] = self.ext
         return d
 
     def to_client_connect_config(self) -> ClientConnectConfig:
@@ -292,6 +310,61 @@ class ClientConfigProfile:
             env_vars=override_env_vars,
         )
         return ClientConfigProfile.from_dict(raw_profile)
+
+
+@dataclass(frozen=True)
+class ClientConfigExtensionRequest:
+    """Input to :py:meth:`ClientConfigExtension.client_plugin`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    profile: ClientConfigProfile
+    """The loaded profile, with environment variable overrides applied."""
+    env: Mapping[str, str] | None
+    """Env to read extension env vars from, or None if env loading is disabled."""
+
+
+class ClientConfigExtension(ABC):
+    """Extension that adds config to client environment configuration.
+
+    An extension owns the TOML table under ``profile.<profile>.ext.<name>``,
+    where ``<name>`` is :py:meth:`name`, and turns its config into a client
+    plugin. Extensions are recommended to use a ``TEMPORAL_EXT_<NAME>_`` prefix
+    for any environment variables they read. Pass extensions to
+    :py:meth:`ClientConfig.load_client_connect_config`.
+
+    .. warning::
+       This API is experimental and unstable.
+    """
+
+    @abstractmethod
+    def name(self) -> str:
+        """The extension's table key under ``profile.<profile>.ext``. Must be
+        unique among loaded extensions.
+        """
+
+    @abstractmethod
+    def client_plugin(
+        self, req: ClientConfigExtensionRequest
+    ) -> temporalio.client.Plugin | None:
+        """Read this extension's config from the profile and env, and return a
+        plugin that applies it, or None if there's nothing to apply.
+        """
+
+
+def _validate_extensions(extensions: Sequence[ClientConfigExtension]) -> None:
+    names: set[str] = set()
+    for i, extension in enumerate(extensions):
+        if extension is None:  # type: ignore[reportUnnecessaryComparison]
+            raise ValueError(f"client config extension at index {i} is None")
+        name = extension.name()
+        if not name:
+            raise ValueError(f"client config extension at index {i} has empty name")
+        if name in names:
+            raise ValueError(f'duplicate client config extension name "{name}"')
+        names.add(name)
 
 
 @dataclass
@@ -371,12 +444,14 @@ class ClientConfig:
         disable_env: bool = False,
         config_file_strict: bool = False,
         override_env_vars: Mapping[str, str] | None = None,
+        extensions: Sequence[ClientConfigExtension] = [],
     ) -> ClientConnectConfig:
         """Load a single client profile and convert to connect config.
 
         This is a convenience function that combines loading a profile and
-        converting it to a connect config dictionary. This will use the current
-        process's environment for overrides unless disabled.
+        converting it to a connect config dictionary, plus any extensions. This
+        will use the current process's environment for overrides unless
+        disabled.
 
         Args:
             profile: The profile to load from the config. Defaults to "default".
@@ -393,11 +468,22 @@ class ClientConfig:
                 environment is used. To use a specific set of environment
                 variables, provide them here. To disable environment variable
                 loading, set ``disable_env`` to true.
+            extensions: Extensions to apply, in order. Each extension is given
+                the loaded profile and env, and any plugin it returns is
+                appended to the ``plugins`` of the returned config. Extension
+                names must be unique. To also pass other plugins to
+                :py:meth:`temporalio.client.Client.connect`, combine them with
+                these rather than passing ``plugins`` separately.
+
+                .. warning::
+                   This parameter is experimental and unstable.
 
         Returns:
             TypedDict of keyword arguments for
             :py:meth:`temporalio.client.Client.connect`.
         """
+        _validate_extensions(extensions)
+
         config_source: DataSource | None = None
         if config_file and not disable_file:
             config_source = Path(config_file)
@@ -410,4 +496,25 @@ class ClientConfig:
             config_file_strict=config_file_strict,
             override_env_vars=override_env_vars,
         )
-        return prof.to_client_connect_config()
+        config = prof.to_client_connect_config()
+
+        if extensions:
+            req = ClientConfigExtensionRequest(
+                profile=prof,
+                env=None
+                if disable_env
+                else (os.environ if override_env_vars is None else override_env_vars),
+            )
+            plugins: list[temporalio.client.Plugin] = []
+            for extension in extensions:
+                try:
+                    plugin = extension.client_plugin(req)
+                except Exception as err:
+                    raise RuntimeError(
+                        f'client config extension "{extension.name()}": {err}'
+                    ) from err
+                if plugin is not None:
+                    plugins.append(plugin)
+            if plugins:
+                config["plugins"] = plugins
+        return config

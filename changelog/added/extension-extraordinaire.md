@@ -1,0 +1,1 @@
+Add experimental envconfig extensions: `ClientConfig.load_client_connect_config` accepts `extensions` that read their own config from `profile.<profile>.ext.<name>` TOML tables (exposed as `ClientConfigProfile.ext` and never rejected by strict mode) and env vars, and contribute client plugins to the returned config's `plugins`.

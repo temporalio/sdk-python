@@ -1,12 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::{
     exceptions::PyRuntimeError,
-    types::{PyBytes, PyDict},
+    types::{PyBytes, PyDict, PyList},
 };
 use std::collections::HashMap;
 use temporalio_common::envconfig::{
     load_client_config as core_load_client_config,
-    load_client_config_profile as core_load_client_config_profile,
+    load_client_config_profile as core_load_client_config_profile, toml,
     ClientConfig as CoreClientConfig, ClientConfigCodec,
     ClientConfigProfile as CoreClientConfigProfile, ClientConfigTLS as CoreClientConfigTLS,
     DataSource, LoadClientConfigOptions, LoadClientConfigProfileOptions,
@@ -78,7 +78,79 @@ fn profile_to_dict(py: Python, profile: &CoreClientConfigProfile) -> PyResult<Py
     if !profile.grpc_meta.is_empty() {
         dict.set_item("grpc_meta", &profile.grpc_meta)?;
     }
+    if !profile.ext.is_empty() {
+        let ext = PyDict::new(py);
+        for (name, table) in &profile.ext {
+            ext.set_item(name, toml_table_to_py(py, table)?)?;
+        }
+        dict.set_item("ext", ext)?;
+    }
     Ok(dict.into())
+}
+
+fn toml_table_to_py(py: Python, table: &toml::Table) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    for (k, v) in table {
+        dict.set_item(k, toml_value_to_py(py, v)?)?;
+    }
+    Ok(dict.into())
+}
+
+// Values are converted the same way as by Python's tomllib.
+fn toml_value_to_py(py: Python, value: &toml::Value) -> PyResult<Py<PyAny>> {
+    Ok(match value {
+        toml::Value::String(s) => s.into_pyobject(py)?.into_any().unbind(),
+        toml::Value::Integer(i) => i.into_pyobject(py)?.into_any().unbind(),
+        toml::Value::Float(f) => f.into_pyobject(py)?.into_any().unbind(),
+        toml::Value::Boolean(b) => b.into_pyobject(py)?.to_owned().into_any().unbind(),
+        toml::Value::Datetime(dt) => toml_datetime_to_py(py, dt)?,
+        toml::Value::Array(a) => {
+            let list = PyList::empty(py);
+            for v in a {
+                list.append(toml_value_to_py(py, v)?)?;
+            }
+            list.into_any().unbind()
+        }
+        toml::Value::Table(t) => toml_table_to_py(py, t)?,
+    })
+}
+
+// Offset datetimes become aware datetimes, local datetimes become naive datetimes, local dates
+// become dates, and local times become times. Fractional seconds are truncated to microseconds.
+// Built via the datetime module since the datetime C API isn't part of the limited API.
+fn toml_datetime_to_py(py: Python, dt: &toml::value::Datetime) -> PyResult<Py<PyAny>> {
+    let datetime = py.import("datetime")?;
+    let time = dt.time.map(|t| {
+        (
+            t.hour,
+            t.minute,
+            t.second.unwrap_or(0),
+            t.nanosecond.unwrap_or(0) / 1000,
+        )
+    });
+    let obj = match (dt.date, time) {
+        (Some(d), Some((hour, minute, second, micros))) => {
+            let tz = match dt.offset {
+                None => py.None().into_bound(py),
+                Some(toml::value::Offset::Z) => datetime.getattr("timezone")?.getattr("utc")?,
+                Some(toml::value::Offset::Custom { minutes }) => {
+                    let delta = datetime
+                        .getattr("timedelta")?
+                        .call1((0, i32::from(minutes) * 60))?;
+                    datetime.getattr("timezone")?.call1((delta,))?
+                }
+            };
+            datetime
+                .getattr("datetime")?
+                .call1((d.year, d.month, d.day, hour, minute, second, micros, tz))?
+        }
+        (Some(d), None) => datetime.getattr("date")?.call1((d.year, d.month, d.day))?,
+        (None, Some((hour, minute, second, micros))) => datetime
+            .getattr("time")?
+            .call1((hour, minute, second, micros))?,
+        (None, None) => return Err(PyRuntimeError::new_err("empty TOML datetime")),
+    };
+    Ok(obj.unbind())
 }
 
 fn core_config_to_dict(py: Python, core_config: &CoreClientConfig) -> PyResult<Py<PyAny>> {
