@@ -162,6 +162,7 @@ class Start(google.protobuf.message.Message):
     IS_LOCAL_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
+    WORKFLOW_TASK_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
     workflow_type: builtins.str
@@ -237,6 +238,11 @@ class Start(google.protobuf.message.Message):
         Only set for standalone activities. Lang should use it to serialize the activity's result and
         failure, which are returned to the Nexus caller.
         """
+    @property
+    def workflow_task(self) -> global___WorkflowTaskAttempt:
+        """For a local activity, the workflow task in which Core dispatched this execution. Retries that
+        Core runs locally keep the value. Unset for other activities.
+        """
     def __init__(
         self,
         *,
@@ -270,6 +276,7 @@ class Start(google.protobuf.message.Message):
         run_id: builtins.str = ...,
         propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
         | None = ...,
+        workflow_task: global___WorkflowTaskAttempt | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -294,6 +301,8 @@ class Start(google.protobuf.message.Message):
             b"started_time",
             "workflow_execution",
             b"workflow_execution",
+            "workflow_task",
+            b"workflow_task",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -337,12 +346,91 @@ class Start(google.protobuf.message.Message):
             b"workflow_execution",
             "workflow_namespace",
             b"workflow_namespace",
+            "workflow_task",
+            b"workflow_task",
             "workflow_type",
             b"workflow_type",
         ],
     ) -> None: ...
 
 global___Start = Start
+
+class WorkflowTaskAttempt(google.protobuf.message.Message):
+    """One attempt of a workflow task, from the poll response and the history of that attempt."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    STARTED_TIME_FIELD_NUMBER: builtins.int
+    PREVIOUS_STARTED_EVENT_ID_FIELD_NUMBER: builtins.int
+    FAILED_TASKS_FIELD_NUMBER: builtins.int
+    PREVIOUS_ATTEMPT_FIELD_NUMBER: builtins.int
+    PREVIOUS_STARTED_TIME_FIELD_NUMBER: builtins.int
+    started_event_id: builtins.int
+    """The event id of the task's WorkflowTaskStarted event."""
+    attempt: builtins.int
+    @property
+    def started_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """When the server started the task."""
+    previous_started_event_id: builtins.int
+    """The started event id of the run's last completed workflow task, from the poll response.
+    0 when no task of the run has completed.
+    """
+    @property
+    def failed_tasks(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
+        """The started event ids of the run's last 100 failed and timed out workflow tasks in history,
+        in event order. The cap keeps each start small. A transient attempt has no such event.
+        """
+    previous_attempt: builtins.int
+    """The attempt and the started time of the task at previous_started_event_id, from its
+    WorkflowTaskScheduled and WorkflowTaskStarted events. Unset when no task has completed.
+    """
+    @property
+    def previous_started_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def __init__(
+        self,
+        *,
+        started_event_id: builtins.int = ...,
+        attempt: builtins.int = ...,
+        started_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        previous_started_event_id: builtins.int = ...,
+        failed_tasks: collections.abc.Iterable[builtins.int] | None = ...,
+        previous_attempt: builtins.int = ...,
+        previous_started_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing_extensions.Literal[
+            "previous_started_time",
+            b"previous_started_time",
+            "started_time",
+            b"started_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing_extensions.Literal[
+            "attempt",
+            b"attempt",
+            "failed_tasks",
+            b"failed_tasks",
+            "previous_attempt",
+            b"previous_attempt",
+            "previous_started_event_id",
+            b"previous_started_event_id",
+            "previous_started_time",
+            b"previous_started_time",
+            "started_event_id",
+            b"started_event_id",
+            "started_time",
+            b"started_time",
+        ],
+    ) -> None: ...
+
+global___WorkflowTaskAttempt = WorkflowTaskAttempt
 
 class Cancel(google.protobuf.message.Message):
     """Attempt to cancel a running activity"""
