@@ -1524,7 +1524,9 @@ _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
 
 
 def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
-    assert _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+    assert (
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+    )
 
 
 @workflow.defn
