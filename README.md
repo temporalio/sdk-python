@@ -669,7 +669,7 @@ class GreetingWorkflow:
 
             # Wait for salutation update or complete signal (this can be
             # cancelled)
-            await asyncio.wait(
+            await workflow.wait(
                 [
                     asyncio.create_task(self._greeting_info_update.wait()),
                     asyncio.create_task(self._complete.wait()),
