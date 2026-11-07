@@ -271,7 +271,7 @@ async def _invocation_config_scope(
     """Run *configure* (see run_worker for the forms) against a fresh per-invocation config
     and yield it. For the generator / context-manager forms, post-``yield`` teardown runs
     when the caller's block exits, including on error. Task queue is validated after
-    setup.
+    setup. The config's shutdown hooks run even if validation fails, before that teardown.
     """
     config = new_config()
     if inspect.isasyncgenfunction(configure):
@@ -285,13 +285,21 @@ async def _invocation_config_scope(
         # A @asynccontextmanager-decorated callback returns the context manager directly.
         cm = result if result is not None and hasattr(result, "__aenter__") else None
 
+    # Run hooks on failure as well as success, before configure teardown can
+    # close resources used by the hooks.
     if cm is not None:
         async with cm:
+            try:
+                _validate_task_queue(config)
+                yield config
+            finally:
+                await _run_shutdown_hooks(config)
+    else:
+        try:
             _validate_task_queue(config)
             yield config
-    else:
-        _validate_task_queue(config)
-        yield config
+        finally:
+            await _run_shutdown_hooks(config)
 
 
 async def _invocation_handler(
@@ -363,7 +371,3 @@ async def _invocation_handler(
         else:
             # No deadline - run until cancelled.
             await worker.run()
-
-        # Run shutdown hooks after worker has stopped, before any async-generator
-        # configure teardown (which unwinds on scope exit).
-        await _run_shutdown_hooks(config)
