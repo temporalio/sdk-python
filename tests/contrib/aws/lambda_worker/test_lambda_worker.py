@@ -297,6 +297,7 @@ def _invoke(
 # (deps overrides, expected exception) for each way an invocation can end.
 _INVOCATION_ENDINGS = [
     pytest.param({}, None, id="success"),
+    pytest.param({"getenv": lambda _: None}, ValueError, id="task-queue-error"),
     pytest.param({"connect": _connect_fails}, RuntimeError, id="connect-error"),
     pytest.param(
         {"create_worker": _create_worker_fails}, ValueError, id="create-worker-error"
@@ -747,7 +748,6 @@ class TestAsyncConfigure:
         events: list[str] = []
 
         async def configure(config: LambdaWorkerConfig):
-            config.worker_config["task_queue"] = "gen-queue"
             config.shutdown_hooks.append(lambda: events.append("hook"))
             try:
                 yield

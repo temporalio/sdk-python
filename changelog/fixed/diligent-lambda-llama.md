@@ -1,1 +1,1 @@
-`temporalio.contrib.aws.lambda_worker`: `shutdown_hooks` now run when an invocation fails or is cancelled after configuration setup and task queue validation succeed, before configuration teardown.
+`temporalio.contrib.aws.lambda_worker`: `shutdown_hooks` now run before configuration teardown when an invocation fails or is cancelled after configuration setup succeeds, including task queue validation failures.
