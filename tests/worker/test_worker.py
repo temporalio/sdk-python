@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import logging
 import multiprocessing
 import multiprocessing.context
 import os
 import sys
+import traceback
 import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from contextlib import contextmanager
@@ -472,6 +474,37 @@ async def test_cant_specify_max_concurrent_and_tuner(client: Client):
     assert "when also specifying tuner" in str(err.value)
 
 
+async def _run_worker_with_shutdown_diagnostics(worker: Worker) -> None:
+    async def report_slow_shutdown() -> None:
+        await worker._shutdown_event.wait()
+        for elapsed, delay in ((5, 5), (25, 20), (55, 30)):
+            await asyncio.sleep(delay)
+            if worker.is_shutdown:
+                return
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                "Worker %s still shutting down after %s seconds; pending asyncio tasks:",
+                worker.task_queue,
+                elapsed,
+            )
+            for task in asyncio.all_tasks():
+                if task is asyncio.current_task():
+                    continue
+                stack = "".join(
+                    "".join(traceback.format_stack(frame, limit=4))
+                    for frame in task.get_stack(limit=4)
+                )
+                logger.warning("Pending %r:\n%s", task, stack)
+
+    diagnostic_task = asyncio.create_task(report_slow_shutdown())
+    try:
+        async with worker:
+            pass
+    finally:
+        diagnostic_task.cancel()
+        await asyncio.gather(diagnostic_task, return_exceptions=True)
+
+
 async def test_warns_when_workers_too_low(client: Client):
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
@@ -482,27 +515,29 @@ async def test_warns_when_workers_too_low(client: Client):
             UserWarning,
             match="Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
         ):
-            async with new_worker(
-                client,
-                WaitOnSignalWorkflow,
-                activities=[say_hello],
-                tuner=tuner,
-                activity_executor=executor,
-            ):
-                pass
+            await _run_worker_with_shutdown_diagnostics(
+                new_worker(
+                    client,
+                    WaitOnSignalWorkflow,
+                    activities=[say_hello],
+                    tuner=tuner,
+                    activity_executor=executor,
+                )
+            )
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with pytest.warns(
             UserWarning,
             match="Worker max_concurrent_nexus_tasks is 500 but nexus_task_executor's max_workers is only",
         ):
-            async with new_worker(
-                client,
-                WaitOnSignalWorkflow,
-                nexus_service_handlers=[NeverRunService()],
-                tuner=tuner,
-                nexus_task_executor=executor,
-            ):
-                pass
+            await _run_worker_with_shutdown_diagnostics(
+                new_worker(
+                    client,
+                    WaitOnSignalWorkflow,
+                    nexus_service_handlers=[NeverRunService()],
+                    tuner=tuner,
+                    nexus_task_executor=executor,
+                )
+            )
 
 
 @nexusrpc.handler.service_handler
