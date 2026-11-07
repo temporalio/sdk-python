@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Iterator, Sequence
 from datetime import timedelta
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+    SpanExporter,
+    SpanExportResult,
+)
+from opentelemetry.util._once import Once
 
+from temporalio.contrib.aws.lambda_worker import otel
 from temporalio.contrib.aws.lambda_worker._configure import (
     LambdaWorkerConfig,
     _run_shutdown_hooks,
@@ -147,6 +159,94 @@ class TestApplyDefaults:
         apply_defaults(config)
         assert "runtime" in config.client_connect_config
         assert len(config.shutdown_hooks) == 1
+
+
+class _RecordingExporter(SpanExporter):
+    def __init__(self) -> None:
+        super().__init__()
+        self.exported: list[str] = []
+
+    def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        self.exported.extend(span.name for span in spans)
+        return SpanExportResult.SUCCESS
+
+
+def _span_export_threads() -> int:
+    return sum(
+        1 for t in threading.enumerate() if t.name == "OtelBatchSpanRecordProcessor"
+    )
+
+
+class TestApplyDefaultsWarmInvocations:
+    """``configure`` runs on every Lambda invocation in the same warm process."""
+
+    @pytest.fixture(autouse=True)
+    def exporters(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> Iterator[list[_RecordingExporter]]:
+        """Isolate the global provider and record every span exporter that gets built."""
+        # OpenTelemetry only allows the global provider to be set once per process.
+        exporters: list[_RecordingExporter] = []
+        monkeypatch.setattr(trace, "_TRACER_PROVIDER", None)
+        monkeypatch.setattr(trace, "_TRACER_PROVIDER_SET_ONCE", Once())
+        monkeypatch.setattr(otel, "_installed_tracer_provider", None, raising=False)
+
+        def build_processor(*_args: Any, **_kwargs: Any) -> BatchSpanProcessor:
+            exporter = _RecordingExporter()
+            exporters.append(exporter)
+            return BatchSpanProcessor(exporter)
+
+        monkeypatch.setattr(
+            otel._serverless,  # type: ignore[reportPrivateUsage]
+            "build_otlp_span_processor",
+            build_processor,
+        )
+        yield exporters
+        provider = trace.get_tracer_provider()
+        if isinstance(provider, TracerProvider):
+            provider.shutdown()
+
+    def test_reuses_provider_across_invocations(
+        self, exporters: list[_RecordingExporter]
+    ) -> None:
+        baseline = _span_export_threads()
+        providers = []
+        for _ in range(4):
+            apply_defaults(LambdaWorkerConfig())
+            providers.append(trace.get_tracer_provider())
+        assert len({id(p) for p in providers}) == 1
+        assert len(exporters) == 1
+        assert _span_export_threads() == baseline + 1
+
+    def test_does_not_warn_about_overriding_provider(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        apply_defaults(LambdaWorkerConfig())
+        caplog.clear()
+        apply_defaults(LambdaWorkerConfig())
+        assert "Overriding of current TracerProvider" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_flush_hook_exports_on_every_invocation(
+        self, exporters: list[_RecordingExporter]
+    ) -> None:
+        for invocation in range(3):
+            config = LambdaWorkerConfig()
+            apply_defaults(config)
+            tracer = trace.get_tracer("test")
+            with tracer.start_as_current_span(f"span-{invocation}"):
+                pass
+            await _run_shutdown_hooks(config)
+        assert exporters[0].exported == ["span-0", "span-1", "span-2"]
+
+    def test_unused_provider_is_shut_down_when_global_already_set(self) -> None:
+        foreign = TracerProvider()
+        trace.set_tracer_provider(foreign)
+        baseline = _span_export_threads()
+        for _ in range(3):
+            apply_defaults(LambdaWorkerConfig())
+        assert trace.get_tracer_provider() is foreign
+        assert _span_export_threads() == baseline
 
 
 class TestOtelOptions:
