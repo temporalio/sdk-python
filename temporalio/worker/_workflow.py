@@ -46,6 +46,7 @@ from ._workflow_instance import (
     WorkflowInstance,
     WorkflowInstanceDetails,
     WorkflowRunner,
+    _EventLoopUnusableError,
     _WorkflowExternFunctions,
     _WorkflowLogicFlag,
 )
@@ -205,6 +206,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0
+        # Workflows whose event loop became unusable during eviction. They are
+        # kept referenced so their suspended coroutines are never garbage
+        # collected, which could wake them up on another thread.
+        self._unusable_workflows: list[WorkflowInstance] = []
 
         # Set the worker-level failure exception types into the runner
         workflow_runner.set_worker_level_failure_exception_types(
@@ -631,6 +636,20 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                             handle_eviction_task, self._deadlock_timeout_seconds
                         )
                     # Break if it succeeds
+                    break
+                except _EventLoopUnusableError:
+                    # Retrying can never succeed, and dropping the instance
+                    # would let its tasks be garbage collected. Keep it
+                    # referenced and finish the eviction so the run can be
+                    # processed again on a new instance.
+                    logger.error(
+                        "Eviction of run ID %s cannot finish because its event loop "
+                        + "can no longer run tasks, usually after a deadlock interrupt. "
+                        + "Keeping the workflow instance in memory until the worker stops.",
+                        act.run_id,
+                        exc_info=True,
+                    )
+                    self._unusable_workflows.append(workflow)
                     break
                 except BaseException as err:
                     # Only want to log and mark as could not evict once

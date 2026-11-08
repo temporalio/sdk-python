@@ -1,0 +1,1 @@
+Workflow eviction no longer retries forever when a deadlock interrupt lands while a finished task schedules its done callbacks, so the run can continue on a new instance instead of staying stuck until the worker restarts.

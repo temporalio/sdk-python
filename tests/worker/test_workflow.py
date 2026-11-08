@@ -3826,6 +3826,79 @@ async def test_workflow_eviction_deadlock(client: Client):
     worker_task.cancel()
 
 
+@workflow.defn
+class EvictAfterInterruptedQueryWorkflow:
+    def __init__(self) -> None:
+        self.pokes = 0
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: self.pokes > 0)
+
+    @workflow.signal
+    def poke(self) -> None:
+        self.pokes += 1
+
+    @workflow.query
+    def state(self) -> int:
+        return self.pokes
+
+
+async def test_workflow_evicts_after_interrupt_in_done_callback(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    # A deadlock interrupt that lands while a finished task schedules its done
+    # callbacks used to leave that task in the instance's task set, so eviction
+    # failed forever and the run could not make progress (#2067). Stalling
+    # call_soon for the query task's done callback reproduces that timing.
+    impl = temporalio.worker._workflow_instance._WorkflowInstanceImpl
+    original_call_soon = impl.call_soon
+    stall = {"armed": False}
+
+    def call_soon(self, callback, *args, context=None):  # type: ignore[no-untyped-def]
+        task = args[0] if args else None
+        if (
+            stall["armed"]
+            and getattr(callback, "__self__", None) is self._tasks
+            and isinstance(task, asyncio.Task)
+            and task.get_name().startswith("query:")
+        ):
+            stall["armed"] = False
+            time.sleep(2)
+        return original_call_soon(self, callback, *args, context=context)
+
+    monkeypatch.setattr(impl, "call_soon", call_soon)
+
+    # Without the fix the worker can never shut down, so like
+    # test_workflow_eviction_deadlock, cancel it at the end without waiting.
+    worker = new_worker(
+        client,
+        EvictAfterInterruptedQueryWorkflow,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    )
+    assert worker._workflow_worker
+    worker._workflow_worker._deadlock_timeout_seconds = 1
+    worker_task = asyncio.create_task(worker.run())
+    try:
+        handle = await client.start_workflow(
+            EvictAfterInterruptedQueryWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert await handle.query(EvictAfterInterruptedQueryWorkflow.state) == 0
+
+        stall["armed"] = True
+        with pytest.raises(WorkflowQueryFailedError) as err:
+            await handle.query(EvictAfterInterruptedQueryWorkflow.state)
+        assert "TMPRL1101" in str(err.value)
+
+        # Eviction must finish so the run can continue on a new instance
+        await handle.signal(EvictAfterInterruptedQueryWorkflow.poke)
+        await asyncio.wait_for(handle.result(), timeout=20)
+    finally:
+        worker_task.cancel()
+
+
 class PatchWorkflowBase:
     def __init__(self) -> None:
         self._result = "<unset>"

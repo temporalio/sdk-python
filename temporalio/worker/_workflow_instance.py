@@ -593,11 +593,28 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # collected which can trigger a GeneratorExit exception thrown in the
         # coroutine which can cause it to wakeup on a different thread which may
         # have a different workflow/event-loop going.
-        if self._deleting and self._tasks:
-            raise RuntimeError(
-                f"Eviction processed, but {len(self._tasks)} tasks remain. "
-                + f"Stack traces below:\n\n{self._stack_trace()}"
-            )
+        if self._deleting:
+            # A finished task has no coroutine left to tear down. Its done
+            # callback can still be lost, e.g. when a deadlock interrupt lands
+            # while the task schedules it, so drop finished tasks here instead
+            # of relying on that callback.
+            for task in [task for task in self._tasks if task.done()]:
+                self._tasks.discard(task)
+            if self._tasks:
+                # If the interrupt left a finished task as this loop's current
+                # task, no task can run on this loop again, so retrying eviction
+                # can never succeed.
+                current = asyncio.current_task(self)
+                if current is not None and current.done():
+                    raise _EventLoopUnusableError(
+                        f"Eviction cannot finish: finished task {current.get_name()} "
+                        + f"is still this event loop's current task, so {len(self._tasks)} "
+                        + f"tasks can never run. Stack traces below:\n\n{self._stack_trace()}"
+                    )
+                raise RuntimeError(
+                    f"Eviction processed, but {len(self._tasks)} tasks remain. "
+                    + f"Stack traces below:\n\n{self._stack_trace()}"
+                )
 
         if activation_err:
             logger.warning(
@@ -2840,7 +2857,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Add to and remove from our own non-weak set instead of relying on
         # Python's weak set which can collect these too early
         self._tasks.add(task)
-        task.add_done_callback(self._tasks.remove)
+        task.add_done_callback(self._tasks.discard)
         # When the workflow is GC'd (for whatever reason, e.g. eviction or
         # worker shutdown), still-open tasks get a message logged to the
         # exception handler about still pending. We disable this if the
@@ -4199,6 +4216,10 @@ class _ReplaySafeMetricGaugeFloat(
 
 class _WorkflowBeingEvictedError(BaseException):
     pass
+
+
+class _EventLoopUnusableError(RuntimeError):
+    """Eviction can never finish because the workflow event loop cannot run tasks."""
 
 
 @dataclass
