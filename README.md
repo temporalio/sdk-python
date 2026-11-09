@@ -2045,6 +2045,32 @@ like Temporal. See [this gevent issue](https://github.com/gevent/gevent/issues/9
 users are encouraged to not use gevent in asyncio applications (including Temporal). But if you must, there is
 [a sample](https://github.com/temporalio/samples-python/tree/main/gevent_async) showing how it is possible.
 
+#### Deadlock Interruption and Logging Lock Leaks (Python ≤ 3.12)
+
+On Python ≤ 3.12, interrupting a thread asynchronously via `PyThreadState_SetAsyncExc` can leak the
+`logging.Handler` lock if the interruption occurs while acquiring the handler lock. In Python ≤ 3.12,
+`logging.Handler.handle()` acquires `self.lock` before entering its `try/finally` block. If an asynchronous
+exception arrives between lock acquisition and entering the protected block, the lock remains held
+permanently.
+
+In Temporal, this can occur when:
+* A workflow task blocks without yielding and the worker's deadlock detector triggers after
+  `deadlock_timeout_seconds` (2 seconds by default), injecting `_InterruptDeadlockError` into the workflow thread.
+* A synchronous multithreaded activity is cancelled, injecting `temporalio.exceptions.CancelledError` into the
+  activity thread.
+
+If the thread is interrupted while logging, the leaked handler lock causes subsequent logging calls on the
+worker's main event-loop thread (such as logging the deadlock failure) to block indefinitely, freezing the worker.
+
+**Mitigations and Version Differences:**
+* **Python 3.13+**: CPython 3.13 refactored `logging.Handler.handle()` to use `with self.lock:`, preventing this
+  specific handler lock leak. (Note: asynchronous thread interruption may still affect other non-context-managed
+  locks.)
+* **Activities**: Set `no_thread_cancel_exception=True` on `@activity.defn` to disable injecting cancellation
+  exceptions into synchronous activity threads.
+* **Workflows**: Deadlock detection and interruption can be disabled by setting `debug_mode=True` on the `Worker`
+  (or setting `TEMPORAL_DEBUG=1` in the environment). Note that this disables deadlock timeouts entirely.
+
 # Development
 
 The Python SDK supports Python 3.11 through 3.15. It is built using
