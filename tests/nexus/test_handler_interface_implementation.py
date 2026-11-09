@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import nexusrpc
 import nexusrpc.handler
@@ -12,9 +12,9 @@ from temporalio.nexus import WorkflowRunOperationContext, workflow_run_operation
 
 @dataclass
 class _InterfaceImplementationTestCase:
-    Interface: type[Any]
-    Impl: type[Any]
-    error_message: str | None
+    Interface: ClassVar[type[Any]]
+    Impl: ClassVar[type[Any]]
+    error_message: ClassVar[str | None]
 
 
 class ValidImpl(_InterfaceImplementationTestCase):

@@ -171,12 +171,15 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 req,
                 temporalio.api.workflowservice.v1.SignalWithStartWorkflowExecutionRequest,
             ):
-                resp = await self._client.workflow_service.signal_with_start_workflow_execution(
-                    req,
-                    retry=True,
-                    metadata=input.rpc_metadata,
-                    timeout=input.rpc_timeout,
-                )
+                with temporalio.nexus._operation_context._signal_request_nexus_context(
+                    req
+                ):
+                    resp = await self._client.workflow_service.signal_with_start_workflow_execution(
+                        req,
+                        retry=True,
+                        metadata=input.rpc_metadata,
+                        timeout=input.rpc_timeout,
+                    )
                 first_execution_run_id = resp.first_execution_run_id or (
                     resp.run_id if resp.started else None
                 )
@@ -255,9 +258,6 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 await data_converter.encode(input.start_signal_args)
             )
         await self._populate_start_workflow_execution_request(req, input)
-        temporalio.nexus._operation_context._apply_nexus_context_to_signal_with_start_workflow_request(
-            req
-        )
         return req
 
     async def _build_update_with_start_start_workflow_execution_request(
@@ -499,12 +499,10 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             req.input.payloads.extend(await data_converter.encode(input.args))
         if input.headers is not None:  # type:ignore[reportUnnecessaryComparison]
             await self._apply_headers(input.headers, req.header.fields)
-        temporalio.nexus._operation_context._apply_nexus_context_to_signal_workflow_request(
-            req
-        )
-        resp = await self._client.workflow_service.signal_workflow_execution(
-            req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
-        )
+        with temporalio.nexus._operation_context._signal_request_nexus_context(req):
+            resp = await self._client.workflow_service.signal_workflow_execution(
+                req, retry=True, metadata=input.rpc_metadata, timeout=input.rpc_timeout
+            )
         temporalio.nexus._operation_context._apply_signal_workflow_response_to_nexus_context(
             resp
         )

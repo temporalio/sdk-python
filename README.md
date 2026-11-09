@@ -1,6 +1,6 @@
 ![Temporal Python SDK](https://assets.temporal.io/w/py.png)
 
-[![Python 3.10+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![PyPI](https://img.shields.io/pypi/v/temporalio.svg?style=for-the-badge)](https://pypi.org/project/temporalio)
 [![MIT](https://img.shields.io/pypi/l/temporalio.svg?style=for-the-badge)](LICENSE)
 
@@ -112,7 +112,7 @@ informal introduction to the features and their implementation.
       - [Metrics](#metrics)
       - [OpenTelemetry Tracing](#opentelemetry-tracing)
       - [OpenTelemetry Metrics](#opentelemetry-metrics)
-    - [Protobuf 3.x vs 4.x](#protobuf-3x-vs-4x)
+    - [Protobuf compatibility](#protobuf-compatibility)
     - [Known Compatibility Issues](#known-compatibility-issues)
       - [gevent Patching](#gevent-patching)
 - [Development](#development)
@@ -2027,17 +2027,12 @@ async with MetricsExporter(buffer, meter_provider):
 exported, since it works by draining the buffer on a fixed interval (`poll_interval`, default one second) -- per the
 warning on `MetricBuffer`, updates are dropped if the buffer isn't drained regularly.
 
-### Protobuf 3.x vs 4.x
+### Protobuf compatibility
 
-Python currently has two somewhat-incompatible protobuf library versions - the 3.x series and the 4.x series. Python
-currently recommends 4.x and that is the primary supported version. Some libraries like
-[Pulumi](https://github.com/pulumi/pulumi) require 4.x. Other libraries such as [ONNX](https://github.com/onnx/onnx) and
-[Streamlit](https://github.com/streamlit/streamlit), for one reason or another, have/will not leave 3.x.
-
-To support these, Temporal Python SDK allows any protobuf library >= 3.19. However, the C extension in older Python
-versions can cause issues with the sandbox due to global state sharing. Temporal strongly recommends using the latest
-protobuf 4.x library unless you absolutely cannot at which point some proto libraries may have to be marked as
-[Passthrough Modules](#passthrough-modules).
+The SDK requires `protobuf>=4.21.12,<8` and supports protobuf 4, 5, 6, and 7 runtimes.
+Its Python bindings are generated with `grpcio-tools` 1.49.1, which bundles
+protoc 3.21.6 (Python protobuf 4.21.6).
+The optional `grpc` extra requires `grpcio>=1.49.1,<2`.
 
 ### Known Compatibility Issues
 
@@ -2052,7 +2047,7 @@ users are encouraged to not use gevent in asyncio applications (including Tempor
 
 # Development
 
-The Python SDK is built to work with Python 3.10 and newer. It is built using
+The Python SDK supports Python 3.11 through 3.15. It is built using
 [SDK Core](https://github.com/temporalio/sdk-rust/) which is written in Rust.
 
 ### Building
@@ -2248,18 +2243,16 @@ poe test -s --log-cli-level=DEBUG -k test_sync_activity_thread_cancel_caught
 
 #### Proto Generation and Testing
 
-If you have docker available, run
+Generate protobuf code:
 
 ```
-poe gen-protos-docker
+poe gen-protos
 ```
 
-Alternatively: to generate protobuf code, you must be on Python <= 3.10, and then run `uv add
-"protobuf<4"` + `uv sync --all-extras`. Then the protobuf files can be generated via `poe
-gen-protos` followed by `poe format`. Do not commit `uv.lock` or `pyproject.toml` changes. To go
-back from this downgrade, restore both of those files and run `uv sync --all-extras`. Tests can be
-run for protobuf version 3 by setting the `TEMPORAL_TEST_PROTO3` env var to `1` prior to running
-tests.
+`uv` runs the protobuf compiler in an isolated Python 3.11 environment using the
+dependencies declared in `scripts/gen_protos.py` and locked in
+`scripts/gen_protos.py.lock`. It downloads Python if needed and leaves the SDK
+development environment unchanged.
 
 ### Style
 

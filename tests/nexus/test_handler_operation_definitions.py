@@ -5,7 +5,7 @@ and input/output types.
 
 import warnings
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, ClassVar
 
 import nexusrpc.handler
 import pytest
@@ -27,8 +27,8 @@ class Output:
 
 @dataclass
 class _TestCase:
-    Service: type[Any]
-    expected_operations: dict[str, nexusrpc.Operation]
+    Service: ClassVar[type[Any]]
+    expected_operations: ClassVar[dict[str, nexusrpc.Operation]]
 
 
 class NotCalled(_TestCase):

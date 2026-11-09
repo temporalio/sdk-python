@@ -32,7 +32,8 @@ document as a quick reference when submitting pull requests.
 * Avoid unqualified imports from `temporalio` packages except `temporalio.types`.
   Relative imports are acceptable for private packages.
 * Do not commit `uv.lock` or `pyproject.toml` changes created only for temporary
-  protobuf downgrade workflows. Prefer to use poe gen-protos-docker when possible.
+  protobuf downgrade workflows. Use `poe gen-protos` for generation; uv manages
+  its isolated tool environment.
 
 ## Repo Specific Utilities
 
@@ -46,9 +47,8 @@ document as a quick reference when submitting pull requests.
   * `poe update-core` - update the Core pin and import its changelog fragments.
   * `poe format` - run Ruff import sorting, Ruff formatting, and `cargo fmt` for
     the bridge.
-  * `poe gen-protos-docker` - regenerate protobuf-related files using Docker.
-  * `poe gen-protos` - regenerate protobuf-related files without Docker, with
-    the Python/protobuf constraints documented in `README.md`.
+  * `poe gen-protos` - regenerate protobuf-related files with a uv-managed tool
+    environment, as documented in `README.md`.
 
 ## Building and Testing
 
@@ -121,7 +121,7 @@ Reviewers will look for:
 
 ## Notes
 
-* The SDK supports Python 3.10 and newer.
+* The SDK supports Python 3.11 through 3.15.
 * Generated protobuf and bridge files have specific regeneration workflows; see
   `README.md` before changing them.
 * The Rust bridge uses SDK Core from `temporalio/bridge/sdk-core`.
@@ -131,7 +131,7 @@ Reviewers will look for:
   and generated fragments together; do not update the pin and defer its notes
   until release time. The Python task copies Core path dependency versions from the new checkout
   and refreshes the bridge lockfile; review both and check Rust API compatibility as needed.
-  If Core protobuf definitions changed, run `poe gen-protos-docker` and commit the
+  If Core protobuf definitions changed, run `poe gen-protos` and commit the
   regenerated bindings with the pin update.
 * `__pycache__`, `build`, `dist`, and Rust `target` outputs are generated
   artifacts and should not be reviewed as source changes.

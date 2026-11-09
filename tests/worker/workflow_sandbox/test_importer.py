@@ -1,6 +1,7 @@
 import dataclasses
 import importlib
 import importlib.machinery
+import select
 import subprocess
 import sys
 import textwrap
@@ -26,6 +27,15 @@ from temporalio.worker.workflow_sandbox._restrictions import (
 from .testmodules import restrictions
 
 
+@pytest.mark.parametrize("fromlist", [None, (), ("urlparse",)])
+def test_workflow_sandbox_importer_optional_fromlist(fromlist: tuple[str, ...] | None):
+    importer = Importer(SandboxRestrictions.default, RestrictionContext())
+    with importer.applied():
+        module = importer.import_func("urllib.parse", fromlist=fromlist)
+
+    assert module.__name__ == ("urllib.parse" if fromlist else "urllib")
+
+
 def test_workflow_sandbox_importer_path_in_place_division():
     context = RestrictionContext()
     context.is_runtime = True
@@ -39,6 +49,26 @@ def test_workflow_sandbox_importer_path_in_place_division():
         assert str(original) == "root"
         with pytest.raises(RestrictedWorkflowAccessError):
             path.exists()
+
+
+@pytest.mark.skipif(not hasattr(select, "kevent"), reason="Requires kqueue support")
+def test_workflow_sandbox_importer_subprocess_kqueue_probe():
+    context = RestrictionContext()
+    restrictions = dataclasses.replace(
+        SandboxRestrictions.default,
+        passthrough_modules=SandboxRestrictions.passthrough_modules_with_temporal,
+    )
+    with Importer(restrictions, context).applied():
+        import select as sandboxed_select
+        import subprocess as sandboxed_subprocess
+
+        kevent = getattr(sandboxed_select, "kevent")
+        assert type(kevent(1)) is kevent
+        context.is_runtime = True
+        with pytest.raises(RestrictedWorkflowAccessError):
+            getattr(sandboxed_select, "kqueue")()
+        with pytest.raises(RestrictedWorkflowAccessError):
+            sandboxed_subprocess.run(["unused"])
 
 
 @pytest.mark.parametrize(

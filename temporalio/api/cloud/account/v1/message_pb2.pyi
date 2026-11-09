@@ -22,6 +22,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class MetricsSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -36,14 +37,12 @@ class MetricsSpec(google.protobuf.message.Message):
         accepted_client_ca: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "accepted_client_ca", b"accepted_client_ca"
-        ],
+        self, field_name: typing.Literal["accepted_client_ca", b"accepted_client_ca"]
     ) -> None: ...
 
 global___MetricsSpec = MetricsSpec
 
+@typing.final
 class AccountSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -53,20 +52,20 @@ class AccountSpec(google.protobuf.message.Message):
         """The metrics specification for this account.
         If not specified, metrics will not be enabled.
         """
+
     def __init__(
         self,
         *,
         metrics: global___MetricsSpec | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["metrics", b"metrics"]
+        self, field_name: typing.Literal["metrics", b"metrics"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["metrics", b"metrics"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["metrics", b"metrics"]) -> None: ...
 
 global___AccountSpec = AccountSpec
 
+@typing.final
 class Metrics(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -80,12 +79,11 @@ class Metrics(google.protobuf.message.Message):
         *,
         uri: builtins.str = ...,
     ) -> None: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["uri", b"uri"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["uri", b"uri"]) -> None: ...
 
 global___Metrics = Metrics
 
+@typing.final
 class Account(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -97,9 +95,6 @@ class Account(google.protobuf.message.Message):
     METRICS_FIELD_NUMBER: builtins.int
     id: builtins.str
     """The id of the account."""
-    @property
-    def spec(self) -> global___AccountSpec:
-        """The account specification."""
     resource_version: builtins.str
     """The current version of the account specification.
     The next update operation will have to include this version.
@@ -109,8 +104,13 @@ class Account(google.protobuf.message.Message):
     async_operation_id: builtins.str
     """The id of the async operation that is updating the account, if any."""
     @property
+    def spec(self) -> global___AccountSpec:
+        """The account specification."""
+
+    @property
     def metrics(self) -> global___Metrics:
         """Information related to metrics."""
+
     def __init__(
         self,
         *,
@@ -122,12 +122,11 @@ class Account(google.protobuf.message.Message):
         metrics: global___Metrics | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal["metrics", b"metrics", "spec", b"spec"],
+        self, field_name: typing.Literal["metrics", b"metrics", "spec", b"spec"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "async_operation_id",
             b"async_operation_id",
             "id",
@@ -145,6 +144,7 @@ class Account(google.protobuf.message.Message):
 
 global___Account = Account
 
+@typing.final
 class AuditLogSinkSpec(google.protobuf.message.Message):
     """AuditLogSinkSpec is only used by Audit Log"""
 
@@ -156,14 +156,16 @@ class AuditLogSinkSpec(google.protobuf.message.Message):
     ENABLED_FIELD_NUMBER: builtins.int
     name: builtins.str
     """Name of the sink e.g. "audit_log_01" """
+    enabled: builtins.bool
+    """Enabled indicates whether the sink is enabled or not."""
     @property
     def kinesis_sink(self) -> temporalio.api.cloud.sink.v1.message_pb2.KinesisSpec:
         """The KinesisSpec when destination_type is Kinesis"""
+
     @property
     def pub_sub_sink(self) -> temporalio.api.cloud.sink.v1.message_pb2.PubSubSpec:
         """The PubSubSpec when destination_type is PubSub"""
-    enabled: builtins.bool
-    """Enabled indicates whether the sink is enabled or not."""
+
     def __init__(
         self,
         *,
@@ -174,7 +176,7 @@ class AuditLogSinkSpec(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "kinesis_sink",
             b"kinesis_sink",
             "pub_sub_sink",
@@ -185,7 +187,7 @@ class AuditLogSinkSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "enabled",
             b"enabled",
             "kinesis_sink",
@@ -199,11 +201,12 @@ class AuditLogSinkSpec(google.protobuf.message.Message):
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["sink_type", b"sink_type"]
-    ) -> typing_extensions.Literal["kinesis_sink", "pub_sub_sink"] | None: ...
+        self, oneof_group: typing.Literal["sink_type", b"sink_type"]
+    ) -> typing.Literal["kinesis_sink", "pub_sub_sink"] | None: ...
 
 global___AuditLogSinkSpec = AuditLogSinkSpec
 
+@typing.final
 class AuditLogSink(google.protobuf.message.Message):
     """AuditLogSink is only used by Audit Log"""
 
@@ -218,7 +221,7 @@ class AuditLogSink(google.protobuf.message.Message):
             AuditLogSink._Health.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         HEALTH_UNSPECIFIED: AuditLogSink._Health.ValueType  # 0
         HEALTH_OK: AuditLogSink._Health.ValueType  # 1
@@ -252,16 +255,18 @@ class AuditLogSink(google.protobuf.message.Message):
     """The version of the audit log sink resource."""
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     """The current state of the audit log sink."""
-    @property
-    def spec(self) -> global___AuditLogSinkSpec:
-        """The specification details of the audit log sink."""
     health: global___AuditLogSink.Health.ValueType
     """The health status of the audit log sink."""
     error_message: builtins.str
     """An error message describing any issues with the audit log sink, if applicable."""
     @property
+    def spec(self) -> global___AuditLogSinkSpec:
+        """The specification details of the audit log sink."""
+
+    @property
     def last_succeeded_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The last succeeded timestamp for the internal workflow responsible for adding data to the sink."""
+
     def __init__(
         self,
         *,
@@ -275,13 +280,13 @@ class AuditLogSink(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "last_succeeded_time", b"last_succeeded_time", "spec", b"spec"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "error_message",
             b"error_message",
             "health",

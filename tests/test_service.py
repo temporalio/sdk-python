@@ -7,6 +7,7 @@ from collections.abc import Callable, Mapping
 from datetime import timedelta
 from typing import Any
 
+import google.protobuf.descriptor_pb2
 import google.protobuf.empty_pb2
 import google.protobuf.message
 import google.protobuf.symbol_database
@@ -273,7 +274,9 @@ async def test_rpc_execution_not_unknown(client: Client):
     async def test_method(
         target_service_name: str, method_descriptor: MethodDescriptor
     ):
-        if method_descriptor.client_streaming or method_descriptor.server_streaming:
+        method_proto = google.protobuf.descriptor_pb2.MethodDescriptorProto()
+        method_descriptor.CopyToProto(method_proto)
+        if method_proto.client_streaming or method_proto.server_streaming:
             # skip streaming calls
             return
 

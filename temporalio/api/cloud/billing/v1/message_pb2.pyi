@@ -22,6 +22,7 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class BillingReportSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -34,7 +35,7 @@ class BillingReportSpec(google.protobuf.message.Message):
             BillingReportSpec._BillingReportGranularity.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         BILLING_REPORT_GRANULARITY_UNSPECIFIED: (
             BillingReportSpec._BillingReportGranularity.ValueType
@@ -70,17 +71,6 @@ class BillingReportSpec(google.protobuf.message.Message):
     DOWNLOAD_URL_EXPIRATION_DURATION_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     GRANULARITY_FIELD_NUMBER: builtins.int
-    @property
-    def start_time_inclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The start time of the billing report (in UTC)."""
-    @property
-    def end_time_exclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The end time of the billing report (in UTC)."""
-    @property
-    def download_url_expiration_duration(self) -> google.protobuf.duration_pb2.Duration:
-        """The duration after which the download url will expire.
-        Optional, default is 5 minutes and maximum is 1 hour.
-        """
     description: builtins.str
     """The description for the billing report.
     Optional, default is empty.
@@ -90,6 +80,20 @@ class BillingReportSpec(google.protobuf.message.Message):
     Optional, default is hourly.
     temporal:versioning:min_version=v0.16.0
     """
+    @property
+    def start_time_inclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The start time of the billing report (in UTC)."""
+
+    @property
+    def end_time_exclusive(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The end time of the billing report (in UTC)."""
+
+    @property
+    def download_url_expiration_duration(self) -> google.protobuf.duration_pb2.Duration:
+        """The duration after which the download url will expire.
+        Optional, default is 5 minutes and maximum is 1 hour.
+        """
+
     def __init__(
         self,
         *,
@@ -102,7 +106,7 @@ class BillingReportSpec(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "download_url_expiration_duration",
             b"download_url_expiration_duration",
             "end_time_exclusive",
@@ -113,7 +117,7 @@ class BillingReportSpec(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "description",
             b"description",
             "download_url_expiration_duration",
@@ -129,6 +133,7 @@ class BillingReportSpec(google.protobuf.message.Message):
 
 global___BillingReportSpec = BillingReportSpec
 
+@typing.final
 class BillingReport(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -141,7 +146,7 @@ class BillingReport(google.protobuf.message.Message):
             BillingReport._BillingReportState.ValueType
         ],
         builtins.type,
-    ):  # noqa: F821
+    ):
         DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
         BILLING_REPORT_STATE_UNSPECIFIED: (
             BillingReport._BillingReportState.ValueType
@@ -160,6 +165,7 @@ class BillingReport(google.protobuf.message.Message):
     BILLING_REPORT_STATE_GENERATED: BillingReport.BillingReportState.ValueType  # 2
     BILLING_REPORT_STATE_FAILED: BillingReport.BillingReportState.ValueType  # 3
 
+    @typing.final
     class Download(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -172,7 +178,7 @@ class BillingReport(google.protobuf.message.Message):
                 BillingReport.Download._FileFormat.ValueType
             ],
             builtins.type,
-        ):  # noqa: F821
+        ):
             DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
             FILE_FORMAT_UNSPECIFIED: BillingReport.Download._FileFormat.ValueType  # 0
             FILE_FORMAT_CSV: BillingReport.Download._FileFormat.ValueType  # 1
@@ -187,13 +193,14 @@ class BillingReport(google.protobuf.message.Message):
         FILE_SIZE_BYTES_FIELD_NUMBER: builtins.int
         url: builtins.str
         """The download url."""
-        @property
-        def url_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-            """The time when the download url will expire."""
         file_format: global___BillingReport.Download.FileFormat.ValueType
         """The file format of the billing report"""
         file_size_bytes: builtins.int
         """The size of the file in bytes. Useful for pre-allocating space, progress indicators, etc."""
+        @property
+        def url_expiration_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+            """The time when the download url will expire."""
+
         def __init__(
             self,
             *,
@@ -204,13 +211,11 @@ class BillingReport(google.protobuf.message.Message):
         ) -> None: ...
         def HasField(
             self,
-            field_name: typing_extensions.Literal[
-                "url_expiration_time", b"url_expiration_time"
-            ],
+            field_name: typing.Literal["url_expiration_time", b"url_expiration_time"],
         ) -> builtins.bool: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "file_format",
                 b"file_format",
                 "file_size_bytes",
@@ -233,9 +238,12 @@ class BillingReport(google.protobuf.message.Message):
     """The id of the billing report."""
     state: global___BillingReport.BillingReportState.ValueType
     """The current state of the billing report."""
+    async_operation_id: builtins.str
+    """The async operation id associated with the billing report generation."""
     @property
     def spec(self) -> global___BillingReportSpec:
         """The spec used to generate this billing report."""
+
     @property
     def download_info(
         self,
@@ -245,14 +253,15 @@ class BillingReport(google.protobuf.message.Message):
         """The download information for the billing report.
         For future-proofness this is repeated as we may return multiple files (e.g. csv+meta/json, split by size/date, etc.)
         """
+
     @property
     def requested_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the billing report was requested."""
+
     @property
     def generated_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """The date and time when the billing report generation completed."""
-    async_operation_id: builtins.str
-    """The async operation id associated with the billing report generation."""
+
     def __init__(
         self,
         *,
@@ -267,7 +276,7 @@ class BillingReport(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "generated_time",
             b"generated_time",
             "requested_time",
@@ -278,7 +287,7 @@ class BillingReport(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "async_operation_id",
             b"async_operation_id",
             "download_info",

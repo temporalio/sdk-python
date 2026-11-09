@@ -30,7 +30,7 @@ class _VersioningIntentEnumTypeWrapper(
         _VersioningIntent.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     UNSPECIFIED: _VersioningIntent.ValueType  # 0
     """Indicates that core should choose the most sensible default behavior for the type of
@@ -68,6 +68,7 @@ build ID.
 """
 global___VersioningIntent = VersioningIntent
 
+@typing.final
 class NamespacedWorkflowExecution(google.protobuf.message.Message):
     """Identifying information about a particular workflow execution, including namespace"""
 
@@ -91,7 +92,7 @@ class NamespacedWorkflowExecution(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "namespace",
             b"namespace",
             "run_id",
@@ -103,6 +104,7 @@ class NamespacedWorkflowExecution(google.protobuf.message.Message):
 
 global___NamespacedWorkflowExecution = NamespacedWorkflowExecution
 
+@typing.final
 class WorkerDeploymentVersion(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -118,13 +120,14 @@ class WorkerDeploymentVersion(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "build_id", b"build_id", "deployment_name", b"deployment_name"
         ],
     ) -> None: ...
 
 global___WorkerDeploymentVersion = WorkerDeploymentVersion
 
+@typing.final
 class ExternalStorageMetrics(google.protobuf.message.Message):
     """Metrics for a set of external payload storage operations (all uploads and downloads)
     performed while processing a task, so core can emit unified logging and metrics.
@@ -143,11 +146,13 @@ class ExternalStorageMetrics(google.protobuf.message.Message):
     @property
     def total_duration(self) -> google.protobuf.duration_pb2.Duration:
         """Wall-clock time spent on the external storage operations."""
+
     @property
     def driver_names(
         self,
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
         """Names of the drivers that participated in the operations."""
+
     def __init__(
         self,
         *,
@@ -157,11 +162,11 @@ class ExternalStorageMetrics(google.protobuf.message.Message):
         driver_names: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["total_duration", b"total_duration"]
+        self, field_name: typing.Literal["total_duration", b"total_duration"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "driver_names",
             b"driver_names",
             "payload_count",

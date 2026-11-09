@@ -26,7 +26,7 @@ class _ActivityExecutionStatusEnumTypeWrapper(
         _ActivityExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_EXECUTION_STATUS_UNSPECIFIED: _ActivityExecutionStatus.ValueType  # 0
     ACTIVITY_EXECUTION_STATUS_RUNNING: _ActivityExecutionStatus.ValueType  # 1
@@ -126,7 +126,7 @@ class _ActivityIdReusePolicyEnumTypeWrapper(
         _ActivityIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_ID_REUSE_POLICY_UNSPECIFIED: _ActivityIdReusePolicy.ValueType  # 0
     ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE: _ActivityIdReusePolicy.ValueType  # 1
@@ -175,7 +175,7 @@ class _ActivityIdConflictPolicyEnumTypeWrapper(
         _ActivityIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_ID_CONFLICT_POLICY_UNSPECIFIED: _ActivityIdConflictPolicy.ValueType  # 0
     ACTIVITY_ID_CONFLICT_POLICY_FAIL: _ActivityIdConflictPolicy.ValueType  # 1

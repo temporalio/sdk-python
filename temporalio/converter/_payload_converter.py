@@ -8,7 +8,6 @@ import dataclasses
 import functools
 import inspect
 import json
-import sys
 import typing
 import uuid
 import warnings
@@ -38,11 +37,6 @@ from typing_extensions import Self
 import temporalio.api.common.v1
 import temporalio.common
 import temporalio.types
-
-if sys.version_info < (3, 11):
-    # Python's datetime.fromisoformat doesn't support certain formats pre-3.11
-    from dateutil import parser  # type: ignore
-
 from temporalio.converter._serialization_context import (
     SerializationContext,
     WithSerializationContext,
@@ -801,16 +795,12 @@ class JSONPlainPayloadConverter(EncodingPayloadConverter):
 
 
 def _get_iso_datetime_parser() -> Callable[[str], datetime]:
-    """Isolates system version check and returns relevant datetime passer
+    """Return the ISO datetime parser.
 
     Returns:
         A callable to parse date strings into datetimes.
     """
-    if sys.version_info >= (3, 11):
-        return datetime.fromisoformat  # type:ignore[reportUnreachable] # noqa
-    else:
-        # Isolate import for py > 3.11, as dependency only installed for < 3.11
-        return parser.isoparse  # type:ignore[reportUnreachable]
+    return datetime.fromisoformat
 
 
 def value_to_type(

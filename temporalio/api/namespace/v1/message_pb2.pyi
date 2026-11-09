@@ -5,7 +5,7 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -15,16 +15,13 @@ import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.namespace_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class NamespaceInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -39,10 +36,10 @@ class NamespaceInfo(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
     class Capabilities(google.protobuf.message.Message):
         """Namespace capability details. Should contain what features are enabled in a namespace."""
 
@@ -127,7 +124,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "async_update",
                 b"async_update",
                 "eager_workflow_start",
@@ -165,6 +162,7 @@ class NamespaceInfo(google.protobuf.message.Message):
             ],
         ) -> None: ...
 
+    @typing.final
     class Limits(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -192,7 +190,7 @@ class NamespaceInfo(google.protobuf.message.Message):
         ) -> None: ...
         def ClearField(
             self,
-            field_name: typing_extensions.Literal[
+            field_name: typing.Literal[
                 "blob_size_limit_error",
                 b"blob_size_limit_error",
                 "memo_size_limit_error",
@@ -215,22 +213,25 @@ class NamespaceInfo(google.protobuf.message.Message):
     state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
     description: builtins.str
     owner_email: builtins.str
+    id: builtins.str
+    supports_schedules: builtins.bool
+    """Whether scheduled workflows are supported on this namespace. This is only needed
+    temporarily while the feature is experimental, so we can give it a high tag.
+    """
     @property
     def data(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """A key-value map for any customized purpose."""
-    id: builtins.str
+
     @property
     def capabilities(self) -> global___NamespaceInfo.Capabilities:
         """All capabilities the namespace supports."""
+
     @property
     def limits(self) -> global___NamespaceInfo.Limits:
         """Namespace configured limits"""
-    supports_schedules: builtins.bool
-    """Whether scheduled workflows are supported on this namespace. This is only needed
-    temporarily while the feature is experimental, so we can give it a high tag.
-    """
+
     def __init__(
         self,
         *,
@@ -246,13 +247,13 @@ class NamespaceInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "capabilities", b"capabilities", "limits", b"limits"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "capabilities",
             b"capabilities",
             "data",
@@ -276,9 +277,11 @@ class NamespaceInfo(google.protobuf.message.Message):
 
 global___NamespaceInfo = NamespaceInfo
 
+@typing.final
 class NamespaceConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class CustomSearchAttributeAliasesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -293,8 +296,7 @@ class NamespaceConfig(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     WORKFLOW_EXECUTION_RETENTION_TTL_FIELD_NUMBER: builtins.int
@@ -304,12 +306,6 @@ class NamespaceConfig(google.protobuf.message.Message):
     VISIBILITY_ARCHIVAL_STATE_FIELD_NUMBER: builtins.int
     VISIBILITY_ARCHIVAL_URI_FIELD_NUMBER: builtins.int
     CUSTOM_SEARCH_ATTRIBUTE_ALIASES_FIELD_NUMBER: builtins.int
-    @property
-    def workflow_execution_retention_ttl(
-        self,
-    ) -> google.protobuf.duration_pb2.Duration: ...
-    @property
-    def bad_binaries(self) -> global___BadBinaries: ...
     history_archival_state: (
         temporalio.api.enums.v1.namespace_pb2.ArchivalState.ValueType
     )
@@ -321,10 +317,17 @@ class NamespaceConfig(google.protobuf.message.Message):
     """If unspecified (ARCHIVAL_STATE_UNSPECIFIED) then default server configuration is used."""
     visibility_archival_uri: builtins.str
     @property
+    def workflow_execution_retention_ttl(
+        self,
+    ) -> google.protobuf.duration_pb2.Duration: ...
+    @property
+    def bad_binaries(self) -> global___BadBinaries: ...
+    @property
     def custom_search_attribute_aliases(
         self,
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.str]:
         """Map from field name to alias."""
+
     def __init__(
         self,
         *,
@@ -342,7 +345,7 @@ class NamespaceConfig(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "bad_binaries",
             b"bad_binaries",
             "workflow_execution_retention_ttl",
@@ -351,7 +354,7 @@ class NamespaceConfig(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "bad_binaries",
             b"bad_binaries",
             "custom_search_attribute_aliases",
@@ -371,9 +374,11 @@ class NamespaceConfig(google.protobuf.message.Message):
 
 global___NamespaceConfig = NamespaceConfig
 
+@typing.final
 class BadBinaries(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class BinariesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -389,11 +394,10 @@ class BadBinaries(google.protobuf.message.Message):
             value: global___BadBinaryInfo | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     BINARIES_FIELD_NUMBER: builtins.int
@@ -410,11 +414,12 @@ class BadBinaries(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["binaries", b"binaries"]
+        self, field_name: typing.Literal["binaries", b"binaries"]
     ) -> None: ...
 
 global___BadBinaries = BadBinaries
 
+@typing.final
 class BadBinaryInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -433,20 +438,22 @@ class BadBinaryInfo(google.protobuf.message.Message):
         create_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["create_time", b"create_time"]
+        self, field_name: typing.Literal["create_time", b"create_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time", b"create_time", "operator", b"operator", "reason", b"reason"
         ],
     ) -> None: ...
 
 global___BadBinaryInfo = BadBinaryInfo
 
+@typing.final
 class UpdateNamespaceInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class DataEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -461,8 +468,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
             value: builtins.str = ...,
         ) -> None: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     DESCRIPTION_FIELD_NUMBER: builtins.int
@@ -471,6 +477,13 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
     STATE_FIELD_NUMBER: builtins.int
     description: builtins.str
     owner_email: builtins.str
+    state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
+    """New namespace state, server will reject if transition is not allowed.
+    Allowed transitions are:
+     Registered -> [ Deleted | Deprecated | Handover ]
+     Handover -> [ Registered ]
+    Default is NAMESPACE_STATE_UNSPECIFIED which is do not change state.
+    """
     @property
     def data(
         self,
@@ -479,13 +492,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
         If data already exists on the namespace,
         this will merge with the existing key values.
         """
-    state: temporalio.api.enums.v1.namespace_pb2.NamespaceState.ValueType
-    """New namespace state, server will reject if transition is not allowed.
-    Allowed transitions are:
-     Registered -> [ Deleted | Deprecated | Handover ]
-     Handover -> [ Registered ]
-    Default is NAMESPACE_STATE_UNSPECIFIED which is do not change state.
-    """
+
     def __init__(
         self,
         *,
@@ -496,7 +503,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "data",
             b"data",
             "description",
@@ -510,6 +517,7 @@ class UpdateNamespaceInfo(google.protobuf.message.Message):
 
 global___UpdateNamespaceInfo = UpdateNamespaceInfo
 
+@typing.final
 class NamespaceFilter(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -525,8 +533,7 @@ class NamespaceFilter(google.protobuf.message.Message):
         include_deleted: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["include_deleted", b"include_deleted"],
+        self, field_name: typing.Literal["include_deleted", b"include_deleted"]
     ) -> None: ...
 
 global___NamespaceFilter = NamespaceFilter

@@ -5,10 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
-from google.protobuf.internal import enum_type_wrapper
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -21,51 +19,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n%temporal/sdk/core/common/common.proto\x12\x0e\x63oresdk.common\x1a\x1egoogle/protobuf/duration.proto"U\n\x1bNamespacedWorkflowExecution\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t"D\n\x17WorkerDeploymentVersion\x12\x17\n\x0f\x64\x65ployment_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t"\x92\x01\n\x16\x45xternalStorageMetrics\x12\x15\n\rpayload_count\x18\x01 \x01(\x04\x12\x18\n\x10total_size_bytes\x18\x02 \x01(\x04\x12\x31\n\x0etotal_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x14\n\x0c\x64river_names\x18\x04 \x03(\t*@\n\x10VersioningIntent\x12\x0f\n\x0bUNSPECIFIED\x10\x00\x12\x0e\n\nCOMPATIBLE\x10\x01\x12\x0b\n\x07\x44\x45\x46\x41ULT\x10\x02\x42,\xea\x02)Temporalio::Internal::Bridge::Api::Commonb\x06proto3'
 )
 
-_VERSIONINGINTENT = DESCRIPTOR.enum_types_by_name["VersioningIntent"]
-VersioningIntent = enum_type_wrapper.EnumTypeWrapper(_VERSIONINGINTENT)
-UNSPECIFIED = 0
-COMPATIBLE = 1
-DEFAULT = 2
-
-
-_NAMESPACEDWORKFLOWEXECUTION = DESCRIPTOR.message_types_by_name[
-    "NamespacedWorkflowExecution"
-]
-_WORKERDEPLOYMENTVERSION = DESCRIPTOR.message_types_by_name["WorkerDeploymentVersion"]
-_EXTERNALSTORAGEMETRICS = DESCRIPTOR.message_types_by_name["ExternalStorageMetrics"]
-NamespacedWorkflowExecution = _reflection.GeneratedProtocolMessageType(
-    "NamespacedWorkflowExecution",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _NAMESPACEDWORKFLOWEXECUTION,
-        "__module__": "temporal.sdk.core.common.common_pb2",
-        # @@protoc_insertion_point(class_scope:coresdk.common.NamespacedWorkflowExecution)
-    },
-)
-_sym_db.RegisterMessage(NamespacedWorkflowExecution)
-
-WorkerDeploymentVersion = _reflection.GeneratedProtocolMessageType(
-    "WorkerDeploymentVersion",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKERDEPLOYMENTVERSION,
-        "__module__": "temporal.sdk.core.common.common_pb2",
-        # @@protoc_insertion_point(class_scope:coresdk.common.WorkerDeploymentVersion)
-    },
-)
-_sym_db.RegisterMessage(WorkerDeploymentVersion)
-
-ExternalStorageMetrics = _reflection.GeneratedProtocolMessageType(
-    "ExternalStorageMetrics",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _EXTERNALSTORAGEMETRICS,
-        "__module__": "temporal.sdk.core.common.common_pb2",
-        # @@protoc_insertion_point(class_scope:coresdk.common.ExternalStorageMetrics)
-    },
-)
-_sym_db.RegisterMessage(ExternalStorageMetrics)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = (

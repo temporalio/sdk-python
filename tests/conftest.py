@@ -37,22 +37,6 @@ if os.getenv("TEMPORAL_INTEGRATION_TEST"):
         f"Expected {temporalio.__file__} to be in {sys.prefix}"
     )
 
-# Unless specifically overridden, we expect tests to run under protobuf 4.x/5.x/6.x/7.x lib
-import google.protobuf
-
-protobuf_version = google.protobuf.__version__
-if os.getenv("TEMPORAL_TEST_PROTO3"):
-    assert protobuf_version.startswith("3."), (
-        f"Expected protobuf 3.x, got {protobuf_version}"
-    )
-else:
-    assert (
-        protobuf_version.startswith("4.")
-        or protobuf_version.startswith("5.")
-        or protobuf_version.startswith("6.")
-        or protobuf_version.startswith("7.")
-    ), f"Expected protobuf 4.x/5.x/6.x/7.x, got {protobuf_version}"
-
 
 def pytest_runtest_setup(item):  # type: ignore[reportMissingParameterType]
     """Print a newline so that custom printed output starts on new line."""
@@ -75,7 +59,7 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
     )
 
 
-def _uses_envconfig_server(env_type: str) -> bool:
+def _uses_envconfig_server(env_type: str | None) -> bool:
     return env_type == "envconfig"
 
 
@@ -132,11 +116,13 @@ class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-d
     def new_event_loop(self):  # type: ignore[reportIncompatibleMethodOverride]
         return None
 
-    def get_child_watcher(self):
-        return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
+    if sys.version_info < (3, 14):
 
-    def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
-        return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
+        def get_child_watcher(self):
+            return self._underlying.get_child_watcher()  # type: ignore[reportDeprecated]
+
+        def set_child_watcher(self, watcher):  # type: ignore[reportMissingParameterType]
+            return self._underlying.set_child_watcher(watcher)  # type: ignore[reportDeprecated]
 
 
 @pytest.fixture(scope="session")

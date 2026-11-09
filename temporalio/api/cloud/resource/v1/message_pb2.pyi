@@ -26,7 +26,7 @@ class _ResourceStateEnumTypeWrapper(
         _ResourceState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_STATE_UNSPECIFIED: _ResourceState.ValueType  # 0
     RESOURCE_STATE_ACTIVATING: _ResourceState.ValueType  # 1

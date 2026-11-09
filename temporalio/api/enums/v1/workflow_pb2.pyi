@@ -26,7 +26,7 @@ class _WorkflowIdReusePolicyEnumTypeWrapper(
         _WorkflowIdReusePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_ID_REUSE_POLICY_UNSPECIFIED: _WorkflowIdReusePolicy.ValueType  # 0
     WORKFLOW_ID_REUSE_POLICY_ALLOW_DUPLICATE: _WorkflowIdReusePolicy.ValueType  # 1
@@ -91,7 +91,7 @@ class _WorkflowIdConflictPolicyEnumTypeWrapper(
         _WorkflowIdConflictPolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_ID_CONFLICT_POLICY_UNSPECIFIED: _WorkflowIdConflictPolicy.ValueType  # 0
     WORKFLOW_ID_CONFLICT_POLICY_FAIL: _WorkflowIdConflictPolicy.ValueType  # 1
@@ -130,7 +130,7 @@ class _ParentClosePolicyEnumTypeWrapper(
         _ParentClosePolicy.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PARENT_CLOSE_POLICY_UNSPECIFIED: _ParentClosePolicy.ValueType  # 0
     PARENT_CLOSE_POLICY_TERMINATE: _ParentClosePolicy.ValueType  # 1
@@ -163,7 +163,7 @@ class _ContinueAsNewInitiatorEnumTypeWrapper(
         _ContinueAsNewInitiator.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CONTINUE_AS_NEW_INITIATOR_UNSPECIFIED: _ContinueAsNewInitiator.ValueType  # 0
     CONTINUE_AS_NEW_INITIATOR_WORKFLOW: _ContinueAsNewInitiator.ValueType  # 1
@@ -195,7 +195,7 @@ class _WorkflowExecutionStatusEnumTypeWrapper(
         _WorkflowExecutionStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_EXECUTION_STATUS_UNSPECIFIED: _WorkflowExecutionStatus.ValueType  # 0
     WORKFLOW_EXECUTION_STATUS_RUNNING: _WorkflowExecutionStatus.ValueType  # 1
@@ -236,7 +236,7 @@ class _PendingActivityStateEnumTypeWrapper(
         _PendingActivityState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_ACTIVITY_STATE_UNSPECIFIED: _PendingActivityState.ValueType  # 0
     PENDING_ACTIVITY_STATE_SCHEDULED: _PendingActivityState.ValueType  # 1
@@ -270,7 +270,7 @@ class _PendingWorkflowTaskStateEnumTypeWrapper(
         _PendingWorkflowTaskState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_WORKFLOW_TASK_STATE_UNSPECIFIED: _PendingWorkflowTaskState.ValueType  # 0
     PENDING_WORKFLOW_TASK_STATE_SCHEDULED: _PendingWorkflowTaskState.ValueType  # 1
@@ -294,7 +294,7 @@ class _HistoryEventFilterTypeEnumTypeWrapper(
         _HistoryEventFilterType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     HISTORY_EVENT_FILTER_TYPE_UNSPECIFIED: _HistoryEventFilterType.ValueType  # 0
     HISTORY_EVENT_FILTER_TYPE_ALL_EVENT: _HistoryEventFilterType.ValueType  # 1
@@ -316,7 +316,7 @@ class _RetryState:
 class _RetryStateEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_RetryState.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RETRY_STATE_UNSPECIFIED: _RetryState.ValueType  # 0
     RETRY_STATE_IN_PROGRESS: _RetryState.ValueType  # 1
@@ -346,7 +346,7 @@ class _TimeoutType:
 class _TimeoutTypeEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_TimeoutType.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     TIMEOUT_TYPE_UNSPECIFIED: _TimeoutType.ValueType  # 0
     TIMEOUT_TYPE_START_TO_CLOSE: _TimeoutType.ValueType  # 1
@@ -372,7 +372,7 @@ class _VersioningBehaviorEnumTypeWrapper(
         _VersioningBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     VERSIONING_BEHAVIOR_UNSPECIFIED: _VersioningBehavior.ValueType  # 0
     """Workflow execution does not have a Versioning Behavior and is called Unversioned. This is the
@@ -487,7 +487,7 @@ class _ContinueAsNewVersioningBehaviorEnumTypeWrapper(
         _ContinueAsNewVersioningBehavior.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CONTINUE_AS_NEW_VERSIONING_BEHAVIOR_UNSPECIFIED: (
         _ContinueAsNewVersioningBehavior.ValueType
@@ -573,7 +573,7 @@ class _SuggestContinueAsNewReasonEnumTypeWrapper(
         _SuggestContinueAsNewReason.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SUGGEST_CONTINUE_AS_NEW_REASON_UNSPECIFIED: (
         _SuggestContinueAsNewReason.ValueType

@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -20,36 +19,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n!nexusannotations/v1/options.proto\x12\x13nexusannotations.v1\x1a google/protobuf/descriptor.proto".\n\x10OperationOptions\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04tags\x18\x02 \x03(\t",\n\x0eServiceOptions\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0c\n\x04tags\x18\x02 \x03(\t:Y\n\x07service\x12\x1f.google.protobuf.ServiceOptions\x18\xa9@ \x01(\x0b\x32#.nexusannotations.v1.ServiceOptions\x88\x01\x01:\\\n\toperation\x12\x1e.google.protobuf.MethodOptions\x18\xaa@ \x01(\x0b\x32%.nexusannotations.v1.OperationOptions\x88\x01\x01\x42\x45ZCgithub.com/nexus-rpc/nexus-proto-annotations/go/nexusannotations/v1b\x06proto3'
 )
 
-
-SERVICE_FIELD_NUMBER = 8233
-service = DESCRIPTOR.extensions_by_name["service"]
-OPERATION_FIELD_NUMBER = 8234
-operation = DESCRIPTOR.extensions_by_name["operation"]
-
-_OPERATIONOPTIONS = DESCRIPTOR.message_types_by_name["OperationOptions"]
-_SERVICEOPTIONS = DESCRIPTOR.message_types_by_name["ServiceOptions"]
-OperationOptions = _reflection.GeneratedProtocolMessageType(
-    "OperationOptions",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _OPERATIONOPTIONS,
-        "__module__": "temporalio.api.dependencies.nexusannotations.v1.options_pb2",
-        # @@protoc_insertion_point(class_scope:nexusannotations.v1.OperationOptions)
-    },
-)
-_sym_db.RegisterMessage(OperationOptions)
-
-ServiceOptions = _reflection.GeneratedProtocolMessageType(
-    "ServiceOptions",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _SERVICEOPTIONS,
-        "__module__": "temporalio.api.dependencies.nexusannotations.v1.options_pb2",
-        # @@protoc_insertion_point(class_scope:nexusannotations.v1.ServiceOptions)
-    },
-)
-_sym_db.RegisterMessage(ServiceOptions)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     google_dot_protobuf_dot_descriptor__pb2.ServiceOptions.RegisterExtension(service)
     google_dot_protobuf_dot_descriptor__pb2.MethodOptions.RegisterExtension(operation)

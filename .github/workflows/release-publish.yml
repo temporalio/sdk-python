@@ -20,29 +20,29 @@ jobs:
         include:
           - os: ubuntu-latest
             package-suffix: linux-amd64
-            cibw-build: cp310-manylinux_x86_64
+            cibw-build: cp311-manylinux_x86_64
           - os: ubuntu-arm
             package-suffix: linux-aarch64
-            cibw-build: cp310-manylinux_aarch64
+            cibw-build: cp311-manylinux_aarch64
             runsOn: ubuntu-24.04-arm64-2-core
           - os: ubuntu-latest
             package-suffix: linux-musl-amd64
-            cibw-build: cp310-musllinux_x86_64
+            cibw-build: cp311-musllinux_x86_64
           - os: ubuntu-arm
             package-suffix: linux-musl-aarch64
-            cibw-build: cp310-musllinux_aarch64
+            cibw-build: cp311-musllinux_aarch64
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-intel
             package-suffix: macos-amd64
-            cibw-build: cp310-macosx_x86_64
+            cibw-build: cp311-macosx_x86_64
             runsOn: macos-15-intel
           - os: macos-arm
             package-suffix: macos-aarch64
-            cibw-build: cp310-macosx_arm64
+            cibw-build: cp311-macosx_arm64
             runsOn: macos-15
           - os: windows-latest
             package-suffix: windows-amd64
-            cibw-build: cp310-win_amd64
+            cibw-build: cp311-win_amd64
     runs-on: ${{ matrix.runsOn || matrix.os }}
     permissions:
       contents: read

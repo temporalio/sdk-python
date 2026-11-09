@@ -25,13 +25,19 @@ try:
     import grpc
 
     from .service_pb2_grpc import (
+        TestService,  # type: ignore
         TestServiceServicer,
         TestServiceStub,
         add_TestServiceServicer_to_server,
     )
 
     __all__.extend(
-        ["TestServiceServicer", "TestServiceStub", "add_TestServiceServicer_to_server"]
+        [
+            "TestService",
+            "TestServiceServicer",
+            "TestServiceStub",
+            "add_TestServiceServicer_to_server",
+        ]
     )
 except ImportError:
     pass

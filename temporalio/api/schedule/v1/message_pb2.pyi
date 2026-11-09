@@ -9,7 +9,7 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
@@ -22,13 +22,9 @@ import temporalio.api.enums.v1.schedule_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.workflow.v1.message_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class CalendarSpec(google.protobuf.message.Message):
     """CalendarSpec describes an event specification relative to the calendar,
     similar to a traditional cron specification, but with labeled fields. Each
@@ -93,7 +89,7 @@ class CalendarSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "comment",
             b"comment",
             "day_of_month",
@@ -115,6 +111,7 @@ class CalendarSpec(google.protobuf.message.Message):
 
 global___CalendarSpec = CalendarSpec
 
+@typing.final
 class Range(google.protobuf.message.Message):
     """Range represents a set of integer values, used to match fields of a calendar
     time in StructuredCalendarSpec. If end < start, then end is interpreted as
@@ -142,13 +139,12 @@ class Range(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
-            "end", b"end", "start", b"start", "step", b"step"
-        ],
+        field_name: typing.Literal["end", b"end", "start", b"start", "step", b"step"],
     ) -> None: ...
 
 global___Range = Range
 
+@typing.final
 class StructuredCalendarSpec(google.protobuf.message.Message):
     """StructuredCalendarSpec describes an event specification relative to the
     calendar, in a form that's easy to work with programmatically. Each field can
@@ -171,6 +167,8 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
     YEAR_FIELD_NUMBER: builtins.int
     DAY_OF_WEEK_FIELD_NUMBER: builtins.int
     COMMENT_FIELD_NUMBER: builtins.int
+    comment: builtins.str
+    """Free-form comment describing the intention of this spec."""
     @property
     def second(
         self,
@@ -178,6 +176,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match seconds (0-59)"""
+
     @property
     def minute(
         self,
@@ -185,6 +184,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match minutes (0-59)"""
+
     @property
     def hour(
         self,
@@ -192,6 +192,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match hours (0-23)"""
+
     @property
     def day_of_month(
         self,
@@ -202,6 +203,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: standard name of field --)
         """
+
     @property
     def month(
         self,
@@ -209,6 +211,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match months (1-12)"""
+
     @property
     def year(
         self,
@@ -216,6 +219,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match years."""
+
     @property
     def day_of_week(
         self,
@@ -223,8 +227,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
         global___Range
     ]:
         """Match days of the week (0-6; 0 is Sunday)."""
-    comment: builtins.str
-    """Free-form comment describing the intention of this spec."""
+
     def __init__(
         self,
         *,
@@ -239,7 +242,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "comment",
             b"comment",
             "day_of_month",
@@ -261,6 +264,7 @@ class StructuredCalendarSpec(google.protobuf.message.Message):
 
 global___StructuredCalendarSpec = StructuredCalendarSpec
 
+@typing.final
 class IntervalSpec(google.protobuf.message.Message):
     """IntervalSpec matches times that can be expressed as:
     epoch + n * interval + phase
@@ -290,20 +294,15 @@ class IntervalSpec(google.protobuf.message.Message):
         phase: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self,
-        field_name: typing_extensions.Literal[
-            "interval", b"interval", "phase", b"phase"
-        ],
+        self, field_name: typing.Literal["interval", b"interval", "phase", b"phase"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal[
-            "interval", b"interval", "phase", b"phase"
-        ],
+        self, field_name: typing.Literal["interval", b"interval", "phase", b"phase"]
     ) -> None: ...
 
 global___IntervalSpec = IntervalSpec
 
+@typing.final
 class ScheduleSpec(google.protobuf.message.Message):
     """ScheduleSpec is a complete description of a set of absolute timestamps
     (possibly infinite) that an action should occur at. The meaning of a
@@ -338,80 +337,6 @@ class ScheduleSpec(google.protobuf.message.Message):
     JITTER_FIELD_NUMBER: builtins.int
     TIMEZONE_NAME_FIELD_NUMBER: builtins.int
     TIMEZONE_DATA_FIELD_NUMBER: builtins.int
-    @property
-    def structured_calendar(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___StructuredCalendarSpec
-    ]:
-        """Calendar-based specifications of times."""
-    @property
-    def cron_string(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
-        """cron_string holds a traditional cron specification as a string. It
-        accepts 5, 6, or 7 fields, separated by spaces, and interprets them the
-        same way as CalendarSpec.
-        5 fields:         minute, hour, day_of_month, month, day_of_week
-        6 fields:         minute, hour, day_of_month, month, day_of_week, year
-        7 fields: second, minute, hour, day_of_month, month, day_of_week, year
-        If year is not given, it defaults to *. If second is not given, it
-        defaults to 0.
-        Shorthands @yearly, @monthly, @weekly, @daily, and @hourly are also
-        accepted instead of the 5-7 time fields.
-        Optionally, the string can be preceded by CRON_TZ=<timezone name> or
-        TZ=<timezone name>, which will get copied to timezone_name. (There must
-        not also be a timezone_name present.)
-        Optionally "#" followed by a comment can appear at the end of the string.
-        Note that the special case that some cron implementations have for
-        treating day_of_month and day_of_week as "or" instead of "and" when both
-        are set is not implemented.
-        @every <interval>[/<phase>] is accepted and gets compiled into an
-        IntervalSpec instead. <interval> and <phase> should be a decimal integer
-        with a unit suffix s, m, h, or d.
-        """
-    @property
-    def calendar(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___CalendarSpec
-    ]:
-        """Calendar-based specifications of times."""
-    @property
-    def interval(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___IntervalSpec
-    ]:
-        """Interval-based specifications of times."""
-    @property
-    def exclude_calendar(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___CalendarSpec
-    ]:
-        """Any timestamps matching any of exclude_* will be skipped.
-        Deprecated. Use exclude_structured_calendar.
-        """
-    @property
-    def exclude_structured_calendar(
-        self,
-    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
-        global___StructuredCalendarSpec
-    ]: ...
-    @property
-    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """If start_time is set, any timestamps before start_time will be skipped.
-        (Together, start_time and end_time make an inclusive interval.)
-        """
-    @property
-    def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """If end_time is set, any timestamps after end_time will be skipped."""
-    @property
-    def jitter(self) -> google.protobuf.duration_pb2.Duration:
-        """All timestamps will be incremented by a random value from 0 to this
-        amount of jitter. Default: 0
-        """
     timezone_name: builtins.str
     """Time zone to interpret all calendar-based specs in.
 
@@ -437,6 +362,88 @@ class ScheduleSpec(google.protobuf.message.Message):
     Also note that no actions are taken on leap-seconds (e.g. 23:59:60 UTC).
     """
     timezone_data: builtins.bytes
+    @property
+    def structured_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StructuredCalendarSpec
+    ]:
+        """Calendar-based specifications of times."""
+
+    @property
+    def cron_string(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """cron_string holds a traditional cron specification as a string. It
+        accepts 5, 6, or 7 fields, separated by spaces, and interprets them the
+        same way as CalendarSpec.
+        5 fields:         minute, hour, day_of_month, month, day_of_week
+        6 fields:         minute, hour, day_of_month, month, day_of_week, year
+        7 fields: second, minute, hour, day_of_month, month, day_of_week, year
+        If year is not given, it defaults to *. If second is not given, it
+        defaults to 0.
+        Shorthands @yearly, @monthly, @weekly, @daily, and @hourly are also
+        accepted instead of the 5-7 time fields.
+        Optionally, the string can be preceded by CRON_TZ=<timezone name> or
+        TZ=<timezone name>, which will get copied to timezone_name. (There must
+        not also be a timezone_name present.)
+        Optionally "#" followed by a comment can appear at the end of the string.
+        Note that the special case that some cron implementations have for
+        treating day_of_month and day_of_week as "or" instead of "and" when both
+        are set is not implemented.
+        @every <interval>[/<phase>] is accepted and gets compiled into an
+        IntervalSpec instead. <interval> and <phase> should be a decimal integer
+        with a unit suffix s, m, h, or d.
+        """
+
+    @property
+    def calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CalendarSpec
+    ]:
+        """Calendar-based specifications of times."""
+
+    @property
+    def interval(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___IntervalSpec
+    ]:
+        """Interval-based specifications of times."""
+
+    @property
+    def exclude_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___CalendarSpec
+    ]:
+        """Any timestamps matching any of exclude_* will be skipped.
+        Deprecated. Use exclude_structured_calendar.
+        """
+
+    @property
+    def exclude_structured_calendar(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StructuredCalendarSpec
+    ]: ...
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """If start_time is set, any timestamps before start_time will be skipped.
+        (Together, start_time and end_time make an inclusive interval.)
+        """
+
+    @property
+    def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """If end_time is set, any timestamps after end_time will be skipped."""
+
+    @property
+    def jitter(self) -> google.protobuf.duration_pb2.Duration:
+        """All timestamps will be incremented by a random value from 0 to this
+        amount of jitter. Default: 0
+        """
+
     def __init__(
         self,
         *,
@@ -458,13 +465,13 @@ class ScheduleSpec(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "end_time", b"end_time", "jitter", b"jitter", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "calendar",
             b"calendar",
             "cron_string",
@@ -492,6 +499,7 @@ class ScheduleSpec(google.protobuf.message.Message):
 
 global___ScheduleSpec = ScheduleSpec
 
+@typing.final
 class SchedulePolicies(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -505,14 +513,6 @@ class SchedulePolicies(google.protobuf.message.Message):
     and some changes might produce unintuitive results. In general, the later
     policy overrides the earlier policy.
     """
-    @property
-    def catchup_window(self) -> google.protobuf.duration_pb2.Duration:
-        """Policy for catchups:
-        If the Temporal server misses an action due to one or more components
-        being down, and comes back up, the action will be run if the scheduled
-        time is within this window from the current time.
-        This value defaults to one year, and can't be less than 10 seconds.
-        """
     pause_on_failure: builtins.bool
     """If true, and a workflow run fails or times out, turn on "paused".
     This applies after retry policies: the full chain of retries must fail to
@@ -522,6 +522,15 @@ class SchedulePolicies(google.protobuf.message.Message):
     """If true, and the action would start a workflow, a timestamp will not be
     appended to the scheduled workflow id.
     """
+    @property
+    def catchup_window(self) -> google.protobuf.duration_pb2.Duration:
+        """Policy for catchups:
+        If the Temporal server misses an action due to one or more components
+        being down, and comes back up, the action will be run if the scheduled
+        time is within this window from the current time.
+        This value defaults to one year, and can't be less than 10 seconds.
+        """
+
     def __init__(
         self,
         *,
@@ -531,11 +540,11 @@ class SchedulePolicies(google.protobuf.message.Message):
         keep_original_workflow_id: builtins.bool = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["catchup_window", b"catchup_window"]
+        self, field_name: typing.Literal["catchup_window", b"catchup_window"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "catchup_window",
             b"catchup_window",
             "keep_original_workflow_id",
@@ -549,6 +558,7 @@ class SchedulePolicies(google.protobuf.message.Message):
 
 global___SchedulePolicies = SchedulePolicies
 
+@typing.final
 class ScheduleAction(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -563,6 +573,7 @@ class ScheduleAction(google.protobuf.message.Message):
         The workflow id of the started workflow may not match this exactly,
         it may have a timestamp appended for uniqueness.
         """
+
     def __init__(
         self,
         *,
@@ -571,22 +582,23 @@ class ScheduleAction(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "action", b"action", "start_workflow", b"start_workflow"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "action", b"action", "start_workflow", b"start_workflow"
         ],
     ) -> None: ...
     def WhichOneof(
-        self, oneof_group: typing_extensions.Literal["action", b"action"]
-    ) -> typing_extensions.Literal["start_workflow"] | None: ...
+        self, oneof_group: typing.Literal["action", b"action"]
+    ) -> typing.Literal["start_workflow"] | None: ...
 
 global___ScheduleAction = ScheduleAction
 
+@typing.final
 class ScheduleActionResult(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -594,23 +606,26 @@ class ScheduleActionResult(google.protobuf.message.Message):
     ACTUAL_TIME_FIELD_NUMBER: builtins.int
     START_WORKFLOW_RESULT_FIELD_NUMBER: builtins.int
     START_WORKFLOW_STATUS_FIELD_NUMBER: builtins.int
-    @property
-    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time that the action was taken (according to the schedule, including jitter)."""
-    @property
-    def actual_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Time that the action was taken (real time)."""
-    @property
-    def start_workflow_result(
-        self,
-    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
-        """If action was start_workflow:"""
     start_workflow_status: (
         temporalio.api.enums.v1.workflow_pb2.WorkflowExecutionStatus.ValueType
     )
     """If the action was start_workflow, this field will reflect an
     eventually-consistent view of the started workflow's status.
     """
+    @property
+    def schedule_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time that the action was taken (according to the schedule, including jitter)."""
+
+    @property
+    def actual_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Time that the action was taken (real time)."""
+
+    @property
+    def start_workflow_result(
+        self,
+    ) -> temporalio.api.common.v1.message_pb2.WorkflowExecution:
+        """If action was start_workflow:"""
+
     def __init__(
         self,
         *,
@@ -622,7 +637,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "actual_time",
             b"actual_time",
             "schedule_time",
@@ -633,7 +648,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "actual_time",
             b"actual_time",
             "schedule_time",
@@ -647,6 +662,7 @@ class ScheduleActionResult(google.protobuf.message.Message):
 
 global___ScheduleActionResult = ScheduleActionResult
 
+@typing.final
 class ScheduleState(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -681,7 +697,7 @@ class ScheduleState(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "limited_actions",
             b"limited_actions",
             "notes",
@@ -695,6 +711,7 @@ class ScheduleState(google.protobuf.message.Message):
 
 global___ScheduleState = ScheduleState
 
+@typing.final
 class TriggerImmediatelyRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -707,6 +724,7 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
         """Timestamp used for the identity of the target workflow.
         If not set the default value is the current time.
         """
+
     def __init__(
         self,
         *,
@@ -714,23 +732,26 @@ class TriggerImmediatelyRequest(google.protobuf.message.Message):
         scheduled_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["scheduled_time", b"scheduled_time"]
+        self, field_name: typing.Literal["scheduled_time", b"scheduled_time"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "overlap_policy", b"overlap_policy", "scheduled_time", b"scheduled_time"
         ],
     ) -> None: ...
 
 global___TriggerImmediatelyRequest = TriggerImmediatelyRequest
 
+@typing.final
 class BackfillRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     START_TIME_FIELD_NUMBER: builtins.int
     END_TIME_FIELD_NUMBER: builtins.int
     OVERLAP_POLICY_FIELD_NUMBER: builtins.int
+    overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
+    """If set, override overlap policy for this request."""
     @property
     def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Time range to evaluate schedule in. Currently, this time range is
@@ -740,10 +761,9 @@ class BackfillRequest(google.protobuf.message.Message):
         nominally scheduled in the interval but with jitter that pushes it after
         end_time will not be included.
         """
+
     @property
     def end_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    overlap_policy: temporalio.api.enums.v1.schedule_pb2.ScheduleOverlapPolicy.ValueType
-    """If set, override overlap policy for this request."""
     def __init__(
         self,
         *,
@@ -753,13 +773,13 @@ class BackfillRequest(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "end_time", b"end_time", "start_time", b"start_time"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "end_time",
             b"end_time",
             "overlap_policy",
@@ -771,6 +791,7 @@ class BackfillRequest(google.protobuf.message.Message):
 
 global___BackfillRequest = BackfillRequest
 
+@typing.final
 class SchedulePatch(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -779,9 +800,15 @@ class SchedulePatch(google.protobuf.message.Message):
     PAUSE_FIELD_NUMBER: builtins.int
     UNPAUSE_FIELD_NUMBER: builtins.int
     TIME_SKIPPING_CONFIG_FIELD_NUMBER: builtins.int
+    pause: builtins.str
+    """If set, change the state to paused or unpaused (respectively) and set the
+    notes field to the value of the string.
+    """
+    unpause: builtins.str
     @property
     def trigger_immediately(self) -> global___TriggerImmediatelyRequest:
         """If set, trigger one action immediately."""
+
     @property
     def backfill_request(
         self,
@@ -792,11 +819,7 @@ class SchedulePatch(google.protobuf.message.Message):
         passed by right now, all at once. The overlap policy can be overridden for the
         scope of the backfill.
         """
-    pause: builtins.str
-    """If set, change the state to paused or unpaused (respectively) and set the
-    notes field to the value of the string.
-    """
-    unpause: builtins.str
+
     @property
     def time_skipping_config(
         self,
@@ -804,6 +827,7 @@ class SchedulePatch(google.protobuf.message.Message):
         """If set, applies the specified time-skipping configuration to this schedule,
         replacing any existing time-skipping configuration.
         """
+
     def __init__(
         self,
         *,
@@ -817,7 +841,7 @@ class SchedulePatch(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "time_skipping_config",
             b"time_skipping_config",
             "trigger_immediately",
@@ -826,7 +850,7 @@ class SchedulePatch(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "backfill_request",
             b"backfill_request",
             "pause",
@@ -842,6 +866,7 @@ class SchedulePatch(google.protobuf.message.Message):
 
 global___SchedulePatch = SchedulePatch
 
+@typing.final
 class ScheduleInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -871,6 +896,10 @@ class ScheduleInfo(google.protobuf.message.Message):
     be immediately triggered (due to the overlap policy). These actions can be a result of
     the normal schedule or a backfill.
     """
+    invalid_schedule_error: builtins.str
+    """Deprecated."""
+    state_size_bytes: builtins.int
+    """Size of the schedule's internal state (including payloads) in bytes."""
     @property
     def running_workflows(
         self,
@@ -883,6 +912,7 @@ class ScheduleInfo(google.protobuf.message.Message):
         started by the schedule. If the workflows retried, did continue-as-new,
         or were reset, they might still be running but with a different run_id.
         """
+
     @property
     def recent_actions(
         self,
@@ -890,6 +920,7 @@ class ScheduleInfo(google.protobuf.message.Message):
         global___ScheduleActionResult
     ]:
         """Most recent ten actual action times (including manual triggers)."""
+
     @property
     def future_action_times(
         self,
@@ -897,15 +928,13 @@ class ScheduleInfo(google.protobuf.message.Message):
         google.protobuf.timestamp_pb2.Timestamp
     ]:
         """Next ten scheduled action times."""
+
     @property
     def create_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
         """Timestamps of schedule creation and last update."""
+
     @property
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
-    invalid_schedule_error: builtins.str
-    """Deprecated."""
-    state_size_bytes: builtins.int
-    """Size of the schedule's internal state (including payloads) in bytes."""
     @property
     def time_skipping_info(
         self,
@@ -913,6 +942,7 @@ class ScheduleInfo(google.protobuf.message.Message):
         """Information about time skipping for this schedule.
         If the schedule has never enabled time skipping, this will be unset.
         """
+
     def __init__(
         self,
         *,
@@ -940,7 +970,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "create_time",
             b"create_time",
             "time_skipping_info",
@@ -951,7 +981,7 @@ class ScheduleInfo(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "action_count",
             b"action_count",
             "buffer_dropped",
@@ -983,6 +1013,7 @@ class ScheduleInfo(google.protobuf.message.Message):
 
 global___ScheduleInfo = ScheduleInfo
 
+@typing.final
 class Schedule(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1008,7 +1039,7 @@ class Schedule(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "action",
             b"action",
             "policies",
@@ -1021,7 +1052,7 @@ class Schedule(google.protobuf.message.Message):
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "action",
             b"action",
             "policies",
@@ -1035,6 +1066,7 @@ class Schedule(google.protobuf.message.Message):
 
 global___Schedule = Schedule
 
+@typing.final
 class ScheduleListInfo(google.protobuf.message.Message):
     """ScheduleListInfo is an abbreviated set of values from Schedule and ScheduleInfo
     that's returned in ListSchedules.
@@ -1049,20 +1081,24 @@ class ScheduleListInfo(google.protobuf.message.Message):
     RECENT_ACTIONS_FIELD_NUMBER: builtins.int
     FUTURE_ACTION_TIMES_FIELD_NUMBER: builtins.int
     STATE_SIZE_BYTES_FIELD_NUMBER: builtins.int
+    notes: builtins.str
+    """From state:"""
+    paused: builtins.bool
+    state_size_bytes: builtins.int
+    """Size of the schedule's internal state (including payloads) in bytes."""
     @property
     def spec(self) -> global___ScheduleSpec:
         """From spec:
         Some fields are dropped from this copy of spec: timezone_data
         """
+
     @property
     def workflow_type(self) -> temporalio.api.common.v1.message_pb2.WorkflowType:
         """From action:
         Action is a oneof field, but we need to encode this in JSON and oneof fields don't work
         well with JSON. If action is start_workflow, this is set:
         """
-    notes: builtins.str
-    """From state:"""
-    paused: builtins.bool
+
     @property
     def recent_actions(
         self,
@@ -1070,14 +1106,13 @@ class ScheduleListInfo(google.protobuf.message.Message):
         global___ScheduleActionResult
     ]:
         """From info (maybe fewer entries):"""
+
     @property
     def future_action_times(
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         google.protobuf.timestamp_pb2.Timestamp
     ]: ...
-    state_size_bytes: builtins.int
-    """Size of the schedule's internal state (including payloads) in bytes."""
     def __init__(
         self,
         *,
@@ -1095,13 +1130,11 @@ class ScheduleListInfo(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
-            "spec", b"spec", "workflow_type", b"workflow_type"
-        ],
+        field_name: typing.Literal["spec", b"spec", "workflow_type", b"workflow_type"],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "future_action_times",
             b"future_action_times",
             "notes",
@@ -1121,6 +1154,7 @@ class ScheduleListInfo(google.protobuf.message.Message):
 
 global___ScheduleListInfo = ScheduleListInfo
 
+@typing.final
 class ScheduleListEntry(google.protobuf.message.Message):
     """ScheduleListEntry is returned by ListSchedules."""
 
@@ -1150,13 +1184,13 @@ class ScheduleListEntry(google.protobuf.message.Message):
     ) -> None: ...
     def HasField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "info", b"info", "memo", b"memo", "search_attributes", b"search_attributes"
         ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "info",
             b"info",
             "memo",

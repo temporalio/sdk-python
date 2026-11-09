@@ -25,20 +25,16 @@ THE SOFTWARE.
 """
 
 import builtins
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class LockTimeSkippingRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -48,6 +44,7 @@ class LockTimeSkippingRequest(google.protobuf.message.Message):
 
 global___LockTimeSkippingRequest = LockTimeSkippingRequest
 
+@typing.final
 class LockTimeSkippingResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -57,6 +54,7 @@ class LockTimeSkippingResponse(google.protobuf.message.Message):
 
 global___LockTimeSkippingResponse = LockTimeSkippingResponse
 
+@typing.final
 class UnlockTimeSkippingRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -66,6 +64,7 @@ class UnlockTimeSkippingRequest(google.protobuf.message.Message):
 
 global___UnlockTimeSkippingRequest = UnlockTimeSkippingRequest
 
+@typing.final
 class UnlockTimeSkippingResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -75,6 +74,7 @@ class UnlockTimeSkippingResponse(google.protobuf.message.Message):
 
 global___UnlockTimeSkippingResponse = UnlockTimeSkippingResponse
 
+@typing.final
 class SleepUntilRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -87,14 +87,15 @@ class SleepUntilRequest(google.protobuf.message.Message):
         timestamp: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+        self, field_name: typing.Literal["timestamp", b"timestamp"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["timestamp", b"timestamp"]
+        self, field_name: typing.Literal["timestamp", b"timestamp"]
     ) -> None: ...
 
 global___SleepUntilRequest = SleepUntilRequest
 
+@typing.final
 class SleepRequest(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -107,14 +108,15 @@ class SleepRequest(google.protobuf.message.Message):
         duration: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["duration", b"duration"]
+        self, field_name: typing.Literal["duration", b"duration"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["duration", b"duration"]
+        self, field_name: typing.Literal["duration", b"duration"]
     ) -> None: ...
 
 global___SleepRequest = SleepRequest
 
+@typing.final
 class SleepResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -124,6 +126,7 @@ class SleepResponse(google.protobuf.message.Message):
 
 global___SleepResponse = SleepResponse
 
+@typing.final
 class GetCurrentTimeResponse(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -136,10 +139,8 @@ class GetCurrentTimeResponse(google.protobuf.message.Message):
         time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing_extensions.Literal["time", b"time"]
+        self, field_name: typing.Literal["time", b"time"]
     ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing_extensions.Literal["time", b"time"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["time", b"time"]) -> None: ...
 
 global___GetCurrentTimeResponse = GetCurrentTimeResponse

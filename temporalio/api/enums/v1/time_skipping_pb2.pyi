@@ -26,7 +26,7 @@ class _FastForwardPollingResultEnumTypeWrapper(
         _FastForwardPollingResult.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     FAST_FORWARD_POLLING_RESULT_UNSPECIFIED: _FastForwardPollingResult.ValueType  # 0
     """Never returned; guards against an unset result."""

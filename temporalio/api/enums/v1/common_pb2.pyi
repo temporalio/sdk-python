@@ -26,7 +26,7 @@ class _EncodingTypeEnumTypeWrapper(
         _EncodingType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ENCODING_TYPE_UNSPECIFIED: _EncodingType.ValueType  # 0
     ENCODING_TYPE_PROTO3: _EncodingType.ValueType  # 1
@@ -48,7 +48,7 @@ class _IndexedValueTypeEnumTypeWrapper(
         _IndexedValueType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     INDEXED_VALUE_TYPE_UNSPECIFIED: _IndexedValueType.ValueType  # 0
     INDEXED_VALUE_TYPE_TEXT: _IndexedValueType.ValueType  # 1
@@ -80,7 +80,7 @@ class _Severity:
 class _SeverityEnumTypeWrapper(
     google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[_Severity.ValueType],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SEVERITY_UNSPECIFIED: _Severity.ValueType  # 0
     SEVERITY_HIGH: _Severity.ValueType  # 1
@@ -104,7 +104,7 @@ class _CallbackStateEnumTypeWrapper(
         _CallbackState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CALLBACK_STATE_UNSPECIFIED: _CallbackState.ValueType  # 0
     """Default value, unspecified state."""
@@ -149,7 +149,7 @@ class _PendingNexusOperationStateEnumTypeWrapper(
         _PendingNexusOperationState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     PENDING_NEXUS_OPERATION_STATE_UNSPECIFIED: (
         _PendingNexusOperationState.ValueType
@@ -192,7 +192,7 @@ class _NexusOperationCancellationStateEnumTypeWrapper(
         _NexusOperationCancellationState.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     NEXUS_OPERATION_CANCELLATION_STATE_UNSPECIFIED: (
         _NexusOperationCancellationState.ValueType
@@ -268,7 +268,7 @@ class _WorkflowRuleActionScopeEnumTypeWrapper(
         _WorkflowRuleActionScope.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_RULE_ACTION_SCOPE_UNSPECIFIED: _WorkflowRuleActionScope.ValueType  # 0
     """Default value, unspecified scope."""
@@ -298,7 +298,7 @@ class _ApplicationErrorCategoryEnumTypeWrapper(
         _ApplicationErrorCategory.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     APPLICATION_ERROR_CATEGORY_UNSPECIFIED: _ApplicationErrorCategory.ValueType  # 0
     APPLICATION_ERROR_CATEGORY_BENIGN: _ApplicationErrorCategory.ValueType  # 1
@@ -322,7 +322,7 @@ class _WorkerStatusEnumTypeWrapper(
         _WorkerStatus.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKER_STATUS_UNSPECIFIED: _WorkerStatus.ValueType  # 0
     WORKER_STATUS_RUNNING: _WorkerStatus.ValueType  # 1
@@ -349,7 +349,7 @@ class _ExecutionTypeEnumTypeWrapper(
         _ExecutionType.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     EXECUTION_TYPE_UNSPECIFIED: _ExecutionType.ValueType  # 0
     EXECUTION_TYPE_WORKFLOW: _ExecutionType.ValueType  # 1

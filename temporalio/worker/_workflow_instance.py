@@ -9,7 +9,6 @@ import inspect
 import json
 import logging
 import random
-import sys
 import threading
 import traceback
 import warnings
@@ -2432,13 +2431,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
                 apply_cancel(err)
 
-                # Clear the cancellation counter on Python 3.11+ so the next
-                # await does not immediately re-raise CancelledError.
-                if (
-                    sys.version_info >= (3, 11)
-                    and (task := asyncio.current_task()) is not None
-                ):
-                    task.uncancel()  # type: ignore[union-attr]
+                # Clear the cancellation counter so the next await does not
+                # immediately re-raise CancelledError.
+                if (task := asyncio.current_task()) is not None:
+                    task.uncancel()
 
                 if reraise_on_workflow_cancellation and (
                     self._cancel_reason is not None or self._deleting
@@ -3201,14 +3197,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         *,
         name: str | None = None,
         context: contextvars.Context | None = None,
-        # Accepted for Python 3.14 signature compatibility; ignored
         eager_start: bool | None = None,
     ) -> asyncio.Task[_T]:
-        # Context only supported on newer Python versions
-        if sys.version_info >= (3, 11):
-            task = asyncio.Task(coro, loop=self, context=context)  # type: ignore
-        else:
-            task = asyncio.Task(coro, loop=self)  # type: ignore
+        if eager_start:
+            # Eager execution would bypass the workflow's deterministic task queue.
+            raise NotImplementedError(
+                "Eager task execution is not supported in workflows"
+            )
+        task = asyncio.Task(coro, loop=self, context=context)  # type: ignore
         self._register_task(task, name=name)
         return task
 

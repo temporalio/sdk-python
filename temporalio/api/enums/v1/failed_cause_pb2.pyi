@@ -26,7 +26,7 @@ class _WorkflowTaskFailedCauseEnumTypeWrapper(
         _WorkflowTaskFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     WORKFLOW_TASK_FAILED_CAUSE_UNSPECIFIED: _WorkflowTaskFailedCause.ValueType  # 0
     WORKFLOW_TASK_FAILED_CAUSE_UNHANDLED_COMMAND: (
@@ -357,7 +357,7 @@ class _ActivityTaskFailedCauseEnumTypeWrapper(
         _ActivityTaskFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     ACTIVITY_TASK_FAILED_CAUSE_UNSPECIFIED: _ActivityTaskFailedCause.ValueType  # 0
     ACTIVITY_TASK_FAILED_CAUSE_PAYLOADS_TOO_LARGE: (
@@ -420,7 +420,7 @@ class _StartChildWorkflowExecutionFailedCauseEnumTypeWrapper(
         _StartChildWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     START_CHILD_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _StartChildWorkflowExecutionFailedCause.ValueType
@@ -463,7 +463,7 @@ class _CancelExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
         _CancelExternalWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     CANCEL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _CancelExternalWorkflowExecutionFailedCause.ValueType
@@ -500,7 +500,7 @@ class _SignalExternalWorkflowExecutionFailedCauseEnumTypeWrapper(
         _SignalExternalWorkflowExecutionFailedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     SIGNAL_EXTERNAL_WORKFLOW_EXECUTION_FAILED_CAUSE_UNSPECIFIED: (
         _SignalExternalWorkflowExecutionFailedCause.ValueType
@@ -545,7 +545,7 @@ class _ResourceExhaustedCauseEnumTypeWrapper(
         _ResourceExhaustedCause.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_EXHAUSTED_CAUSE_UNSPECIFIED: _ResourceExhaustedCause.ValueType  # 0
     RESOURCE_EXHAUSTED_CAUSE_RPS_LIMIT: _ResourceExhaustedCause.ValueType  # 1
@@ -619,7 +619,7 @@ class _ResourceExhaustedScopeEnumTypeWrapper(
         _ResourceExhaustedScope.ValueType
     ],
     builtins.type,
-):  # noqa: F821
+):
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     RESOURCE_EXHAUSTED_SCOPE_UNSPECIFIED: _ResourceExhaustedScope.ValueType  # 0
     RESOURCE_EXHAUSTED_SCOPE_NAMESPACE: _ResourceExhaustedScope.ValueType  # 1

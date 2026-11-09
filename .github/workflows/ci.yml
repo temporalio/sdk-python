@@ -20,15 +20,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.14"]
+        python: ["3.11", "3.15"]
         os: [ubuntu-latest, ubuntu-arm, macos-arm, windows-latest]
         include:
           - os: ubuntu-latest
-            python: "3.14"
+            python: "3.15"
             docsTarget: true
             clippyLinter: true
-          - python: "3.10"
-            pytestExtraArgs: '--reruns 3 --only-rerun "RuntimeError: Failed validating workflow"'
           - os: ubuntu-arm
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-arm
@@ -106,7 +104,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
@@ -181,9 +179,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - cibw-build: cp310-musllinux_x86_64
+          - cibw-build: cp311-musllinux_x86_64
             runsOn: ubuntu-latest
-          - cibw-build: cp310-musllinux_aarch64
+          - cibw-build: cp311-musllinux_aarch64
             runsOn: ubuntu-24.04-arm64-2-core
     runs-on: ${{ matrix.runsOn }}
     steps:
@@ -214,7 +212,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.10"
+          python-version: "3.11"
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: temporalio/bridge -> target
@@ -226,8 +224,6 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: astral-sh/setup-uv@cec208311dfd045dd5311c1add060b2062131d57 # v8
       - run: uv tool install poethepoet
-      - run: uv add --dev --python 3.10 "googleapis-common-protos==1.70.0"
-      - run: uv add --python 3.10 "protobuf<4"
       - run: uv sync --all-extras
       - run: cargo install --locked nexgen --version 0.2.8 --features advanced --force
       - run: poe build-develop
@@ -235,10 +231,12 @@ jobs:
       - name: Check generation unchanged
         run: |
           [[ -z $(git status --porcelain temporalio tests) ]] || (git diff temporalio tests; echo "Protos changed"; exit 1)
-      - name: Test with protobuf 3.x
+      - run: uv add --dev --python 3.11 "googleapis-common-protos==1.70.0"
+      - run: uv add --python 3.11 "protobuf==4.21.12"
+      - run: uv sync --all-extras
+      - run: poe build-develop
+      - name: Test with minimum protobuf runtime
         run: poe test -s
-        env:
-          TEMPORAL_TEST_PROTO3: 1
 
   test-latest-deps:
     timeout-minutes: 30

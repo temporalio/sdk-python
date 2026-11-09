@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -30,99 +29,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n$temporal/api/compute/v1/config.proto\x12\x17temporal.api.compute.v1\x1a&temporal/api/compute/v1/provider.proto\x1a$temporal/api/compute/v1/scaler.proto\x1a&temporal/api/enums/v1/task_queue.proto\x1a google/protobuf/field_mask.proto"\xe3\x01\n\x19\x43omputeConfigScalingGroup\x12>\n\x10task_queue_types\x18\x01 \x03(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x12\n\nregion_ids\x18\x02 \x03(\t\x12:\n\x08provider\x18\x03 \x01(\x0b\x32(.temporal.api.compute.v1.ComputeProvider\x12\x36\n\x06scaler\x18\x04 \x01(\x0b\x32&.temporal.api.compute.v1.ComputeScaler"\xcc\x01\n\rComputeConfig\x12Q\n\x0escaling_groups\x18\x01 \x03(\x0b\x32\x39.temporal.api.compute.v1.ComputeConfig.ScalingGroupsEntry\x1ah\n\x12ScalingGroupsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x41\n\x05value\x18\x02 \x01(\x0b\x32\x32.temporal.api.compute.v1.ComputeConfigScalingGroup:\x02\x38\x01"\x9d\x01\n\x1f\x43omputeConfigScalingGroupUpdate\x12I\n\rscaling_group\x18\x01 \x01(\x0b\x32\x32.temporal.api.compute.v1.ComputeConfigScalingGroup\x12/\n\x0bupdate_mask\x18\x02 \x01(\x0b\x32\x1a.google.protobuf.FieldMask"\xe1\x01\n\x14\x43omputeConfigSummary\x12X\n\x0escaling_groups\x18\x01 \x03(\x0b\x32@.temporal.api.compute.v1.ComputeConfigSummary.ScalingGroupsEntry\x1ao\n\x12ScalingGroupsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12H\n\x05value\x18\x02 \x01(\x0b\x32\x39.temporal.api.compute.v1.ComputeConfigScalingGroupSummary:\x02\x38\x01"\x8d\x01\n ComputeConfigScalingGroupSummary\x12>\n\x10task_queue_types\x18\x01 \x03(\x0e\x32$.temporal.api.enums.v1.TaskQueueType\x12\x15\n\rprovider_type\x18\x02 \x01(\t\x12\x12\n\nregion_ids\x18\x03 \x03(\tB\x8d\x01\n\x1aio.temporal.api.compute.v1B\x0b\x43onfigProtoP\x01Z%go.temporal.io/api/compute/v1;compute\xaa\x02\x19Temporalio.Api.Compute.V1\xea\x02\x1cTemporalio::Api::Compute::V1b\x06proto3'
 )
 
-
-_COMPUTECONFIGSCALINGGROUP = DESCRIPTOR.message_types_by_name[
-    "ComputeConfigScalingGroup"
-]
-_COMPUTECONFIG = DESCRIPTOR.message_types_by_name["ComputeConfig"]
-_COMPUTECONFIG_SCALINGGROUPSENTRY = _COMPUTECONFIG.nested_types_by_name[
-    "ScalingGroupsEntry"
-]
-_COMPUTECONFIGSCALINGGROUPUPDATE = DESCRIPTOR.message_types_by_name[
-    "ComputeConfigScalingGroupUpdate"
-]
-_COMPUTECONFIGSUMMARY = DESCRIPTOR.message_types_by_name["ComputeConfigSummary"]
-_COMPUTECONFIGSUMMARY_SCALINGGROUPSENTRY = _COMPUTECONFIGSUMMARY.nested_types_by_name[
-    "ScalingGroupsEntry"
-]
-_COMPUTECONFIGSCALINGGROUPSUMMARY = DESCRIPTOR.message_types_by_name[
-    "ComputeConfigScalingGroupSummary"
-]
-ComputeConfigScalingGroup = _reflection.GeneratedProtocolMessageType(
-    "ComputeConfigScalingGroup",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _COMPUTECONFIGSCALINGGROUP,
-        "__module__": "temporalio.api.compute.v1.config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfigScalingGroup)
-    },
-)
-_sym_db.RegisterMessage(ComputeConfigScalingGroup)
-
-ComputeConfig = _reflection.GeneratedProtocolMessageType(
-    "ComputeConfig",
-    (_message.Message,),
-    {
-        "ScalingGroupsEntry": _reflection.GeneratedProtocolMessageType(
-            "ScalingGroupsEntry",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _COMPUTECONFIG_SCALINGGROUPSENTRY,
-                "__module__": "temporalio.api.compute.v1.config_pb2",
-                # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfig.ScalingGroupsEntry)
-            },
-        ),
-        "DESCRIPTOR": _COMPUTECONFIG,
-        "__module__": "temporalio.api.compute.v1.config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfig)
-    },
-)
-_sym_db.RegisterMessage(ComputeConfig)
-_sym_db.RegisterMessage(ComputeConfig.ScalingGroupsEntry)
-
-ComputeConfigScalingGroupUpdate = _reflection.GeneratedProtocolMessageType(
-    "ComputeConfigScalingGroupUpdate",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _COMPUTECONFIGSCALINGGROUPUPDATE,
-        "__module__": "temporalio.api.compute.v1.config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfigScalingGroupUpdate)
-    },
-)
-_sym_db.RegisterMessage(ComputeConfigScalingGroupUpdate)
-
-ComputeConfigSummary = _reflection.GeneratedProtocolMessageType(
-    "ComputeConfigSummary",
-    (_message.Message,),
-    {
-        "ScalingGroupsEntry": _reflection.GeneratedProtocolMessageType(
-            "ScalingGroupsEntry",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _COMPUTECONFIGSUMMARY_SCALINGGROUPSENTRY,
-                "__module__": "temporalio.api.compute.v1.config_pb2",
-                # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfigSummary.ScalingGroupsEntry)
-            },
-        ),
-        "DESCRIPTOR": _COMPUTECONFIGSUMMARY,
-        "__module__": "temporalio.api.compute.v1.config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfigSummary)
-    },
-)
-_sym_db.RegisterMessage(ComputeConfigSummary)
-_sym_db.RegisterMessage(ComputeConfigSummary.ScalingGroupsEntry)
-
-ComputeConfigScalingGroupSummary = _reflection.GeneratedProtocolMessageType(
-    "ComputeConfigScalingGroupSummary",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _COMPUTECONFIGSCALINGGROUPSUMMARY,
-        "__module__": "temporalio.api.compute.v1.config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.compute.v1.ComputeConfigScalingGroupSummary)
-    },
-)
-_sym_db.RegisterMessage(ComputeConfigScalingGroupSummary)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\032io.temporal.api.compute.v1B\013ConfigProtoP\001Z%go.temporal.io/api/compute/v1;compute\252\002\031Temporalio.Api.Compute.V1\352\002\034Temporalio::Api::Compute::V1"

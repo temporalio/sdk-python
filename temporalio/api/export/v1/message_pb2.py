@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -25,55 +24,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b'\n$temporal/api/export/v1/message.proto\x12\x16temporal.api.export.v1\x1a%temporal/api/history/v1/message.proto\x1a\x36temporal/api/workflowservice/v1/request_response.proto"F\n\x11WorkflowExecution\x12\x31\n\x07history\x18\x01 \x01(\x0b\x32 .temporal.api.history.v1.History"N\n\x12WorkflowExecutions\x12\x38\n\x05items\x18\x01 \x03(\x0b\x32).temporal.api.export.v1.WorkflowExecution"i\n\x11\x41\x63tivityExecution\x12T\n\x08\x61\x63tivity\x18\x01 \x01(\x0b\x32\x42.temporal.api.workflowservice.v1.DescribeActivityExecutionResponse"\x91\x01\n\x12\x45xportedExecutions\x12<\n\tworkflows\x18\x01 \x03(\x0b\x32).temporal.api.export.v1.WorkflowExecution\x12=\n\nactivities\x18\x02 \x03(\x0b\x32).temporal.api.export.v1.ActivityExecutionB\x89\x01\n\x19io.temporal.api.export.v1B\x0cMessageProtoP\x01Z#go.temporal.io/api/export/v1;export\xaa\x02\x18Temporalio.Api.Export.V1\xea\x02\x1bTemporalio::Api::Export::V1b\x06proto3'
 )
 
-
-_WORKFLOWEXECUTION = DESCRIPTOR.message_types_by_name["WorkflowExecution"]
-_WORKFLOWEXECUTIONS = DESCRIPTOR.message_types_by_name["WorkflowExecutions"]
-_ACTIVITYEXECUTION = DESCRIPTOR.message_types_by_name["ActivityExecution"]
-_EXPORTEDEXECUTIONS = DESCRIPTOR.message_types_by_name["ExportedExecutions"]
-WorkflowExecution = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecution",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTION,
-        "__module__": "temporalio.api.export.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.WorkflowExecution)
-    },
-)
-_sym_db.RegisterMessage(WorkflowExecution)
-
-WorkflowExecutions = _reflection.GeneratedProtocolMessageType(
-    "WorkflowExecutions",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _WORKFLOWEXECUTIONS,
-        "__module__": "temporalio.api.export.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.WorkflowExecutions)
-    },
-)
-_sym_db.RegisterMessage(WorkflowExecutions)
-
-ActivityExecution = _reflection.GeneratedProtocolMessageType(
-    "ActivityExecution",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _ACTIVITYEXECUTION,
-        "__module__": "temporalio.api.export.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.ActivityExecution)
-    },
-)
-_sym_db.RegisterMessage(ActivityExecution)
-
-ExportedExecutions = _reflection.GeneratedProtocolMessageType(
-    "ExportedExecutions",
-    (_message.Message,),
-    {
-        "DESCRIPTOR": _EXPORTEDEXECUTIONS,
-        "__module__": "temporalio.api.export.v1.message_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.export.v1.ExportedExecutions)
-    },
-)
-_sym_db.RegisterMessage(ExportedExecutions)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\031io.temporal.api.export.v1B\014MessageProtoP\001Z#go.temporal.io/api/export/v1;export\252\002\030Temporalio.Api.Export.V1\352\002\033Temporalio::Api::Export::V1"

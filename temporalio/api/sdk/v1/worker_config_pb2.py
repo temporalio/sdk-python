@@ -5,9 +5,8 @@
 
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import descriptor_pool as _descriptor_pool
-from google.protobuf import message as _message
-from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
+from google.protobuf.internal import builder as _builder
 
 # @@protoc_insertion_point(imports)
 
@@ -18,45 +17,8 @@ DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
     b"\n'temporal/api/sdk/v1/worker_config.proto\x12\x13temporal.api.sdk.v1\"\x89\x03\n\x0cWorkerConfig\x12\x1b\n\x13workflow_cache_size\x18\x01 \x01(\x05\x12X\n\x16simple_poller_behavior\x18\x02 \x01(\x0b\x32\x36.temporal.api.sdk.v1.WorkerConfig.SimplePollerBehaviorH\x00\x12\x62\n\x1b\x61utoscaling_poller_behavior\x18\x03 \x01(\x0b\x32;.temporal.api.sdk.v1.WorkerConfig.AutoscalingPollerBehaviorH\x00\x1a+\n\x14SimplePollerBehavior\x12\x13\n\x0bmax_pollers\x18\x01 \x01(\x05\x1a^\n\x19\x41utoscalingPollerBehavior\x12\x13\n\x0bmin_pollers\x18\x01 \x01(\x05\x12\x13\n\x0bmax_pollers\x18\x02 \x01(\x05\x12\x17\n\x0finitial_pollers\x18\x03 \x01(\x05\x42\x11\n\x0fpoller_behaviorB\x7f\n\x16io.temporal.api.sdk.v1B\x11WorkerConfigProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3"
 )
 
-
-_WORKERCONFIG = DESCRIPTOR.message_types_by_name["WorkerConfig"]
-_WORKERCONFIG_SIMPLEPOLLERBEHAVIOR = _WORKERCONFIG.nested_types_by_name[
-    "SimplePollerBehavior"
-]
-_WORKERCONFIG_AUTOSCALINGPOLLERBEHAVIOR = _WORKERCONFIG.nested_types_by_name[
-    "AutoscalingPollerBehavior"
-]
-WorkerConfig = _reflection.GeneratedProtocolMessageType(
-    "WorkerConfig",
-    (_message.Message,),
-    {
-        "SimplePollerBehavior": _reflection.GeneratedProtocolMessageType(
-            "SimplePollerBehavior",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _WORKERCONFIG_SIMPLEPOLLERBEHAVIOR,
-                "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
-                # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig.SimplePollerBehavior)
-            },
-        ),
-        "AutoscalingPollerBehavior": _reflection.GeneratedProtocolMessageType(
-            "AutoscalingPollerBehavior",
-            (_message.Message,),
-            {
-                "DESCRIPTOR": _WORKERCONFIG_AUTOSCALINGPOLLERBEHAVIOR,
-                "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
-                # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig.AutoscalingPollerBehavior)
-            },
-        ),
-        "DESCRIPTOR": _WORKERCONFIG,
-        "__module__": "temporalio.api.sdk.v1.worker_config_pb2",
-        # @@protoc_insertion_point(class_scope:temporal.api.sdk.v1.WorkerConfig)
-    },
-)
-_sym_db.RegisterMessage(WorkerConfig)
-_sym_db.RegisterMessage(WorkerConfig.SimplePollerBehavior)
-_sym_db.RegisterMessage(WorkerConfig.AutoscalingPollerBehavior)
-
+_builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\026io.temporal.api.sdk.v1B\021WorkerConfigProtoP\001Z\035go.temporal.io/api/sdk/v1;sdk\252\002\025Temporalio.Api.Sdk.V1\352\002\030Temporalio::Api::Sdk::V1"

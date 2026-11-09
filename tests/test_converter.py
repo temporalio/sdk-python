@@ -11,7 +11,7 @@ from collections import deque
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, StrEnum
 from typing import (
     Any,
     Dict,  # type:ignore[reportDeprecated]
@@ -66,10 +66,6 @@ from temporalio.exceptions import (
     NexusOperationError,
 )
 
-# StrEnum is available in 3.11+
-if sys.version_info >= (3, 11):
-    from enum import StrEnum  # type:ignore[reportUnreachable]
-
 
 class NonSerializableClass:
     pass
@@ -91,10 +87,8 @@ class SerializableMixinIntEnum(int, Enum):
     FOO = 1
 
 
-if sys.version_info >= (3, 11):
-
-    class SerializableStrEnum(StrEnum):  # type:ignore[reportUnreachable]
-        FOO = "foo"
+class SerializableStrEnum(StrEnum):
+    FOO = "foo"
 
 
 @dataclass
@@ -763,14 +757,12 @@ def test_json_type_hints():
     ok(UUID, uuid4())
     ok(list[UUID], [uuid4(), uuid4()])
 
-    # StrEnum is available in 3.11+
-    if sys.version_info >= (3, 11):
-        # StrEnum
-        ok(SerializableStrEnum, SerializableStrEnum.FOO)  # type:ignore[reportUnreachable]
-        ok(
-            list[SerializableStrEnum],
-            [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
-        )
+    # StrEnum
+    ok(SerializableStrEnum, SerializableStrEnum.FOO)
+    ok(
+        list[SerializableStrEnum],
+        [SerializableStrEnum.FOO, SerializableStrEnum.FOO],
+    )
 
     # Pydantic
     # TODO(cretz): Fix when https://github.com/pydantic/pydantic/pull/9612 tagged

@@ -5,24 +5,21 @@ isort:skip_file
 
 import builtins
 import collections.abc
-import sys
+import typing
 
 import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-if sys.version_info >= (3, 8):
-    import typing as typing_extensions
-else:
-    import typing_extensions
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+@typing.final
 class EnhancedStackTrace(google.protobuf.message.Message):
     """Internal structure used to create worker stack traces with references to code."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
     class SourcesEntry(google.protobuf.message.Message):
         DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -38,11 +35,10 @@ class EnhancedStackTrace(google.protobuf.message.Message):
             value: global___StackTraceFileSlice | None = ...,
         ) -> None: ...
         def HasField(
-            self, field_name: typing_extensions.Literal["value", b"value"]
+            self, field_name: typing.Literal["value", b"value"]
         ) -> builtins.bool: ...
         def ClearField(
-            self,
-            field_name: typing_extensions.Literal["key", b"key", "value", b"value"],
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
     SDK_FIELD_NUMBER: builtins.int
@@ -51,6 +47,7 @@ class EnhancedStackTrace(google.protobuf.message.Message):
     @property
     def sdk(self) -> global___StackTraceSDKInfo:
         """Information pertaining to the SDK that the trace has been captured from."""
+
     @property
     def sources(
         self,
@@ -58,6 +55,7 @@ class EnhancedStackTrace(google.protobuf.message.Message):
         builtins.str, global___StackTraceFileSlice
     ]:
         """Mapping of file path to file contents."""
+
     @property
     def stacks(
         self,
@@ -65,6 +63,7 @@ class EnhancedStackTrace(google.protobuf.message.Message):
         global___StackTrace
     ]:
         """Collection of stacks captured."""
+
     def __init__(
         self,
         *,
@@ -73,18 +72,17 @@ class EnhancedStackTrace(google.protobuf.message.Message):
         | None = ...,
         stacks: collections.abc.Iterable[global___StackTrace] | None = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing_extensions.Literal["sdk", b"sdk"]
-    ) -> builtins.bool: ...
+    def HasField(self, field_name: typing.Literal["sdk", b"sdk"]) -> builtins.bool: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "sdk", b"sdk", "sources", b"sources", "stacks", b"stacks"
         ],
     ) -> None: ...
 
 global___EnhancedStackTrace = EnhancedStackTrace
 
+@typing.final
 class StackTraceSDKInfo(google.protobuf.message.Message):
     """Information pertaining to the SDK that the trace has been captured from.
     (-- api-linter: core::0123::resource-annotation=disabled
@@ -106,12 +104,12 @@ class StackTraceSDKInfo(google.protobuf.message.Message):
         version: builtins.str = ...,
     ) -> None: ...
     def ClearField(
-        self,
-        field_name: typing_extensions.Literal["name", b"name", "version", b"version"],
+        self, field_name: typing.Literal["name", b"name", "version", b"version"]
     ) -> None: ...
 
 global___StackTraceSDKInfo = StackTraceSDKInfo
 
+@typing.final
 class StackTraceFileSlice(google.protobuf.message.Message):
     """ "Slice" of a file starting at line_offset -- a line offset and code fragment corresponding to the worker's stack."""
 
@@ -135,13 +133,14 @@ class StackTraceFileSlice(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "content", b"content", "line_offset", b"line_offset"
         ],
     ) -> None: ...
 
 global___StackTraceFileSlice = StackTraceFileSlice
 
+@typing.final
 class StackTraceFileLocation(google.protobuf.message.Message):
     """More specific location details of a file: its path, precise line and column numbers if applicable, and function name if available.
     In essence, a pointer to a location in a file
@@ -183,7 +182,7 @@ class StackTraceFileLocation(google.protobuf.message.Message):
     ) -> None: ...
     def ClearField(
         self,
-        field_name: typing_extensions.Literal[
+        field_name: typing.Literal[
             "column",
             b"column",
             "file_path",
@@ -199,6 +198,7 @@ class StackTraceFileLocation(google.protobuf.message.Message):
 
 global___StackTraceFileLocation = StackTraceFileLocation
 
+@typing.final
 class StackTrace(google.protobuf.message.Message):
     """Collection of FileLocation messages from a single stack."""
 
@@ -212,6 +212,7 @@ class StackTrace(google.protobuf.message.Message):
         global___StackTraceFileLocation
     ]:
         """Collection of `FileLocation`s, each for a stack frame that comprise a stack trace."""
+
     def __init__(
         self,
         *,
@@ -219,7 +220,7 @@ class StackTrace(google.protobuf.message.Message):
         | None = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing_extensions.Literal["locations", b"locations"]
+        self, field_name: typing.Literal["locations", b"locations"]
     ) -> None: ...
 
 global___StackTrace = StackTrace

@@ -501,6 +501,7 @@ try:
     import grpc
 
     from .service_pb2_grpc import (
+        WorkflowService,  # type: ignore
         WorkflowServiceServicer,
         WorkflowServiceStub,
         add_WorkflowServiceServicer_to_server,
@@ -508,6 +509,7 @@ try:
 
     __all__.extend(
         [
+            "WorkflowService",
             "WorkflowServiceServicer",
             "WorkflowServiceStub",
             "add_WorkflowServiceServicer_to_server",
