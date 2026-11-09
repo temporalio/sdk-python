@@ -362,15 +362,16 @@ async def encode_completion(
         completion,
     )
 
-    with metrics.track():
-        await CommandAwarePayloadVisitor(
-            skip_search_attributes=True,
-            skip_headers=not encode_headers,
-            concurrency_limit=storage_concurrency_limit,
-        ).visit(
-            _Visitor(data_converter._external_store_payload_sequence),
-            completion,
-        )
+    if data_converter.external_storage:
+        with metrics.track():
+            await CommandAwarePayloadVisitor(
+                skip_search_attributes=True,
+                skip_headers=not encode_headers,
+                concurrency_limit=storage_concurrency_limit,
+            ).visit(
+                _Visitor(data_converter._external_store_payload_sequence),
+                completion,
+            )
 
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,

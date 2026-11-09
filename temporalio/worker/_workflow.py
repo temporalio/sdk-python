@@ -399,16 +399,21 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     ),
                 ),
             )
-            # Resolving a command's context calls into the workflow instance (the
-            # sandbox, when sandboxed) for every payload sequence, and only a codec
-            # or external storage can use it.
-            if workflow and data_converter._has_codec_or_external_storage:
-                data_converter = _CommandAwareDataConverter.create(
-                    instance=workflow.instance,
-                    context_free_dc=self._data_converter,
-                    workflow_context_dc=data_converter,
-                    workflow_context=workflow_context,
-                )
+            if workflow:
+                # Resolving a command's context calls into the workflow instance
+                # (the sandbox, when sandboxed) for every payload sequence, and only
+                # a codec or external storage can use it.
+                if data_converter._has_codec_or_external_storage:
+                    data_converter = _CommandAwareDataConverter.create(
+                        instance=workflow.instance,
+                        context_free_dc=self._data_converter,
+                        workflow_context_dc=data_converter,
+                        workflow_context=workflow_context,
+                    )
+                else:
+                    # Activation failures are converted with this converter, and
+                    # the command-aware one has no context there.
+                    data_converter = self._data_converter
             previous_run_outcome = (
                 _take_nexus_previous_run_outcome(init_job)
                 if not workflow and init_job

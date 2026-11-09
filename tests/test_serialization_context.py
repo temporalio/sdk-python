@@ -1355,23 +1355,23 @@ async def test_command_context_resolved_only_with_codec_or_external_storage(
 ):
     """Context resolution calls into the workflow instance, which is costly in the
     sandbox, so workers skip it when no codec or external storage can use it."""
-    lookups = 0
-    get_serialization_context = _WorkflowInstanceImpl.get_serialization_context
+    lookups: defaultdict[str, int] = defaultdict(int)
 
-    def counting_get_serialization_context(self, command_info):  # type: ignore[reportMissingParameterType]
-        nonlocal lookups
-        lookups += 1
-        return get_serialization_context(self, command_info)
+    def count_lookups(name: str) -> None:
+        lookup = getattr(_WorkflowInstanceImpl, name)
 
-    monkeypatch.setattr(
-        _WorkflowInstanceImpl,
-        "get_serialization_context",
-        counting_get_serialization_context,
-    )
+        def counting_lookup(self, command_info):  # type: ignore[reportMissingParameterType]
+            lookups[name] += 1
+            return lookup(self, command_info)
 
-    async def run_workflow(data_converter: DataConverter) -> int:
-        nonlocal lookups
-        lookups = 0
+        monkeypatch.setattr(_WorkflowInstanceImpl, name, counting_lookup)
+
+    count_lookups("get_serialization_context")
+    count_lookups("get_external_store_context")
+
+    async def run_workflow(data_converter: DataConverter) -> tuple[int, int]:
+        """Returns the serialization and external store context lookup counts."""
+        lookups.clear()
         workflow_id = str(uuid.uuid4())
         task_queue = str(uuid.uuid4())
         client_config = client.config()
@@ -1390,17 +1390,29 @@ async def test_command_context_resolved_only_with_codec_or_external_storage(
                 task_queue=task_queue,
             )
         test_traces.pop(workflow_id, None)
-        return lookups
-
-    assert await run_workflow(DataConverter.default) == 0
-    assert (
-        await run_workflow(
-            dataclasses.replace(
-                DataConverter.default, payload_codec=PayloadCodecWithContext()
-            )
+        return (
+            lookups["get_serialization_context"],
+            lookups["get_external_store_context"],
         )
-        > 0
+
+    assert await run_workflow(DataConverter.default) == (0, 0)
+
+    serialization_lookups, store_lookups = await run_workflow(
+        dataclasses.replace(
+            DataConverter.default, payload_codec=PayloadCodecWithContext()
+        )
     )
+    assert serialization_lookups > 0
+    assert store_lookups == 0
+
+    serialization_lookups, store_lookups = await run_workflow(
+        dataclasses.replace(
+            DataConverter.default,
+            external_storage=ExternalStorage(drivers=[InMemoryTestDriver()]),
+        )
+    )
+    assert serialization_lookups > 0
+    assert store_lookups > 0
 
 
 # Local activity codec test
