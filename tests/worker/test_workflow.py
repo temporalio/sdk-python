@@ -688,6 +688,226 @@ async def test_workflow_signal_qnd_query_handlers_old_dynamic_style(client: Clie
         )
 
 
+@workflow.defn
+class ReservedNameSetHandlersWorkflow:
+    @workflow.run
+    async def run(self) -> list[str]:
+        def handler() -> None:
+            pass
+
+        errors: list[str] = []
+        for set_handler in [
+            lambda: workflow.set_signal_handler("__temporal_signal", handler),
+            lambda: workflow.set_query_handler("__temporal_query", handler),
+            lambda: workflow.set_query_handler("__stack_trace", handler),
+            lambda: workflow.set_query_handler("__enhanced_stack_trace", None),
+            lambda: workflow.set_update_handler("__temporal_update", handler),
+        ]:
+            try:
+                set_handler()
+            except ValueError as err:
+                errors.append(str(err))
+        workflow.set_signal_handler("__temporal_workflow_stream_test", handler)
+        return errors
+
+
+async def test_workflow_set_handler_reserved_names(client: Client):
+    async with new_worker(client, ReservedNameSetHandlersWorkflow) as worker:
+        errors = await client.execute_workflow(
+            ReservedNameSetHandlersWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert errors == [
+            "Signal name '__temporal_signal' cannot start with reserved prefix '__temporal_'",
+            "Query name '__temporal_query' cannot start with reserved prefix '__temporal_'",
+            "Query name '__stack_trace' is reserved",
+            "Query name '__enhanced_stack_trace' is reserved",
+            "Update name '__temporal_update' cannot start with reserved prefix '__temporal_'",
+        ]
+
+
+@workflow.defn
+class ReservedNameDynamicHandlersWorkflow:
+    def __init__(self) -> None:
+        self._dynamic_signals: list[str] = []
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.signal(dynamic=True)
+    def dynamic_signal(self, name: str, _args: Sequence[RawValue]) -> None:
+        self._dynamic_signals.append(name)
+
+    @workflow.query(dynamic=True)
+    def dynamic_query(self, name: str, _args: Sequence[RawValue]) -> str:
+        return f"dynamic query {name}"
+
+    @workflow.update(dynamic=True)
+    def dynamic_update(self, name: str, _args: Sequence[RawValue]) -> str:
+        return f"dynamic update {name}"
+
+    @workflow.query
+    def dynamic_signals(self) -> list[str]:
+        return self._dynamic_signals
+
+
+async def test_workflow_reserved_names_skip_dynamic_handlers(client: Client):
+    async with new_worker(client, ReservedNameDynamicHandlersWorkflow) as worker:
+        handle = await client.start_workflow(
+            ReservedNameDynamicHandlersWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        await handle.signal("__temporal_signal")
+        await handle.signal("some_signal")
+        assert ["some_signal"] == await handle.query(
+            ReservedNameDynamicHandlersWorkflow.dynamic_signals
+        )
+
+        assert "dynamic query some_query" == await handle.query("some_query")
+        with pytest.raises(WorkflowQueryFailedError) as query_err:
+            await handle.query("__temporal_query")
+        assert "Query handler for '__temporal_query' expected but not found" in str(
+            query_err.value
+        )
+
+        assert "dynamic update some_update" == await handle.execute_update(
+            "some_update"
+        )
+        with pytest.raises(WorkflowUpdateFailedError) as update_err:
+            await handle.execute_update("__temporal_update")
+        assert isinstance(update_err.value.cause, ApplicationError)
+        assert (
+            "Update handler for '__temporal_update' expected but not found"
+            in update_err.value.cause.message
+        )
+
+
+@workflow.defn
+class ReservedNameBufferedSignalWorkflow:
+    def __init__(self) -> None:
+        self._received: list[str] = []
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.signal
+    def register_handlers(self) -> None:
+        def dynamic_handler(name: str, _args: Sequence[RawValue]) -> None:
+            self._received.append(f"dynamic {name}")
+
+        def stream_handler() -> None:
+            self._received.append("stream")
+
+        workflow.set_dynamic_signal_handler(dynamic_handler)
+        workflow.set_signal_handler("__temporal_workflow_stream_test", stream_handler)
+
+    @workflow.query
+    def received(self) -> list[str]:
+        return self._received
+
+
+async def test_workflow_reserved_name_buffered_signal_skips_dynamic_handler(
+    client: Client,
+):
+    async with new_worker(client, ReservedNameBufferedSignalWorkflow) as worker:
+        handle = await client.start_workflow(
+            ReservedNameBufferedSignalWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.signal("__temporal_workflow_stream_test")
+        await handle.signal("some_signal")
+        await handle.signal(ReservedNameBufferedSignalWorkflow.register_handlers)
+        assert ["dynamic some_signal", "stream"] == await handle.query(
+            ReservedNameBufferedSignalWorkflow.received
+        )
+
+
+@workflow.defn(dynamic=True)
+class ReservedNameDynamicWorkflow:
+    @workflow.run
+    async def run(self, _args: Sequence[RawValue]) -> str:
+        return workflow.info().workflow_type
+
+
+@workflow.defn
+class ReservedNameActivityWorkflow:
+    @workflow.run
+    async def run(self, activity_name: str, local: bool) -> str:
+        if local:
+            try:
+                return await workflow.execute_local_activity(
+                    activity_name,
+                    start_to_close_timeout=timedelta(seconds=10),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            except ValueError as err:
+                return f"local activity error: {err}"
+        return await workflow.execute_activity(
+            activity_name,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+async def test_workflow_reserved_name_skips_dynamic_workflow(client: Client):
+    async with new_worker(client, ReservedNameDynamicWorkflow) as worker:
+        assert "some_workflow" == await client.execute_workflow(
+            "some_workflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        handle = await client.start_workflow(
+            "__temporal_workflow",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Workflow class __temporal_workflow is not registered on this worker",
+        )
+        await handle.terminate()
+
+
+async def test_workflow_reserved_name_skips_dynamic_activity(client: Client):
+    async with new_worker(
+        client, ReservedNameActivityWorkflow, activities=[return_name_activity]
+    ) as worker:
+        for local in [False, True]:
+            assert "some_activity" == await client.execute_workflow(
+                ReservedNameActivityWorkflow.run,
+                args=["some_activity", local],
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                ReservedNameActivityWorkflow.run,
+                args=["__temporal_activity", False],
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert isinstance(err.value.cause, ActivityError)
+        assert isinstance(err.value.cause.cause, ApplicationError)
+        assert (
+            "Activity function __temporal_activity for workflow"
+            in err.value.cause.cause.message
+        )
+        assert "Activity function __temporal_activity is not registered" in (
+            await client.execute_workflow(
+                ReservedNameActivityWorkflow.run,
+                args=["__temporal_activity", True],
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        )
+
+
 @dataclass
 class BadSignalParam:
     some_str: str

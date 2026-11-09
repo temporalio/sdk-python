@@ -70,12 +70,14 @@ def defn(
     Args:
         cls: The class to decorate.
         name: Name to use for the workflow. Defaults to class ``__name__``. This
-            cannot be set if dynamic is set.
+            cannot be set if dynamic is set. Names starting with ``__temporal_``
+            are reserved.
         sandboxed: Whether the workflow should run in a sandbox. Default is
             true.
         dynamic: If true, this workflow will be dynamic. Dynamic workflows have
             to accept a single 'Sequence[RawValue]' parameter. This cannot be
-            set to true if name is present.
+            set to true if name is present. Names starting with ``__temporal_``
+            are never passed to it.
         failure_exception_types: The types of exceptions that, if a
             workflow-thrown exception extends, will cause the workflow/update to
             fail instead of suspending the workflow via task failure. These are
@@ -275,6 +277,8 @@ class _Definition:
         # Check it's not being doubly applied
         if _Definition.from_class(cls):
             raise ValueError("Class already contains workflow definition")
+        if workflow_name is not None:
+            temporalio.common._assert_not_reserved_name("Workflow", workflow_name)
         issues: list[str] = []
 
         # Collect run fn and all signal/query/update fns

@@ -101,6 +101,12 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         self._handler = Handler(
             service_handlers, handler_executor, middleware=[middleware]
         )
+        for service_name, service_handler in self._handler.service_handlers.items():
+            temporalio.common._assert_not_reserved_name("Nexus service", service_name)
+            for operation_name in service_handler.operation_handlers:
+                temporalio.common._assert_not_reserved_name(
+                    "Nexus operation", operation_name
+                )
 
         self._data_converter = data_converter
 

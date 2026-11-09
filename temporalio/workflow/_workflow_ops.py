@@ -938,9 +938,11 @@ def set_signal_handler(name: str, handler: Callable | None) -> None:
     to the handler.
 
     Args:
-        name: Name of the signal.
+        name: Name of the signal. Names starting with ``__temporal_`` are
+            reserved.
         handler: Callable to set or None to unset.
     """
+    temporalio.common._assert_not_reserved_handler_name("Signal", name)
     _Runtime.current().workflow_set_signal_handler(name, handler)
 
 
@@ -962,7 +964,9 @@ def set_dynamic_signal_handler(handler: Callable | None) -> None:
     This overrides the existing dynamic handler even if it was created via the
     ``@workflow.signal`` decorator.
 
-    When set, all unhandled past signals are immediately sent to the handler.
+    When set, all unhandled past signals are immediately sent to the handler,
+    except those with names starting with ``__temporal_``, which dynamic handlers
+    never receive.
 
     Args:
         handler: Callable to set or None to unset.
@@ -992,9 +996,11 @@ def set_query_handler(name: str, handler: Callable | None) -> None:
     created via the ``@workflow.query`` decorator.
 
     Args:
-        name: Name of the query.
+        name: Name of the query. Names starting with ``__temporal_``,
+            ``__stack_trace``, and ``__enhanced_stack_trace`` are reserved.
         handler: Callable to set or None to unset.
     """
+    temporalio.common._assert_not_reserved_handler_name("Query", name, query=True)
     _Runtime.current().workflow_set_query_handler(name, handler)
 
 
@@ -1014,7 +1020,8 @@ def set_dynamic_query_handler(handler: Callable | None) -> None:
     """Set or unset the dynamic query handler.
 
     This overrides the existing dynamic handler even if it was created via the
-    ``@workflow.query`` decorator.
+    ``@workflow.query`` decorator. Names starting with ``__temporal_`` are never
+    passed to dynamic handlers.
 
     Args:
         handler: Callable to set or None to unset.
@@ -1046,11 +1053,13 @@ def set_update_handler(
     created via the ``@workflow.update`` decorator.
 
     Args:
-        name: Name of the update.
+        name: Name of the update. Names starting with ``__temporal_`` are
+            reserved.
         handler: Callable to set or None to unset.
         validator: Callable to set or None to unset as the update validator.
             This must not be an ``async def`` function.
     """
+    temporalio.common._assert_not_reserved_handler_name("Update", name)
     _Runtime.current().workflow_set_update_handler(name, handler, validator)
 
 
@@ -1072,7 +1081,8 @@ def set_dynamic_update_handler(
     """Set or unset the dynamic update handler.
 
     This overrides the existing dynamic handler even if it was created via the
-    ``@workflow.update`` decorator.
+    ``@workflow.update`` decorator. Names starting with ``__temporal_`` are never
+    passed to dynamic handlers.
 
     Args:
         handler: Callable to set or None to unset.

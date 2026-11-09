@@ -69,12 +69,14 @@ def defn(
     Args:
         fn: The function to decorate.
         name: Name to use for the activity. Defaults to function ``__name__``.
-            This cannot be set if dynamic is set.
+            This cannot be set if dynamic is set. Names starting with
+            ``__temporal_`` are reserved.
         no_thread_cancel_exception: If set to true, an exception will not be
             raised in synchronous, threaded activities upon cancellation.
         dynamic: If true, this activity will be dynamic. Dynamic activities have
             to accept a single 'Sequence[RawValue]' parameter. This cannot be
-            set to true if name is present.
+            set to true if name is present. Names starting with ``__temporal_``
+            are never passed to it.
     """
 
     def decorator(fn: CallableType) -> CallableType:
@@ -614,6 +616,8 @@ class _Definition:
             raise ValueError("Function already contains activity definition")
         elif not callable(fn):
             raise TypeError("Activity is not callable")  # type:ignore[reportUnreachable]
+        if activity_name is not None:
+            temporalio.common._assert_not_reserved_name("Activity", activity_name)
         # We do not allow keyword only arguments in activities
         sig = inspect.signature(fn)
         for param in sig.parameters.values():

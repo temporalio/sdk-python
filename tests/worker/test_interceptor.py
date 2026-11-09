@@ -416,3 +416,56 @@ async def test_workflow_instance_access_from_interceptor(client: Client):
             task_queue=task_queue,
         )
         assert difference == 0
+
+
+query_interceptor_traces: list[str] = []
+
+
+class QueryTracingInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> type[WorkflowInboundInterceptor] | None:
+        return QueryTracingWorkflowInboundInterceptor
+
+
+class QueryTracingWorkflowInboundInterceptor(WorkflowInboundInterceptor):
+    async def handle_query(self, input: HandleQueryInput) -> Any:
+        query_interceptor_traces.append(input.query)
+        return await super().handle_query(input)
+
+
+@workflow.defn
+class BuiltInQueriesWorkflow:
+    def __init__(self) -> None:
+        workflow.set_query_handler("__temporal_workflow_stream_test", lambda: "stream")
+
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.query
+    def user_query(self) -> str:
+        return "user"
+
+
+async def test_built_in_queries_skip_interceptors(client: Client):
+    query_interceptor_traces.clear()
+    task_queue = f"task_queue_{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[BuiltInQueriesWorkflow],
+        interceptors=[QueryTracingInterceptor()],
+    ):
+        handle = await client.start_workflow(
+            BuiltInQueriesWorkflow.run,
+            id=f"workflow_{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        assert "user" == await handle.query(BuiltInQueriesWorkflow.user_query)
+        assert "BuiltInQueriesWorkflow" in await handle.query("__stack_trace")
+        await handle.query("__enhanced_stack_trace")
+        await handle.query("__temporal_workflow_metadata")
+        assert "stream" == await handle.query("__temporal_workflow_stream_test")
+        assert query_interceptor_traces == ["user_query"]
+        await handle.terminate()

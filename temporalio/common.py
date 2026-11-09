@@ -1444,6 +1444,36 @@ def _type_hints_from_func(  # type:ignore[reportUnusedFunction]
     return args, ret
 
 
+_RESERVED_NAME_PREFIX = "__temporal_"
+_RESERVED_QUERY_NAMES = ("__stack_trace", "__enhanced_stack_trace")
+# temporalio.contrib.workflow_streams registers its handlers under this prefix,
+# which the Go SDK exempts too
+_WORKFLOW_STREAM_NAME_PREFIX = "__temporal_workflow_stream_"
+
+
+def _is_reserved_name(name: str, *, query: bool = False) -> bool:  # type:ignore[reportUnusedFunction]
+    return name.startswith(_RESERVED_NAME_PREFIX) or (
+        query and name in _RESERVED_QUERY_NAMES
+    )
+
+
+def _assert_not_reserved_name(kind: str, name: str) -> None:
+    if name.startswith(_RESERVED_NAME_PREFIX):
+        raise ValueError(
+            f"{kind} name {name!r} cannot start with reserved prefix {_RESERVED_NAME_PREFIX!r}"
+        )
+
+
+def _assert_not_reserved_handler_name(  # type:ignore[reportUnusedFunction]
+    kind: str, name: str | None, *, query: bool = False
+) -> None:
+    if name is None or name.startswith(_WORKFLOW_STREAM_NAME_PREFIX):
+        return
+    if query and name in _RESERVED_QUERY_NAMES:
+        raise ValueError(f"{kind} name {name!r} is reserved")
+    _assert_not_reserved_name(kind, name)
+
+
 class HeaderCodecBehavior(IntEnum):
     """Different ways to handle header encoding"""
 

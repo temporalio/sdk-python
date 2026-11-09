@@ -453,6 +453,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         temporalio.workflow._Runtime.set_on_loop(asyncio.get_running_loop(), self)
         try:
             root_inbound = _WorkflowInboundImpl(self)
+            self._root_inbound = root_inbound
             self._inbound: WorkflowInboundInterceptor = root_inbound
             for interceptor_class in reversed(list(det.interceptor_classes)):
                 self._inbound = interceptor_class(self._inbound)
@@ -734,7 +735,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             command.update_response.protocol_instance_id = job.protocol_instance_id
             past_validation = False
             try:
-                defn = self._updates.get(job.name) or self._updates.get(None)
+                defn = self._updates.get(job.name)
+                if not defn and not temporalio.common._is_reserved_name(job.name):
+                    defn = self._updates.get(None)
                 if not defn:
                     known_updates = sorted([k for k in self._updates.keys() if k])
                     raise RuntimeError(
@@ -861,8 +864,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         async def run_query() -> None:
             try:
                 with self._as_read_only(in_query_or_validator=True):
+                    reserved = temporalio.common._is_reserved_name(
+                        job.query_type, query=True
+                    )
                     # Named query or dynamic
-                    defn = self._queries.get(job.query_type) or self._queries.get(None)
+                    defn = self._queries.get(job.query_type)
+                    if not defn and not reserved:
+                        defn = self._queries.get(None)
                     if not defn:
                         known_queries = sorted([k for k in self._queries.keys() if k])
                         raise RuntimeError(
@@ -884,7 +892,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         args=args,
                         headers=job.headers,
                     )
-                    success = await self._inbound.handle_query(input)
+                    # Built-in queries skip interceptors so they stay out of
+                    # user tracing
+                    inbound = self._root_inbound if reserved else self._inbound
+                    success = await inbound.handle_query(input)
                     result_payloads = (
                         self._workflow_context_payload_converter.to_payloads([success])
                     )
@@ -1204,7 +1215,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, job: temporalio.bridge.proto.workflow_activation.SignalWorkflow
     ) -> None:
         # Apply to named or to dynamic or buffer
-        signal_defn = self._signals.get(job.signal_name) or self._signals.get(None)
+        signal_defn = self._signals.get(job.signal_name)
+        if not signal_defn and not temporalio.common._is_reserved_name(job.signal_name):
+            signal_defn = self._signals.get(None)
         if not signal_defn:
             self._buffered_signals.setdefault(job.signal_name, []).append(job)
             return
@@ -1602,10 +1615,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 for job in self._buffered_signals.pop(name, []):
                     self._process_signal_job(defn, job)
             else:
-                for jobs in self._buffered_signals.values():
-                    for job in jobs:
-                        self._process_signal_job(defn, job)
-                self._buffered_signals.clear()
+                # Dynamic handlers never get reserved names, so those stay
+                # buffered for a named handler
+                for signal_name, jobs in list(self._buffered_signals.items()):
+                    if not temporalio.common._is_reserved_name(signal_name):
+                        for job in jobs:
+                            self._process_signal_job(defn, job)
+                        del self._buffered_signals[signal_name]
         else:
             self._signals.pop(name, None)
 

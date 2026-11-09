@@ -560,7 +560,11 @@ class _ActivityWorker:
         Exceptions are handled by a caller of this function.
         """
         # Find activity or fail
-        activity_def = self._activities.get(start.activity_type, self._dynamic_activity)
+        activity_def = self._activities.get(start.activity_type)
+        if not activity_def and not temporalio.common._is_reserved_name(
+            start.activity_type
+        ):
+            activity_def = self._dynamic_activity
         if not activity_def:
             activity_names = ", ".join(sorted(self._activities.keys()))
             raise temporalio.exceptions.ApplicationError(
@@ -739,7 +743,7 @@ class _ActivityWorker:
         return await impl.execute_activity(input)
 
     def assert_activity_valid(self, activity: str) -> None:
-        if self._dynamic_activity:
+        if self._dynamic_activity and not temporalio.common._is_reserved_name(activity):
             return
         activity_def = self._activities.get(activity)
         if not activity_def:

@@ -374,6 +374,25 @@ async def test_activity_kwonly_params():
     assert str(err.value).endswith("cannot have keyword-only arguments")
 
 
+def test_activity_reserved_name():
+    async def some_activity() -> None:
+        pass
+
+    with pytest.raises(ValueError) as err:
+        activity.defn(name="__temporal_activity")(some_activity)
+    assert (
+        "Activity name '__temporal_activity' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+    with pytest.raises(ValueError) as err:
+
+        @activity.defn
+        async def __temporal_activity() -> None:  # type:ignore[reportUnusedFunction]
+            pass
+
+    assert "Activity name '__temporal_activity' cannot start" in str(err.value)
+
+
 async def test_activity_cancel_catch(
     client: Client,
     worker: ExternalWorker,

@@ -120,11 +120,12 @@ def signal(
     Args:
         fn: The function to decorate.
         name: Signal name. Defaults to method ``__name__``. Cannot be present
-            when ``dynamic`` is present.
+            when ``dynamic`` is present. Names starting with ``__temporal_``
+            are reserved.
         dynamic: If true, this handles all signals not otherwise handled. The
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
-            present.
+            present. Names starting with ``__temporal_`` are never passed to it.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
         description: A short description of the signal that may appear in the UI/CLI.
@@ -137,6 +138,7 @@ def signal(
     ) -> CallableSyncOrAsyncReturnNoneType:
         if not name and not dynamic:
             name = fn.__name__
+        temporalio.common._assert_not_reserved_handler_name("Signal", name)
         defn = _SignalDefinition(
             name=name,
             fn=fn,
@@ -201,12 +203,13 @@ def query(
     Args:
         fn: The function to decorate.
         name: Query name. Defaults to method ``__name__``. Cannot be present
-            when ``dynamic`` is present.
+            when ``dynamic`` is present. Names starting with ``__temporal_``,
+            ``__stack_trace``, and ``__enhanced_stack_trace`` are reserved.
         dynamic: If true, this handles all queries not otherwise handled. The
             parameters of the method should be self, a string name, and a
             ``Sequence[RawValue]``. An older form of this accepted vararg
             parameters which will now warn. Cannot be present when ``name`` is
-            present.
+            present. Names starting with ``__temporal_`` are never passed to it.
         description: A short description of the query that may appear in the UI/CLI.
     """
 
@@ -219,6 +222,7 @@ def query(
     ) -> CallableType:
         if not name and not dynamic:
             name = fn.__name__
+        temporalio.common._assert_not_reserved_handler_name("Query", name, query=True)
         if not bypass_async_check and inspect.iscoroutinefunction(fn):
             warnings.warn(
                 "Queries as async def functions are deprecated",
@@ -354,11 +358,12 @@ def update(
     Args:
         fn: The function to decorate.
         name: Update name. Defaults to method ``__name__``. Cannot be present
-            when ``dynamic`` is present.
+            when ``dynamic`` is present. Names starting with ``__temporal_``
+            are reserved.
         dynamic: If true, this handles all updates not otherwise handled. The
             parameters of the method must be self, a string name, and a
             ``*args`` positional varargs. Cannot be present when ``name`` is
-            present.
+            present. Names starting with ``__temporal_`` are never passed to it.
         unfinished_policy: Actions taken if a workflow terminates with
             a running instance of this handler.
         description: A short description of the update that may appear in the UI/CLI.
@@ -371,6 +376,7 @@ def update(
     ) -> CallableSyncOrAsyncType:
         if not name and not dynamic:
             name = fn.__name__
+        temporalio.common._assert_not_reserved_handler_name("Update", name)
         defn = _UpdateDefinition(
             name=name,
             fn=fn,

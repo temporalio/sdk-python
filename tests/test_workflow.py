@@ -527,6 +527,87 @@ def test_workflow_update_validator_sync():
     assert defn.updates["my_update"].validator is SyncUpdateValidator.my_validator
 
 
+class ReservedNameWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+def test_workflow_defn_reserved_name():
+    with pytest.raises(ValueError) as err:
+        workflow.defn(name="__temporal_workflow")(ReservedNameWorkflow)
+    assert (
+        "Workflow name '__temporal_workflow' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+
+
+def test_workflow_handler_reserved_names():
+    def handler(_self: Any) -> None:
+        pass
+
+    with pytest.raises(ValueError) as err:
+        workflow.signal(name="__temporal_signal")(handler)
+    assert (
+        "Signal name '__temporal_signal' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+    with pytest.raises(ValueError) as err:
+        workflow.query(name="__temporal_query")(handler)
+    assert (
+        "Query name '__temporal_query' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+    with pytest.raises(ValueError) as err:
+        workflow.update(name="__temporal_update")(handler)
+    assert (
+        "Update name '__temporal_update' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+    for name in ["__stack_trace", "__enhanced_stack_trace"]:
+        with pytest.raises(ValueError) as err:
+            workflow.query(name=name)(handler)
+        assert f"Query name '{name}' is reserved" in str(err.value)
+
+
+def test_workflow_handler_reserved_default_names():
+    # Python mangles these attribute names on the class, but not the function
+    # __name__ that becomes the handler name
+    with pytest.raises(ValueError) as err:
+
+        class MangledSignal:  # type:ignore[reportUnusedClass]
+            @workflow.signal
+            def __temporal_signal(self) -> None:  # type:ignore[reportUnusedFunction]
+                pass
+
+    assert "Signal name '__temporal_signal' cannot start" in str(err.value)
+    with pytest.raises(ValueError) as err:
+
+        class MangledQuery:  # type:ignore[reportUnusedClass]
+            @workflow.query
+            def __stack_trace(self) -> str:  # type:ignore[reportUnusedFunction]
+                return ""
+
+    assert "Query name '__stack_trace' is reserved" in str(err.value)
+
+
+def test_workflow_handler_names_near_reserved_allowed():
+    def handler(_self: Any) -> None:
+        pass
+
+    # Used by temporalio.contrib.workflow_streams
+    workflow.signal(name="__temporal_workflow_stream_publish")(handler)
+    workflow.query(name="__temporal_workflow_stream_poll")(handler)
+    workflow.update(name="__temporal_workflow_stream_poll")(handler)
+    # Only queries reserve the stack trace names, and only exactly
+    workflow.signal(name="__stack_trace")(handler)
+    workflow.update(name="__enhanced_stack_trace")(handler)
+    workflow.query(name="__stack_trace_summary")(handler)
+    workflow.query(name="__temporal")(handler)
+    workflow.query(name="_temporal_query")(handler)
+    workflow.signal(name="my__temporal_signal")(handler)
+
+
 def _assert_config_function_parity(
     function_obj: Callable[..., Any],
     config_class: type[Any],

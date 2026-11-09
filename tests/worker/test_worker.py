@@ -146,6 +146,62 @@ class NeverRunService:
         raise NotImplementedError
 
 
+def test_worker_reserved_task_queue():
+    client = Mock(spec=Client)
+    client.config.return_value = {"plugins": []}
+    with pytest.raises(ValueError) as err:
+        Worker(
+            client,
+            task_queue="__temporal_task_queue",
+            activities=[never_run_activity],
+        )
+    assert (
+        "Task queue name '__temporal_task_queue' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+
+
+@nexusrpc.handler.service_handler(name="__temporal_service")
+class ReservedNameNexusService:
+    @nexusrpc.handler.sync_operation
+    async def operation(
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: None
+    ) -> None:
+        raise NotImplementedError
+
+
+@nexusrpc.handler.service_handler
+class ReservedOperationNameNexusService:
+    @nexusrpc.handler.sync_operation(name="__temporal_operation")
+    async def operation(
+        self, _ctx: nexusrpc.handler.StartOperationContext, _input: None
+    ) -> None:
+        raise NotImplementedError
+
+
+async def test_worker_reserved_nexus_names(client: Client):
+    with pytest.raises(ValueError) as err:
+        Worker(
+            client,
+            task_queue=f"tq-{uuid.uuid4()}",
+            nexus_service_handlers=[ReservedNameNexusService()],
+        )
+    assert (
+        "Nexus service name '__temporal_service' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+    with pytest.raises(ValueError) as err:
+        Worker(
+            client,
+            task_queue=f"tq-{uuid.uuid4()}",
+            nexus_service_handlers=[ReservedOperationNameNexusService()],
+        )
+    assert (
+        "Nexus operation name '__temporal_operation' cannot start with reserved prefix '__temporal_'"
+        in str(err.value)
+    )
+
+
 async def test_worker_fatal_error_run(client: Client):
     # Run worker with injected workflow poll error
     worker = create_worker(client)

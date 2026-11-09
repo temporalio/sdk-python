@@ -156,7 +156,8 @@ class Worker:
                 worker_service_client attribute with reference to the original
                 client's underlying service client. This client cannot be
                 "lazy".
-            task_queue: Required task queue for this worker.
+            task_queue: Required task queue for this worker. Names starting
+                with ``__temporal_`` are reserved.
             activities: Activity callables decorated with
                 :py:func:`@activity.defn<temporalio.activity.defn>`. Activities
                 may be async functions or non-async functions.
@@ -435,6 +436,7 @@ class Worker:
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
             )
+        temporalio.common._assert_not_reserved_name("Task queue", config["task_queue"])  # type: ignore[reportTypedDictNotRequiredAccess]
         if config.get("use_worker_versioning") and not config.get("build_id"):
             raise ValueError(
                 "build_id must be specified when use_worker_versioning is True"

@@ -729,7 +729,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
     ) -> WorkflowInstance:
         # Get the definition
-        defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
+        defn = self._workflows.get(init.workflow_type)
+        if not defn and not temporalio.common._is_reserved_name(init.workflow_type):
+            defn = self._dynamic_workflow
         if not defn:
             workflow_names = ", ".join(sorted(self._workflows.keys()))
             raise temporalio.exceptions.ApplicationError(
