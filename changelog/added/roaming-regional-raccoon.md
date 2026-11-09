@@ -1,0 +1,1 @@
+`TLSConfig.verification_server_name` now also accepts a sequence of names. The server certificate is accepted if it is valid for any one of them, for targets whose servers present different certificate names (for example, regional servers behind one global address). Requires `server_root_ca_cert`.

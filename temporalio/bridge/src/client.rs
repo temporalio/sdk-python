@@ -58,7 +58,7 @@ struct ClientTlsConfig {
     domain: Option<String>,
     client_cert: Option<Vec<u8>>,
     client_private_key: Option<Vec<u8>>,
-    verification_server_name: Option<String>,
+    verification_server_names: Option<Vec<String>>,
 }
 
 #[derive(FromPyObject)]
@@ -316,9 +316,9 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
 
     fn try_from(conf: ClientTlsConfig) -> PyResult<Self> {
         let mut server_root_ca_cert = conf.server_root_ca_cert;
-        let server_cert_verifier = match conf.verification_server_name {
+        let server_cert_verifier = match conf.verification_server_names {
             None => None,
-            Some(name) => {
+            Some(names) => {
                 // The CA bundle is consumed by the verifier's own root store; a
                 // custom verifier cannot be combined with roots on the connection.
                 let ca_cert = server_root_ca_cert.take().ok_or_else(|| {
@@ -326,7 +326,7 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
                         "Must have server root CA cert when verification server name is set",
                     )
                 })?;
-                Some(fixed_server_name_verifier(&name, &ca_cert)?)
+                Some(fixed_server_name_verifier(&names, &ca_cert)?)
             }
         };
         let client_tls_options = match (conf.client_cert, conf.client_private_key) {
@@ -353,11 +353,11 @@ impl TryFrom<ClientTlsConfig> for temporalio_client::TlsOptions {
 }
 
 /// Builds a standard WebPKI verifier over the given root CA bundle that
-/// checks the certificate against `verification_server_name` rather than the
-/// connection's server name, leaving SNI/`:authority` to follow the
+/// checks the certificate against the verification server names rather than
+/// the connection's server name, leaving SNI/`:authority` to follow the
 /// connected host (or `domain` when set).
 fn fixed_server_name_verifier(
-    verification_server_name: &str,
+    verification_server_names: &[String],
     ca_cert_pem: &[u8],
 ) -> PyResult<Arc<dyn ServerCertVerifier>> {
     let certs = CertificateDer::pem_slice_iter(ca_cert_pem)
@@ -390,17 +390,32 @@ fn fixed_server_name_verifier(
         .map_err(|err| {
             PyValueError::new_err(format!("Failed building certificate verifier: {err}"))
         })?;
-    let server_name = ServerName::try_from(verification_server_name.to_owned())
-        .map_err(|err| PyValueError::new_err(format!("Invalid verification server name: {err}")))?;
-    Ok(Arc::new(FixedServerNameVerifier { inner, server_name }))
+    if verification_server_names.is_empty() {
+        return Err(PyValueError::new_err(
+            "Verification server names must not be empty",
+        ));
+    }
+    let server_names = verification_server_names
+        .iter()
+        .map(|name| {
+            ServerName::try_from(name.to_owned()).map_err(|err| {
+                PyValueError::new_err(format!("Invalid verification server name: {err}"))
+            })
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    Ok(Arc::new(FixedServerNameVerifier {
+        inner,
+        server_names,
+    }))
 }
 
 /// Delegates to the standard WebPKI verifier, but verifies the certificate
-/// against a fixed server name instead of the connection's server name.
+/// against fixed server names instead of the connection's server name. The
+/// certificate is accepted if it is valid for any one of the names.
 #[derive(Debug)]
 struct FixedServerNameVerifier {
     inner: Arc<WebPkiServerVerifier>,
-    server_name: ServerName<'static>,
+    server_names: Vec<ServerName<'static>>,
 }
 
 impl ServerCertVerifier for FixedServerNameVerifier {
@@ -412,13 +427,24 @@ impl ServerCertVerifier for FixedServerNameVerifier {
         ocsp_response: &[u8],
         now: UnixTime,
     ) -> Result<ServerCertVerified, rustls::Error> {
-        self.inner.verify_server_cert(
-            end_entity,
-            intermediates,
-            &self.server_name,
-            ocsp_response,
-            now,
-        )
+        let mut first_err = None;
+        for server_name in &self.server_names {
+            match self.inner.verify_server_cert(
+                end_entity,
+                intermediates,
+                server_name,
+                ocsp_response,
+                now,
+            ) {
+                Ok(verified) => return Ok(verified),
+                Err(err) => {
+                    first_err.get_or_insert(err);
+                }
+            }
+        }
+        Err(first_err.unwrap_or_else(|| {
+            rustls::Error::General("no verification server names configured".to_owned())
+        }))
     }
 
     fn verify_tls12_signature(
