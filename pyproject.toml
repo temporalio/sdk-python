@@ -68,7 +68,8 @@ dev = [
   "pydocstyle>=6.3.0,<7",
   "pydoctor>=25.10.1,<26",
   "pyright==1.1.414",
-  "pytest~=9.0",
+  # pytest-asyncio 0.21 relies on pytest internals removed in 9.2.
+  "pytest>=9.0,<9.2",
   "pytest-asyncio>=0.21,<0.22",
   "pytest-timeout~=2.2",
   "ruff>=0.15.12,<0.16",
