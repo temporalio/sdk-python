@@ -67,7 +67,10 @@ from temporalio.converter import (
 from temporalio.exceptions import ApplicationError, NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
-from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from temporalio.worker._workflow_instance import (
+    UnsandboxedWorkflowRunner,
+    _WorkflowInstanceImpl,
+)
 from tests.helpers import assert_eq_eventually
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.test_extstore import InMemoryTestDriver
@@ -1345,6 +1348,71 @@ async def test_codec_with_context(client: Client):
         ),
     ]
     del test_traces[workflow_id]
+
+
+async def test_command_context_resolved_only_with_codec_or_external_storage(
+    client: Client, monkeypatch: pytest.MonkeyPatch
+):
+    """Context resolution calls into the workflow instance, which is costly in the
+    sandbox, so workers skip it when no codec or external storage can use it."""
+    lookups: defaultdict[str, int] = defaultdict(int)
+
+    def count_lookups(name: str) -> None:
+        lookup = getattr(_WorkflowInstanceImpl, name)
+
+        def counting_lookup(self, command_info):  # type: ignore[reportMissingParameterType]
+            lookups[name] += 1
+            return lookup(self, command_info)
+
+        monkeypatch.setattr(_WorkflowInstanceImpl, name, counting_lookup)
+
+    count_lookups("get_serialization_context")
+    count_lookups("get_external_store_context")
+
+    async def run_workflow(data_converter: DataConverter) -> tuple[int, int]:
+        """Returns the serialization and external store context lookup counts."""
+        lookups.clear()
+        workflow_id = str(uuid.uuid4())
+        task_queue = str(uuid.uuid4())
+        client_config = client.config()
+        client_config["data_converter"] = data_converter
+        converter_client = Client(**client_config)
+        async with Worker(
+            converter_client,
+            task_queue=task_queue,
+            workflows=[CodecTestWorkflow],
+            workflow_runner=UnsandboxedWorkflowRunner(),
+        ):
+            await converter_client.execute_workflow(
+                CodecTestWorkflow.run,
+                "data",
+                id=workflow_id,
+                task_queue=task_queue,
+            )
+        test_traces.pop(workflow_id, None)
+        return (
+            lookups["get_serialization_context"],
+            lookups["get_external_store_context"],
+        )
+
+    assert await run_workflow(DataConverter.default) == (0, 0)
+
+    serialization_lookups, store_lookups = await run_workflow(
+        dataclasses.replace(
+            DataConverter.default, payload_codec=PayloadCodecWithContext()
+        )
+    )
+    assert serialization_lookups > 0
+    assert store_lookups == 0
+
+    serialization_lookups, store_lookups = await run_workflow(
+        dataclasses.replace(
+            DataConverter.default,
+            external_storage=ExternalStorage(drivers=[InMemoryTestDriver()]),
+        )
+    )
+    assert serialization_lookups > 0
+    assert store_lookups > 0
 
 
 # Local activity codec test

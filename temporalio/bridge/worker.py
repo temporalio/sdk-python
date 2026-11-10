@@ -330,10 +330,11 @@ async def decode_activation(
             _Visitor(data_converter._external_retrieve_payload_sequence), activation
         )
 
-    await CommandAwarePayloadVisitor(
-        skip_search_attributes=True,
-        skip_headers=not decode_headers,
-    ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
+    if data_converter.payload_codec:
+        await CommandAwarePayloadVisitor(
+            skip_search_attributes=True,
+            skip_headers=not decode_headers,
+        ).visit(_Visitor(data_converter._decode_payload_sequence), activation)
 
     return metrics
 
@@ -349,6 +350,10 @@ async def encode_completion(
     Returns:
         Metrics from any external storage store operations that occurred.
     """
+    metrics = temporalio.converter._extstore.StorageOperationMetrics()
+    if not data_converter._has_codec_or_external_storage:
+        return metrics
+
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not encode_headers,
@@ -357,16 +362,16 @@ async def encode_completion(
         completion,
     )
 
-    metrics = temporalio.converter._extstore.StorageOperationMetrics()
-    with metrics.track():
-        await CommandAwarePayloadVisitor(
-            skip_search_attributes=True,
-            skip_headers=not encode_headers,
-            concurrency_limit=storage_concurrency_limit,
-        ).visit(
-            _Visitor(data_converter._external_store_payload_sequence),
-            completion,
-        )
+    if data_converter.external_storage:
+        with metrics.track():
+            await CommandAwarePayloadVisitor(
+                skip_search_attributes=True,
+                skip_headers=not encode_headers,
+                concurrency_limit=storage_concurrency_limit,
+            ).visit(
+                _Visitor(data_converter._external_store_payload_sequence),
+                completion,
+            )
 
     await CommandAwarePayloadVisitor(
         skip_search_attributes=True,
