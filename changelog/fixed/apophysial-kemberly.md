@@ -1,0 +1,1 @@
+Core: Downloading an ephemeral dev or test server binary now retries transient HTTP failures, such as a `503` returned while a release is rolling out, with backoff instead of failing on the first attempt.
