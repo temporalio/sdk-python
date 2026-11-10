@@ -32,10 +32,15 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     CURRENT_POLLERS_FIELD_NUMBER: builtins.int
     LAST_SUCCESSFUL_POLL_TIME_FIELD_NUMBER: builtins.int
     IS_AUTOSCALING_FIELD_NUMBER: builtins.int
+    TARGET_POLLERS_FIELD_NUMBER: builtins.int
     current_pollers: builtins.int
     """Number of polling RPCs that are currently in flight."""
     is_autoscaling: builtins.bool
     """Set true if the number of concurrent pollers is auto-scaled"""
+    target_pollers: builtins.int
+    """Number of concurrent poll requests this poller pool is currently targeting, which may
+    differ from current_pollers. 0 if unknown, such as a poller pool of fixed size.
+    """
     @property
     def last_successful_poll_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
     def __init__(
@@ -44,6 +49,7 @@ class WorkerPollerInfo(google.protobuf.message.Message):
         current_pollers: builtins.int = ...,
         last_successful_poll_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         is_autoscaling: builtins.bool = ...,
+        target_pollers: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -60,6 +66,8 @@ class WorkerPollerInfo(google.protobuf.message.Message):
             b"is_autoscaling",
             "last_successful_poll_time",
             b"last_successful_poll_time",
+            "target_pollers",
+            b"target_pollers",
         ],
     ) -> None: ...
 
