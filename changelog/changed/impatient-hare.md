@@ -1,0 +1,1 @@
+`ApplicationError(next_retry_delay=timedelta(0))` now sends the zero delay instead of falling back to the retry policy's interval, so a local activity retries right away. Servers affected by temporalio/temporal#13010 fail a regular activity that sends a zero delay with `RETRY_STATE_TIMEOUT`.
