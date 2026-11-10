@@ -580,6 +580,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: str | None = None,
         static_details: str | None = None,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -600,6 +601,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: str | None = None,
         static_details: str | None = None,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -622,6 +624,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: str | None = None,
         static_details: str | None = None,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
@@ -643,6 +646,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         typed_search_attributes: temporalio.common.TypedSearchAttributes = temporalio.common.TypedSearchAttributes.empty,
         static_summary: str | None = None,
         static_details: str | None = None,
+        headers: Mapping[str, temporalio.api.common.v1.Payload] | None = None,
         priority: temporalio.common.Priority = temporalio.common.Priority.default,
     ) -> None: ...
 
