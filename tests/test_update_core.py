@@ -9,6 +9,121 @@ import tomlkit
 import scripts.update_core
 
 
+@pytest.mark.parametrize(
+    "tags, expected",
+    [
+        (
+            "core-v0.9.0\ncore-v0.11.0\ncore-v0.10.2\ncore-v0.12.0-rc.1\n"
+            "sdk-v99.0.0\ncore-v0.11.1\n",
+            "core-v0.11.1",
+        ),
+        ("core-v1.0.0\ncore-v0.99.0\n", "core-v1.0.0"),
+    ],
+)
+def test_latest_core_tag(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tags: str,
+    expected: str,
+) -> None:
+    (tmp_path / "temporalio/bridge/sdk-core/.git").mkdir(parents=True)
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert kwargs["cwd"] == tmp_path / "temporalio/bridge/sdk-core"
+        assert kwargs["check"] is True
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, tags)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    assert scripts.update_core.latest_core_tag(tmp_path) == expected
+    assert calls == [
+        ["git", "fetch", "origin", "--tags"],
+        ["git", "tag", "--list", "core-v*"],
+    ]
+
+
+def test_latest_core_tag_requires_stable_release(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "temporalio/bridge/sdk-core/.git").mkdir(parents=True)
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            [], 0, "core-v1.0.0-rc.1\n"
+        ),
+    )
+    with pytest.raises(RuntimeError, match="No stable"):
+        scripts.update_core.latest_core_tag(tmp_path)
+
+
+def test_latest_core_tag_requires_initialized_submodule(tmp_path: pathlib.Path) -> None:
+    with pytest.raises(RuntimeError, match="git submodule update --init"):
+        scripts.update_core.latest_core_tag(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "args, expected",
+    [
+        ([], []),
+        (["--latest-tag"], ["--revision", "core-v0.11.0"]),
+        (["--revision", "main"], ["--revision", "main"]),
+        (["--revision=main"], ["--revision", "main"]),
+    ],
+)
+def test_update_core_orders_import_lock_and_protos(
+    tmp_path: pathlib.Path,
+    monkeypatch: pytest.MonkeyPatch,
+    args: list[str],
+    expected: list[str],
+) -> None:
+    calls: list[str] = []
+
+    def latest(_root: pathlib.Path) -> str:
+        calls.append("tag")
+        return "core-v0.11.0"
+
+    def import_core(_root: pathlib.Path, tool_args: list[str]) -> str:
+        assert tool_args == [
+            "update-core",
+            "--submodule",
+            "temporalio/bridge/sdk-core",
+            *expected,
+        ]
+        calls.append("import")
+        return ""
+
+    def generate(command: list[str], **kwargs: object) -> None:
+        assert command == ["poe", "gen-protos"]
+        assert kwargs == {"cwd": tmp_path, "check": True}
+        calls.append("protos")
+
+    monkeypatch.setattr(scripts.update_core, "latest_core_tag", latest)
+    monkeypatch.setattr(scripts.update_core, "run_tool", import_core)
+    monkeypatch.setattr(
+        scripts.update_core,
+        "update_bridge_dependencies",
+        lambda _root: calls.append("lock"),
+    )
+    monkeypatch.setattr(subprocess, "run", generate)
+    scripts.update_core.update_core(tmp_path, args)
+    assert calls == (["tag"] if args == ["--latest-tag"] else []) + [
+        "import",
+        "lock",
+        "protos",
+    ]
+
+
+@pytest.mark.parametrize("revision", [["--revision", "main"], ["--revision=main"]])
+def test_latest_tag_and_revision_are_mutually_exclusive(
+    tmp_path: pathlib.Path, revision: list[str]
+) -> None:
+    with pytest.raises(SystemExit) as err:
+        scripts.update_core.update_core(tmp_path, ["--latest-tag", *revision])
+    assert err.value.code == 2
+
+
 def write_crate(path: pathlib.Path, name: str, version: str) -> None:
     path.mkdir(parents=True, exist_ok=True)
     (path / "Cargo.toml").write_text(
