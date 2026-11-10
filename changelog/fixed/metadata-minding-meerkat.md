@@ -1,0 +1,1 @@
+The built-in `__temporal_workflow_metadata` query now encodes its result with the default payload converter, allowing the UI and CLI to read workflow metadata even when the worker's payload converter cannot serialize protobuf. The configured payload codec still applies.
