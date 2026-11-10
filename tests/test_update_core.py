@@ -196,8 +196,10 @@ def test_refresh_failure_leaves_manifest_for_review(
 ) -> None:
     bridge = bridge_fixture(tmp_path)
 
-    def fail(*_args: object, **_kwargs: object) -> None:
-        raise subprocess.CalledProcessError(1, "cargo fetch")
+    def fail(command: list[str], **kwargs: object) -> None:
+        assert command == ["cargo", "update"]
+        assert kwargs == {"cwd": bridge, "check": True}
+        raise subprocess.CalledProcessError(1, command)
 
     monkeypatch.setattr(subprocess, "run", fail)
     with pytest.raises(subprocess.CalledProcessError):

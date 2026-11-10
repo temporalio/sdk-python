@@ -102,7 +102,8 @@ Repeated updates import only the range since the previous checkout; an unchanged
 pin creates no fragments. Review and commit the updated pin and generated fragments
 together with the bridge manifest and lockfile. Python copies Core path dependency
 versions from the updated checkout into `temporalio/bridge/Cargo.toml` and runs
-`cargo fetch` to refresh `Cargo.lock`, preserving existing valid registry pins.
+`cargo update` to refresh all bridge dependencies in `Cargo.lock` to the latest
+versions allowed by their requirements.
 The command does not stage or commit changes or resolve Rust API
 compatibility issues. If dependency refresh fails, inspect the updated pin,
 fragments, and manifest before retrying.

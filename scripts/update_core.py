@@ -47,7 +47,7 @@ def update_bridge_dependencies(repo_root: pathlib.Path) -> None:
     updated = tomlkit.dumps(manifest)
     if updated != original:
         manifest_path.write_text(updated)
-    subprocess.run(["cargo", "fetch"], cwd=bridge, check=True)
+    subprocess.run(["cargo", "update"], cwd=bridge, check=True)
 
 
 def latest_core_tag(repo_root: pathlib.Path) -> str:
