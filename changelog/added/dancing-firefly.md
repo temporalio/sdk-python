@@ -1,1 +1,0 @@
-Add experimental Nexus Handler Callbacks for standalone Nexus operations through `NexusClient.start_operation`. Use `temporalio.nexus.create_completion_callback` to send the result or failure and source context to a Nexus handler.

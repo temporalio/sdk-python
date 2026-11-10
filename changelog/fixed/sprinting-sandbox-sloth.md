@@ -1,1 +1,0 @@
-Workflow workers without a payload codec or external storage skip the payload codec passes and the per-command serialization-context lookups on every activation and completion, restoring the workflow task and replay performance lost since 1.23.
