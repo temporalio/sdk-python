@@ -4651,7 +4651,7 @@ dev = [
     { name = "pydocstyle", specifier = ">=6.3.0,<7" },
     { name = "pydoctor", specifier = ">=25.10.1,<26" },
     { name = "pyright", specifier = "==1.1.414" },
-    { name = "pytest", specifier = "~=9.0" },
+    { name = "pytest", specifier = ">=9.0,<9.2" },
     { name = "pytest-asyncio", specifier = ">=0.21,<0.22" },
     { name = "pytest-cov", specifier = ">=6.1.1" },
     { name = "pytest-flakefinder", specifier = ">=1.1.0" },
