@@ -574,6 +574,17 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
         ),
         "asyncio": SandboxMatcher(
             children={
+                "TaskGroup": SandboxMatcher(
+                    children={
+                        "__call__": SandboxMatcher(
+                            match_self=True,
+                            leaf_warning=UserWarning,
+                            leaf_message=(
+                                "asyncio.TaskGroup() has non-deterministic task cancellation order"
+                            ),
+                        )
+                    },
+                ),
                 "as_completed": SandboxMatcher(
                     children={
                         "__call__": SandboxMatcher(
