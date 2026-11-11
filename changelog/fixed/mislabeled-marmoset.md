@@ -1,1 +1,0 @@
-Fix `contrib.opentelemetry` `MetricsExporter` recording a metric under another metric's instrument or another attribute set's labels when instruments or attributes are created per call. It cached them by `id()`, which Python reuses once an object is freed.

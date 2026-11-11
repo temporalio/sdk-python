@@ -1,1 +1,0 @@
-Workers that don't configure poller behavior now auto-enroll in poller autoscaling when the server enables it (`frontend.pollerAutoscalingAutoEnroll`); otherwise they keep using a fixed 5-poller maximum.

@@ -7,6 +7,89 @@ This file contains assembled releases only.
 
 # Changelog
 
+## [1.36.0] - 2026-11-10
+
+### Added
+
+- Add experimental Nexus Handler Callbacks for standalone Nexus operations through `NexusClient.start_operation`. Use `temporalio.nexus.create_completion_callback` to send the result or failure and source context to a Nexus handler.
+
+- Workers that don't configure poller behavior now auto-enroll in poller autoscaling when the server enables it (`frontend.pollerAutoscalingAutoEnroll`); otherwise they keep using a fixed 5-poller maximum.
+
+- Add experimental envconfig extensions: `ClientConfig.load_client_connect_config` accepts `extensions` that read their own config from `profile.<profile>.ext.<name>` TOML tables (exposed as `ClientConfigProfile.ext` and never rejected by strict mode) and env vars, and contribute client plugins to the returned config's `plugins`.
+
+- Core: A local activity's `ActivityTask.Start` has `workflow_task` (field 21), with the started event id, attempt and start time of the workflow task in which Core dispatched it. `workflow_task` also has `previous_started_event_id`, `previous_attempt` and `previous_started_time`, which name the run's last completed workflow task, and `failed_tasks`, the started event ids of the run's last 100 failed or timed out workflow tasks. Retries that Core runs locally keep the value. Core leaves it unset for other activities.
+- Core: Client environment config profiles include the raw TOML tables under `profile.<name>.ext`, keyed by extension name, for SDK envconfig extensions. Strict mode accepts any content under `ext`. The C bridge's profile JSON includes them as an `ext` object, with TOML datetimes as strings.
+
+- Client and worker plugins have a new `Plugin.version()` method. Worker plugins report it in worker heartbeats; override it or pass `version` to `SimplePlugin`.
+
+- Add Python 3.15 support.
+
+- Nexus operation handlers now propagate their `NexusSerializationContext` to the workflow updates they send, which encode their result, failure and rejection with it. Update handles decode them with the context the server returns. Requires a server that propagates the context.
+
+- Nexus operation handlers now propagate their `NexusSerializationContext` to the workflows and standalone activities they start, which encode their results and failures (and a standalone activity's heartbeat details) with it because these are returned to the Nexus caller. Clients decode them with the context the server returns, including handles obtained by ID and standalone Nexus operation handles. Requires a server that propagates the context.
+- Added `activity.Info.nexus_serialization_context`. To complete a Nexus-started standalone activity asynchronously, pass it to `AsyncActivityHandle.with_context`.
+
+- Warn when `asyncio.TaskGroup` is created in a sandboxed workflow because its non-deterministic task cancellation order can cause replay failures.
+
+### Changed
+
+- Core: Poller pools now report their poller target to the server on each poll and in the worker heartbeat: the current target for autoscaling pools, the configured maximum for fixed-size pools. (We'll use this count on the server side for now for load balancing pollers between workers, and for creating a per-worker poller count metric.)
+
+- Process workflow activation jobs as a single batch by default (workflow logic flag 2), so signal and update handlers no longer run before other jobs delivered in the same workflow task, such as the random seed update after a reset. Histories that record this flag replay with the new ordering only on SDK 1.31.0 or later.
+- Cancelling a Nexus operation handle after its synchronous response has already arrived now raises `CancelledError` when the handle is awaited, matching activities, instead of returning the result.
+
+- Update the `langsmith` extra to require `temporalio-langsmith>=0.1.1`.
+
+### :boom: Breaking Changes
+
+- Drop Python 3.10 support; Python 3.11 or newer is now required.
+
+- The workflow sandbox now restricts `time.clock_gettime()` and `time.clock_gettime_ns()` at runtime, like `time.time()` and `time.monotonic()`. Calling them from workflow code raises `RestrictedWorkflowAccessError`.
+
+- Experimental: a Temporal operation handler can now send only one signal (including signal-with-start) per invocation; a second raises a `BAD_REQUEST` error, unless the first signal failed. Signals from other Nexus operation handlers are not limited.
+
+- Core: Core now rejects activation responses with a nondeterminism error if the activation contained only updates and the response rejects every update but also includes another workflow command. SDKs must return only update rejections when all validators reject an update-only activation.
+
+- Regenerate Python bindings with grpcio-tools 1.49.1. The SDK now requires protobuf >=4.21.12 (protobuf 3 is no longer supported), and the optional grpc extra requires grpcio >=1.49.1.
+
+### Fixed
+
+- `temporalio.contrib.pydantic`: setting `ToJsonOptions` on the Pydantic payload converter no longer drops field aliases or serializes `inf`/`nan` as `null`; the JSON output now matches the default converter apart from the options themselves.
+
+- Core: Downloading an ephemeral dev or test server binary now retries transient HTTP failures, such as a `503` returned while a release is rolling out, with backoff instead of failing on the first attempt.
+
+- Fix the payload converter and failure converter losing their serialization context when external storage is configured. A converter that implements WithSerializationContext now gets the workflow, activity or other context whether or not external storage is enabled.
+
+- `temporalio.contrib.aws.lambda_worker`: `shutdown_hooks` now run before configuration teardown when an invocation fails or is cancelled after configuration setup succeeds, including task queue validation failures.
+
+- `temporalio.contrib.aws.lambda_worker.otel.apply_defaults` now creates its tracer provider once per process, so warm Lambda invocations no longer leak an OTLP span exporter thread and gRPC channel each time.
+
+- Core: A workflow task failure reported with the cause `WORKFLOW_TASK_FAILED_CAUSE_EXTERNAL_STORAGE_FAILURE` is now counted on `workflow_task_execution_failed` with `failure_reason="ExternalStorageError"`, matching activity failures with the storage cause. It was previously counted as `WorkflowError`.
+- Core: Ephemeral dev and test servers now complete the automatic port reservation handshake on Linux and macOS before starting, preventing intermittent address-in-use errors during TCP teardown.
+- Core: Resource-based worker tuners now read CPU usage and quotas from standard cgroup v1 mounts. Workers on cgroup v1 systems no longer fall back to host CPU usage and admit work based on understated container load.
+
+- `asyncio.sleep()`, `asyncio.wait_for()` and other asyncio timers no longer reuse the `timeout_summary` and Event Groups of an earlier `workflow.wait_condition()` call in the same task.
+
+- Fix `contrib.opentelemetry` `MetricsExporter` recording a metric under another metric's instrument or another attribute set's labels when instruments or attributes are created per call. It cached them by `id()`, which Python reuses once an object is freed.
+
+- Calling `Worker.run()` again on the same worker now raises `RuntimeError("Already started")` instead of a bridge panic.
+
+- Keep an empty TLS table when `ClientConfigProfile` and `ClientConfig` are converted to and from dictionaries, so a profile that enables TLS with default settings does not lose it.
+
+- Workflow workers without a payload codec or external storage skip the payload codec passes and the per-command serialization-context lookups on every activation and completion, restoring the workflow task and replay performance lost since 1.23.
+
+- Fix OpenTelemetryPlugin dropping the worker-side span for a rejected update or a failed query. An exception from an update validator or query handler does not fail the workflow task, so its span is now ended and exported with an error status.
+
+- Experimental: signals and signal-with-start sent from a Temporal operation handler now reuse the Nexus operation request ID, so a retried Nexus task no longer delivers the same signal twice.
+
+- Fix OpenTelemetry logger attribute typing and logger-provider test collection with OpenTelemetry 1.45 and newer by accepting string-keyed mappings without restricting attribute value types.
+
+- Core: Preserve queued queries across workflow eviction so requests for the same run are answered instead of silently dropped.
+- Core: Rejection-only update tasks no longer dispatch local activities resumed from replay before validation, allowing those tasks to remain unrecorded in workflow history.
+- Core: Preparing a legacy query now remains in replay mode, preventing unrecorded local activity attempts that could execute twice or leave the workflow stuck.
+
+- Fix argument conversion for activity methods that annotate `self` with `Self`.
+
 ## [1.35.0] - 2026-10-28
 
 ### Added
