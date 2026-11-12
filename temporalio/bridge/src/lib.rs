@@ -47,6 +47,10 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<runtime::BufferedLogEntry>()?;
     m.add_function(wrap_pyfunction!(init_runtime, m)?)?;
     m.add_function(wrap_pyfunction!(raise_in_thread, m)?)?;
+    py.import("atexit")?.call_method1(
+        "register",
+        (wrap_pyfunction!(runtime::shutdown_runtimes, m)?,),
+    )?;
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
@@ -90,7 +94,7 @@ fn connect_client<'a>(
 }
 
 #[pyfunction]
-fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<metric::MetricMeterRef> {
+fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> PyResult<Option<metric::MetricMeterRef>> {
     metric::new_metric_meter(runtime_ref)
 }
 
