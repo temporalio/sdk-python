@@ -1,0 +1,1 @@
+Add `@temporal_operation(dynamic=True)` for one unnamed Nexus operation fallback per service. The handler receives raw `nexusrpc.LazyValue` input and reuses Temporal start, result, and cancellation behavior.
