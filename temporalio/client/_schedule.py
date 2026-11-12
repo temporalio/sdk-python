@@ -800,6 +800,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 workflow_id=self.id,
             ),
             StorageDriverStoreContext(
+                namespace=client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=self.id, type=self.workflow, namespace=client.namespace
                 ),

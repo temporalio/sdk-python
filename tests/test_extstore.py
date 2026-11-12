@@ -765,6 +765,27 @@ class TestMultiDriver:
         assert isinstance(driver._store_contexts[0], StorageDriverStoreContext)
         assert driver._store_contexts[0].target == target
 
+    async def test_contexts_carry_namespace_without_target(self):
+        driver = InMemoryTestDriver("test-driver")
+        seen: list[StorageDriverSelectContext] = []
+
+        def selector(
+            context: StorageDriverSelectContext, _payload: Payload
+        ) -> StorageDriver:
+            seen.append(context)
+            return driver
+
+        storage = ExternalStorage(
+            drivers=[driver],
+            driver_selector=selector,
+            payload_size_threshold=50,
+        )._with_store_context(StorageDriverStoreContext(namespace="ns"))
+
+        await DataConverter(external_storage=storage).encode(["x" * 200])
+
+        assert seen == [StorageDriverSelectContext(namespace="ns")]
+        assert driver._store_contexts == [StorageDriverStoreContext(namespace="ns")]
+
     async def test_selector_routes_payloads_to_different_drivers_in_single_batch(self):
         """When a selector routes different payloads to different drivers, a
         single encode([v1, v2, ...]) call batches payloads per driver so each

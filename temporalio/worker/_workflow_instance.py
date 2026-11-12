@@ -2635,7 +2635,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
 
         if command_info is None:
-            return StorageDriverStoreContext(target=current_wf)
+            return StorageDriverStoreContext(
+                namespace=self._info.namespace, target=current_wf
+            )
 
         COMMAND_TYPE = temporalio.api.enums.v1.command_type_pb2.CommandType
 
@@ -2646,6 +2648,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             child = self._pending_child_workflows[command_info.command_seq]
             return StorageDriverStoreContext(
+                namespace=self._info.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=child._input.id,
                     type=child._input.workflow,
@@ -2660,6 +2663,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         ):
             _, target_id = self._pending_external_signals[command_info.command_seq]
             return StorageDriverStoreContext(
+                namespace=self._info.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=target_id, namespace=self._info.namespace
                 ),
@@ -2672,6 +2676,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             and self._info.continued_run_id is None
         ):
             return StorageDriverStoreContext(
+                namespace=self._info.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=self._info.parent.workflow_id,
                     run_id=self._info.parent.run_id,
@@ -2680,7 +2685,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         else:
-            return StorageDriverStoreContext(target=current_wf)
+            return StorageDriverStoreContext(
+                namespace=self._info.namespace, target=current_wf
+            )
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
