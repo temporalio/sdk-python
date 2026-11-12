@@ -149,6 +149,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._workflow_task_executor_user_provided = workflow_task_executor is not None
 
+        if isinstance(workflow_runner, SandboxedWorkflowRunner):
+            # Give each worker its own module cache rather than sharing the
+            # default SandboxedWorkflowRunner instance across workers.
+            workflow_runner = workflow_runner._with_fresh_module_cache()
+
         # If debug mode is enabled, ensure that the debugpy (https://github.com/microsoft/debugpy)
         # import is added as a passthrough
         if debug_mode and isinstance(workflow_runner, SandboxedWorkflowRunner):

@@ -15,6 +15,7 @@ from temporalio import workflow
 from temporalio.worker.workflow_sandbox._importer import (
     Importer,
     _loaded_module_for_import,
+    _ModuleCache,
     _thread_local_sys_modules,
     _ThreadLocalSysModules,
 )
@@ -438,3 +439,177 @@ def test_workflow_sandbox_importer_loaded_module_import_inside_module_lock(
 
         assert sandbox_lock_reentry_module.VALUE == 1
     assert nested_done
+
+
+def test_workflow_sandbox_importer_module_cache_prevents_hot_reload(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import concurrent.futures
+    import inspect
+    import shutil
+    import threading
+
+    pkg_dir = tmp_path / "cached_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("from . import helper\nPKG_VERSION = 'v1'\n")
+    (pkg_dir / "helper.py").write_text(
+        "STATE = ['orig']\ndef get_version() -> str:\n    return 'helper_v1'\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    cache = _ModuleCache()
+    with Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    ).applied():
+        import cached_pkg  # type: ignore[import-not-found]
+        from cached_pkg import helper  # type: ignore[import-not-found]
+
+        assert cached_pkg.PKG_VERSION == "v1"
+        assert helper.get_version() == "helper_v1"
+        assert cached_pkg.__package__ == "cached_pkg"
+        assert helper.__package__ == "cached_pkg"
+        assert cached_pkg.__file__ == str(pkg_dir / "__init__.py")
+        assert helper.__file__ == str(pkg_dir / "helper.py")
+        helper.STATE.append("mutated")
+
+    # Overwrite files on disk and clear bytecode caches
+    pycache = pkg_dir / "__pycache__"
+    if pycache.exists():
+        shutil.rmtree(pycache)
+    (pkg_dir / "__init__.py").write_text(
+        "from . import helper\nPKG_VERSION = 'v2_from_disk'\n"
+    )
+    (pkg_dir / "helper.py").write_text(
+        "STATE = ['new']\ndef get_version() -> str:\n    return 'helper_v2_from_disk'\n"
+    )
+    importlib.invalidate_caches()
+
+    # Subsequent sandboxed imports using the same cache get v1 with fresh state
+    with Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    ).applied():
+        import cached_pkg as cached_pkg_2  # type: ignore[import-not-found]
+        from cached_pkg import helper as helper_2  # type: ignore[import-not-found]
+
+        assert cached_pkg_2.PKG_VERSION == "v1"
+        assert helper_2.get_version() == "helper_v1"
+        assert helper_2.STATE == ["orig"]
+
+    # Delete files completely from disk; cached code and source still work
+    shutil.rmtree(pkg_dir)
+    importlib.invalidate_caches()
+
+    with Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    ).applied():
+        import cached_pkg as cached_pkg_3  # type: ignore[import-not-found]
+        from cached_pkg import helper as helper_3  # type: ignore[import-not-found]
+
+        assert cached_pkg_3.PKG_VERSION == "v1"
+        assert helper_3.get_version() == "helper_v1"
+        assert "return 'helper_v1'" in inspect.getsource(helper_3.get_version)
+
+    # Concurrent imports on a fresh cache do not race or deadlock
+    concurrent_dir = tmp_path / "concurrent_mod_dir"
+    concurrent_dir.mkdir()
+    (concurrent_dir / "concurrent_cached_mod.py").write_text("VALUE = 'ok'\n")
+    monkeypatch.syspath_prepend(str(concurrent_dir))
+    concurrent_cache = _ModuleCache()
+    barrier = threading.Barrier(4)
+
+    def import_worker() -> str:
+        barrier.wait(timeout=5)
+        with Importer(
+            SandboxRestrictions.default,
+            RestrictionContext(),
+            module_cache=concurrent_cache,
+        ).applied():
+            import concurrent_cached_mod  # type: ignore[import-not-found]
+
+            return concurrent_cached_mod.VALUE
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        results = list(executor.map(lambda _: import_worker(), range(4)))
+    assert results == ["ok", "ok", "ok", "ok"]
+
+
+def test_workflow_sandbox_importer_module_cache_temporal_main(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import shutil
+
+    main_file = tmp_path / "fake_main_script.py"
+    main_file.write_text("MAIN_VERSION = 'main_v1'\n")
+    monkeypatch.setattr(
+        sys.modules["__main__"], "__file__", str(main_file), raising=False
+    )
+
+    cache = _ModuleCache()
+    with Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    ).applied():
+        import __temporal_main__ as main_1  # type: ignore[import-not-found]
+
+        assert main_1.MAIN_VERSION == "main_v1"
+
+    pycache = tmp_path / "__pycache__"
+    if pycache.exists():
+        shutil.rmtree(pycache)
+    main_file.write_text("MAIN_VERSION = 'main_v2_from_disk'\n")
+    importlib.invalidate_caches()
+
+    with Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    ).applied():
+        import __temporal_main__ as main_2  # type: ignore[import-not-found]
+
+        assert main_2.MAIN_VERSION == "main_v1"
+
+
+def test_workflow_sandbox_importer_module_cache_does_not_affect_host(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import threading
+
+    mod_file = tmp_path / "host_vs_sandbox_mod.py"
+    mod_file.write_text("VERSION = 'v1'\n")
+    unapplied_file = tmp_path / "host_unapplied_mod.py"
+    unapplied_file.write_text("VERSION = 'unapplied_v1'\n")
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    cache = _ModuleCache()
+    importer = Importer(
+        SandboxRestrictions.default, RestrictionContext(), module_cache=cache
+    )
+    with importer.applied():
+        import host_vs_sandbox_mod  # type: ignore[import-not-found]
+
+        assert host_vs_sandbox_mod.VERSION == "v1"
+
+        # Update on disk while the sandbox importer is active
+        mod_file.write_text("VERSION = 'v2_host'\n")
+        unapplied_file.write_text("VERSION = 'unapplied_v2'\n")
+        importlib.invalidate_caches()
+
+        # Inside _unapplied(), host imports bypass the sandbox module cache
+        with importer._unapplied():
+            try:
+                unapplied_mod = importlib.import_module("host_unapplied_mod")
+                assert unapplied_mod.VERSION == "unapplied_v2"
+            finally:
+                sys.modules.pop("host_unapplied_mod", None)
+
+        # Other threads are also unaffected while sandbox importer is active
+        thread_result: list[str] = []
+
+        def host_thread() -> None:
+            try:
+                mod = importlib.import_module("host_vs_sandbox_mod")
+                thread_result.append(mod.VERSION)
+            finally:
+                sys.modules.pop("host_vs_sandbox_mod", None)
+
+        t = threading.Thread(target=host_thread)
+        t.start()
+        t.join(timeout=5)
+        assert thread_result == ["v2_host"]

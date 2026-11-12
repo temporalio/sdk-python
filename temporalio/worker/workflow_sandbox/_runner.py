@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import copy
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -30,7 +31,7 @@ from .._workflow_instance import (
     WorkflowInstanceDetails,
     WorkflowRunner,
 )
-from ._importer import Importer
+from ._importer import Importer, _ModuleCache
 from ._restrictions import RestrictionContext, SandboxRestrictions
 
 _fake_info = temporalio.workflow.Info(
@@ -74,6 +75,9 @@ class SandboxedWorkflowRunner(WorkflowRunner):
     _worker_level_failure_exception_types: Sequence[type[BaseException]] = field(
         default_factory=list, init=False
     )
+    _module_cache: _ModuleCache = field(
+        default_factory=_ModuleCache, init=False, repr=False, compare=False
+    )
 
     def prepare_workflow(self, defn: temporalio.workflow._Definition) -> None:
         """Implements :py:meth:`WorkflowRunner.prepare_workflow`."""
@@ -98,13 +102,20 @@ class SandboxedWorkflowRunner(WorkflowRunner):
 
     def create_instance(self, det: WorkflowInstanceDetails) -> WorkflowInstance:
         """Implements :py:meth:`WorkflowRunner.create_instance`."""
-        return _Instance(det, self.runner_class, self.restrictions)
+        return _Instance(
+            det, self.runner_class, self.restrictions, module_cache=self._module_cache
+        )
 
     def set_worker_level_failure_exception_types(
         self, types: Sequence[type[BaseException]]
     ) -> None:
         """Implements :py:meth:`WorkflowRunner.set_worker_level_failure_exception_types`."""
         object.__setattr__(self, "_worker_level_failure_exception_types", types)
+
+    def _with_fresh_module_cache(self) -> SandboxedWorkflowRunner:
+        ret = copy.copy(self)
+        object.__setattr__(ret, "_module_cache", _ModuleCache())
+        return ret
 
 
 # Implements in_sandbox._ExternEnvironment. Some of these calls are called from
@@ -115,6 +126,7 @@ class _Instance(WorkflowInstance):
         instance_details: WorkflowInstanceDetails,
         runner_class: type[WorkflowRunner],
         restrictions: SandboxRestrictions,
+        module_cache: _ModuleCache | None = None,
     ) -> None:
         self.instance_details = instance_details
         self.runner_class = runner_class
@@ -122,6 +134,7 @@ class _Instance(WorkflowInstance):
             restrictions,
             RestrictionContext(),
             workflow_module_name=self._workflow_module_name(),
+            module_cache=module_cache,
         )
 
         self._current_thread_id: int | None = None

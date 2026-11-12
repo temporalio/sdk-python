@@ -9,6 +9,8 @@ from __future__ import annotations
 import builtins
 import functools
 import importlib
+import importlib.abc
+import importlib.machinery
 import importlib.util
 import logging
 import sys
@@ -17,6 +19,7 @@ import types
 import warnings
 from collections.abc import Callable, Iterator, Mapping, MutableMapping, Sequence
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 from typing import (
     Any,
     Generic,
@@ -57,11 +60,15 @@ class Importer:
         restrictions: SandboxRestrictions,
         restriction_context: RestrictionContext,
         workflow_module_name: str | None = None,
+        module_cache: _ModuleCache | None = None,
     ) -> None:
         """Create importer."""
         self.restrictions = restrictions
         self.restriction_context = restriction_context
         self._workflow_module_name = workflow_module_name
+        self._module_cache = module_cache
+        if module_cache is not None:
+            _ensure_sandbox_meta_path_finder()
         self.new_modules: dict[str, types.ModuleType] = {
             "sys": sys,
             "builtins": builtins,
@@ -149,6 +156,8 @@ class Importer:
             while it is running and therefore should be locked against other
             code running at the same time.
         """
+        if self._module_cache is not None:
+            _ensure_sandbox_meta_path_finder()
         orig_importer = Importer.current_importer()
         Importer._thread_local_current.importer = self
         try:
@@ -248,9 +257,17 @@ class Importer:
             # we load it from whatever file __main__ was originally in
             if full_name == "__temporal_main__":
                 orig_mod = _thread_local_sys_modules.orig["__main__"]
-                new_spec = importlib.util.spec_from_file_location(
-                    full_name, orig_mod.__file__
-                )
+                if self._module_cache is not None:
+                    new_spec = self._module_cache.get_or_load(
+                        full_name,
+                        lambda: importlib.util.spec_from_file_location(
+                            full_name, orig_mod.__file__
+                        ),
+                    )
+                else:
+                    new_spec = importlib.util.spec_from_file_location(
+                        full_name, orig_mod.__file__
+                    )
                 if not new_spec:
                     raise ImportError(
                         f"No spec for __main__ file at {orig_mod.__file__}"
@@ -615,3 +632,186 @@ def _calc___package__(globals: Mapping[str, object]) -> str:
         if "__path__" not in globals:
             package = package.rpartition(".")[0]
     return package
+
+
+@dataclass(frozen=True)
+class _CachedModule:
+    name: str
+    code: types.CodeType
+    origin: str | None
+    has_location: bool
+    cached: str | None
+    submodule_search_locations: tuple[str, ...] | None
+    source: str | None
+
+    @staticmethod
+    def from_spec(
+        spec: importlib.machinery.ModuleSpec, fullname: str
+    ) -> _CachedModule | None:
+        loader = spec.loader
+        if loader is None or not spec.has_location:
+            return None
+        # Only cache Python code-backed loaders that construct standard modules.
+        # C extensions and custom loaders (e.g. ExtensionFileLoader) override
+        # create_module and cannot be re-executed from a CodeType object.
+        if getattr(type(loader), "create_module", None) not in (
+            None,
+            importlib.abc.Loader.create_module,
+            importlib.machinery.SourceFileLoader.create_module,
+        ):
+            return None
+        get_code = getattr(loader, "get_code", None)
+        if not callable(get_code):
+            return None
+        code = get_code(fullname)
+        if not isinstance(code, types.CodeType):
+            return None
+        source: str | None = None
+        get_source = getattr(loader, "get_source", None)
+        if callable(get_source):
+            try:
+                raw_source = get_source(fullname)
+                if isinstance(raw_source, str):
+                    source = raw_source
+            except Exception:
+                pass
+        return _CachedModule(
+            name=spec.name,
+            code=code,
+            origin=spec.origin,
+            has_location=spec.has_location,
+            cached=spec.cached,
+            submodule_search_locations=(
+                tuple(spec.submodule_search_locations)
+                if spec.submodule_search_locations is not None
+                else None
+            ),
+            source=source,
+        )
+
+    def to_spec(self) -> importlib.machinery.ModuleSpec:
+        spec = importlib.machinery.ModuleSpec(
+            name=self.name,
+            loader=_CachedLoader(self),
+            origin=self.origin,
+            is_package=self.submodule_search_locations is not None,
+        )
+        spec.has_location = self.has_location
+        spec.cached = self.cached
+        if self.submodule_search_locations is not None:
+            spec.submodule_search_locations = list(self.submodule_search_locations)
+        return spec
+
+
+class _CachedLoader(importlib.abc.InspectLoader):
+    def __init__(self, cached: _CachedModule) -> None:
+        self._cached = cached
+
+    def create_module(
+        self, spec: importlib.machinery.ModuleSpec
+    ) -> types.ModuleType | None:
+        return None
+
+    def exec_module(self, module: types.ModuleType) -> None:
+        exec(self._cached.code, module.__dict__)
+
+    def get_code(self, fullname: str) -> types.CodeType:
+        if fullname != self._cached.name:
+            raise ImportError(
+                f"loader for {self._cached.name} cannot handle {fullname}"
+            )
+        return self._cached.code
+
+    def get_source(self, fullname: str) -> str | None:
+        if fullname != self._cached.name:
+            raise ImportError(
+                f"loader for {self._cached.name} cannot handle {fullname}"
+            )
+        return self._cached.source
+
+    def is_package(self, fullname: str) -> bool:
+        if fullname != self._cached.name:
+            raise ImportError(
+                f"loader for {self._cached.name} cannot handle {fullname}"
+            )
+        return self._cached.submodule_search_locations is not None
+
+
+class _ModuleCache:
+    """Thread-safe cache of compiled module code objects for a sandbox runner."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._modules: dict[str, _CachedModule] = {}
+
+    def get_or_load(
+        self,
+        fullname: str,
+        find_spec: Callable[[], importlib.machinery.ModuleSpec | None],
+    ) -> importlib.machinery.ModuleSpec | None:
+        with self._lock:
+            cached = self._modules.get(fullname)
+        if cached is not None:
+            return cached.to_spec()
+
+        # Perform spec lookup and compilation outside the cache lock so we never
+        # invert lock ordering with importlib's internal module/import locks.
+        spec = find_spec()
+        if spec is None:
+            return None
+        entry = _CachedModule.from_spec(spec, fullname)
+        if entry is None:
+            return spec
+        with self._lock:
+            existing = self._modules.setdefault(fullname, entry)
+        return existing.to_spec()
+
+
+class _SandboxMetaPathFinder(importlib.abc.MetaPathFinder):
+    def __init__(self) -> None:
+        self._in_progress = threading.local()
+
+    def _in_progress_names(self) -> set[str]:
+        names = self._in_progress.__dict__.get("names")
+        if names is None:
+            names = set()
+            self._in_progress.names = names
+        return names
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: Sequence[str] | None,
+        target: types.ModuleType | None = None,
+    ) -> importlib.machinery.ModuleSpec | None:
+        importer = Importer.current_importer()
+        if importer is None or importer._module_cache is None:
+            return None
+        in_progress = self._in_progress_names()
+        if fullname in in_progress:
+            return None
+
+        def find_real_spec() -> importlib.machinery.ModuleSpec | None:
+            in_progress.add(fullname)
+            try:
+                for finder in list(sys.meta_path):
+                    if finder is self:
+                        continue
+                    spec = finder.find_spec(fullname, path, target)
+                    if spec is not None:
+                        return spec
+                return None
+            finally:
+                in_progress.discard(fullname)
+
+        return importer._module_cache.get_or_load(fullname, find_real_spec)
+
+
+_sandbox_meta_path_finder = _SandboxMetaPathFinder()
+_sandbox_meta_path_lock = threading.Lock()
+
+
+def _ensure_sandbox_meta_path_finder() -> None:
+    with _sandbox_meta_path_lock:
+        if _sandbox_meta_path_finder not in sys.meta_path:
+            sys.meta_path.insert(0, _sandbox_meta_path_finder)

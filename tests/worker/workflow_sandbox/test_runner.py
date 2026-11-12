@@ -722,3 +722,271 @@ def _assert_expected_warnings(
 ):
     actual_warnings = {str(w.message) for w in recorder}
     assert expected_warnings <= actual_warnings
+
+
+async def test_workflow_sandbox_no_hot_reload_on_disk_change(
+    client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import importlib
+    import shutil
+
+    pkg_dir = tmp_path / "no_hot_reload_pkg"
+    pkg_dir.mkdir()
+    (pkg_dir / "__init__.py").write_text("")
+    (pkg_dir / "helper.py").write_text("def val() -> str:\n    return 'helper_v1'\n")
+    (pkg_dir / "lazy_helper.py").write_text("def val() -> str:\n    return 'lazy_v1'\n")
+    (pkg_dir / "wf.py").write_text(
+        "from temporalio import workflow\n"
+        "from . import helper\n"
+        "@workflow.defn\n"
+        "class DiskWorkflow:\n"
+        "    def __init__(self) -> None:\n"
+        "        self._done = False\n"
+        "    @workflow.signal\n"
+        "    def finish(self) -> None:\n"
+        "        self._done = True\n"
+        "    @workflow.run\n"
+        "    async def run(self) -> list[str]:\n"
+        "        with workflow.unsafe.sandbox_import_notification_policy(\n"
+        "            workflow.SandboxImportNotificationPolicy.SILENT\n"
+        "        ):\n"
+        "            from . import lazy_helper\n"
+        "        await workflow.wait_condition(lambda: self._done)\n"
+        "        return [helper.val(), lazy_helper.val(), 'wf_v1']\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    try:
+        wf_mod = importlib.import_module("no_hot_reload_pkg.wf")
+        DiskWorkflow = wf_mod.DiskWorkflow
+
+        # max_cached_workflows=0 forces eviction & sandbox re-import on every WFT
+        async with Worker(
+            client,
+            task_queue=f"tq-{uuid.uuid4()}",
+            workflows=[DiskWorkflow],
+            max_cached_workflows=0,
+        ) as worker:
+            # Complete run 1 so lazy_helper is also loaded into the worker's cache
+            handle1 = await client.start_workflow(
+                DiskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle1.signal(DiskWorkflow.finish)
+            assert ["helper_v1", "lazy_v1", "wf_v1"] == await handle1.result()
+
+            # Start run 2 and wait until its first WFT has been processed & evicted
+            handle2 = await client.start_workflow(
+                DiskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await assert_eq_eventually(
+                True,
+                lambda: _has_workflow_task_completed(handle2),
+            )
+
+            # Overwrite all workflow and helper files on disk and clear __pycache__
+            pycache = pkg_dir / "__pycache__"
+            if pycache.exists():
+                shutil.rmtree(pycache)
+            (pkg_dir / "helper.py").write_text(
+                "def val() -> str:\n    return 'helper_v2_from_disk'\n"
+            )
+            (pkg_dir / "lazy_helper.py").write_text(
+                "def val() -> str:\n    return 'lazy_v2_from_disk'\n"
+            )
+            (pkg_dir / "wf.py").write_text(
+                "from temporalio import workflow\n"
+                "from . import helper\n"
+                "@workflow.defn\n"
+                "class DiskWorkflow:\n"
+                "    def __init__(self) -> None:\n"
+                "        self._done = False\n"
+                "    @workflow.signal\n"
+                "    def finish(self) -> None:\n"
+                "        self._done = True\n"
+                "    @workflow.run\n"
+                "    async def run(self) -> list[str]:\n"
+                "        with workflow.unsafe.sandbox_import_notification_policy(\n"
+                "            workflow.SandboxImportNotificationPolicy.SILENT\n"
+                "        ):\n"
+                "            from . import lazy_helper\n"
+                "        await workflow.wait_condition(lambda: self._done)\n"
+                "        return [helper.val(), lazy_helper.val(), 'wf_v2_from_disk']\n"
+            )
+            importlib.invalidate_caches()
+
+            # Evicted run 2 replays and completes with v1, not v2_from_disk
+            await handle2.signal(DiskWorkflow.finish)
+            assert ["helper_v1", "lazy_v1", "wf_v1"] == await handle2.result()
+
+            # New run 3 on the same worker also uses v1
+            handle3 = await client.start_workflow(
+                DiskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle3.signal(DiskWorkflow.finish)
+            assert ["helper_v1", "lazy_v1", "wf_v1"] == await handle3.result()
+
+            # Even if the package directory is deleted from disk, run 4 succeeds
+            shutil.rmtree(pkg_dir)
+            importlib.invalidate_caches()
+            handle4 = await client.start_workflow(
+                DiskWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            await handle4.signal(DiskWorkflow.finish)
+            assert ["helper_v1", "lazy_v1", "wf_v1"] == await handle4.result()
+    finally:
+        for mod_name in list(sys.modules):
+            if mod_name == "no_hot_reload_pkg" or mod_name.startswith(
+                "no_hot_reload_pkg."
+            ):
+                sys.modules.pop(mod_name, None)
+
+
+async def test_workflow_sandbox_separate_workers_isolated_module_cache(
+    client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import importlib
+    import shutil
+
+    mod_file = tmp_path / "isolated_workers_wf.py"
+    mod_file.write_text(
+        "from temporalio import workflow\n"
+        "@workflow.defn\n"
+        "class IsolatedWf:\n"
+        "    @workflow.run\n"
+        "    async def run(self) -> str:\n"
+        "        return 'worker_v1'\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    try:
+        mod = importlib.import_module("isolated_workers_wf")
+        async with Worker(
+            client,
+            task_queue=f"tq-{uuid.uuid4()}",
+            workflows=[mod.IsolatedWf],
+        ) as worker1:
+            assert "worker_v1" == await client.execute_workflow(
+                mod.IsolatedWf.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker1.task_queue,
+            )
+
+            # Update on disk and reload on host, then start a second worker
+            pycache = tmp_path / "__pycache__"
+            if pycache.exists():
+                shutil.rmtree(pycache)
+            mod_file.write_text(
+                "from temporalio import workflow\n"
+                "@workflow.defn\n"
+                "class IsolatedWf:\n"
+                "    @workflow.run\n"
+                "    async def run(self) -> str:\n"
+                "        return 'worker_v2_reloaded'\n"
+            )
+            importlib.invalidate_caches()
+            mod = importlib.reload(mod)
+
+            async with Worker(
+                client,
+                task_queue=f"tq-{uuid.uuid4()}",
+                workflows=[mod.IsolatedWf],
+            ) as worker2:
+                # Worker 2 sees reloaded v2; Worker 1 still runs v1
+                assert "worker_v2_reloaded" == await client.execute_workflow(
+                    mod.IsolatedWf.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker2.task_queue,
+                )
+                assert "worker_v1" == await client.execute_workflow(
+                    mod.IsolatedWf.run,
+                    id=f"workflow-{uuid.uuid4()}",
+                    task_queue=worker1.task_queue,
+                )
+    finally:
+        sys.modules.pop("isolated_workers_wf", None)
+
+
+async def _has_workflow_task_completed(handle: WorkflowHandle) -> bool:
+    from temporalio.api.enums.v1 import EventType
+
+    history = await handle.fetch_history()
+    return any(
+        e.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+        for e in history.events
+    )
+
+
+async def test_workflow_sandbox_replayer_no_hot_reload(
+    client: Client, monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+):
+    import importlib
+    import shutil
+    from collections.abc import AsyncIterator
+
+    from temporalio.client import WorkflowHistory
+    from temporalio.worker import Replayer
+
+    mod_file = tmp_path / "replayer_no_hot_reload_wf.py"
+    mod_file.write_text(
+        "from temporalio import workflow\n"
+        "@workflow.defn\n"
+        "class ReplayDiskWf:\n"
+        "    @workflow.run\n"
+        "    async def run(self) -> str:\n"
+        "        return 'replay_v1'\n"
+    )
+    monkeypatch.syspath_prepend(str(tmp_path))
+
+    try:
+        mod = importlib.import_module("replayer_no_hot_reload_wf")
+        async with Worker(
+            client,
+            task_queue=f"tq-{uuid.uuid4()}",
+            workflows=[mod.ReplayDiskWf],
+        ) as worker:
+            h1 = await client.start_workflow(
+                mod.ReplayDiskWf.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert "replay_v1" == await h1.result()
+            h2 = await client.start_workflow(
+                mod.ReplayDiskWf.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+            assert "replay_v1" == await h2.result()
+            hist1 = await h1.fetch_history()
+            hist2 = await h2.fetch_history()
+
+        async def histories() -> AsyncIterator[WorkflowHistory]:
+            yield hist1
+            # Overwrite the workflow file on disk between replayed histories
+            pycache = tmp_path / "__pycache__"
+            if pycache.exists():
+                shutil.rmtree(pycache)
+            mod_file.write_text(
+                "from datetime import timedelta\n"
+                "from temporalio import workflow\n"
+                "@workflow.defn\n"
+                "class ReplayDiskWf:\n"
+                "    @workflow.run\n"
+                "    async def run(self) -> str:\n"
+                "        await workflow.sleep(timedelta(milliseconds=1))\n"
+                "        return 'replay_v2_from_disk'\n"
+            )
+            importlib.invalidate_caches()
+            yield hist2
+
+        replayer = Replayer(workflows=[mod.ReplayDiskWf])
+        await replayer.replay_workflows(histories())
+    finally:
+        sys.modules.pop("replayer_no_hot_reload_wf", None)
