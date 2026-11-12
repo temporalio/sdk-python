@@ -7,7 +7,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
 use std::time::{Duration, UNIX_EPOCH};
 use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
@@ -38,12 +38,27 @@ pub(crate) struct Runtime {
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
 }
 
-/// Owns the Core runtime so the last runtime clone can shut it down with the GIL released.
-/// Shutting down waits for running Tokio tasks, and the log forwarder may be one of them,
-/// waiting for the GIL.
-pub(crate) struct CoreRuntimeHandle(Option<CoreRuntime>);
+// Python can finish an awaited RPC before the blocking Rust task which delivered
+// its result has returned. Join native threads before interpreter finalization,
+// while those tasks can still attach to Python and release their thread states.
+static RUNTIMES: Mutex<RuntimeRegistry> = Mutex::new(RuntimeRegistry {
+    shutting_down: false,
+    runtimes: Vec::new(),
+});
 
-impl std::ops::Deref for CoreRuntimeHandle {
+struct RuntimeRegistry {
+    shutting_down: bool,
+    runtimes: Vec<Weak<CoreRuntimeHandle>>,
+}
+
+pub(crate) struct CoreRuntimeHandle {
+    pid: u32,
+    core: RwLock<Option<CoreRuntime>>,
+}
+
+pub(crate) struct CoreRuntimeGuard<'a>(RwLockReadGuard<'a, Option<CoreRuntime>>);
+
+impl std::ops::Deref for CoreRuntimeGuard<'_> {
     type Target = CoreRuntime;
 
     fn deref(&self) -> &CoreRuntime {
@@ -51,10 +66,53 @@ impl std::ops::Deref for CoreRuntimeHandle {
     }
 }
 
+impl CoreRuntimeHandle {
+    pub(crate) fn read(&self) -> PyResult<CoreRuntimeGuard<'_>> {
+        let core = self.core.read().unwrap();
+        if core.is_none() {
+            return Err(PyRuntimeError::new_err("Temporal runtime has shut down"));
+        }
+        Ok(CoreRuntimeGuard(core))
+    }
+
+    fn shutdown(&self) {
+        // Do not hold the lock while joining threads: their remaining callbacks
+        // may try to use this runtime and must be able to observe its shutdown.
+        let core = self.core.write().unwrap().take();
+        drop(core);
+    }
+}
+
 impl Drop for CoreRuntimeHandle {
     fn drop(&mut self) {
-        let _ = Python::try_attach(|py| py.detach(|| drop(self.0.take())));
+        let mut core = self.core.get_mut().unwrap().take();
+        if core.is_some() && self.pid == std::process::id() {
+            let _ = Python::try_attach(|py| py.detach(|| drop(core.take())));
+        }
+        // A forked child or an interpreter which bypassed atexit cannot
+        // safely join threads that might still need the interpreter.
+        std::mem::forget(core);
     }
+}
+
+#[pyfunction]
+pub(crate) fn shutdown_runtimes(py: Python) {
+    let runtimes = {
+        let mut registry = RUNTIMES.lock().unwrap();
+        registry.shutting_down = true;
+        std::mem::take(&mut registry.runtimes)
+            .into_iter()
+            .filter_map(|runtime| runtime.upgrade())
+            .filter(|runtime| runtime.pid == std::process::id())
+            .collect::<Vec<_>>()
+    };
+    // Tokio joins blocking tasks even after their Python futures completed or
+    // were cancelled. They must be able to acquire the GIL until the join ends.
+    py.detach(|| {
+        for runtime in runtimes {
+            runtime.shutdown();
+        }
+    });
 }
 
 #[derive(FromPyObject)]
@@ -118,6 +176,11 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
+    if RUNTIMES.lock().unwrap().shutting_down {
+        return Err(PyRuntimeError::new_err(
+            "Temporal runtimes are shutting down",
+        ));
+    }
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
@@ -215,10 +278,26 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         }))
     });
 
+    let core = Arc::new(CoreRuntimeHandle {
+        pid: std::process::id(),
+        core: RwLock::new(Some(core)),
+    });
+    {
+        let mut registry = RUNTIMES.lock().unwrap();
+        if registry.shutting_down {
+            return Err(PyRuntimeError::new_err(
+                "Temporal runtimes are shutting down",
+            ));
+        }
+        registry
+            .runtimes
+            .retain(|runtime| runtime.strong_count() > 0);
+        registry.runtimes.push(Arc::downgrade(&core));
+    }
     Ok(RuntimeRef {
         runtime: Runtime {
             pid: std::process::id(),
-            core: Arc::new(CoreRuntimeHandle(Some(core))),
+            core,
             metrics_call_buffer,
             log_forwarder_handle,
         },
@@ -239,7 +318,8 @@ impl Runtime {
         F: Future<Output = PyResult<T>> + Send + 'static,
         T: for<'py> IntoPyObject<'py> + Send + 'static,
     {
-        let _guard = self.core.tokio_handle().enter();
+        let handle = self.core.read()?.tokio_handle();
+        let _guard = handle.enter();
         pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
     }
 
@@ -284,28 +364,32 @@ impl RuntimeRef {
         )
     }
 
-    fn write_test_info_log(&self, message: &str, extra_data: &str) {
+    fn write_test_info_log(&self, message: &str, extra_data: &str) -> PyResult<()> {
         let _g = tracing::subscriber::set_default(
             self.runtime
                 .core
+                .read()?
                 .telemetry()
                 .trace_subscriber()
                 .unwrap()
                 .clone(),
         );
         tracing::info!(message, extra_data = extra_data);
+        Ok(())
     }
 
-    fn write_test_debug_log(&self, message: &str, extra_data: &str) {
+    fn write_test_debug_log(&self, message: &str, extra_data: &str) -> PyResult<()> {
         let _g = tracing::subscriber::set_default(
             self.runtime
                 .core
+                .read()?
                 .telemetry()
                 .trace_subscriber()
                 .unwrap()
                 .clone(),
         );
         tracing::debug!(message, extra_data = extra_data);
+        Ok(())
     }
 }
 
