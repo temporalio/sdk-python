@@ -87,9 +87,11 @@ git submodule update --init
 poe update-core
 ```
 
-This fetches and updates Core to `origin/main`, importing user-facing entries from
-`crates/sdk-core/CHANGELOG.md` over the old-to-new revision range. Use
-`poe update-core --revision <ref>` to select a particular locally available revision.
+This fetches and updates Core to the head of `origin/main`, importing user-facing
+entries from `crates/sdk-core/CHANGELOG.md` over the old-to-new revision range.
+Use `poe update-core --latest-tag` to fetch tags and select the highest stable
+`core-vX.Y.Z` version, or `poe update-core --revision <ref>` to select a particular
+locally available revision. These two options are mutually exclusive.
 Each affected category gets a fragment with an automatically generated whimsical
 filename. Core entries join the language entries in the same categories with a
 `Core: ` prefix. Wrapped Core prose becomes one line per entry; unsupported block
@@ -100,13 +102,30 @@ Repeated updates import only the range since the previous checkout; an unchanged
 pin creates no fragments. Review and commit the updated pin and generated fragments
 together with the bridge manifest and lockfile. Python copies Core path dependency
 versions from the updated checkout into `temporalio/bridge/Cargo.toml` and runs
-`cargo fetch` to refresh `Cargo.lock`, preserving existing valid registry pins.
+`cargo update` to refresh all bridge dependencies in `Cargo.lock` to the latest
+versions allowed by their requirements.
 The command does not stage or commit changes or resolve Rust API
 compatibility issues. If dependency refresh fails, inspect the updated pin,
 fragments, and manifest before retrying.
 
-If Core protobuf definitions changed, run `poe gen-protos` and include the
-regenerated bindings in the update PR.
+The command then runs `poe gen-protos`. Include regenerated bindings in the update
+PR.
+
+## Preparing a Release
+
+Run `poe prepare-release <version>` (optionally with `--date YYYY-MM-DD`) from a
+clean worktree. This creates `chore/release-<version>` from `origin/main`, runs the
+Core update with `--latest-tag`, and then prepares the Python versions, lockfile, and
+changelog. It commits the Core and Python changes together, pushes the release
+branch, and opens a PR. A failed Core update or proto generation stops preparation
+before changelog fragments are consumed. Review any partial changes before retrying.
+Rerunning for the same version rebuilds the local release branch from `origin/main`,
+replacing prior release-branch commits, and updates the remote branch using an
+explicit force-with-lease. If the remote branch changes during preparation, the
+push fails rather than overwriting that change. An existing open release PR is
+reused, preserving its description and discussion.
+The optional `--date` sets the date in the changelog release heading and defaults
+to today; it does not schedule publication.
 
 ## Things to Avoid
 

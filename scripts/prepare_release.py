@@ -14,6 +14,7 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from scripts.changelog import prepare_changelog
+from scripts.update_core import update_core
 
 VERSION_RE = re.compile(r"[0-9]+(?:\.[0-9]+)+(?:[a-zA-Z0-9_.+-]+)?")
 _RELEASE_FILES = (
@@ -57,14 +58,25 @@ def replace_service_version(text: str, version: str) -> str:
     )
 
 
-def create_release_branch(repo_root: pathlib.Path, version: str) -> None:
+def create_release_branch(repo_root: pathlib.Path, version: str) -> str:
+    """Rebuild the release branch and return its expected remote commit, if any."""
     subprocess.run(["git", "fetch", "origin", "main"], cwd=repo_root, check=True)
+    branch = f"chore/release-{version}"
+    result = subprocess.run(
+        ["git", "ls-remote", "--heads", "origin", f"refs/heads/{branch}"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    remote_commit = result.stdout.split()[0] if result.stdout.strip() else ""
     subprocess.run(
-        ["git", "switch", "--create", f"chore/release-{version}", "origin/main"],
+        ["git", "switch", "--force-create", branch, "origin/main"],
         cwd=repo_root,
         check=True,
     )
     subprocess.run(["git", "submodule", "update", "--init"], cwd=repo_root, check=True)
+    return remote_commit
 
 
 def changed_files(repo_root: pathlib.Path) -> set[str]:
@@ -104,6 +116,11 @@ def commit_release_changes(
     repo_root: pathlib.Path, version: str, consumed_paths: Sequence[str] = ()
 ) -> None:
     subprocess.run(
+        ["git", "add", "--all", "--", *_RELEASE_FILES, *consumed_paths],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
         [
             "git",
             "commit",
@@ -118,10 +135,19 @@ def commit_release_changes(
     )
 
 
-def push_release_branch(repo_root: pathlib.Path, version: str) -> None:
+def push_release_branch(
+    repo_root: pathlib.Path, version: str, remote_commit: str = ""
+) -> None:
     branch = f"chore/release-{version}"
     subprocess.run(
-        ["git", "push", "--set-upstream", "origin", branch],
+        [
+            "git",
+            "push",
+            f"--force-with-lease=refs/heads/{branch}:{remote_commit}",
+            "--set-upstream",
+            "origin",
+            branch,
+        ],
         cwd=repo_root,
         check=True,
     )
@@ -129,6 +155,30 @@ def push_release_branch(repo_root: pathlib.Path, version: str) -> None:
 
 def create_release_pr(repo_root: pathlib.Path, version: str) -> None:
     branch = f"chore/release-{version}"
+    result = subprocess.run(
+        [
+            "gh",
+            "pr",
+            "list",
+            "--base",
+            "main",
+            "--head",
+            branch,
+            "--state",
+            "open",
+            "--json",
+            "url",
+            "--jq",
+            ".[0].url // empty",
+        ],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout.strip():
+        print(f"Updated existing release PR: {result.stdout.strip()}")
+        return
     subprocess.run(
         [
             "gh",
@@ -169,6 +219,7 @@ def prepare_release_files(
     release_date: datetime.date,
     *,
     skip_lock: bool = False,
+    core_changes: Sequence[str] = (),
 ) -> tuple[str, ...]:
     """Update Python versions and lockfile before preparing the shared changelog."""
     pyproject_path = repo_root / "pyproject.toml"
@@ -185,7 +236,7 @@ def prepare_release_files(
     service_path.write_text(service_text, encoding="utf-8")
     if not skip_lock:
         subprocess.run(["uv", "lock"], cwd=repo_root, check=True)
-    ensure_only_release_changes(repo_root)
+    ensure_only_release_changes(repo_root, core_changes)
     prepare_changelog(repo_root, version, release_date)
     result = subprocess.run(
         ["git", "ls-files", "--deleted", "-z", "--", "changelog"],
@@ -215,23 +266,37 @@ def main(argv: Sequence[str] | None = None) -> None:
         action="store_true",
         help="Do not run 'uv lock'. Intended only for local testing.",
     )
+    parser.add_argument(
+        "--update-core",
+        action="store_true",
+        help="Update to the latest Core release and regenerate protos on the release branch.",
+    )
     args = parser.parse_args(argv)
 
     repo_root = pathlib.Path(__file__).resolve().parents[1]
     version = validate_version(args.version)
     release_date = parse_date(args.date)
     ensure_clean_worktree(repo_root)
-    create_release_branch(repo_root, version)
+    remote_commit = create_release_branch(repo_root, version)
+    core_changes: set[str] = set()
+    if args.update_core:
+        update_core(repo_root, ["--latest-tag"])
+        core_changes = changed_files(repo_root)
     consumed = prepare_release_files(
-        repo_root, version, release_date, skip_lock=args.skip_lock
+        repo_root,
+        version,
+        release_date,
+        skip_lock=args.skip_lock,
+        core_changes=tuple(sorted(core_changes)),
     )
-    ensure_only_release_changes(repo_root, consumed)
-    commit_release_changes(repo_root, version, consumed)
-    push_release_branch(repo_root, version)
+    ensure_only_release_changes(repo_root, (*consumed, *core_changes))
+    extra_paths = tuple(sorted(changed_files(repo_root) - set(_RELEASE_FILES)))
+    commit_release_changes(repo_root, version, extra_paths)
+    push_release_branch(repo_root, version, remote_commit)
     create_release_pr(repo_root, version)
 
     print(
-        f"Prepared release {version} dated {release_date.isoformat()} and opened a PR"
+        f"Prepared release {version} dated {release_date.isoformat()} and created or updated a PR"
     )
 
 
