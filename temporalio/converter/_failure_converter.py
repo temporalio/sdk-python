@@ -154,7 +154,7 @@ class DefaultFailureConverter(FailureConverter):
                 failure.application_failure_info.details.CopyFrom(
                     payload_converter.to_payloads_wrapper(error.details)
                 )
-            if error.next_retry_delay:
+            if error.next_retry_delay is not None:
                 failure.application_failure_info.next_retry_delay.FromTimedelta(
                     error.next_retry_delay
                 )
