@@ -794,7 +794,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
         priority: temporalio.api.common.v1.Priority | None = None
         if self.priority:
             priority = self.priority._to_proto()
-        data_converter = client.data_converter._with_contexts(
+        data_converter = client._data_converter._with_contexts(
             WorkflowSerializationContext(
                 namespace=client.namespace,
                 workflow_id=self.id,
@@ -858,7 +858,7 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 client.config(active_config=True)["header_codec_behavior"]
                 == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
-                client.data_converter,
+                client._data_converter,
             )
         return action
 
@@ -1572,7 +1572,7 @@ class ScheduleAsyncIterator:
             timeout=self._input.rpc_timeout,
         )
         self._current_page = [
-            ScheduleListDescription._from_proto(v, self._client.data_converter)
+            ScheduleListDescription._from_proto(v, self._client._data_converter)
             for v in resp.schedules
         ]
         self._current_page_index = 0

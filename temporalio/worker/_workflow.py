@@ -56,15 +56,6 @@ logger = logging.getLogger(__name__)
 LOG_PROTOS = False
 
 
-# Value was chosen abitrarily as a small number that allows some concurrency and prevents
-# large numbers of concurrent external storage operations causing resource contention.
-# This default limit is per workflow task activation and does not limit the total number
-# of concurrent external storage operations across all workflow task activations.
-# Advise customers to adjust based on their workload needs and to report issues with the
-# value if problems are encountered. This setting is experimental.
-_DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY: int = 3
-
-
 def _set_external_storage_metrics(
     target: temporalio.bridge.proto.common.ExternalStorageMetrics,
     metrics: temporalio.converter._extstore.StorageOperationMetrics,
@@ -126,7 +117,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
-        max_workflow_task_external_storage_concurrency: int,
         default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
@@ -194,9 +184,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
         self._encode_headers = encode_headers
-        self._max_workflow_task_external_storage_concurrency = (
-            max_workflow_task_external_storage_concurrency
-        )
         self._throw_after_activation: Exception | None = None
 
         # If debug mode is enabled, disable deadlock detection
@@ -423,7 +410,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 act,
                 data_converter,
                 decode_headers=self._encode_headers,
-                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
             )
             if init_job and previous_run_outcome:
                 await self._decode_nexus_previous_run_outcome(
@@ -542,7 +528,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 completion,
                 data_converter,
                 encode_headers=self._encode_headers,
-                storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
             )
         except Exception as err:
             logger.exception(
@@ -721,7 +706,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             act,
             self._data_converter.with_context(nexus_context),
             decode_headers=self._encode_headers,
-            storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
         )
         download_metrics.merge(metrics)
         # Constructing the activation copied the outcome, so read the decoded fields from it

@@ -965,8 +965,8 @@ class AsyncActivityHandle(WithSerializationContext):
         :py:class:`temporalio.converter.NexusSerializationContext`. To complete or heartbeat such an
         activity, pass :py:attr:`temporalio.activity.Info.nexus_serialization_context`.
         """
-        data_converter = self._client.data_converter.with_context(context)
-        if data_converter is self._client.data_converter:
+        data_converter = self._client._data_converter.with_context(context)
+        if data_converter is self._client._data_converter:
             return self
         cls = type(self)
         if cls.__init__ is not AsyncActivityHandle.__init__:
@@ -1006,7 +1006,7 @@ class ActivityHandle(Generic[ReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             ActivitySerializationContext(
                 namespace=self._client.namespace,
                 activity_id=self._id,
@@ -1063,7 +1063,7 @@ class ActivityHandle(Generic[ReturnType]):
         # encodes them with the handler's Nexus context, which the server returns with the outcome.
         assert self._known_outcome
         data_converter = (
-            self._client.data_converter.with_context(self._known_outcome_nexus_context)
+            self._client._data_converter.with_context(self._known_outcome_nexus_context)
             if self._known_outcome_nexus_context
             else self._data_converter
         )
