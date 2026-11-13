@@ -859,7 +859,9 @@ class ScheduleActionStartWorkflow(ScheduleAction):
                 client.config(active_config=True)["header_codec_behavior"]
                 == HeaderCodecBehavior.CODEC
                 and not self._from_raw,
-                client.data_converter,
+                client.data_converter._with_store_context(
+                    StorageDriverStoreContext(namespace=client.namespace)
+                ),
             )
         return action
 
