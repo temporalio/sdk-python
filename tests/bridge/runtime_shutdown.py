@@ -2,6 +2,7 @@
 
 import asyncio
 import atexit
+import pickle
 import sys
 import threading
 from typing import Any
@@ -33,15 +34,18 @@ def create_runtime(started):
 )
 
 if sys.argv[1] == "client":
-    namespace["target_host"] = sys.argv[2]
+    namespace["connect_config"], namespace["client_namespace"] = pickle.load(
+        sys.stdin.buffer
+    )
     exec(
         """
 import asyncio
 import threading
+import temporalio.api.workflowservice.v1
 from temporalio.client import Client
 
 async def run_client():
-    client = await Client.connect(target_host)
+    client = await Client.connect(namespace=client_namespace, **vars(connect_config))
     started = threading.Event()
     loop = asyncio.get_running_loop()
     original_call_soon = loop.call_soon_threadsafe
@@ -56,7 +60,8 @@ async def run_client():
     # Let Python receive the RPC result while its Rust completion callback
     # remains active, reproducing the client's interpreter-shutdown race.
     loop.call_soon_threadsafe = call_soon
-    assert await client.service_client.check_health()
+    await client.workflow_service.describe_namespace(
+        temporalio.api.workflowservice.v1.DescribeNamespaceRequest(namespace=client.namespace))
     assert started.wait(10)
 """,
         namespace,
