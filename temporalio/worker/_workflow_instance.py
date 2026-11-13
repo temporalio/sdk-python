@@ -413,7 +413,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 fn=self._temporal_workflow_metadata,
                 is_method=False,
                 arg_types=[],
-                ret_type=temporalio.api.sdk.v1.WorkflowMetadata,
+                ret_type=temporalio.common.RawValue,
             )
         )
 
@@ -3060,7 +3060,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
             return est
 
-    def _temporal_workflow_metadata(self) -> temporalio.api.sdk.v1.WorkflowMetadata:
+    def _temporal_workflow_metadata(self) -> temporalio.common.RawValue:
         query_definitions = [
             temporalio.api.sdk.v1.WorkflowInteractionDefinition(
                 name=qd.name or "",
@@ -3092,8 +3092,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             update_definitions=update_definitions,
         )
         cur_details = self.workflow_get_current_details()
-        return temporalio.api.sdk.v1.WorkflowMetadata(
-            definition=wf_def, current_details=cur_details
+        # The default converter, not the user's, so the UI and CLI can read this
+        # even if the user's converter cannot serialize protobuf
+        return temporalio.common.RawValue(
+            temporalio.converter.PayloadConverter.default.to_payload(
+                temporalio.api.sdk.v1.WorkflowMetadata(
+                    definition=wf_def, current_details=cur_details
+                )
+            )
         )
 
     def _timer_impl(

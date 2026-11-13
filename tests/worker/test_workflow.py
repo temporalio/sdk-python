@@ -8278,6 +8278,69 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
         assert await describe_r.static_details() == "xtremely detailed"
 
 
+class NoProtobufPayloadConverter(temporalio.converter.CompositePayloadConverter):
+    def __init__(self) -> None:
+        super().__init__(
+            temporalio.converter.BinaryNullPayloadConverter(),
+            temporalio.converter.BinaryPlainPayloadConverter(),
+            temporalio.converter.JSONPlainPayloadConverter(),
+        )
+
+
+@workflow.defn
+class WorkflowMetadataQueryWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.query(description="qdesc")
+    def some_query(self) -> None:
+        pass
+
+
+async def test_workflow_metadata_query_uses_default_payload_converter(
+    client: Client,
+):
+    # The worker's converter cannot serialize protobuf, so the metadata is readable
+    # only if the default converter encoded it; SimpleCodec rejects a response the
+    # worker didn't encode
+    config = client.config()
+    config["data_converter"] = DataConverter(
+        payload_converter_class=NoProtobufPayloadConverter,
+        payload_codec=SimpleCodec(),
+    )
+    no_protobuf_client = Client(**config)
+    config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
+    default_converter_client = Client(**config)
+
+    async with new_worker(no_protobuf_client, WorkflowMetadataQueryWorkflow) as worker:
+        handle = await no_protobuf_client.start_workflow(
+            WorkflowMetadataQueryWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        raw = await handle.query("__temporal_workflow_metadata", result_type=RawValue)
+        assert raw.payload.metadata["encoding"] == b"json/protobuf"
+        from_raw = PayloadConverter.default.from_payload(
+            raw.payload, temporalio.api.sdk.v1.WorkflowMetadata
+        )
+        from_default_client = await default_converter_client.get_workflow_handle(
+            handle.id
+        ).query(
+            "__temporal_workflow_metadata",
+            result_type=temporalio.api.sdk.v1.WorkflowMetadata,
+        )
+
+        for md in [from_raw, from_default_client]:
+            assert md.definition.type == "WorkflowMetadataQueryWorkflow"
+            matched_q = [
+                q for q in md.definition.query_definitions if q.name == "some_query"
+            ]
+            assert len(matched_q) == 1
+            assert matched_q[0].description == "qdesc"
+
+
 @workflow.defn
 class WorkflowSleepWorkflow:
     @workflow.run
