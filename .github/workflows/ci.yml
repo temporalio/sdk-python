@@ -31,6 +31,10 @@ jobs:
             runsOn: ubuntu-24.04-arm64-2-core
           - os: macos-arm
             runsOn: macos-latest
+          # The thread-based pytest timeout needs the GIL to report a native hang.
+          - os: windows-latest
+            python: "3.11"
+            pytestExtraArgs: "-v -o faulthandler_timeout=90 -o faulthandler_exit_on_timeout=true"
     runs-on: ${{ matrix.runsOn || matrix.os }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
