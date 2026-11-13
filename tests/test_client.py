@@ -15,6 +15,10 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.schedule.v1
+import temporalio.api.taskqueue.v1
+import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -106,6 +110,7 @@ from tests.helpers.worker import (
     KSSleepAction,
     KSWorkflowParams,
 )
+from tests.test_extstore_client import _client, _FakeWorkflowService
 
 
 async def test_start_id_reuse(
@@ -1246,6 +1251,46 @@ async def test_schedule_create_limited_actions_validation(
         sched.state.remaining_actions = 10
         await client.create_schedule(f"schedule-{uuid.uuid4()}", sched)
     assert "are remaining actions set" in str(err.value)
+
+
+async def test_schedule_update_keeps_unset_retry_backoff():
+    # The Go SDK stores RetryPolicy{MaximumAttempts: 3} with backoff_coefficient
+    # left at zero. Updating that schedule from Python must not fail validation.
+    action = temporalio.api.schedule.v1.ScheduleAction(
+        start_workflow=temporalio.api.workflow.v1.NewWorkflowExecutionInfo(
+            workflow_id="some-workflow-id",
+            workflow_type=temporalio.api.common.v1.WorkflowType(name="SomeWorkflow"),
+            task_queue=temporalio.api.taskqueue.v1.TaskQueue(name="some-task-queue"),
+            retry_policy=temporalio.api.common.v1.RetryPolicy(maximum_attempts=3),
+        )
+    )
+    service = _FakeWorkflowService(
+        {
+            "describe_schedule": temporalio.api.workflowservice.v1.DescribeScheduleResponse(
+                schedule=temporalio.api.schedule.v1.Schedule(
+                    action=action,
+                    spec=temporalio.api.schedule.v1.ScheduleSpec(),
+                    policies=temporalio.api.schedule.v1.SchedulePolicies(
+                        overlap_policy=temporalio.api.enums.v1.ScheduleOverlapPolicy.SCHEDULE_OVERLAP_POLICY_SKIP
+                    ),
+                )
+            ),
+            "update_schedule": temporalio.api.workflowservice.v1.UpdateScheduleResponse(),
+        }
+    )
+    client = _client(service, DataConverter.default)
+
+    await client.get_schedule_handle("some-schedule").update(
+        lambda input: ScheduleUpdate(input.description.schedule)
+    )
+
+    request = cast(
+        temporalio.api.workflowservice.v1.UpdateScheduleRequest,
+        service.requests["update_schedule"],
+    )
+    retry_policy = request.schedule.action.start_workflow.retry_policy
+    assert retry_policy.maximum_attempts == 3
+    assert retry_policy.backoff_coefficient == 0
 
 
 @pytest.mark.requires_local_server
