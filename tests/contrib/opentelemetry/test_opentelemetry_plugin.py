@@ -15,6 +15,7 @@ from opentelemetry.trace import (
 )
 
 import temporalio.contrib.opentelemetry.workflow
+import temporalio.worker._workflow_instance
 from temporalio import activity, nexus, workflow
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType, ResetReapplyType
@@ -838,12 +839,17 @@ async def test_otel_tracing_reset_reapplied_update_span_id(
     new_config["plugins"] = [OpenTelemetryPlugin(add_temporal_spans=True)]
     new_client = Client(**new_config)
 
-    async with new_worker(
+    worker = new_worker(
         new_client,
         ResetReapplyUpdateWorkflow,
         activities=[simple_no_context_activity],
         max_cached_workflows=0,
-    ) as worker:
+    )
+    worker._set_default_workflow_logic_flag(
+        temporalio.worker._workflow_instance._WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH,
+        enabled=True,
+    )
+    async with worker:
         handle = await new_client.start_workflow(
             ResetReapplyUpdateWorkflow.run,
             id=f"otel-reset-{uuid.uuid4()}",
