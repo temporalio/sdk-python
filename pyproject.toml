@@ -48,6 +48,7 @@ cloud-run-worker-otel = [
   "protobuf<7",
 ]
 aioboto3 = ["aioboto3>=10.4.0", "types-aioboto3[s3]>=10.4.0"]
+boto3 = ["boto3>=1.26.0,<2"]
 gcloud-aio-storage = ["gcloud-aio-storage>=9.6.4,<10"]
 google-genai = ["temporalio-google-genai[mcp]>=0.1.0"]
 strands-agents = ["temporalio-strands-agents>=0.1.0"]
@@ -84,7 +85,8 @@ dev = [
   "googleapis-common-protos>=1.75.0,<2",
   "pytest-rerunfailures>=16.1",
   "pytest-xdist>=3.6,<4",
-  "moto[s3,server]>=5",
+  "moto[s3,secretsmanager,server]>=5",
+  "types-boto3[secretsmanager]>=1.26.0",
   "setuptools<82",
   "opentelemetry-exporter-otlp-proto-grpc>=1.11.1,<2",
   "opentelemetry-semantic-conventions>=0.40b0,<1",
