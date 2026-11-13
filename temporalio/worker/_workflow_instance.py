@@ -61,6 +61,8 @@ import temporalio.nexus.system
 import temporalio.workflow
 from temporalio.client._stream_store import _STREAM_SERVICE
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.nexus.system.stream_service.models import StreamRecord
+from temporalio.nexus.system.stream_service.workflow._resources.stream import Stream
 from temporalio.nexus.system.stream_service.workflow._system_nexus_interceptor import (
     _start_system_nexus_operation as _start_stream_system_nexus_operation,
 )
@@ -95,7 +97,12 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ._stream_store import _no_stream_config_error, _WorkflowStreamStore
+from ._stream_read import _read_stream_in_workflow
+from ._stream_store import (
+    _NO_STREAM_STORE_MESSAGE,
+    _no_stream_config_error,
+    _WorkflowStreamStore,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1994,6 +2001,27 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         else [update.value]
                     )
 
+    async def workflow_read_stream(
+        self,
+        stream: Stream[Any],
+        *,
+        until: Callable[[StreamRecord[Any]], bool] | None,
+        from_offset: bytes | None,
+        max_records: int,
+        timeout: timedelta,
+    ) -> temporalio.workflow.StreamRead[Any]:
+        if self._stream_store is None:
+            raise temporalio.exceptions.StreamConfigError(_NO_STREAM_STORE_MESSAGE)
+        return await _read_stream_in_workflow(
+            self,
+            self._stream_store.config,
+            stream,
+            until=until,
+            from_offset=from_offset,
+            max_records=max_records,
+            timeout=timeout,
+        )
+
     async def workflow_sleep(
         self,
         duration: float,
@@ -2369,10 +2397,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         temporalio.nexus.system._SystemNexusPayloadConverter,
         temporalio.converter.FailureConverter,
     ]:
+        return self._system_nexus_converters_for(
+            input.service, input.operation_name, input.input
+        )
+
+    def _system_nexus_converters_for(
+        self, service: str, operation: str, request: Any
+    ) -> tuple[
+        temporalio.nexus.system._SystemNexusPayloadConverter,
+        temporalio.converter.FailureConverter,
+    ]:
         serialization_context = temporalio.nexus.system._get_serialization_context(
-            input.service,
-            input.operation_name,
-            input.input,
+            service, operation, request
         )
         user_payload_converter = self._context_free_payload_converter
         user_failure_converter = self._context_free_failure_converter

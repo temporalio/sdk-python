@@ -155,6 +155,11 @@ from ._sandbox import (
     logger,
     unsafe,
 )
+from ._streams import (
+    DEFAULT_READ_STREAM_MAX_RECORDS,
+    StreamRead,
+    read_stream,
+)
 from ._workflow_ops import (
     ChildWorkflowCancellationType,
     ChildWorkflowConfig,
@@ -262,6 +267,9 @@ __all__ = [
     "SandboxImportNotificationPolicy",
     "logger",
     "unsafe",
+    "DEFAULT_READ_STREAM_MAX_RECORDS",
+    "StreamRead",
+    "read_stream",
     "ChildWorkflowCancellationType",
     "ChildWorkflowConfig",
     "ChildWorkflowHandle",

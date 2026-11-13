@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import dataclasses
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from typing import TYPE_CHECKING, Any
 
 from nexusrpc import OutputT
@@ -24,16 +25,46 @@ if TYPE_CHECKING:
     from ._workflow_instance import _WorkflowInstanceImpl
 
 
+_NO_STREAM_STORE_MESSAGE = (
+    "The client of this Worker has no Stream Store. Give one in "
+    "stream_config=StreamConfig(stores=[...])."
+)
+
+
 def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyright: ignore[reportUnusedFunction]
     # A `StreamConfigError` would fail the Workflow Task, and its retries would fail the
     # same way for good. A Worker with no config is a setup that a user has to see, so
     # the Workflow fails instead.
     return temporalio.exceptions.ApplicationError(
-        "The client of this Worker has no Stream Store. Give one in "
-        "stream_config=StreamConfig(stores=[...]).",
-        type="StreamConfigError",
-        non_retryable=True,
+        _NO_STREAM_STORE_MESSAGE, type="StreamConfigError", non_retryable=True
     )
+
+
+@contextlib.contextmanager
+def _store_errors() -> Iterator[None]:
+    """Give Workflow code the Store's error of a Local Activity, not its wrapper."""
+    try:
+        yield
+    except temporalio.exceptions.ApplicationError as err:
+        # Core hands back a failed Local Activity's error without a wrapper.
+        stream_error = temporalio.exceptions._stream_error_from_failure(err)
+        if stream_error is not None:
+            raise stream_error from None
+        raise
+    except temporalio.exceptions.ActivityError as err:
+        if err.cause is not None:
+            stream_error = temporalio.exceptions._stream_error_from_failure(err.cause)
+            if stream_error is not None:
+                raise stream_error from None
+        if isinstance(
+            err.cause,
+            (
+                temporalio.exceptions.ApplicationError,
+                temporalio.exceptions.TimeoutError,
+            ),
+        ):
+            raise err.cause
+        raise
 
 
 def _workflow_target() -> StorageDriverWorkflowInfo:
@@ -80,33 +111,10 @@ class _WorkflowStreamStore:
         options = self.config.workflow_call_options
 
         async def result() -> OutputT:
-            try:
+            with _store_errors():
                 response = await store.call_from_workflow(
                     input.operation_name, request, options
                 )
-            except temporalio.exceptions.ApplicationError as err:
-                # Core hands back a failed Local Activity's error without a wrapper.
-                stream_error = temporalio.exceptions._stream_error_from_failure(err)
-                if stream_error is not None:
-                    raise stream_error from None
-                raise
-            except temporalio.exceptions.ActivityError as err:
-                # Workflow code gets the Store's error, not the Local Activity's wrapper.
-                if err.cause is not None:
-                    stream_error = temporalio.exceptions._stream_error_from_failure(
-                        err.cause
-                    )
-                    if stream_error is not None:
-                        raise stream_error from None
-                if isinstance(
-                    err.cause,
-                    (
-                        temporalio.exceptions.ApplicationError,
-                        temporalio.exceptions.TimeoutError,
-                    ),
-                ):
-                    raise err.cause
-                raise
             return payload_converter._from_transfer_value(
                 stream_operation.check_response(store, response), input.output_type
             )

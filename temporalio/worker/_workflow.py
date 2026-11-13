@@ -27,6 +27,7 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.client._stream_read import _PENDING_STREAM_READS
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
@@ -678,6 +679,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         # Remove from map and send completion
         if act.run_id in self._running_workflows:
             del self._running_workflows[act.run_id]
+        _PENDING_STREAM_READS.drop_run(act.run_id)
         try:
             await self._bridge_worker().complete_workflow_activation(
                 temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(

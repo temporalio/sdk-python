@@ -21,10 +21,16 @@ from ..types import AnyType, ParamType
 from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
+    from temporalio.nexus.system.stream_service.models import StreamRecord
+    from temporalio.nexus.system.stream_service.workflow._resources.stream import (
+        Stream,
+    )
+
     from ._activities import ActivityCancellationType, ActivityHandle
     from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
+    from ._streams import StreamRead
     from ._workflow_ops import (
         ChildWorkflowCancellationType,
         ChildWorkflowHandle,
@@ -398,6 +404,17 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_random(self) -> Random: ...
+
+    @abstractmethod
+    async def workflow_read_stream(
+        self,
+        stream: Stream[Any],
+        *,
+        until: Callable[[StreamRecord[Any]], bool] | None,
+        from_offset: bytes | None,
+        max_records: int,
+        timeout: timedelta,
+    ) -> StreamRead[Any]: ...
 
     @abstractmethod
     def workflow_set_query_handler(
