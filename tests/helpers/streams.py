@@ -184,3 +184,15 @@ class DictStreamStore(StreamStore):
             else StreamStatus.STREAM_STATUS_OPEN,
             last_offset=stream.records[-1].offset if stream.records else b"",
         )
+
+
+class StreamReadState:
+    """State that a test of a Workflow read shares with its Workflows.
+
+    A Workflow file imports this module with ``imports_passed_through``, so the sandbox
+    and the test see one copy of these values.
+    """
+
+    until_calls = 0
+    fail_next_task = False
+    results: dict[str, tuple[object, ...]] = {}
