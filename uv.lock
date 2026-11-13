@@ -11,17 +11,17 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-10-27T22:56:36.90179Z"
+exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P2W"
 
 [options.exclude-newer-package]
 nexus-rpc = false
-temporalio-google-genai = false
 temporalio-deepagents = false
-temporalio-langgraph = false
-temporalio-strands-agents = false
-temporalio-langsmith = false
 temporalio-google-adk = false
+temporalio-google-genai = false
+temporalio-langgraph = false
+temporalio-langsmith = false
+temporalio-strands-agents = false
 
 [[package]]
 name = "aioboto3"
@@ -1588,8 +1588,8 @@ name = "httpcore2"
 version = "2.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "h11", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
-    { name = "truststore", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
+    { name = "h11" },
+    { name = "truststore" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/cb/f3/1db7aa2bc2524062192bb0e0323969492d1883152a232fe36eea65f4e35c/httpcore2-2.13.1.tar.gz", hash = "sha256:e0aa977abe17e69a3b820a24542a6fa88702676d83880b8d194dcd18408e5103", size = 68071, upload-time = "2026-09-23T07:47:22.372Z" }
 wheels = [
@@ -4399,8 +4399,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
-    { name = "jeepney", marker = "python_full_version != '3.12.*' or sys_platform != 'emscripten'" },
+    { name = "cryptography" },
+    { name = "jeepney" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -4521,6 +4521,9 @@ aioboto3 = [
     { name = "aioboto3" },
     { name = "types-aioboto3", extra = ["s3"] },
 ]
+boto3 = [
+    { name = "boto3" },
+]
 cloud-run-worker-otel = [
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
@@ -4600,11 +4603,13 @@ dev = [
     { name = "toml" },
     { name = "tomlkit" },
     { name = "twine" },
+    { name = "types-boto3", extra = ["secretsmanager"] },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aioboto3'", specifier = ">=10.4.0" },
+    { name = "boto3", marker = "extra == 'boto3'", specifier = ">=1.26.0,<2" },
     { name = "gcloud-aio-storage", marker = "extra == 'gcloud-aio-storage'", specifier = ">=9.6.4,<10" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.49.1,<2" },
     { name = "nexus-rpc", specifier = "==1.5.0" },
@@ -4632,7 +4637,7 @@ requires-dist = [
     { name = "types-protobuf", specifier = ">=4.24,<8.0.0" },
     { name = "typing-extensions", specifier = ">=4.2.0,<5" },
 ]
-provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "deepagents", "lambda-worker-otel", "cloud-run-worker-otel", "aioboto3", "gcloud-aio-storage", "google-genai", "strands-agents"]
+provides-extras = ["grpc", "opentelemetry", "pydantic", "openai-agents", "google-adk", "langgraph", "langsmith", "deepagents", "lambda-worker-otel", "cloud-run-worker-otel", "aioboto3", "boto3", "gcloud-aio-storage", "google-genai", "strands-agents"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -4642,7 +4647,7 @@ dev = [
     { name = "googleapis-common-protos", specifier = ">=1.75.0,<2" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "maturin", specifier = ">=1.8.2" },
-    { name = "moto", extras = ["s3", "server"], specifier = ">=5" },
+    { name = "moto", extras = ["s3", "secretsmanager", "server"], specifier = ">=5" },
     { name = "mypy", specifier = "==2.4.0" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.11.1,<2" },
     { name = "opentelemetry-sdk-extension-aws", specifier = ">=2.0.0,<3" },
@@ -4665,6 +4670,7 @@ dev = [
     { name = "toml", specifier = ">=0.10.2,<0.11" },
     { name = "tomlkit", specifier = ">=0.13,<0.14" },
     { name = "twine", specifier = ">=4.0.1,<5" },
+    { name = "types-boto3", extras = ["secretsmanager"], specifier = ">=1.26.0" },
 ]
 
 [[package]]
@@ -4976,6 +4982,37 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a7/c6/9bb91a44eed1114690edb15d8251f32392e355dfa0a5b8e1c190b4cf89a4/types_aiobotocore_s3-2.25.2.tar.gz", hash = "sha256:678aa425491af19bd6d011d59ecdbbb7ae7e95800efddcf4fd559ab72c94e194", size = 75955, upload-time = "2025-11-12T01:52:06.536Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b4/0a/d0d9faefd7caa8536eb97647c38c711e73ab83341a65119d08c2cb20957d/types_aiobotocore_s3-2.25.2-py3-none-any.whl", hash = "sha256:151301e84bb2f1cbf30f0d1ef791bb75c141cfbfe47b93fd317b7f1ba3eb35e4", size = 83626, upload-time = "2025-11-12T01:52:04.763Z" },
+]
+
+[[package]]
+name = "types-boto3"
+version = "1.43.122"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "botocore-stubs" },
+    { name = "types-s3transfer" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/80/23/59d79b4ddb68d6e1e0869e1b20bc9e2b6c6b26f2c788a2f91a93a9aab690/types_boto3-1.43.122.tar.gz", hash = "sha256:8ce7bd2c0207fce4f46ff87708b6fa672396ac8005f6e1cf698ac1bb41180826", size = 105759, upload-time = "2026-10-29T19:49:25.229Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/ef/829c73eb81fdc62a01af8183af8be8c338e5b1c03ce88c882382859e5831/types_boto3-1.43.122-py3-none-any.whl", hash = "sha256:d31630ea47a0c0cac9c9231145c29ec57ce8fb09ea9503ceb1f362af67a3b479", size = 71907, upload-time = "2026-10-29T19:49:21.686Z" },
+]
+
+[package.optional-dependencies]
+secretsmanager = [
+    { name = "types-boto3-secretsmanager" },
+]
+
+[[package]]
+name = "types-boto3-secretsmanager"
+version = "1.43.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions", marker = "python_full_version < '3.12'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8d/b3/4bf7c59c116bdcfa28a3b6c456beeb5919157044d5252da18b7cfba2f1da/types_boto3_secretsmanager-1.43.0.tar.gz", hash = "sha256:434a90cd08c4e5d25ca6139caa6a737454c62f95dfff924b00d951d4c6736706", size = 19964, upload-time = "2026-04-29T23:06:38.34Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6f/0e/88785341c771a486174dc44798b29230f81ead04b721159c9dd3fdf6a39b/types_boto3_secretsmanager-1.43.0-py3-none-any.whl", hash = "sha256:4e6863cf32ab239f16c568a8a1edd311e16bf57ffb7a58a39749c5dfac2b6e5f", size = 27290, upload-time = "2026-04-29T23:06:36.084Z" },
 ]
 
 [[package]]
