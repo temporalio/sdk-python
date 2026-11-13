@@ -29,6 +29,7 @@ from nexusrpc.handler._decorators import operation_handler
 import temporalio.api
 import temporalio.api.enums.v1
 import temporalio.nexus._operation_handlers
+import temporalio.worker._workflow_instance
 from temporalio import nexus, workflow
 from temporalio.client import (
     Client,
@@ -59,18 +60,25 @@ from temporalio.worker import (
     ExecuteNexusOperationStartInput,
     Interceptor,
     NexusOperationInboundInterceptor,
+    Replayer,
     StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
-from tests.helpers import find_free_port, new_worker
+from tests.helpers import (
+    assert_eq_eventually,
+    assert_eventually,
+    find_free_port,
+    new_worker,
+)
 from tests.helpers.metrics import PromMetricMatcher
 from tests.helpers.nexus import (
     links_from_workflow_execution_started_event,
     make_nexus_endpoint_name,
 )
+from tests.worker.test_workflow import CustomWorkflowRunner
 
 # TODO(nexus-preview): test worker shutdown, wait_all_completed, drain etc
 
@@ -455,9 +463,11 @@ class CallerWorkflow:
                 )
 
         if request_cancel:
-            # Even for SyncResponse, the op_handle future is not done at this point; that
-            # transition doesn't happen until the handle is awaited.
-            assert op_handle.cancel()
+            # A synchronous response has already supplied the operation outcome,
+            # even if the internal result task has not finished returning it.
+            assert op_handle.cancel() is not isinstance(
+                input.op_input.response_type, SyncResponse
+            )
         op_output = await op_handle
         return CallerWfOutput(op_output=OpOutput(value=op_output.value))
 
@@ -1092,17 +1102,194 @@ async def test_sync_response(
                 if op_definition_type == OpDefinitionType.SHORTHAND
                 else "sync_or_async_operation"
             )
-        elif request_cancel:
-            # The response was synchronous, so the result had already arrived when the
-            # workflow cancelled the handle. Single-batch activations keep that task
-            # cancellation instead of returning the completed result. See explanation
-            # below.
-            with pytest.raises(WorkflowFailureError) as ei:
-                await caller_wf_handle.result()
-            assert isinstance(ei.value.cause, CancelledError)
         else:
+            # Cancellation cannot discard an already-available synchronous result.
             result = await caller_wf_handle.result()
             assert result.op_output.value == "sync response"
+
+
+@workflow.defn
+class CompleteNexusOnSignalWorkflow:
+    def __init__(self) -> None:
+        self._finish = False
+
+    @workflow.run
+    async def run(self, fail: bool = False) -> str:
+        await workflow.wait_condition(lambda: self._finish)
+        if fail:
+            raise ApplicationError(
+                "operation failed", type="ResultRetentionFailure", non_retryable=True
+            )
+        return "operation complete"
+
+    @workflow.signal
+    def finish(self) -> None:
+        self._finish = True
+
+
+@dataclass
+class ResultRetentionInput:
+    workflow_id: str
+    fail: bool
+
+
+@nexusrpc.service
+class ResultRetentionService:
+    run: nexusrpc.Operation[ResultRetentionInput, str]
+
+
+@service_handler(service=ResultRetentionService)
+class ResultRetentionServiceHandler:
+    @workflow_run_operation
+    async def run(
+        self, ctx: WorkflowRunOperationContext, input: ResultRetentionInput
+    ) -> nexus.WorkflowHandle[str]:
+        return await ctx.start_workflow(
+            CompleteNexusOnSignalWorkflow.run, input.fail, id=input.workflow_id
+        )
+
+
+@workflow.defn
+class RetryNexusResultAfterCancellationWorkflow:
+    def __init__(self) -> None:
+        self._operation_started = False
+
+    @workflow.run
+    async def run(
+        self, endpoint: str, operation_id: str, wait_style: str, fail: bool
+    ) -> list[str]:
+        nexus_client = workflow.create_nexus_client(
+            service=ResultRetentionService, endpoint=endpoint
+        )
+        operation = await nexus_client.start_operation(
+            ResultRetentionService.run, ResultRetentionInput(operation_id, fail)
+        )
+        self._operation_started = True
+        events: list[str] = []
+        try:
+            if wait_style == "gather":
+                events.extend(await asyncio.gather(operation))
+            elif wait_style == "wait_for":
+                events.append(await asyncio.wait_for(operation, timeout=1000))
+            else:
+                events.append(await operation)
+        except NexusOperationError as err:
+            events.append(str(err.cause))
+        except asyncio.CancelledError:
+            events.append("caller caught cancellation")
+            try:
+                events.append(await operation)
+            except NexusOperationError as err:
+                events.append(str(err.cause))
+            except asyncio.CancelledError:
+                events.append("second await cancelled")
+        return events
+
+    @workflow.query
+    def operation_started(self) -> bool:
+        return self._operation_started
+
+
+@pytest.mark.parametrize(
+    ("single_batch", "wait_style"),
+    [(False, "direct"), (True, "direct"), (True, "gather"), (True, "wait_for")],
+)
+@pytest.mark.parametrize("fail", [False, True])
+async def test_retry_completed_nexus_operation_after_cancellation(
+    client: Client,
+    env: WorkflowEnvironment,
+    single_batch: bool,
+    wait_style: str,
+    fail: bool,
+) -> None:
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with time-skipping server")
+
+    caller_task_queue = str(uuid.uuid4())
+    handler_task_queue = str(uuid.uuid4())
+    operation_id = str(uuid.uuid4())
+    endpoint = make_nexus_endpoint_name(handler_task_queue)
+    await env.create_nexus_endpoint(endpoint, handler_task_queue)
+    runner = CustomWorkflowRunner()
+
+    def caller_worker() -> Worker:
+        worker = new_worker(
+            client,
+            RetryNexusResultAfterCancellationWorkflow,
+            task_queue=caller_task_queue,
+            workflow_runner=runner,
+            # Keep subsequent tasks off the stopped worker's sticky queue.
+            max_cached_workflows=0,
+        )
+        worker._set_default_workflow_logic_flag(
+            temporalio.worker._workflow_instance._WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH,
+            enabled=single_batch,
+        )
+        return worker
+
+    async with Worker(
+        client,
+        task_queue=handler_task_queue,
+        workflows=[CompleteNexusOnSignalWorkflow],
+        nexus_service_handlers=[ResultRetentionServiceHandler()],
+    ):
+        caller = await client.start_workflow(
+            RetryNexusResultAfterCancellationWorkflow.run,
+            args=[endpoint, operation_id, wait_style, fail],
+            id=str(uuid.uuid4()),
+            task_queue=caller_task_queue,
+        )
+        async with caller_worker():
+
+            async def operation_started() -> bool:
+                return await caller.query(
+                    RetryNexusResultAfterCancellationWorkflow.operation_started
+                )
+
+            await assert_eq_eventually(True, operation_started)
+
+        operation_workflow = client.get_workflow_handle(operation_id)
+        await operation_workflow.signal(CompleteNexusOnSignalWorkflow.finish)
+        if fail:
+            with pytest.raises(WorkflowFailureError) as err:
+                await operation_workflow.result()
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "ResultRetentionFailure"
+        else:
+            assert await operation_workflow.result() == "operation complete"
+
+        async def operation_completion_recorded() -> None:
+            async for event in caller.fetch_history_events():
+                if event.event_type == (
+                    temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_FAILED
+                    if fail
+                    else temporalio.api.enums.v1.EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED
+                ):
+                    return
+            raise AssertionError("Nexus completion is not in caller history")
+
+        await assert_eventually(operation_completion_recorded)
+        await caller.cancel()
+        async with caller_worker():
+            result = await caller.result()
+
+    assert any(
+        {"resolve_nexus_operation", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+    expected_outcome = (
+        "ResultRetentionFailure: operation failed" if fail else "operation complete"
+    )
+    assert result == (
+        ["caller caught cancellation", expected_outcome]
+        if single_batch
+        else [expected_outcome]
+    )
+    await Replayer(
+        workflows=[RetryNexusResultAfterCancellationWorkflow]
+    ).replay_workflow(await caller.fetch_history())
 
 
 @pytest.mark.parametrize("exception_in_operation_start", [False, True])
@@ -1759,9 +1946,10 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 # awaited, because both resolve_nexus_operation_start and resolve_nexus_operation jobs
 # were sent in the same activation and hence the task's fut_waiter was already finished.
 #
-# With single-batch activations (workflow logic flag 2, the default) the SDK re-raises
-# the task cancellation even though the result future is already done, so awaiting the
-# handle raises CancelledError in the sync case as well.
+# With single-batch activations (workflow logic flag 2), the internal result task now
+# declines cancellation when its operation outcome is already available. An explicit
+# handle.cancel() returns False in the sync case, preserving the result. Cancellation
+# of a caller awaiting that task is delivered to the caller instead.
 #
 # But in the async case, at the time that we cancel the NexusOperationHandle, only the
 # resolve_nexus_operation_start job had been sent; the result_fut was unresolved. Thus
