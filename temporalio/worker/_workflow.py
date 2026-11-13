@@ -41,6 +41,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
+from ._stream_read import _fill_stream_reads
 from ._stream_store import _WorkflowStreamStore
 from ._workflow_instance import (
     _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
@@ -432,6 +433,12 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             if init_job and previous_run_outcome:
                 await self._decode_nexus_previous_run_outcome(
                     act.run_id, init_job, previous_run_outcome, download_metrics
+                )
+            if self._stream_store is not None:
+                # A replay has only the marker of a Stream read, so the Records come
+                # from the Store before the Workflow sees the result.
+                await _fill_stream_reads(
+                    act, self._stream_store.config, self._data_converter
                 )
             if not workflow:
                 assert init_job
