@@ -1990,11 +1990,17 @@ async def _assert_completed_child_result_after_cancellation(
     expected_outcome = (
         "ResultRetentionFailure: child failed" if fail else "child complete"
     )
-    assert result == (
+    expected_events = (
         ["parent caught cancellation", expected_outcome]
         if single_batch
         else [expected_outcome]
     )
+    if single_batch and wait_style == "wait_for" and sys.version_info[:2] == (3, 11):
+        # Python 3.11 wait_for can consume caller cancellation when its task is
+        # already done. The operation outcome must still be preserved.
+        assert result in ([expected_outcome], expected_events)
+    else:
+        assert result == expected_events
     await Replayer(
         workflows=[RetryChildResultAfterCancellationWorkflow]
     ).replay_workflow(await handle.fetch_history())
@@ -2100,12 +2106,17 @@ async def test_workflow_retry_completed_activity_after_cancellation(
         )
         for activation, _ in runner._pairs
     )
-    assert result == [
+    expected_outcome = "activity failed" if fail else "activity complete"
+    expected_events = [
         "workflow caught cancellation",
-        ("activity failed" if fail else "activity complete")
-        if single_batch
-        else "second await cancelled",
+        expected_outcome if single_batch else "second await cancelled",
     ]
+    if single_batch and wait_style == "wait_for" and sys.version_info[:2] == (3, 11):
+        # Python 3.11 wait_for can consume caller cancellation when its task is
+        # already done. The operation outcome must still be preserved.
+        assert result in ([expected_outcome], expected_events)
+    else:
+        assert result == expected_events
     await Replayer(
         workflows=[RetryActivityResultAfterCancellationWorkflow]
     ).replay_workflow(await handle.fetch_history())

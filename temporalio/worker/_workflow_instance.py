@@ -2028,16 +2028,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         markers = _capture_event_group_markers(event_groups)
-        # Timeout creation must inherit the wait's metadata rather than the
-        # context of another task that later schedules a timer.
+        # Scope the timeout timer's summary and event groups to this wait so
+        # later timers in this task do not inherit them.
         token = _TimerOptionsCtxVar.set(
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
             if self._single_batch_activation:
-                # Directly awaiting the future preserves task cancellation in
-                # result races without cancelling shielded tasks based on
-                # workflow-wide cancellation state.
                 async with asyncio.timeout(timeout):
                     await fut
             else:
