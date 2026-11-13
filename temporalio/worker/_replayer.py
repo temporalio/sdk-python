@@ -20,15 +20,17 @@ import temporalio.runtime
 import temporalio.worker
 import temporalio.workflow
 
+from .._workflow_context import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    _WorkflowLogicFlag,
+)
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import (
-    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
     UnsandboxedWorkflowRunner,
     WorkflowRunner,
-    _WorkflowLogicFlag,
 )
 from .workflow_sandbox import SandboxedWorkflowRunner
 
