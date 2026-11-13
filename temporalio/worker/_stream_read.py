@@ -1,4 +1,7 @@
-"""The Worker side of :py:func:`temporalio.workflow.read_stream`."""
+"""The Worker side of :py:func:`temporalio.workflow.read_stream`.
+
+Workflow code starts the read here, and the Worker gives a replayed read its Records.
+"""
 
 from __future__ import annotations
 
@@ -7,16 +10,21 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import temporalio.api.stream.v1
+import temporalio.bridge.proto.workflow_activation
 import temporalio.common
+import temporalio.converter
+import temporalio.exceptions
 import temporalio.workflow
 from temporalio.client._stream_read import (
     _PENDING_STREAM_READS,
     _PendingStreamRead,
+    _read_range,
     _StreamReadMarker,
 )
 from temporalio.client._stream_store import (
     _STREAM_SERVICE,
     StreamConfig,
+    _store_page_reader,
     _store_read_activity_name,
 )
 from temporalio.nexus.system.stream_service.models import (
@@ -93,3 +101,41 @@ async def _read_stream_in_workflow(  # pyright: ignore[reportUnusedFunction]
         )
     finally:
         _PENDING_STREAM_READS.remove(run_id, read_id, pending)
+
+
+async def _fill_stream_reads(  # pyright: ignore[reportUnusedFunction]
+    act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+    config: StreamConfig,
+    data_converter: temporalio.converter.DataConverter,
+) -> None:
+    """Give each read that this activation resolves its Records, before the Workflow runs.
+
+    History has only the marker of a read. On a replay, the Records come from the Store
+    again, through the same codec as the read Activity used.
+
+    Raises:
+        RuntimeError: The Store failed, the Records are gone, or they don't match the
+            marker. The activation fails, and so does the Workflow Task.
+    """
+    for job in act.jobs:
+        if not job.HasField("resolve_activity"):
+            continue
+        resolve = job.resolve_activity
+        if not resolve.is_local or not resolve.result.HasField("completed"):
+            continue
+        marker = _StreamReadMarker.from_payload(resolve.result.completed.result)
+        if marker is None:
+            continue
+        pending = _PENDING_STREAM_READS.get(act.run_id, marker.read_id)
+        # On a first run the read Activity already gave its Records.
+        if pending is None or pending.records_for(marker) is not None:
+            continue
+        try:
+            store = config._get_store_by_name(marker.store)
+        except temporalio.exceptions.StreamConfigError as err:
+            raise RuntimeError(
+                f"The replay of a Workflow read can't read {marker.describe_range()}: "
+                f"{err}"
+            ) from err
+        page_reader = _store_page_reader(store, data_converter)
+        pending.fill(marker, await _read_range(page_reader, marker))

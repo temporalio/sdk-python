@@ -286,3 +286,45 @@ def _call_until(
         raise temporalio.exceptions.ApplicationError(
             str(err), type=type(err).__name__, non_retryable=True
         ) from err
+
+
+async def _read_range(  # pyright: ignore[reportUnusedFunction]
+    read_page: _ReadPage, marker: _StreamReadMarker
+) -> list[temporalio.api.stream.v1.StreamRecord]:
+    """Read the Records of ``marker`` again, and check them against it.
+
+    Raises:
+        RuntimeError: The Store failed, the Records are gone, or they don't match.
+    """
+    records: list[temporalio.api.stream.v1.StreamRecord] = []
+    cursor = marker.from_offset
+    ref = temporalio.api.stream.v1.StreamRef(id=marker.stream_id, store=marker.store)
+    while len(records) < marker.record_count:
+        left = marker.record_count - len(records)
+        request = temporalio.api.streamservice.v1.ReadRecordsRequest(
+            ref=ref,
+            from_offset=cursor or b"",
+            max_records=min(left, _MAX_PAGE_RECORDS),
+        )
+        try:
+            response = await read_page(request)
+        except Exception as err:
+            raise RuntimeError(
+                f"The replay of a Workflow read can't read {marker.describe_range()}: "
+                f"{err}"
+            ) from err
+        if not response.records:
+            raise RuntimeError(
+                f"The replay of a Workflow read can't read {marker.describe_range()}: "
+                f"the Store gave {len(records)} Records, and the Records after them are "
+                "gone"
+            )
+        records.extend(list(response.records)[:left])
+        cursor = records[-1].offset
+    last_offset = records[-1].offset if records else marker.from_offset
+    if last_offset != marker.last_offset or _records_digest(records) != marker.digest:
+        raise RuntimeError(
+            f"The replay of a Workflow read read {marker.describe_range()}, and the "
+            "Records differ from the ones of the first run"
+        )
+    return records
