@@ -17,9 +17,15 @@ import temporalio.common
 import temporalio.converter
 import temporalio.converter._payload_converter
 import temporalio.nexus.system._support
+import temporalio.exceptions
 import temporalio.nexus.system.stream_service
 import temporalio.runtime
 import temporalio.workflow
+from temporalio.client._stream_read import (
+    _PENDING_STREAM_READS,
+    _read_until,
+    _StreamReadMarker,
+)
 from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
 from temporalio.exceptions import StreamConfigError
 
@@ -138,12 +144,15 @@ class StreamStore(ABC):
     def worker_activities(self) -> Sequence[Callable[..., Any]]:
         """The Activities that a Worker registers for this Store when it runs Workflows.
 
-        The default is one Activity, named for this Store, that
-        :py:meth:`call_from_workflow` runs as a Local Activity, or as a regular Activity
-        for a close. A Store that overrides one of the two methods overrides the other to
-        match.
+        The default is two Activities, named for this Store. One answers
+        :py:meth:`call_from_workflow`, which runs it as a Local Activity, or as a regular
+        Activity for a close. The other answers :py:func:`temporalio.workflow.read_stream`,
+        which always runs it by its name. A Store that overrides
+        :py:meth:`call_from_workflow` overrides this method to match, and a Store that
+        overrides this method keeps the read Activity in its list for Workflow code that
+        reads.
         """
-        return [_store_call_activity(self)]
+        return [_store_call_activity(self), _store_read_activity(self)]
 
     async def call_from_workflow(
         self,
@@ -392,6 +401,80 @@ def _with_local_activity_producer(
     request.producer.local_activity.epoch.attempt = 1
     if not request.sequence:
         request.sequence = 1
+
+
+_STORE_READ_ACTIVITY = "__temporal_stream_store_read"
+
+
+def _store_read_activity_name(store_name: str) -> str:
+    return f"{_STORE_READ_ACTIVITY}:{store_name}"
+
+
+def _store_read_activity(
+    store: StreamStore,
+) -> Callable[[str, bytes, int, float], Awaitable[temporalio.common.RawValue]]:
+    @temporalio.activity.defn(name=_store_read_activity_name(store.name))
+    async def read(
+        read_id: str, request: bytes, max_records: int, timeout_seconds: float
+    ) -> temporalio.common.RawValue:
+        info = temporalio.activity.info()
+        pending = _PENDING_STREAM_READS.get(info.workflow_run_id or "", read_id)
+        if pending is None:
+            # The predicate and the Records live in the Workflow's process, so only a
+            # Local Activity of that Workflow can run this read.
+            raise temporalio.exceptions.ApplicationError(
+                f"The Stream read '{read_id}' has no pending read in this process. "
+                "Only temporalio.workflow.read_stream runs this Activity.",
+                non_retryable=True,
+            )
+        read_request = temporalio.api.streamservice.v1.ReadRecordsRequest.FromString(
+            request
+        )
+        # The codec decodes the bodies in each page, so the predicate and the Workflow
+        # get the user's values.
+        page_reader = _store_page_reader(
+            store, temporalio.activity.client().data_converter
+        )
+        from_offset = read_request.from_offset or None
+        result = await _read_until(
+            page_reader,
+            ref=read_request.ref,
+            from_offset=from_offset,
+            max_records=max_records,
+            timeout=timedelta(seconds=timeout_seconds),
+            read=pending,
+        )
+        marker = _StreamReadMarker.for_records(
+            read_id=read_id,
+            store=store.name,
+            stream_id=read_request.ref.id,
+            from_offset=from_offset,
+            records=result.records,
+            matched=result.matched,
+            done=result.done,
+        )
+        pending.fill(marker, result.records)
+        return marker.to_raw_value()
+
+    return read
+
+
+def _store_page_reader(
+    store: StreamStore, data_converter: temporalio.converter.DataConverter
+) -> Callable[
+    [temporalio.api.streamservice.v1.ReadRecordsRequest],
+    Awaitable[temporalio.api.streamservice.v1.ReadRecordsResponse],
+]:
+    async def read_page(
+        request: temporalio.api.streamservice.v1.ReadRecordsRequest,
+    ) -> temporalio.api.streamservice.v1.ReadRecordsResponse:
+        response = await _call_stream_store(
+            store, data_converter, "ReadRecords", request
+        )
+        assert isinstance(response, temporalio.api.streamservice.v1.ReadRecordsResponse)
+        return response
+
+    return read_page
 
 
 @dataclasses.dataclass(frozen=True)
