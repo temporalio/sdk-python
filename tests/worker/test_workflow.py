@@ -1743,8 +1743,12 @@ class CompleteChildOnSignalWorkflow:
         self._finish = False
 
     @workflow.run
-    async def run(self) -> str:
+    async def run(self, fail: bool = False) -> str:
         await workflow.wait_condition(lambda: self._finish)
+        if fail:
+            raise ApplicationError(
+                "child failed", type="ResultRetentionFailure", non_retryable=True
+            )
         return "child complete"
 
     @workflow.signal
@@ -1846,6 +1850,349 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
     await Replayer(workflows=[CancelAtChildCompletionWorkflow]).replay_workflow(
         await handle.fetch_history()
     )
+
+
+@workflow.defn
+class RetryChildResultAfterCancellationWorkflow:
+    def __init__(self) -> None:
+        self._child_started: bool = False
+
+    @workflow.run
+    async def run(
+        self, child_task_queue: str, wait_style: str = "direct", fail: bool = False
+    ) -> list[str]:
+        child = await workflow.start_child_workflow(
+            CompleteChildOnSignalWorkflow.run,
+            fail,
+            id=f"{workflow.info().workflow_id}-child",
+            task_queue=child_task_queue,
+        )
+        self._child_started = True
+        events: list[str] = []
+        try:
+            if wait_style == "gather":
+                events.extend(await asyncio.gather(child))
+            elif wait_style == "wait_for":
+                events.append(await asyncio.wait_for(child, timeout=1000))
+            else:
+                events.append(await child)
+        except ChildWorkflowError as err:
+            events.append(str(err.cause))
+        except asyncio.CancelledError:
+            events.append("parent caught cancellation")
+            try:
+                events.append(await child)
+            except ChildWorkflowError as err:
+                events.append(str(err.cause))
+            except asyncio.CancelledError:
+                events.append(
+                    f"second await cancelled; handle.cancelled={child.cancelled()}"
+                )
+        return events
+
+    @workflow.query
+    def child_started(self) -> bool:
+        return self._child_started
+
+
+@pytest.mark.parametrize("single_batch", [False, True])
+@pytest.mark.parametrize("fail", [False, True])
+async def test_workflow_retry_completed_child_after_cancellation(
+    client: Client, single_batch: bool, fail: bool
+) -> None:
+    await _assert_completed_child_result_after_cancellation(
+        client, "direct", single_batch, fail
+    )
+
+
+@pytest.mark.parametrize("wait_style", ["gather", "wait_for"])
+@pytest.mark.parametrize("fail", [False, True])
+async def test_workflow_retry_completed_child_after_wrapped_cancellation(
+    client: Client, wait_style: str, fail: bool
+) -> None:
+    await _assert_completed_child_result_after_cancellation(
+        client, wait_style, fail=fail
+    )
+
+
+async def _assert_completed_child_result_after_cancellation(
+    client: Client, wait_style: str, single_batch: bool = True, fail: bool = False
+) -> None:
+    parent_task_queue = str(uuid.uuid4())
+    child_task_queue = str(uuid.uuid4())
+    workflow_id = f"workflow-{uuid.uuid4()}"
+    runner = CustomWorkflowRunner()
+
+    def parent_worker() -> Worker:
+        worker = new_worker(
+            client,
+            RetryChildResultAfterCancellationWorkflow,
+            task_queue=parent_task_queue,
+            workflow_runner=runner,
+            # Keep subsequent tasks off the stopped worker's sticky queue.
+            max_cached_workflows=0,
+        )
+        worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+        )
+        return worker
+
+    async with new_worker(
+        client, CompleteChildOnSignalWorkflow, task_queue=child_task_queue
+    ):
+        handle = await client.start_workflow(
+            RetryChildResultAfterCancellationWorkflow.run,
+            args=[child_task_queue, wait_style, fail],
+            id=workflow_id,
+            task_queue=parent_task_queue,
+        )
+        async with parent_worker():
+
+            async def child_started() -> bool:
+                return await handle.query(
+                    RetryChildResultAfterCancellationWorkflow.child_started
+                )
+
+            await assert_eq_eventually(True, child_started)
+
+        child_handle = client.get_workflow_handle(f"{workflow_id}-child")
+        await child_handle.signal(CompleteChildOnSignalWorkflow.finish)
+        if fail:
+            with pytest.raises(WorkflowFailureError) as err:
+                await child_handle.result()
+            assert isinstance(err.value.cause, ApplicationError)
+            assert err.value.cause.type == "ResultRetentionFailure"
+        else:
+            assert await child_handle.result() == "child complete"
+
+        async def child_completion_recorded() -> None:
+            async for event in handle.fetch_history_events():
+                if event.event_type == (
+                    EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_FAILED
+                    if fail
+                    else EventType.EVENT_TYPE_CHILD_WORKFLOW_EXECUTION_COMPLETED
+                ):
+                    return
+            raise AssertionError("Child completion is not in parent history")
+
+        await assert_eventually(child_completion_recorded)
+        await handle.cancel()
+
+        async with parent_worker():
+            result = await handle.result()
+
+    assert any(
+        {"resolve_child_workflow_execution", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+    expected_outcome = (
+        "ResultRetentionFailure: child failed" if fail else "child complete"
+    )
+    expected_events = (
+        ["parent caught cancellation", expected_outcome]
+        if single_batch
+        else [expected_outcome]
+    )
+    if single_batch and wait_style == "wait_for" and sys.version_info[:2] == (3, 11):
+        # Python 3.11 wait_for can consume caller cancellation when its task is
+        # already done. The operation outcome must still be preserved.
+        assert result in ([expected_outcome], expected_events)
+    else:
+        assert result == expected_events
+    await Replayer(
+        workflows=[RetryChildResultAfterCancellationWorkflow]
+    ).replay_workflow(await handle.fetch_history())
+
+
+@activity.defn
+async def activity_result_retention(fail: bool) -> str:
+    if fail:
+        raise ApplicationError("activity failed", non_retryable=True)
+    return "activity complete"
+
+
+@workflow.defn
+class RetryActivityResultAfterCancellationWorkflow:
+    @workflow.run
+    async def run(
+        self, activity_task_queue: str, fail: bool, wait_style: str
+    ) -> list[str]:
+        handle = workflow.start_activity(
+            activity_result_retention,
+            fail,
+            task_queue=activity_task_queue,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        events: list[str] = []
+        try:
+            if wait_style == "gather":
+                events.extend(await asyncio.gather(handle))
+            elif wait_style == "wait_for":
+                events.append(await asyncio.wait_for(handle, timeout=1000))
+            else:
+                events.append(await handle)
+        except ActivityError as err:
+            events.append(str(err.cause))
+        except asyncio.CancelledError:
+            events.append("workflow caught cancellation")
+            try:
+                events.append(await handle)
+            except ActivityError as err:
+                events.append(str(err.cause))
+            except asyncio.CancelledError:
+                events.append("second await cancelled")
+        return events
+
+
+@pytest.mark.parametrize("fail", [False, True])
+@pytest.mark.parametrize(
+    ("single_batch", "wait_style"),
+    [(False, "direct"), (True, "direct"), (True, "gather"), (True, "wait_for")],
+)
+async def test_workflow_retry_completed_activity_after_cancellation(
+    client: Client, single_batch: bool, wait_style: str, fail: bool
+) -> None:
+    workflow_task_queue = str(uuid.uuid4())
+    activity_task_queue = str(uuid.uuid4())
+    runner = CustomWorkflowRunner()
+
+    def workflow_worker() -> Worker:
+        worker = new_worker(
+            client,
+            RetryActivityResultAfterCancellationWorkflow,
+            task_queue=workflow_task_queue,
+            workflow_runner=runner,
+            # Keep subsequent tasks off the stopped worker's sticky queue.
+            max_cached_workflows=0,
+        )
+        worker._set_default_workflow_logic_flag(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+        )
+        return worker
+
+    handle = await client.start_workflow(
+        RetryActivityResultAfterCancellationWorkflow.run,
+        args=[activity_task_queue, fail, wait_style],
+        id=str(uuid.uuid4()),
+        task_queue=workflow_task_queue,
+    )
+
+    async def wait_for_event(event_type: EventType.ValueType) -> None:
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            if event.event_type == event_type:
+                return
+
+    async with workflow_worker():
+        await wait_for_event(EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED)
+
+    async with new_worker(
+        client, activities=[activity_result_retention], task_queue=activity_task_queue
+    ):
+        await wait_for_event(
+            EventType.EVENT_TYPE_ACTIVITY_TASK_FAILED
+            if fail
+            else EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
+        )
+    await handle.cancel()
+
+    async with workflow_worker():
+        result = await handle.result()
+
+    assert any(
+        {"resolve_activity", "cancel_workflow"}.issubset(
+            {job.WhichOneof("variant") for job in activation.jobs}
+        )
+        for activation, _ in runner._pairs
+    )
+    expected_outcome = "activity failed" if fail else "activity complete"
+    expected_events = [
+        "workflow caught cancellation",
+        expected_outcome if single_batch else "second await cancelled",
+    ]
+    if single_batch and wait_style == "wait_for" and sys.version_info[:2] == (3, 11):
+        # Python 3.11 wait_for can consume caller cancellation when its task is
+        # already done. The operation outcome must still be preserved.
+        assert result in ([expected_outcome], expected_events)
+    else:
+        assert result == expected_events
+    await Replayer(
+        workflows=[RetryActivityResultAfterCancellationWorkflow]
+    ).replay_workflow(await handle.fetch_history())
+
+
+@workflow.defn(sandboxed=False)
+class RetryLocalActivityResultAfterCancellationWorkflow:
+    @workflow.run
+    async def run(self, fail: bool) -> list[str]:
+        handle = workflow.start_local_activity(
+            activity_result_retention,
+            fail,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        waiter = asyncio.current_task()
+        assert waiter is not None
+
+        def cancel_waiter(_fut: asyncio.Future[Any]) -> None:
+            assert not handle.done()
+            waiter.cancel()
+
+        # Local results are delivered while the workflow worker is running.
+        # Cancel at resolution, before the handle returns its outcome, instead
+        # of relying on a race between a server cancellation and local execution.
+        cast(
+            temporalio.worker._workflow_instance._ActivityHandle, handle
+        )._result_fut.add_done_callback(cancel_waiter)
+        events: list[str] = []
+        try:
+            events.append(await handle)
+        except (ActivityError, ApplicationError) as err:
+            events.append(
+                str(err.cause) if isinstance(err, ActivityError) else str(err)
+            )
+        except asyncio.CancelledError:
+            events.append("workflow caught cancellation")
+            try:
+                events.append(await handle)
+            except (ActivityError, ApplicationError) as err:
+                events.append(
+                    str(err.cause) if isinstance(err, ActivityError) else str(err)
+                )
+            except asyncio.CancelledError:
+                events.append("second await cancelled")
+        return events
+
+
+@pytest.mark.parametrize("single_batch", [False, True])
+@pytest.mark.parametrize("fail", [False, True])
+async def test_workflow_retry_completed_local_activity_after_cancellation(
+    client: Client, single_batch: bool, fail: bool
+) -> None:
+    worker = new_worker(
+        client,
+        RetryLocalActivityResultAfterCancellationWorkflow,
+        activities=[activity_result_retention],
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+    )
+    async with worker:
+        handle = await client.start_workflow(
+            RetryLocalActivityResultAfterCancellationWorkflow.run,
+            fail,
+            id=str(uuid.uuid4()),
+            task_queue=worker.task_queue,
+        )
+        assert await handle.result() == [
+            "workflow caught cancellation",
+            ("activity failed" if fail else "activity complete")
+            if single_batch
+            else "second await cancelled",
+        ]
+    await Replayer(
+        workflows=[RetryLocalActivityResultAfterCancellationWorkflow]
+    ).replay_workflow(await handle.fetch_history())
 
 
 @activity.defn
