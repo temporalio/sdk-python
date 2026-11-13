@@ -1,7 +1,9 @@
 import asyncio
+import dataclasses
 import gc
 import logging
 import logging.handlers
+import pickle
 import queue
 import re
 import subprocess
@@ -84,6 +86,7 @@ async def test_different_runtimes(env: WorkflowEnvironment):
 
 
 async def test_runtime_shutdown_after_completed_rpc(env: WorkflowEnvironment):
+    # Preserve connection credentials, but let the child create its own native runtime.
     result = await asyncio.to_thread(
         subprocess.run,
         [
@@ -92,15 +95,19 @@ async def test_runtime_shutdown_after_completed_rpc(env: WorkflowEnvironment):
             "faulthandler",
             str(Path(__file__).with_name("bridge") / "runtime_shutdown.py"),
             "client",
-            env.client.service_client.config.target_host,
         ],
+        input=pickle.dumps(
+            (
+                dataclasses.replace(env.client.service_client.config, runtime=None),
+                env.client.namespace,
+            )
+        ),
         capture_output=True,
-        text=True,
         timeout=30,
     )
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "completed callbacks: 1"
-    assert result.stderr == ""
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout.strip() == b"completed callbacks: 1"
+    assert result.stderr == b""
 
 
 async def test_runtime_log_forwarding():
