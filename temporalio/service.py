@@ -8,7 +8,7 @@ import os
 import socket
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import IntEnum
@@ -44,8 +44,7 @@ class TLSConfig:
 
     domain: str | None = None
     """SNI host and HTTP/2 authority override, and the default name the server
-    certificate is verified against (see
-    :py:attr:`verification_server_name`)."""
+    certificate is verified against (see :py:attr:`verification_server_name`)."""
 
     client_cert: bytes | None = None
     """Client certificate for mTLS.
@@ -57,8 +56,8 @@ class TLSConfig:
 
     This must be combined with :py:attr:`client_cert`."""
 
-    verification_server_name: str | None = None
-    """Name to verify the server certificate against, instead of the
+    verification_server_name: str | Sequence[str] | None = None
+    """Name, or names, to verify the server certificate against, instead of the
     :py:attr:`domain` / connected host.
 
     Unlike :py:attr:`domain`, this does not change the TLS SNI or HTTP/2
@@ -67,16 +66,30 @@ class TLSConfig:
     carry the name being dialed, e.g. when the connection traverses an
     SNI-inspecting proxy that must be able to resolve the SNI value.
 
+    If this is a sequence of names, the certificate is accepted if it is valid
+    for any one of them. Use this for a target whose servers present different
+    certificate names. For example, a global address may route to regional
+    servers whose certificates each carry only their own region's name. The
+    sequence must not be empty.
+
     Requires :py:attr:`server_root_ca_cert`; the system root store is not
     consulted when this is set."""
 
     def _to_bridge_config(self) -> temporalio.bridge.client.ClientTlsConfig:
+        verification_server_names: list[str] | None = None
+        # Check for str first, because a str is also a Sequence[str].
+        if isinstance(self.verification_server_name, str):
+            verification_server_names = [self.verification_server_name]
+        elif self.verification_server_name is not None:
+            verification_server_names = list(self.verification_server_name)
+            if not verification_server_names:
+                raise ValueError("verification_server_name must not be empty")
         return temporalio.bridge.client.ClientTlsConfig(
             server_root_ca_cert=self.server_root_ca_cert,
             domain=self.domain,
             client_cert=self.client_cert,
             client_private_key=self.client_private_key,
-            verification_server_name=self.verification_server_name,
+            verification_server_names=verification_server_names,
         )
 
 

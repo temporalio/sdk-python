@@ -74,7 +74,7 @@ temporalio-sdk-core = { version = "0.11.0", path = "./sdk-core/crates/sdk-core",
 ] }
 tokio = "1.26"
 # Matches the sdk-core client crate's rustls stack; used to build the custom
-# server certificate verifier for ClientTlsConfig.verification_server_name.
+# server certificate verifier for TLSConfig.verification_server_name.
 # Provider is NOT pinned here — the bridge's tls-ring/tls-aws-lc features select
 # `ring` (default) or `aws_lc_rs` (fips), so this crate's direct rustls use in
 # client.rs tracks the rest of the stack and the `cargo tree -i ring` FIPS gate passes.
