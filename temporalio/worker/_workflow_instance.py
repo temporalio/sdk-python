@@ -40,7 +40,7 @@ from typing import (
 
 import nexusrpc
 from nexusrpc import InputT, OutputT
-from typing_extensions import Self, TypedDict, TypeVarTuple, Unpack
+from typing_extensions import Self, TypedDict, TypeVarTuple, Unpack, override
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -2015,18 +2015,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         self._assert_not_read_only("wait condition")
-        cancellation_requested_before = self._cancel_reason is not None
-
-        # Some asyncio.wait_for implementations can prefer a ready condition
-        # result or timeout over task cancellation that becomes ready in the same
-        # event-loop turn. Only detect a new request so workflows can catch
-        # cancellation and keep going.
-        def cancellation_arrived() -> bool:
-            return (
-                self._single_batch_activation
-                and not cancellation_requested_before
-                and self._cancel_reason is not None
-            )
 
         fut = self.create_future()
         self._conditions.append((fn, fut))
@@ -2040,17 +2028,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         markers = _capture_event_group_markers(event_groups)
-        # asyncio.wait_for() starts its timer from this task, so the options are
-        # set in the task's context and reset once the wait ends
+        # Timeout creation must inherit the wait's metadata rather than the
+        # context of another task that later schedules a timer.
         token = _TimerOptionsCtxVar.set(
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
-            await asyncio.wait_for(fut, timeout)
-        except asyncio.TimeoutError:
-            if cancellation_arrived():
-                raise asyncio.CancelledError()
-            raise
+            if self._single_batch_activation:
+                # Directly awaiting the future preserves task cancellation in
+                # result races without cancelling shielded tasks based on
+                # workflow-wide cancellation state.
+                async with asyncio.timeout(timeout):
+                    await fut
+            else:
+                await asyncio.wait_for(fut, timeout)
         finally:
             try:
                 _TimerOptionsCtxVar.reset(token)
@@ -2059,8 +2050,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # unwinds it in another context, and the one the options were
                 # set in is being discarded anyway
                 pass
-        if cancellation_arrived():
-            raise asyncio.CancelledError()
 
     def workflow_get_current_details(self) -> str:
         return self._current_details
@@ -3501,11 +3490,16 @@ class _ActivityHandle(temporalio.workflow.ActivityHandle[Any]):
         )
         self._event_group_markers = _capture_event_group_markers(input.event_groups)
 
+    @override
     def cancel(self, msg: Any | None = None) -> bool:
         # Allow the cancel to go through for the task even if we're deleting,
         # just don't do any commands
         if not self._instance._deleting:
             self._instance._assert_not_read_only("cancel activity handle")
+            if self._instance._single_batch_activation and self._result_fut.done():
+                # Preserve the known outcome and let the awaiter receive its own
+                # cancellation.
+                return False
             # We override this because if it's not yet started and not done, we need
             # to send a cancel command because the async function won't run to trap
             # the cancel (i.e. cancelled before started)
@@ -3664,6 +3658,14 @@ class _ChildWorkflowHandle(temporalio.workflow.ChildWorkflowHandle[Any, Any]):
             workflow_context
         )
         self._event_group_markers = _capture_event_group_markers(input.event_groups)
+
+    @override
+    def cancel(self, msg: Any | None = None) -> bool:
+        if self._instance._single_batch_activation and self._result_fut.done():
+            # Declining cancellation preserves the known child outcome and lets
+            # an awaiting task receive its own cancellation instead.
+            return False
+        return super().cancel(msg)
 
     @property
     def id(self) -> str:
@@ -3854,6 +3856,26 @@ class _ExternalWorkflowHandle(temporalio.workflow.ExternalWorkflowHandle[Any]):
         await self._instance._cancel_external_workflow(command)
 
 
+class _NexusOperationTask(asyncio.Task[OutputT]):
+    def __init__(
+        self,
+        instance: _WorkflowInstanceImpl,
+        fn: Coroutine[Any, Any, OutputT],
+        result_fut: asyncio.Future[OutputT | None],
+    ) -> None:
+        self._instance = instance
+        self._result_fut = result_fut
+        super().__init__(fn, loop=instance)
+
+    @override
+    def cancel(self, msg: Any | None = None) -> bool:
+        if self._instance._single_batch_activation and self._result_fut.done():
+            # Awaiting a Nexus handle waits on this task directly, so caller
+            # cancellation reaches this method rather than the handle's cancel().
+            return False
+        return super().cancel(msg)
+
+
 class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
     def __init__(
         self,
@@ -3867,11 +3889,12 @@ class _NexusOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):
         self._instance = instance
         self._seq = seq
         self._input = input
-        self._task = instance.create_task(
-            fn, name=f"nexus: {input.service}/{input.operation_name}"
-        )
         self._start_fut: asyncio.Future[str | None] = instance.create_future()
         self._result_fut: asyncio.Future[OutputT | None] = instance.create_future()
+        self._task = _NexusOperationTask(instance, fn, self._result_fut)
+        instance._register_task(
+            self._task, name=f"nexus: {input.service}/{input.operation_name}"
+        )
         self._payload_converter = payload_converter
         self._failure_converter = failure_converter
         self._event_group_markers = _capture_event_group_markers(input.event_groups)
