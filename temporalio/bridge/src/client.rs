@@ -113,6 +113,7 @@ pub fn connect_client<'a>(
     let metrics_meter = runtime_ref
         .runtime
         .core
+        .read()?
         .telemetry()
         .get_temporal_metric_meter();
     let opts = config.into_connection_options(metrics_meter)?;

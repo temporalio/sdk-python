@@ -1,10 +1,16 @@
+import asyncio
+import dataclasses
 import gc
 import logging
 import logging.handlers
+import pickle
 import queue
 import re
+import subprocess
+import sys
 import uuid
 from datetime import timedelta
+from pathlib import Path
 from typing import Any, cast
 from urllib.request import urlopen
 
@@ -77,6 +83,31 @@ async def test_different_runtimes(env: WorkflowEnvironment):
         assert "long_request" in f.read().decode("utf-8")
     with urlopen(url=f"http://{prom_addr2}/metrics") as f:
         assert "long_request" in f.read().decode("utf-8")
+
+
+async def test_runtime_shutdown_after_completed_rpc(env: WorkflowEnvironment):
+    # Preserve connection credentials, but let the child create its own native runtime.
+    result = await asyncio.to_thread(
+        subprocess.run,
+        [
+            sys.executable,
+            "-X",
+            "faulthandler",
+            str(Path(__file__).with_name("bridge") / "runtime_shutdown.py"),
+            "client",
+        ],
+        input=pickle.dumps(
+            (
+                dataclasses.replace(env.client.service_client.config, runtime=None),
+                env.client.namespace,
+            )
+        ),
+        capture_output=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr.decode()
+    assert result.stdout.strip() == b"completed callbacks: 1"
+    assert result.stderr == b""
 
 
 async def test_runtime_log_forwarding():
