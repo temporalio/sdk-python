@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import dataclasses
 import json
@@ -35,6 +36,7 @@ from temporalio.converter import (
     StorageDriverActivityInfo,
     StorageDriverClaim,
     StorageDriverRetrieveContext,
+    StorageDriverSelectContext,
     StorageDriverStoreContext,
     StorageDriverWorkflowInfo,
     WithSerializationContext,
@@ -1534,6 +1536,78 @@ async def test_store_metadata_standalone_activity(env: WorkflowEnvironment) -> N
     assert execute_ctx.target.id == activity_id
     assert execute_ctx.target.type == "echo_activity"
     assert execute_ctx.target.run_id is not None
+
+
+class AsyncCompletedActivity:
+    def __init__(self) -> None:
+        self.task_token: asyncio.Future[bytes] = asyncio.Future()
+
+    @activity.defn
+    async def run(self, _arg: str) -> str:
+        self.task_token.set_result(activity.info().task_token)
+        activity.raise_complete_async()
+
+
+@workflow.defn
+class AsyncCompletedActivityWorkflow:
+    @workflow.run
+    async def run(self, arg: str) -> str:
+        return await workflow.execute_activity(
+            "run", arg, start_to_close_timeout=timedelta(seconds=30)
+        )
+
+
+async def test_store_and_select_contexts_carry_ambient_namespace(
+    env: WorkflowEnvironment,
+) -> None:
+    driver = ContextTrackingStorageDriver()
+    select_contexts: list[StorageDriverSelectContext] = []
+
+    def selector(context: StorageDriverSelectContext, _: Payload) -> StorageDriver:
+        select_contexts.append(context)
+        return driver
+
+    client = await env.connect_client(
+        data_converter=dataclasses.replace(
+            temporalio.converter.default(),
+            external_storage=ExternalStorage(
+                drivers=[driver],
+                driver_selector=selector,
+                payload_size_threshold=0,
+            ),
+        ),
+    )
+    async_activity = AsyncCompletedActivity()
+
+    async with new_worker(
+        client, AsyncCompletedActivityWorkflow, activities=[async_activity.run]
+    ) as worker:
+        handle = await client.start_workflow(
+            AsyncCompletedActivityWorkflow.run,
+            "input",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        task_token = await asyncio.wait_for(async_activity.task_token, timeout=10)
+        await client.get_async_activity_handle(task_token=task_token).complete(
+            "async result"
+        )
+        assert await handle.result() == "async result"
+
+    assert len(driver.store_contexts) == 4
+    assert len(select_contexts) == len(driver.store_contexts)
+    for store_ctx, select_ctx in zip(driver.store_contexts, select_contexts):
+        assert store_ctx.namespace == client.namespace
+        assert select_ctx.namespace == client.namespace
+        assert select_ctx.target == store_ctx.target
+
+    client_start, worker_schedule, token_completion, worker_complete = (
+        driver.store_contexts
+    )
+    assert isinstance(client_start.target, StorageDriverWorkflowInfo)
+    assert isinstance(worker_schedule.target, StorageDriverWorkflowInfo)
+    assert token_completion.target is None
+    assert isinstance(worker_complete.target, StorageDriverWorkflowInfo)
 
 
 @workflow.defn

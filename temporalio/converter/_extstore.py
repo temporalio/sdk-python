@@ -197,6 +197,14 @@ class StorageDriverStoreContext:
     exists the current execution context (workflow or activity) is used as the
     target instead."""
 
+    namespace: str | None = None
+    """The namespace of the client or worker performing the operation.
+
+    It is set even when :attr:`target` is ``None``, and is ``None`` only when
+    external storage is used outside a client or worker. A driver choosing a
+    storage layout should prefer the target's namespace when a target is
+    present."""
+
 
 @dataclass(frozen=True)
 class StorageDriverSelectContext:
@@ -214,6 +222,14 @@ class StorageDriverSelectContext:
     being signaled), this is that target's identity.  When no explicit target
     exists the current execution context (workflow or activity) is used as the
     target instead."""
+
+    namespace: str | None = None
+    """The namespace of the client or worker performing the operation.
+
+    It is set even when :attr:`target` is ``None``, and is ``None`` only when
+    external storage is used outside a client or worker. A driver choosing a
+    storage layout should prefer the target's namespace when a target is
+    present."""
 
 
 @dataclass(frozen=True)
@@ -420,7 +436,9 @@ class ExternalStorage:
         result = dataclasses.replace(self)
         object.__setattr__(result, "_store_context", ctx)
         object.__setattr__(
-            result, "_select_context", StorageDriverSelectContext(target=ctx.target)
+            result,
+            "_select_context",
+            StorageDriverSelectContext(target=ctx.target, namespace=ctx.namespace),
         )
         return result
 

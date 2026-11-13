@@ -276,7 +276,9 @@ class _ActivityWorker:
         if details is None:
             return
 
-        data_converter = self._data_converter
+        data_converter = self._data_converter._with_store_context(
+            StorageDriverStoreContext(namespace=self._client.namespace)
+        )
         if activity.info:
             # The server puts a standalone activity's last heartbeat details into its timeout
             # failure, which goes back to the Nexus caller if a Nexus handler started it
@@ -295,6 +297,7 @@ class _ActivityWorker:
             data_converter = data_converter._with_contexts(
                 context,
                 StorageDriverStoreContext(
+                    namespace=self._client.namespace,
                     target=StorageDriverActivityInfo(
                         id=activity.info.activity_id,
                         type=activity.info.activity_type,
@@ -378,7 +381,10 @@ class _ActivityWorker:
                 namespace=ns,
             )
         data_converter = self._data_converter._with_contexts(
-            context, StorageDriverStoreContext(target=store_target)
+            context,
+            StorageDriverStoreContext(
+                namespace=self._client.namespace, target=store_target
+            ),
         )
         # A standalone activity started by a Nexus operation handler returns its result and
         # failure to the Nexus caller, which decodes them with the handler's Nexus context. The
@@ -388,7 +394,10 @@ class _ActivityWorker:
         )
         caller_facing_data_converter = (
             self._data_converter._with_contexts(
-                nexus_context, StorageDriverStoreContext(target=store_target)
+                nexus_context,
+                StorageDriverStoreContext(
+                    namespace=self._client.namespace, target=store_target
+                ),
             )
             if nexus_context
             else data_converter

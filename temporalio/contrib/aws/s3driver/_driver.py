@@ -148,13 +148,14 @@ class S3StorageDriver(StorageDriver):
         ``payloads``.
 
         Object keys exceeding 1,024 bytes fall back to a namespace-scoped hash
-        key. Empty namespaces on workflow and activity targets use ``"null"``.
+        key. Without a target, keys are scoped to the context's namespace. An
+        empty or missing namespace uses ``"null"``.
         """
         # Build context segments from the target identity.
         context_segments = ""
         target = context.target
-        namespace = _percent_encode(target.namespace) if target is not None else None
-        namespace_segment = f"/ns/{namespace or 'null'}" if target is not None else ""
+        namespace = target.namespace if target is not None else context.namespace
+        namespace_segment = f"/ns/{_percent_encode(namespace) or 'null'}"
         if isinstance(target, StorageDriverWorkflowInfo):
             wf_type = _percent_encode(target.type) or "null"
             wf_id = _percent_encode(target.id) or "null"
