@@ -706,7 +706,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             act,
             self._data_converter.with_context(nexus_context),
             decode_headers=self._encode_headers,
-            storage_concurrency_limit=self._max_workflow_task_external_storage_concurrency,
         )
         download_metrics.merge(metrics)
         # Constructing the activation copied the outcome, so read the decoded fields from it
