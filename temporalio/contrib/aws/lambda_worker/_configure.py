@@ -29,7 +29,11 @@ class LambdaWorkerConfig:
         client_connect_config: Keyword arguments that will be passed to
             :py:meth:`temporalio.client.Client.connect`. Pre-populated from the
             config file / environment variables via envconfig, with Lambda
-            defaults applied.
+            defaults applied. The
+            :py:mod:`temporalio.contrib.aws.secrets_manager` extension is
+            always enabled, and adds a client plugin to ``plugins`` if
+            credentials are configured as AWS Secrets Manager secret IDs. To
+            add client plugins, keep the existing ones rather than replacing them.
         worker_config: Keyword arguments that will be passed to the
             :py:class:`temporalio.worker.Worker` constructor (the ``client``
             key is managed internally). Pre-populated with Lambda-appropriate
