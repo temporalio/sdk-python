@@ -4256,6 +4256,4 @@ class _WorkflowLogicFlag(IntEnum):
     PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
 
 
-_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
-    {_WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH}
-)
+_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
