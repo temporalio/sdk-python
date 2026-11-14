@@ -158,7 +158,11 @@ from ._sandbox import (
 from ._streams import (
     DEFAULT_READ_STREAM_MAX_RECORDS,
     StreamRead,
+    StreamReadStop,
+    StreamReduce,
+    _StreamReadLimits,
     read_stream,
+    reduce_stream,
 )
 from ._workflow_ops import (
     ChildWorkflowCancellationType,
@@ -269,7 +273,10 @@ __all__ = [
     "unsafe",
     "DEFAULT_READ_STREAM_MAX_RECORDS",
     "StreamRead",
+    "StreamReadStop",
+    "StreamReduce",
     "read_stream",
+    "reduce_stream",
     "ChildWorkflowCancellationType",
     "ChildWorkflowConfig",
     "ChildWorkflowHandle",
@@ -312,6 +319,7 @@ __all__ = [
     "_update_validator",
     "_UpdateDefinition",
     "_NexusClient",
+    "_StreamReadLimits",
     "_build_log_context",
     "_imports_passed_through",
     "_in_sandbox",

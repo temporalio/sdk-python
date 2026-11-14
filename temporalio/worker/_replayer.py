@@ -73,7 +73,9 @@ class Replayer:
         replay calls no method of its Stores for a create or a describe. For each
         :py:func:`temporalio.workflow.read_stream` in the history, it reads the
         Records of that read from the Store again, so the replay needs the same
-        ``data_converter`` and Stores that still have them.
+        ``data_converter`` and Stores that still have them. A
+        :py:func:`temporalio.workflow.reduce_stream` takes its value from the
+        history and calls no Store.
 
         Note, unlike the worker, for the replayer the workflow_task_executor
         will default to a new thread pool executor with no max_workers set that

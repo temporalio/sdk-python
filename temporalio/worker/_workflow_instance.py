@@ -59,6 +59,7 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
+from temporalio.client._stream_read import _StreamFold
 from temporalio.client._stream_store import _STREAM_SERVICE
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.nexus.system.stream_service.models import StreamRecord
@@ -97,7 +98,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ._stream_read import _read_stream_in_workflow
+from ._stream_read import _read_stream_in_workflow, _reduce_stream_in_workflow
 from ._stream_store import (
     _NO_STREAM_STORE_MESSAGE,
     _no_stream_config_error,
@@ -2004,22 +2005,34 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def workflow_read_stream(
         self,
         stream: Stream[Any],
-        *,
         until: Callable[[StreamRecord[Any]], bool] | None,
-        from_offset: bytes | None,
-        max_records: int,
-        timeout: timedelta,
+        limits: temporalio.workflow._StreamReadLimits,
     ) -> temporalio.workflow.StreamRead[Any]:
         if self._stream_store is None:
             raise temporalio.exceptions.StreamConfigError(_NO_STREAM_STORE_MESSAGE)
         return await _read_stream_in_workflow(
+            self, self._stream_store.config, stream, until, limits
+        )
+
+    async def workflow_reduce_stream(
+        self,
+        stream: Stream[Any],
+        function: Callable[[Any, StreamRecord[Any]], Any],
+        initial: Any,
+        until: Callable[[Any, StreamRecord[Any]], bool] | None,
+        value_type: Any,
+        limits: temporalio.workflow._StreamReadLimits,
+    ) -> temporalio.workflow.StreamReduce[Any]:
+        if self._stream_store is None:
+            raise temporalio.exceptions.StreamConfigError(_NO_STREAM_STORE_MESSAGE)
+        return await _reduce_stream_in_workflow(
             self,
             self._stream_store.config,
             stream,
-            until=until,
-            from_offset=from_offset,
-            max_records=max_records,
-            timeout=timeout,
+            _StreamFold(function=function, initial=initial),
+            until,
+            value_type,
+            limits,
         )
 
     async def workflow_sleep(

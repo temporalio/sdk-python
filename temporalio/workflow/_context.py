@@ -30,7 +30,7 @@ if TYPE_CHECKING:
     from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
-    from ._streams import StreamRead
+    from ._streams import StreamRead, StreamReduce, _StreamReadLimits
     from ._workflow_ops import (
         ChildWorkflowCancellationType,
         ChildWorkflowHandle,
@@ -409,12 +409,20 @@ class _Runtime(ABC):
     async def workflow_read_stream(
         self,
         stream: Stream[Any],
-        *,
         until: Callable[[StreamRecord[Any]], bool] | None,
-        from_offset: bytes | None,
-        max_records: int,
-        timeout: timedelta,
+        limits: _StreamReadLimits,
     ) -> StreamRead[Any]: ...
+
+    @abstractmethod
+    async def workflow_reduce_stream(
+        self,
+        stream: Stream[Any],
+        function: Callable[[Any, StreamRecord[Any]], Any],
+        initial: Any,
+        until: Callable[[Any, StreamRecord[Any]], bool] | None,
+        value_type: Any,
+        limits: _StreamReadLimits,
+    ) -> StreamReduce[Any]: ...
 
     @abstractmethod
     def workflow_set_query_handler(

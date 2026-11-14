@@ -24,6 +24,7 @@ import temporalio.workflow
 from temporalio.client._stream_read import (
     _PENDING_STREAM_READS,
     _read_until,
+    _ReadLimits,
     _StreamReadMarker,
 )
 from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
@@ -146,11 +147,11 @@ class StreamStore(ABC):
 
         The default is two Activities, named for this Store. One answers
         :py:meth:`call_from_workflow`, which runs it as a Local Activity, or as a regular
-        Activity for a close. The other answers :py:func:`temporalio.workflow.read_stream`,
-        which always runs it by its name. A Store that overrides
-        :py:meth:`call_from_workflow` overrides this method to match, and a Store that
-        overrides this method keeps the read Activity in its list for Workflow code that
-        reads.
+        Activity for a close. The other answers :py:func:`temporalio.workflow.read_stream`
+        and :py:func:`temporalio.workflow.reduce_stream`, which always run it by its name.
+        A Store that overrides :py:meth:`call_from_workflow` overrides this method to
+        match. A Store that overrides this method keeps the read Activity in its list for
+        Workflow code that reads.
         """
         return [_store_call_activity(self), _store_read_activity(self)]
 
@@ -412,48 +413,68 @@ def _store_read_activity_name(store_name: str) -> str:
 
 def _store_read_activity(
     store: StreamStore,
-) -> Callable[[str, bytes, int, float], Awaitable[temporalio.common.RawValue]]:
+) -> Callable[
+    [str, bytes, int, int | None, float | None, float],
+    Awaitable[temporalio.common.RawValue],
+]:
     @temporalio.activity.defn(name=_store_read_activity_name(store.name))
     async def read(
-        read_id: str, request: bytes, max_records: int, timeout_seconds: float
+        read_id: str,
+        request: bytes,
+        max_records: int,
+        max_bytes: int | None,
+        idle_timeout_seconds: float | None,
+        timeout_seconds: float,
     ) -> temporalio.common.RawValue:
         info = temporalio.activity.info()
         pending = _PENDING_STREAM_READS.get(info.workflow_run_id or "", read_id)
         if pending is None:
-            # The predicate and the Records live in the Workflow's process, so only a
-            # Local Activity of that Workflow can run this read.
+            # The functions of the Workflow live in its process, so only a Local
+            # Activity of that Workflow can run this read.
             raise temporalio.exceptions.ApplicationError(
                 f"The Stream read '{read_id}' has no pending read in this process. "
-                "Only temporalio.workflow.read_stream runs this Activity.",
+                "Only temporalio.workflow.read_stream and reduce_stream run this "
+                "Activity.",
                 non_retryable=True,
             )
         read_request = temporalio.api.streamservice.v1.ReadRecordsRequest.FromString(
             request
         )
-        # The codec decodes the bodies in each page, so the predicate and the Workflow
+        # The codec decodes the bodies in each page, so the functions of the Workflow
         # get the user's values.
         page_reader = _store_page_reader(
             store, temporalio.activity.client().data_converter
         )
         from_offset = read_request.from_offset or None
-        result = await _read_until(
+        outcome = await _read_until(
             page_reader,
             ref=read_request.ref,
             from_offset=from_offset,
-            max_records=max_records,
-            timeout=timedelta(seconds=timeout_seconds),
+            limits=_ReadLimits(
+                max_records=max_records,
+                max_bytes=max_bytes,
+                idle_timeout=idle_timeout_seconds,
+                timeout=timeout_seconds,
+            ),
             read=pending,
         )
-        marker = _StreamReadMarker.for_records(
+        marker = _StreamReadMarker(
             read_id=read_id,
             store=store.name,
             stream_id=read_request.ref.id,
             from_offset=from_offset,
-            records=result.records,
-            matched=result.matched,
-            done=result.done,
+            last_offset=outcome.last_offset,
+            record_count=outcome.record_count,
+            stop=outcome.stop,
+            done=outcome.done,
+            digest=outcome.digest,
+            # History keeps the value of a fold, so a replay needs no Store.
+            value=temporalio.activity.payload_converter().to_payload(outcome.value)
+            if pending.fold is not None
+            else None,
         )
-        pending.fill(marker, result.records)
+        if pending.fold is None:
+            pending.fill(marker, outcome.records)
         return marker.to_raw_value()
 
     return read
