@@ -2208,3 +2208,42 @@ async def test_local_activities_with_no_remote_activities_option(client: Client)
         )
 
         assert result == "Hello from local activity, Temporal!"
+
+
+@activity.defn
+async def capture_workflow_task() -> list[int] | None:
+    task = activity.info().workflow_task
+    return None if task is None else [task.started_event_id, task.attempt]
+
+
+@workflow.defn(sandboxed=False)
+class WorkflowTaskInfoWorkflow:
+    @workflow.run
+    async def run(self) -> list[list[int] | None]:
+        local = await workflow.execute_local_activity(
+            capture_workflow_task, start_to_close_timeout=timedelta(seconds=5)
+        )
+        regular = await workflow.execute_activity(
+            capture_workflow_task, start_to_close_timeout=timedelta(seconds=5)
+        )
+        return [local, regular]
+
+
+async def test_activity_info_workflow_task(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[capture_workflow_task],
+        workflows=[WorkflowTaskInfoWorkflow],
+    ):
+        local, regular = await client.execute_workflow(
+            WorkflowTaskInfoWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+    assert local is not None
+    started_event_id, attempt = local
+    assert started_event_id > 0
+    assert attempt == 1
+    assert regular is None

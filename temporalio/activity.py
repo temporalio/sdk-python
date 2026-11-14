@@ -92,6 +92,24 @@ def defn(
 
 
 @dataclass(frozen=True)
+class WorkflowTaskAttempt:
+    """One attempt of a Workflow Task.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    started_event_id: int
+    """ID of the task's ``WorkflowTaskStarted`` event."""
+
+    attempt: int
+    """Attempt of the task."""
+
+    started_time: datetime | None
+    """When the server started the task. None if the server did not send it."""
+
+
+@dataclass(frozen=True)
 class Info:
     """Information about the running activity.
 
@@ -150,6 +168,14 @@ class Info:
     encoded with it because they are returned to the Nexus caller. To complete the activity
     asynchronously, store this context with the task token and pass it to
     :py:meth:`temporalio.client.AsyncActivityHandle.with_context`.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    workflow_task: WorkflowTaskAttempt | None = None
+    """For a Local Activity, the Workflow Task in which the Worker dispatched this execution.
+    None for other Activities.
 
     .. warning::
         This API is experimental and unstable.
