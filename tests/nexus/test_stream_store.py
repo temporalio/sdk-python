@@ -474,9 +474,50 @@ def test_stream_config_refuses_a_bad_set_of_stores():
     same_name = [MemoryStreamStore(name="a"), MemoryStreamStore(name="a")]
     with pytest.raises(StreamConfigError, match="more than one Store named 'a'"):
         StreamConfig(stores=same_name, store_selector=lambda _: same_name[0])
-    with pytest.raises(StreamConfigError, match="store_selector must be set"):
-        StreamConfig(stores=[MemoryStreamStore(name="a"), MemoryStreamStore(name="b")])
     assert not issubclass(StreamConfigError, StreamError)
+
+
+def test_stream_config_takes_several_stores_with_no_selector():
+    first, second = MemoryStreamStore(name="a"), MemoryStreamStore(name="b")
+    stream_config = StreamConfig(stores=[first, second])
+    assert stream_config.store_selector is None
+    assert stream_config._store_for(StreamRef(id="stream", store="b"), None) is second
+    with pytest.raises(StreamConfigError, match="more than one Store"):
+        stream_config._store_for(StreamRef(id="stream"), None)
+
+
+async def test_client_create_with_store_on_several_stores_needs_no_selector(
+    client: Client,
+):
+    first = MemoryStreamStore(name="first")
+    second = MemoryStreamStore(name="second")
+    stream_client = _with_config(client, StreamConfig(stores=[first, second]))
+    stream = await stream_client.create_stream(
+        id=f"stream-{uuid.uuid4()}", store="second", body_type=str
+    )
+    assert stream.ref.store == "second"
+    await stream.append("a")
+    in_second = _with_store(client, second).get_stream(stream.ref, body_type=str)
+    assert [record.body async for record in in_second.iter_read_items()] == ["a"]
+    in_first = _with_store(client, first).get_stream(
+        StreamRef(id=stream.ref.id), body_type=str
+    )
+    err = await _stream_error(in_first.describe())
+    assert err.reason == StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND
+
+
+async def test_client_create_without_store_on_several_stores_fails(client: Client):
+    stream_config = StreamConfig(
+        stores=[MemoryStreamStore(name="first"), MemoryStreamStore(name="second")]
+    )
+    stream_client = _with_config(client, stream_config)
+    with pytest.raises(StreamConfigError) as err:
+        await stream_client.create_stream(id="stream", body_type=str)
+    assert str(err.value) == (
+        "StreamConfig has more than one Store and no store_selector, and the call "
+        "on the Stream 'stream' names no Store. Name one with store=, or set "
+        "StreamConfig.store_selector."
+    )
 
 
 def test_client_refuses_a_store_in_plugins(client: Client):
