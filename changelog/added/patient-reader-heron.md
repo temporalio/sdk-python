@@ -1,1 +1,1 @@
-Add `take_stream`, `filter_stream` and `reduce_stream` to `temporalio.workflow` and `temporalio.client`, which client, Activity and Workflow code call to scan a Stream until a predicate matches, the Stream is done, or a limit is reached.
+Add the `take`, `filter` and `reduce` methods to the client `Stream` and the Workflow `Stream`. Client, Activity and Workflow code call them to scan a Stream until a predicate matches, the Stream is done, or a limit is reached.

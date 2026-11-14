@@ -21,11 +21,12 @@ from ..types import AnyType, ParamType
 from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
+    from temporalio.nexus.system._support import _StreamCall
+
     from ._activities import ActivityCancellationType, ActivityHandle
     from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
     from ._nexus import NexusOperationCancellationType, NexusOperationHandle
-    from ._streams import _StreamCall
     from ._workflow_ops import (
         ChildWorkflowCancellationType,
         ChildWorkflowHandle,

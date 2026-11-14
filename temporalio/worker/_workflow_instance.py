@@ -58,6 +58,7 @@ import temporalio.converter
 import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
+import temporalio.nexus.system._support
 import temporalio.workflow
 from temporalio.client._stream_store import _STREAM_SERVICE
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
@@ -1997,7 +1998,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     )
 
     async def workflow_stream_call(
-        self, stream: Any, call: temporalio.workflow._streams._StreamCall
+        self, stream: Any, call: temporalio.nexus.system._support._StreamCall
     ) -> Any:
         # A counter of the instance, and not a random value, numbers the calls. A change of
         # the code's random calls then leaves the numbers of a replay alone.

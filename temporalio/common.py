@@ -1455,6 +1455,46 @@ class HeaderCodecBehavior(IntEnum):
     """Only automatically encode and decode headers in workflow activation encoding and decoding."""
 
 
+DEFAULT_STREAM_IDLE_TIMEOUT = timedelta(seconds=1)
+"""How long a ``take``, ``filter`` or ``reduce`` of a Stream waits for a new Record.
+
+It applies when the call's ``idle_timeout`` is ``None``.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+DEFAULT_STREAM_MAX_RECORDS = 1_000
+"""The most Records of one ``take``, ``filter`` or ``reduce`` of a Stream.
+
+It applies when the call's ``max_records`` is ``None``.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+DEFAULT_STREAM_MAX_BYTES = 256 * 1024
+"""The most bytes of the Records of one ``take``, ``filter`` or ``reduce`` of a Stream.
+
+It applies when the call's ``max_bytes`` is ``None``.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+MAX_STREAM_RESULT_BYTES = 1024 * 1024
+"""The most bytes of the encoded result of one Stream call in Workflow code.
+
+In Workflow code the result of a ``take``, ``filter`` or ``reduce`` goes into History, so this
+bounds what one call adds to it. A call over it raises
+:py:class:`temporalio.exceptions.ApplicationError`. Client and Activity code have no such
+limit, since their result doesn't go into History and isn't encoded.
+
+.. warning::
+    This API is experimental and subject to change.
+"""
+
+
 @dataclass
 class _CompositeEvent:  # pyright: ignore[reportUnusedClass]
     # This should always be present, but is sometimes lazily set internally

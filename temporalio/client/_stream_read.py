@@ -1,9 +1,9 @@
 """The scan of the take, filter and reduce calls, for client, Activity and Workflow code.
 
-Client and Activity code run the scan straight against the Store. Workflow code runs it in a
-Local Activity, and the result of that Local Activity is the result of the call. The
-functions of the caller can't be serialized, so they reach the Local Activity through the
-registry of this module, in the memory of the Worker process.
+Client and Activity code run the scan with the pages of the client ``Stream.read``. Workflow
+code runs it in a Local Activity that reads the Store, and the result of that Local Activity is
+the result of the call. The functions of the caller can't be serialized, so they reach the
+Local Activity through the registry of this module, in the memory of the Worker process.
 
 .. warning::
     This API is an experimental prototype and subject to change.
@@ -18,9 +18,10 @@ import inspect
 import json
 import threading
 import time
-from collections.abc import Awaitable, Callable
+from abc import ABC, abstractmethod
+from collections.abc import Callable, Sequence
 from datetime import timedelta
-from typing import Any, Protocol
+from typing import Any, Generic, Protocol, TypeVar
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -29,28 +30,19 @@ import temporalio.api.streamservice.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
-import temporalio.nexus.system
 import temporalio.nexus.system.stream_service.client
+from temporalio.nexus.system._support import _StreamCall, _StreamCallKind
 from temporalio.nexus.system.stream_service.models import (
-    ReadRecordsRequest,
-    StreamRecord,
-)
-from temporalio.workflow._streams import (
-    MAX_STREAM_RESULT_BYTES,
     StreamRead,
     StreamReadStop,
+    StreamRecord,
     StreamReduce,
-    _StreamCall,
-    _StreamCallKind,
+)
+from temporalio.nexus.system.stream_service.workflow._resources.stream import (
+    Stream as _WorkflowStream,
 )
 
-from ._client import Client
-from ._stream_store import (
-    _STREAM_SERVICE,
-    StreamStore,
-    _activity_target,
-    _store_page_reader,
-)
+from ._stream_store import StreamStore, _store_page_reader
 
 _RESULT_METADATA_KEY = "temporal-stream-read"
 _RESULT_METADATA_VALUE = b"v3"
@@ -72,11 +64,137 @@ _CALL_FLUSHES: contextvars.ContextVar[list[_CallFlush] | None] = contextvars.Con
     "temporal_stream_call_flushes", default=None
 )
 
-_ReadPage = Callable[
-    [temporalio.api.streamservice.v1.ReadRecordsRequest],
-    Awaitable[temporalio.api.streamservice.v1.ReadRecordsResponse],
-]
+# The size of each Record of one page that the scan of a client or an Activity reads, by its
+# offset. The scan sets it around one `Stream.read`, and the client's Store call fills it. Only
+# that call has the proto Records, and `max_bytes` counts their encoded size.
+_PAGE_SIZES: contextvars.ContextVar[dict[bytes, int] | None] = contextvars.ContextVar(
+    "temporal_stream_page_sizes", default=None
+)
+
+
+def _note_page_sizes(  # pyright: ignore[reportUnusedFunction]
+    response: temporalio.api.streamservice.v1.ReadRecordsResponse,
+) -> None:
+    """Give the scan that waits for this page the size of each of its Records."""
+    sizes = _PAGE_SIZES.get()
+    if sizes is None:
+        return
+    for record in response.records:
+        sizes[record.offset] = record.ByteSize()
+
+
 _ToRecord = Callable[[temporalio.api.stream.v1.StreamRecord], Any]
+_RecordT = TypeVar("_RecordT")
+
+
+@dataclasses.dataclass(frozen=True)
+class _PageRequest:
+    """One page that the scan asks for."""
+
+    from_offset: bytes | None
+    max_records: int
+    max_bytes: int
+    """The cap on the bytes of the page, or 0 for no cap."""
+    wait: timedelta
+
+
+class _Pages(ABC, Generic[_RecordT]):
+    """Reads the pages of one scan, and tells what the scan needs of each Record."""
+
+    @abstractmethod
+    async def read(self, request: _PageRequest) -> tuple[Sequence[_RecordT], bool]:
+        """Give the Records of the next page, and whether it ends a closed Stream."""
+
+    @abstractmethod
+    def offset(self, record: _RecordT) -> bytes:
+        """Give the offset of a Record of the last page."""
+
+    @abstractmethod
+    def size(self, record: _RecordT) -> int:
+        """Give the encoded size of a Record of the last page, after the codec."""
+
+    @abstractmethod
+    def typed(self, record: _RecordT) -> Any:
+        """Give the Record that the caller's functions get."""
+
+
+class _StorePages(_Pages[temporalio.api.stream.v1.StreamRecord]):
+    """The pages of the Local Activity of Workflow code, read from its Store.
+
+    The Records stay proto Records, so the result in History keeps the bodies as the Store
+    gave them.
+    """
+
+    def __init__(
+        self,
+        store: StreamStore,
+        data_converter: temporalio.converter.DataConverter,
+        ref: temporalio.api.stream.v1.StreamRef,
+        to_record: _ToRecord,
+    ) -> None:
+        self._read_page = _store_page_reader(store, data_converter)
+        self._ref = ref
+        self._to_record = to_record
+
+    async def read(
+        self, request: _PageRequest
+    ) -> tuple[Sequence[temporalio.api.stream.v1.StreamRecord], bool]:
+        message = temporalio.api.streamservice.v1.ReadRecordsRequest(
+            ref=self._ref,
+            from_offset=request.from_offset or b"",
+            max_records=request.max_records,
+            max_bytes=request.max_bytes,
+        )
+        message.wait.FromTimedelta(request.wait)
+        response = await self._read_page(message)
+        return response.records, response.done
+
+    def offset(self, record: temporalio.api.stream.v1.StreamRecord) -> bytes:
+        return record.offset
+
+    def size(self, record: temporalio.api.stream.v1.StreamRecord) -> int:
+        return record.ByteSize()
+
+    def typed(self, record: temporalio.api.stream.v1.StreamRecord) -> Any:
+        return self._to_record(record)
+
+
+class _ClientPages(_Pages[StreamRecord[Any]]):
+    """The pages of client and Activity code, each one ``read`` of a client ``Stream``."""
+
+    def __init__(
+        self, stream: temporalio.nexus.system.stream_service.client.Stream[Any]
+    ) -> None:
+        self._stream = stream
+        self._sizes: dict[bytes, int] = {}
+
+    async def read(
+        self, request: _PageRequest
+    ) -> tuple[Sequence[StreamRecord[Any]], bool]:
+        sizes: dict[bytes, int] = {}
+        token = _PAGE_SIZES.set(sizes)
+        try:
+            response = await self._stream.read(
+                from_offset=request.from_offset,
+                max_records=request.max_records,
+                wait=request.wait,
+                max_bytes=request.max_bytes or None,
+            )
+        finally:
+            _PAGE_SIZES.reset(token)
+        self._sizes = sizes
+        return response.records, response.done
+
+    def offset(self, record: StreamRecord[Any]) -> bytes:
+        return record.offset
+
+    def size(self, record: StreamRecord[Any]) -> int:
+        # Only a Store call measures a Record. An interceptor that answers a read itself
+        # gives Records that none measured, so they count no bytes.
+        return self._sizes.get(record.offset, 0)
+
+    def typed(self, record: StreamRecord[Any]) -> Any:
+        return record
 
 
 def _encode_offset(value: bytes | None) -> str | None:
@@ -114,8 +232,8 @@ def _call_function(
 
 
 @dataclasses.dataclass
-class _ScanOutcome:
-    kept: list[temporalio.api.stream.v1.StreamRecord]
+class _ScanOutcome(Generic[_RecordT]):
+    kept: list[_RecordT]
     """The Records that the call gives back. A fold keeps none."""
     count: int
     """How many Records the call kept or folded."""
@@ -126,16 +244,16 @@ class _ScanOutcome:
     """The value of a fold, or ``None``."""
 
 
-class _ScanState:
+class _ScanState(Generic[_RecordT]):
     """What a scan got so far."""
 
     def __init__(
-        self, call: _StreamCall, to_record: _ToRecord, *, in_local_activity: bool
+        self, call: _StreamCall, pages: _Pages[_RecordT], *, in_local_activity: bool
     ) -> None:
         self._call = call
-        self._to_record = to_record
+        self._pages = pages
         self._in_local_activity = in_local_activity
-        self.kept: list[temporalio.api.stream.v1.StreamRecord] = []
+        self.kept: list[_RecordT] = []
         self.count = 0
         self.bytes = 0
         self.last_offset = call.from_offset
@@ -151,22 +269,20 @@ class _ScanState:
     def bytes_left(self) -> int:
         return self._call.max_bytes - self.bytes
 
-    def look(
-        self, record: temporalio.api.stream.v1.StreamRecord, *, ends_stream: bool
-    ) -> StreamReadStop | None:
+    def look(self, record: _RecordT, *, ends_stream: bool) -> StreamReadStop | None:
         """Look at the next Record, and give the stop that holds after it, if any."""
         call = self._call
         typed: Any = None
         if call.kind is not _StreamCallKind.TAKE or call.until is not None:
-            typed = self._to_record(record)
+            typed = self._pages.typed(record)
         keep = True
         if call.predicate is not None:
             keep = bool(self._call_function("predicate", call.predicate, typed))
-        size = record.ByteSize()
+        size = self._pages.size(record)
         # The first Record of a call is taken even when it passes the cap.
         if keep and self.count > 0 and self.bytes + size > call.max_bytes:
             return StreamReadStop.MaxBytes
-        self.last_offset = record.offset
+        self.last_offset = self._pages.offset(record)
         if keep:
             self.count += 1
             self.bytes += size
@@ -186,7 +302,9 @@ class _ScanState:
             return StreamReadStop.MaxRecords
         return None
 
-    def end(self, stop: StreamReadStop, *, done: bool = False) -> _ScanOutcome:
+    def end(
+        self, stop: StreamReadStop, *, done: bool = False
+    ) -> _ScanOutcome[_RecordT]:
         return _ScanOutcome(
             kept=self.kept,
             count=self.count,
@@ -198,20 +316,15 @@ class _ScanState:
 
 
 async def _scan(
-    read_page: _ReadPage,
-    *,
-    ref: temporalio.api.stream.v1.StreamRef,
-    call: _StreamCall,
-    to_record: _ToRecord,
-    in_local_activity: bool,
-) -> _ScanOutcome:
-    """Read pages after ``call.from_offset`` until a stop of :py:class:`StreamReadStop`."""
+    pages: _Pages[_RecordT], *, call: _StreamCall, in_local_activity: bool
+) -> _ScanOutcome[_RecordT]:
+    """Read pages after ``call.from_offset`` until a stop of ``StreamReadStop``."""
     idle_timeout = call.idle_timeout.total_seconds()
     start = time.monotonic()
     deadline = start + call.timeout.total_seconds()
     # The idle stop counts from the last page that gave a Record.
     last_arrival = start
-    state = _ScanState(call, to_record, in_local_activity=in_local_activity)
+    state = _ScanState(call, pages, in_local_activity=in_local_activity)
     # A filter counts only its kept Records, so the Store's cap of a page can't serve it.
     page_cap = call.kind is not _StreamCallKind.FILTER
 
@@ -230,40 +343,35 @@ async def _scan(
         wait = min(
             _MAX_PAGE_WAIT, deadline - now, max(0.0, last_arrival + idle_timeout - now)
         )
-        request = temporalio.api.streamservice.v1.ReadRecordsRequest(
-            ref=ref,
-            from_offset=state.last_offset or b"",
-            max_records=min(call.max_records - state.count, _MAX_PAGE_RECORDS)
-            if page_cap
-            else _MAX_PAGE_RECORDS,
-            max_bytes=max(state.bytes_left(), 1) if page_cap else 0,
+        records, done = await pages.read(
+            _PageRequest(
+                from_offset=state.last_offset,
+                max_records=min(call.max_records - state.count, _MAX_PAGE_RECORDS)
+                if page_cap
+                else _MAX_PAGE_RECORDS,
+                max_bytes=max(state.bytes_left(), 1) if page_cap else 0,
+                wait=timedelta(seconds=wait),
+            )
         )
-        request.wait.FromTimedelta(timedelta(seconds=wait))
-        response = await read_page(request)
-        if response.records:
+        if records:
             last_arrival = time.monotonic()
-        for index, record in enumerate(response.records):
+        for index, record in enumerate(records):
             # A done page ends with the last Record of the Stream.
-            ends_stream = response.done and index == len(response.records) - 1
+            ends_stream = done and index == len(records) - 1
             stop = state.look(record, ends_stream=ends_stream)
             if stop is not None:
                 return state.end(
                     stop, done=ends_stream and stop is not StreamReadStop.MaxBytes
                 )
-        if response.done and not response.records:
+        if done and not records:
             return state.end(StreamReadStop.Done, done=True)
-        if not response.records and idle(time.monotonic()):
+        if not records and idle(time.monotonic()):
             return state.end(StreamReadStop.Idle)
 
 
 async def _scan_and_flush(
-    read_page: _ReadPage,
-    *,
-    ref: temporalio.api.stream.v1.StreamRef,
-    call: _StreamCall,
-    to_record: _ToRecord,
-    in_local_activity: bool,
-) -> _ScanOutcome:
+    pages: _Pages[_RecordT], *, call: _StreamCall, in_local_activity: bool
+) -> _ScanOutcome[_RecordT]:
     """Run :py:func:`_scan`, then write the Records that the caller's functions appended.
 
     In Workflow code the result goes into History only after those Records are in the Store.
@@ -271,13 +379,7 @@ async def _scan_and_flush(
     flushes: list[_CallFlush] = []
     token = _CALL_FLUSHES.set(flushes)
     try:
-        outcome = await _scan(
-            read_page,
-            ref=ref,
-            call=call,
-            to_record=to_record,
-            in_local_activity=in_local_activity,
-        )
+        outcome = await _scan(pages, call=call, in_local_activity=in_local_activity)
     except Exception:
         # The error of the scan wins over an error of the write.
         await _flush_all(flushes, raise_error=False)
@@ -395,10 +497,10 @@ def _result_payload(
     call: _StreamCall,
     store: str,
     stream_id: str,
-    outcome: _ScanOutcome,
+    outcome: _ScanOutcome[temporalio.api.stream.v1.StreamRecord],
     payload_converter: temporalio.converter.PayloadConverter,
 ) -> temporalio.api.common.v1.Payload:
-    """Give the result as a payload, or raise when it is over the limit."""
+    """Give the result for History as a payload, or raise when it is over the limit."""
     payload = _StreamCallResult(
         kind=call.kind,
         store=store,
@@ -414,10 +516,11 @@ def _result_payload(
         else None,
     ).to_payload()
     size = payload.ByteSize()
-    if size > MAX_STREAM_RESULT_BYTES:
+    limit = temporalio.common.MAX_STREAM_RESULT_BYTES
+    if size > limit:
         raise temporalio.exceptions.ApplicationError(
             f"The result of the {call.kind.value} of the Stream '{stream_id}' is {size} "
-            f"bytes encoded, over the limit of {MAX_STREAM_RESULT_BYTES} bytes. Lower "
+            f"bytes encoded, over the limit of {limit} bytes. Lower "
             "max_bytes or max_records, or fold to a smaller value.",
             type="StreamResultTooLarge",
             non_retryable=True,
@@ -496,17 +599,19 @@ async def _stream_call_activity(  # pyright: ignore[reportUnusedFunction]
         # The functions of the caller live in its process, so only a Local Activity of
         # that Workflow can run the scan.
         raise temporalio.exceptions.ApplicationError(
-            f"The Stream call {call_id} has no pending call in this process. Only "
-            "take_stream, filter_stream and reduce_stream in Workflow code run this "
-            "Activity.",
+            f"The Stream call {call_id} has no pending call in this process. Only the "
+            "take, filter and reduce of a Workflow Stream run this Activity.",
             non_retryable=True,
         )
     # The codec decodes the bodies of each page, so the caller's functions get its values.
     outcome = await _scan_and_flush(
-        _store_page_reader(pending.store, temporalio.activity.client().data_converter),
-        ref=pending.ref,
+        _StorePages(
+            pending.store,
+            temporalio.activity.client().data_converter,
+            pending.ref,
+            pending.to_record,
+        ),
         call=pending.call,
-        to_record=pending.to_record,
         in_local_activity=True,
     )
     return temporalio.common.RawValue(
@@ -520,16 +625,17 @@ async def _stream_call_activity(  # pyright: ignore[reportUnusedFunction]
     )
 
 
-def _stream_client(stream: Any) -> Client:
+def _client_stream(
+    stream: Any,
+) -> temporalio.nexus.system.stream_service.client.Stream[Any]:
     if isinstance(stream, temporalio.nexus.system.stream_service.client.Stream):
-        client = getattr(getattr(stream, "_nexus_client", None), "_client", None)
-        if isinstance(client, Client):
-            return client
-        raise TypeError("The client Stream has no Temporal client")
-    if temporalio.activity.in_activity():
+        return stream
+    if isinstance(stream, _WorkflowStream) and temporalio.activity.in_activity():
         # A Workflow Stream outside Workflow code is one that a function of a call or an
-        # Activity got, so the Activity's client reaches its Store.
-        return temporalio.activity.client()
+        # Activity got, so it reads through the Activity's client.
+        return temporalio.activity.client().get_stream(
+            stream.ref, body_type=stream.body_type
+        )
     raise TypeError(
         "A Workflow Stream can be read only in Workflow code or an Activity. Use "
         "client.get_stream for a client Stream."
@@ -539,46 +645,12 @@ def _stream_client(stream: Any) -> Client:
 async def _stream_call_outside_workflow(  # pyright: ignore[reportUnusedFunction]
     stream: Any, call: _StreamCall
 ) -> StreamRead[Any] | StreamReduce[Any]:
-    """Run the scan of a call of client or Activity code straight against the Store."""
-    client = _stream_client(stream)
-    stream_config = client.config(active_config=True).get("stream_config")
-    if stream_config is None:
-        raise temporalio.exceptions.StreamConfigError(
-            "This client has no Stream Store. Give one in "
-            "stream_config=StreamConfig(stores=[...])."
-        )
-    request = ReadRecordsRequest(ref=stream.ref, from_offset=call.from_offset)
-    data_converter = client.data_converter
-    serialization_context = temporalio.nexus.system._get_serialization_context(
-        _STREAM_SERVICE.name, "ReadRecords", request
-    )
-    if serialization_context is not None:
-        data_converter = data_converter.with_context(serialization_context)
-    payload_converter = temporalio.nexus.system._get_payload_converter(
-        data_converter.payload_converter, data_converter.failure_converter
-    )
-    message = payload_converter._to_transfer_value(request)
-    assert isinstance(message, temporalio.api.streamservice.v1.ReadRecordsRequest)
-    store = stream_config._store_for(stream.ref, _activity_target())
-    record_type: Any = StreamRecord[stream.body_type]  # type: ignore[name-defined]
+    """Run the scan of a call of client or Activity code with the pages of ``Stream.read``.
 
-    def to_record(record: temporalio.api.stream.v1.StreamRecord) -> Any:
-        return payload_converter._from_transfer_value(record, record_type)
-
+    The result doesn't go into History, so it has no size limit and isn't encoded.
+    """
     outcome = await _scan_and_flush(
-        _store_page_reader(store, data_converter),
-        ref=message.ref,
-        call=call,
-        to_record=to_record,
-        in_local_activity=False,
-    )
-    # The limit is the same as in Workflow code, so a call gives the same result anywhere.
-    _result_payload(
-        call=call,
-        store=store.name,
-        stream_id=message.ref.id,
-        outcome=outcome,
-        payload_converter=data_converter.payload_converter,
+        _ClientPages(_client_stream(stream)), call=call, in_local_activity=False
     )
     if call.kind is _StreamCallKind.REDUCE:
         return StreamReduce(
@@ -589,7 +661,7 @@ async def _stream_call_outside_workflow(  # pyright: ignore[reportUnusedFunction
             done=outcome.done,
         )
     return StreamRead(
-        records=[to_record(record) for record in outcome.kept],
+        records=outcome.kept,
         last_offset=outcome.last_offset,
         stop=outcome.stop,
         done=outcome.done,
