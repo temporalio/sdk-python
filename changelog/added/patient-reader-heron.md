@@ -1,1 +1,1 @@
-Add `workflow.read_stream` and `workflow.reduce_stream`, which read a Stream from Workflow code in one Local Activity that waits until a predicate matches, the Stream is done, or a limit is reached.
+Add `take_stream`, `filter_stream` and `reduce_stream` to `temporalio.workflow` and `temporalio.client`, which client, Activity and Workflow code call to scan a Stream until a predicate matches, the Stream is done, or a limit is reached.

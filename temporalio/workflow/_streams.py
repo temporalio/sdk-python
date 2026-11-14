@@ -1,4 +1,7 @@
-"""A Workflow read of a Stream that waits for a predicate, and a fold over its Records.
+"""Calls that scan a Stream until a stop: take, filter and reduce.
+
+Client, Activity and Workflow code call the same three functions. A generated method of the
+client ``Stream`` and of the Workflow ``Stream`` calls them too.
 
 .. warning::
     This API is an experimental prototype and subject to change.
@@ -6,97 +9,117 @@
 
 from __future__ import annotations
 
+import dataclasses
 import enum
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+import inspect
+import typing
+from collections.abc import Callable
 from datetime import timedelta
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from ._context import _Runtime
 
 if TYPE_CHECKING:
     # The generated Stream modules import `temporalio.workflow`, so this module names
     # their types for the type checker only.
+    import temporalio.nexus.system.stream_service.client
+    import temporalio.nexus.system.stream_service.workflow._resources.stream
     from temporalio.nexus.system.stream_service.models import StreamRecord
-    from temporalio.nexus.system.stream_service.workflow._resources.stream import (
-        Stream,
-    )
 
 __all__ = [
-    "DEFAULT_READ_STREAM_MAX_RECORDS",
+    "DEFAULT_STREAM_IDLE_TIMEOUT",
+    "DEFAULT_STREAM_MAX_BYTES",
+    "DEFAULT_STREAM_MAX_RECORDS",
+    "MAX_STREAM_RESULT_BYTES",
     "StreamRead",
     "StreamReadStop",
     "StreamReduce",
-    "read_stream",
+    "filter_stream",
     "reduce_stream",
+    "take_stream",
 ]
 
 BodyT = TypeVar("BodyT")
 ValueT = TypeVar("ValueT")
 
-DEFAULT_READ_STREAM_MAX_RECORDS = 1_000
-"""The most Records of one read or fold when ``max_records`` is ``None``."""
+DEFAULT_STREAM_IDLE_TIMEOUT = timedelta(seconds=1)
+"""How long a call waits for a new Record when ``idle_timeout`` is ``None``."""
+
+DEFAULT_STREAM_MAX_RECORDS = 1_000
+"""The most Records of one call when ``max_records`` is ``None``."""
+
+DEFAULT_STREAM_MAX_BYTES = 256 * 1024
+"""The most bytes of the Records of one call when ``max_bytes`` is ``None``."""
+
+MAX_STREAM_RESULT_BYTES = 1024 * 1024
+"""The most bytes of the encoded result of one call.
+
+In Workflow code the result goes into History, so this bounds what one call adds to it. A
+call over it raises :py:class:`temporalio.exceptions.ApplicationError`. Client and Activity
+code have the same limit, so a call gives the same result everywhere.
+"""
 
 
-class StreamReadStop(enum.Enum):
-    """Why a read or a fold of a Stream ended.
+class StreamReadStop(enum.IntEnum):
+    """Why a call on a Stream ended.
 
-    When several hold, the first in this order is the reason. ``MATCH``, ``DONE``,
-    ``MAX_RECORDS``, ``MAX_BYTES``, ``IDLE``, ``TIMEOUT``.
+    When several hold, the first in the order of the values is the reason.
 
     .. warning::
         This API is an experimental prototype and subject to change.
     """
 
-    MATCH = "MATCH"
-    """``until`` was true for the last Record."""
+    Match = 0
+    """``until`` accepted a Record."""
 
-    DONE = "DONE"
-    """The Stream is closed and its last Record was read."""
+    Done = 1
+    """The Stream is closed and the call looked at its last Record."""
 
-    MAX_RECORDS = "MAX_RECORDS"
-    """The read got ``max_records`` Records."""
+    MaxRecords = 2
+    """The call got ``max_records`` Records."""
 
-    MAX_BYTES = "MAX_BYTES"
-    """The next Record would pass ``max_bytes``. The next read gets it."""
+    MaxBytes = 3
+    """The next Record would pass ``max_bytes``. The next call gets it."""
 
-    IDLE = "IDLE"
+    Idle = 4
     """No new Record arrived for ``idle_timeout``."""
 
-    TIMEOUT = "TIMEOUT"
+    Timeout = 5
     """``timeout`` passed."""
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class StreamRead(Generic[BodyT]):
-    """What one :py:func:`read_stream` gave.
+    """What :py:func:`take_stream` or :py:func:`filter_stream` gave.
 
     .. warning::
         This API is an experimental prototype and subject to change.
     """
 
-    records: Sequence[StreamRecord[BodyT]]
-    """The Records of the read in order, typed as a client's read gives them."""
+    records: list[StreamRecord[BodyT]]
+    """The Records that the call gives back, in order."""
 
-    last_offset: bytes | None
-    """The offset of the last Record, or the ``from_offset`` of a read with none.
+    last_offset: bytes | None = None
+    """Where the scan stopped.
 
-    Give it as the ``from_offset`` of the next read.
+    It is the offset of the last Record that the scan looked at, kept or not, or the
+    ``from_offset`` of a call that looked at none. Give it as the ``from_offset`` of the next
+    call, so a loop loses and repeats no Record.
     """
 
     stop: StreamReadStop
-    """Why the read ended."""
+    """Why the call ended."""
 
     done: bool
-    """Whether the Stream is closed and its last Record is in :py:attr:`records`.
+    """Whether the Stream is closed and the scan looked at its last Record.
 
-    It is the state of the Stream, so it can be true when :py:attr:`stop` is ``MATCH``.
+    It is the state of the Stream, so it can be true when :py:attr:`stop` is ``Match``.
     """
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(slots=True, kw_only=True)
 class StreamReduce(Generic[ValueT]):
-    """What one :py:func:`reduce_stream` gave.
+    """What :py:func:`reduce_stream` gave.
 
     .. warning::
         This API is an experimental prototype and subject to change.
@@ -108,11 +131,8 @@ class StreamReduce(Generic[ValueT]):
     count: int
     """The number of Records that the fold got."""
 
-    last_offset: bytes | None
-    """The offset of the last Record, or the ``from_offset`` of a fold with none.
-
-    Give it as the ``from_offset`` of the next read or fold.
-    """
+    last_offset: bytes | None = None
+    """Where the scan stopped, as in :py:attr:`StreamRead.last_offset`."""
 
     stop: StreamReadStop
     """Why the fold ended."""
@@ -121,180 +141,408 @@ class StreamReduce(Generic[ValueT]):
     """Whether the Stream is closed and the fold got its last Record."""
 
 
-@dataclass(frozen=True)
-class _StreamReadLimits:
-    """Where a read starts and what stops it, after the checks of the public functions."""
+class _StreamCallKind(enum.Enum):
+    TAKE = "take"
+    FILTER = "filter"
+    REDUCE = "reduce"
 
+
+@dataclasses.dataclass(frozen=True)
+class _StreamCall:
+    """One call after the checks of the public functions. It holds the caller's functions."""
+
+    kind: _StreamCallKind
     from_offset: bytes | None
-    idle_timeout: timedelta | None
     timeout: timedelta
+    idle_timeout: timedelta
     max_records: int
-    max_bytes: int | None
+    max_bytes: int
+    until: Callable[..., object] | None = None
+    predicate: Callable[..., object] | None = None
+    function: Callable[..., object] | None = None
+    initial: Any = None
+    value_type: Any = None
+    """The type that Workflow code decodes the value of a fold as, or ``None`` for no hint."""
 
     @staticmethod
     def check(
+        kind: _StreamCallKind,
         *,
+        timeout: timedelta,
         from_offset: bytes | None,
         idle_timeout: timedelta | None,
-        timeout: timedelta,
         max_records: int | None,
         max_bytes: int | None,
-    ) -> _StreamReadLimits:
-        if timeout <= timedelta():
-            raise ValueError("timeout must be positive")
-        if idle_timeout is not None and idle_timeout < timedelta():
+        until: Callable[..., object] | None = None,
+        predicate: Callable[..., object] | None = None,
+        function: Callable[..., object] | None = None,
+        initial: Any = None,
+        value_type: Any = None,
+    ) -> _StreamCall:
+        if not isinstance(timeout, timedelta) or timeout <= timedelta():
+            raise ValueError("timeout must be a positive timedelta")
+        if idle_timeout is None:
+            idle_timeout = DEFAULT_STREAM_IDLE_TIMEOUT
+        elif idle_timeout < timedelta():
             raise ValueError("idle_timeout must not be negative")
         if max_records is None:
-            max_records = DEFAULT_READ_STREAM_MAX_RECORDS
+            max_records = DEFAULT_STREAM_MAX_RECORDS
         elif max_records < 1:
             raise ValueError("max_records must be at least 1")
-        if max_bytes is not None and max_bytes < 1:
+        if max_bytes is None:
+            max_bytes = DEFAULT_STREAM_MAX_BYTES
+        elif max_bytes < 1:
             raise ValueError("max_bytes must be at least 1")
-        return _StreamReadLimits(
+        for label, value, required in (
+            ("until", until, False),
+            ("predicate", predicate, kind is _StreamCallKind.FILTER),
+            ("function", function, kind is _StreamCallKind.REDUCE),
+        ):
+            _check_plain_function(label, value, required=required)
+        return _StreamCall(
+            kind=kind,
             from_offset=from_offset,
-            idle_timeout=idle_timeout,
             timeout=timeout,
+            idle_timeout=idle_timeout,
             max_records=max_records,
             max_bytes=max_bytes,
+            until=until,
+            predicate=predicate,
+            function=function,
+            initial=initial,
+            value_type=value_type,
         )
 
 
-async def read_stream(
-    stream: Stream[BodyT],
-    *,
+def _check_plain_function(
+    label: str, value: Callable[..., object] | None, *, required: bool
+) -> None:
+    if value is None:
+        if required:
+            raise TypeError(f"{label} is required")
+        return
+    if not callable(value):
+        raise TypeError(f"{label} must be a function")
+    # The scan calls the function and uses its answer at once, so it can't await one.
+    if inspect.iscoroutinefunction(value) or inspect.iscoroutinefunction(
+        getattr(value, "__call__", None)
+    ):
+        raise TypeError(
+            f"{label} must be a plain function, not a coroutine function. "
+            "The scan calls it for each Record and can't await it."
+        )
+
+
+def _fold_value_type(
+    function: Callable[..., object], initial: Any, value_type: Any
+) -> Any:
+    if value_type is not None:
+        return value_type
+    try:
+        hints = typing.get_type_hints(function)
+    except Exception:
+        hints = {}
+    if "return" in hints:
+        return hints["return"]
+    return type(initial) if initial is not None else None
+
+
+async def _run_stream_call(stream: Any, call: _StreamCall) -> Any:
+    runtime = _Runtime.maybe_current()
+    if runtime is not None:
+        return await runtime.workflow_stream_call(stream, call)
+    # The client package imports this module, so its scan is imported at the first call.
+    from temporalio.client._stream_read import _stream_call_outside_workflow
+
+    return await _stream_call_outside_workflow(stream, call)
+
+
+async def take_stream(
+    stream: temporalio.nexus.system.stream_service.client.Stream[BodyT]
+    | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[BodyT],
+    timeout: timedelta,
     until: Callable[[StreamRecord[BodyT]], bool] | None = None,
     from_offset: bytes | None = None,
     idle_timeout: timedelta | None = None,
-    timeout: timedelta,
     max_records: int | None = None,
     max_bytes: int | None = None,
 ) -> StreamRead[BodyT]:
-    """Read a Stream until a predicate is true, in one Local Activity.
+    """Give every Record of a Stream up to a stop.
 
-    The read starts after ``from_offset`` and ends at the first stop of
-    :py:class:`StreamReadStop`. A Store's Local Activity reads the pages, and History
-    gets one marker for the whole read. The marker has the range of offsets and no
-    Record. A replay reads that range from the Store again before the Workflow sees the
-    result, so the Records must still be in the Store.
+    ``until(record)`` is called for each Record, and the first Record that it accepts is the
+    last one given back.
+
+    The scan starts after ``from_offset`` and reads pages with the Store's long poll. It ends
+    at the first stop of :py:class:`StreamReadStop` that holds, in the order of their
+    values. ``last_offset`` in the result is where the scan stopped. Give it as the
+    ``from_offset`` of the next call, so a loop loses and repeats no Record.
+
+    Client, Activity and Workflow code call it with a client ``Stream`` or a Workflow
+    ``Stream``. The scan, its stops, its defaults and its result are the same in each. In a
+    client or an Activity, the call reads the Store straight away.
+
+    The functions of the caller must be plain functions that change no state. The scan calls
+    each one for a Record and uses its answer at once. A
+    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
+    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.exceptions.StreamError`.
+
+    In Workflow code only, the scan runs in one Local Activity and History gets one marker.
+    The marker holds the result, with the Records and their bodies. Records that the scan
+    looked at and didn't keep stay out of History. The Worker's data converter, with its
+    payload codec, encodes the marker. A replay takes the result from History, so it calls
+    no Store and needs no Stream config. A replay doesn't call the functions either, so an
+    appender in them writes nothing. A Workflow Task that fails and runs again calls them
+    again, and an appender writes again with a higher epoch. The functions run on the
+    Worker's event loop, not in the Workflow's thread. They can read Workflow state through
+    a reference such as ``self``, but can't call ``temporalio.workflow``. Each sees a Record
+    once, so a later change of that state doesn't check an earlier Record again.
 
     Args:
-        stream: The Workflow ``Stream`` to read, from
-            :py:func:`temporalio.workflow.get_stream` or
-            :py:func:`temporalio.workflow.create_stream`.
-        until: Called with each typed Record in order. The read stops after the first
-            Record for which it is true, and Records after it stay for the next read.
-            It is called once for each Record, when the Record arrives. A later change
-            of the state that it reads does not check an earlier Record again. It runs
-            in the Worker process, on the Worker's event loop, while the Local Activity
-            reads. It runs outside the Workflow's own thread. So it must not change any
-            state, and it can't call a function of ``temporalio.workflow``. It can read
-            the Workflow's state through a reference such as ``self``. When it sees a
-            change of that state is not defined. A replay does not call it, since the
-            replay takes the end of the read from History. ``None`` reads until another
-            stop.
-        from_offset: Read after this offset. ``None`` is the beginning.
-        idle_timeout: End the read when no new Record arrived for this long. It counts
-            from the last Record that the read got, or from the start of the read when
-            it got none. ``timedelta(0)`` gives what is in the Stream now and waits for
-            nothing. ``None`` is no idle stop.
-        timeout: The most time for the read. It must be positive.
-        max_records: The most Records to read. ``None`` is
-            :py:data:`DEFAULT_READ_STREAM_MAX_RECORDS`.
-        max_bytes: A cap on the bytes of the Records, as the Store counts them for a
-            page of the client ``read``. A Record that would pass the cap ends the read
-            before it, and the next read gets it. The first Record is always returned.
+        stream: The Stream to scan.
+        timeout: The most time for the call. It must be positive.
+        until: Ends the call after the first Record that it accepts. ``None`` scans
+            until another stop.
+        from_offset: Scan the Records after this offset. ``None`` is the beginning.
+        idle_timeout: End the call with ``Idle`` when no new Record arrived for this long.
+            It counts from the last Record that the scan got, or from the start of the
+            call. ``timedelta(0)`` gives what is in the Stream now. ``None`` is
+            :py:data:`DEFAULT_STREAM_IDLE_TIMEOUT`, 1 second. In Workflow code, a longer
+            wait keeps the Workflow Task open, so a Signal, an Update or a cancel waits for
+            the next Workflow Task heartbeat, and each heartbeat adds events to History.
+        max_records: The most Records to give. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_RECORDS`, 1,000.
+        max_bytes: A cap on the bytes of the Records to give. A Record that would pass
+            it ends the call before that Record, and the next call gets it. The first
+            Record of a call is always taken, also when it is larger. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_BYTES`, 256 KiB.
 
     Returns:
-        The Records of the read, the offset to read after next, and why it ended.
+        The Records, where the scan stopped, and why.
 
     Raises:
-        temporalio.exceptions.StreamError: The Store failed the read.
-        temporalio.exceptions.ApplicationError: ``until`` raised, and the error has
-            the message of the exception. Or the Worker's client has no Stream config,
-            and the error has the ``type`` ``StreamConfigError``. That one is not
-            retryable, so an uncaught one fails the Workflow.
+        TypeError: A function is a coroutine function, or the Stream is of the wrong kind.
+        ValueError: A limit is out of range.
+        temporalio.exceptions.StreamError: The Store failed the call, or an appender in a
+            function failed its write.
+        temporalio.exceptions.ApplicationError: A function raised, or returned an
+            awaitable. Or the encoded result is over :py:data:`MAX_STREAM_RESULT_BYTES`,
+            and the message names both sizes. In Workflow code it is also raised when the
+            Worker's client has no Stream config, with the ``type`` ``StreamConfigError``.
+            These are not retryable, so an uncaught one fails the Workflow.
+        temporalio.workflow.NondeterminismError: In Workflow code, a replay of a call
+            whose Store, Stream id or ``from_offset`` differs from the one in History.
 
     .. warning::
         This API is an experimental prototype and subject to change.
     """
-    limits = _StreamReadLimits.check(
+    call = _StreamCall.check(
+        _StreamCallKind.TAKE,
+        timeout=timeout,
         from_offset=from_offset,
         idle_timeout=idle_timeout,
-        timeout=timeout,
         max_records=max_records,
         max_bytes=max_bytes,
+        until=until,
     )
-    return await _Runtime.current().workflow_read_stream(stream, until, limits)
+    return await _run_stream_call(stream, call)
+
+
+async def filter_stream(
+    stream: temporalio.nexus.system.stream_service.client.Stream[BodyT]
+    | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[BodyT],
+    predicate: Callable[[StreamRecord[BodyT]], bool],
+    timeout: timedelta,
+    until: Callable[[StreamRecord[BodyT]], bool] | None = None,
+    from_offset: bytes | None = None,
+    idle_timeout: timedelta | None = None,
+    max_records: int | None = None,
+    max_bytes: int | None = None,
+) -> StreamRead[BodyT]:
+    """Give the Records of a Stream that a predicate keeps, up to a stop.
+
+    ``predicate(record)`` decides whether a Record is given back. ``until(record)`` is
+    called for every Record that the scan looks at, kept or not. ``max_records`` and
+    ``max_bytes`` count the kept Records. ``max_records=1`` gives the first Record that
+    ``predicate`` keeps.
+
+    The scan starts after ``from_offset`` and reads pages with the Store's long poll. It ends
+    at the first stop of :py:class:`StreamReadStop` that holds, in the order of their
+    values. ``last_offset`` in the result is where the scan stopped. Give it as the
+    ``from_offset`` of the next call, so a loop loses and repeats no Record.
+
+    Client, Activity and Workflow code call it with a client ``Stream`` or a Workflow
+    ``Stream``. The scan, its stops, its defaults and its result are the same in each. In a
+    client or an Activity, the call reads the Store straight away.
+
+    The functions of the caller must be plain functions that change no state. The scan calls
+    each one for a Record and uses its answer at once. A
+    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
+    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.exceptions.StreamError`.
+
+    In Workflow code only, the scan runs in one Local Activity and History gets one marker.
+    The marker holds the result, with the kept Records and their bodies. Records that the
+    scan looked at and didn't keep stay out of History. The Worker's data converter, with
+    its payload codec, encodes the marker. A replay takes the result from History, so it
+    calls no Store and needs no Stream config. A replay doesn't call the functions either,
+    so an appender in them writes nothing. A Workflow Task that fails and runs again calls
+    them again, and an appender writes again with a higher epoch. The functions run on the
+    Worker's event loop, not in the Workflow's thread. They can read Workflow state through
+    a reference such as ``self``, but can't call ``temporalio.workflow``. Each sees a Record
+    once, so a later change of that state doesn't check an earlier Record again.
+
+    Args:
+        stream: The Stream to scan.
+        predicate: Keeps a Record when it returns true.
+        timeout: The most time for the call. It must be positive.
+        until: Ends the call after the first Record that it accepts, kept or not.
+            ``None`` scans until another stop.
+        from_offset: Scan the Records after this offset. ``None`` is the beginning.
+        idle_timeout: End the call with ``Idle`` when no new Record arrived for this long.
+            It counts from the last Record that the scan got, or from the start of the
+            call. ``timedelta(0)`` gives what is in the Stream now. ``None`` is
+            :py:data:`DEFAULT_STREAM_IDLE_TIMEOUT`, 1 second. In Workflow code, a longer
+            wait keeps the Workflow Task open, so a Signal, an Update or a cancel waits for
+            the next Workflow Task heartbeat, and each heartbeat adds events to History.
+        max_records: The most Records to keep. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_RECORDS`, 1,000.
+        max_bytes: A cap on the bytes of the Records to keep. A Record that would pass
+            it ends the call before that Record, and the next call gets it. The first
+            Record of a call is always taken, also when it is larger. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_BYTES`, 256 KiB.
+
+    Returns:
+        The kept Records, where the scan stopped, and why.
+
+    Raises:
+        TypeError: A function is a coroutine function, or the Stream is of the wrong kind.
+        ValueError: A limit is out of range.
+        temporalio.exceptions.StreamError: The Store failed the call, or an appender in a
+            function failed its write.
+        temporalio.exceptions.ApplicationError: A function raised, or returned an
+            awaitable. Or the encoded result is over :py:data:`MAX_STREAM_RESULT_BYTES`,
+            and the message names both sizes. In Workflow code it is also raised when the
+            Worker's client has no Stream config, with the ``type`` ``StreamConfigError``.
+            These are not retryable, so an uncaught one fails the Workflow.
+        temporalio.workflow.NondeterminismError: In Workflow code, a replay of a call
+            whose Store, Stream id or ``from_offset`` differs from the one in History.
+
+    .. warning::
+        This API is an experimental prototype and subject to change.
+    """
+    call = _StreamCall.check(
+        _StreamCallKind.FILTER,
+        timeout=timeout,
+        from_offset=from_offset,
+        idle_timeout=idle_timeout,
+        max_records=max_records,
+        max_bytes=max_bytes,
+        until=until,
+        predicate=predicate,
+    )
+    return await _run_stream_call(stream, call)
 
 
 async def reduce_stream(
-    stream: Stream[BodyT],
+    stream: temporalio.nexus.system.stream_service.client.Stream[BodyT]
+    | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[BodyT],
     function: Callable[[ValueT, StreamRecord[BodyT]], ValueT],
     initial: ValueT,
-    *,
+    timeout: timedelta,
     until: Callable[[ValueT, StreamRecord[BodyT]], bool] | None = None,
-    value_type: type[ValueT] | None = None,
     from_offset: bytes | None = None,
     idle_timeout: timedelta | None = None,
-    timeout: timedelta,
     max_records: int | None = None,
     max_bytes: int | None = None,
+    *,
+    value_type: type[ValueT] | None = None,
 ) -> StreamReduce[ValueT]:
-    """Fold the Records of a Stream into one value, in one Local Activity.
+    """Fold the Records of a Stream into one value, up to a stop.
 
-    The Local Activity calls ``value = function(value, record)`` for each Record in
-    order, then ``until(value, record)``. The fold ends at the first stop of
-    :py:class:`StreamReadStop`, with the same rules as :py:func:`read_stream`. No
-    Record comes back to the Workflow. History keeps the value in the marker of the
-    Local Activity, so a replay takes the value from History and needs no Store. The
-    size of the value is the caller's choice, and History pays for it.
+    The scan calls ``value = function(value, record)`` for each Record in order, then
+    ``until(value, record)``. No Record comes back, only the value. ``function`` must not
+    change ``initial`` or a value in place.
+
+    The scan starts after ``from_offset`` and reads pages with the Store's long poll. It ends
+    at the first stop of :py:class:`StreamReadStop` that holds, in the order of their
+    values. ``last_offset`` in the result is where the scan stopped. Give it as the
+    ``from_offset`` of the next call, so a loop loses and repeats no Record.
+
+    Client, Activity and Workflow code call it with a client ``Stream`` or a Workflow
+    ``Stream``. The scan, its stops, its defaults and its result are the same in each. In a
+    client or an Activity, the call reads the Store straight away.
+
+    The functions of the caller must be plain functions that change no state. The scan calls
+    each one for a Record and uses its answer at once. A
+    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
+    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.exceptions.StreamError`.
+
+    In Workflow code only, the scan runs in one Local Activity and History gets one marker.
+    The marker holds the result, with the value. Records that the scan looked at and didn't
+    keep stay out of History. The Worker's data converter, with its payload codec, encodes
+    the marker. A replay takes the result from History, so it calls no Store and needs no
+    Stream config. A replay doesn't call the functions either, so an appender in them writes
+    nothing. A Workflow Task that fails and runs again calls them again, and an appender
+    writes again with a higher epoch. The functions run on the Worker's event loop, not in
+    the Workflow's thread. They can read Workflow state through a reference such as
+    ``self``, but can't call ``temporalio.workflow``. Each sees a Record once, so a later
+    change of that state doesn't check an earlier Record again.
 
     Args:
-        stream: The Workflow ``Stream`` to fold.
-        function: Gives the next value from the value so far and a typed Record. It
-            changes no state other than the value that it returns, so it must not
-            change ``initial`` or a value in place. It runs in the Worker process, on
-            the Worker's event loop, outside the Workflow's own thread. It does no I/O,
-            and it can't call a function of ``temporalio.workflow``. A replay does not
-            call it.
+        stream: The Stream to fold.
+        function: Gives the next value from the value so far and a Record.
         initial: The value before the first Record.
-        until: Called with the value after each Record and that Record. The fold stops
-            after the first Record for which it is true. It is called once for each
-            Record, when the Record arrives. It has the rules of ``function``.
-        value_type: The type that the Workflow decodes the value as. ``None`` takes the
-            type of ``initial``.
-        from_offset: Fold the Records after this offset. ``None`` is the beginning.
-        idle_timeout: As for :py:func:`read_stream`.
-        timeout: As for :py:func:`read_stream`.
-        max_records: As for :py:func:`read_stream`.
-        max_bytes: As for :py:func:`read_stream`.
+        timeout: The most time for the call. It must be positive.
+        until: Called with the value after each Record and that Record. Ends the
+            fold after the first Record that it accepts.
+        from_offset: Scan the Records after this offset. ``None`` is the beginning.
+        idle_timeout: End the call with ``Idle`` when no new Record arrived for this long.
+            It counts from the last Record that the scan got, or from the start of the
+            call. ``timedelta(0)`` gives what is in the Stream now. ``None`` is
+            :py:data:`DEFAULT_STREAM_IDLE_TIMEOUT`, 1 second. In Workflow code, a longer
+            wait keeps the Workflow Task open, so a Signal, an Update or a cancel waits for
+            the next Workflow Task heartbeat, and each heartbeat adds events to History.
+        max_records: The most Records to fold. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_RECORDS`, 1,000.
+        max_bytes: A cap on the bytes of the Records to fold. A Record that would pass
+            it ends the call before that Record, and the next call gets it. The first
+            Record of a call is always taken, also when it is larger. ``None`` is
+            :py:data:`DEFAULT_STREAM_MAX_BYTES`, 256 KiB.
+        value_type: The type that Workflow code decodes the value as. ``None`` takes the
+            return annotation of ``function``, else the type of ``initial``, and no type
+            when ``initial`` is ``None``. Client and Activity code get the value itself.
 
     Returns:
-        The value, the number of Records, the offset to read after next, and why the
-        fold ended.
+        The value, the number of Records, where the scan stopped, and why.
 
     Raises:
-        temporalio.exceptions.StreamError: The Store failed the read.
-        temporalio.exceptions.ApplicationError: ``function`` or ``until`` raised, and
-            the error has the message of the exception. Or the Worker's client has no
-            Stream config, and the error has the ``type`` ``StreamConfigError``. That
-            one is not retryable, so an uncaught one fails the Workflow.
+        TypeError: A function is a coroutine function, or the Stream is of the wrong kind.
+        ValueError: A limit is out of range.
+        temporalio.exceptions.StreamError: The Store failed the call, or an appender in a
+            function failed its write.
+        temporalio.exceptions.ApplicationError: A function raised, or returned an
+            awaitable. Or the encoded result is over :py:data:`MAX_STREAM_RESULT_BYTES`,
+            and the message names both sizes. In Workflow code it is also raised when the
+            Worker's client has no Stream config, with the ``type`` ``StreamConfigError``.
+            These are not retryable, so an uncaught one fails the Workflow.
+        temporalio.workflow.NondeterminismError: In Workflow code, a replay of a call
+            whose Store, Stream id or ``from_offset`` differs from the one in History.
 
     .. warning::
         This API is an experimental prototype and subject to change.
     """
-    limits = _StreamReadLimits.check(
+    call = _StreamCall.check(
+        _StreamCallKind.REDUCE,
+        timeout=timeout,
         from_offset=from_offset,
         idle_timeout=idle_timeout,
-        timeout=timeout,
         max_records=max_records,
         max_bytes=max_bytes,
+        until=until,
+        function=function,
+        initial=initial,
+        value_type=_fold_value_type(function, initial, value_type),
     )
-    return await _Runtime.current().workflow_reduce_stream(
-        stream,
-        function,
-        initial,
-        until,
-        value_type if value_type is not None else type(initial),
-        limits,
-    )
+    return await _run_stream_call(stream, call)

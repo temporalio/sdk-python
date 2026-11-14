@@ -70,13 +70,10 @@ class Replayer:
         worker had, so a replay makes the same commands. A history that records a
         Stream call needs it. With no Stream config, Workflow code gets an error in
         place of that call, and the replay fails with a nondeterminism error. A
-        replay calls no method of its Stores for a create, an append, a close or a
-        describe. For each
-        :py:func:`temporalio.workflow.read_stream` in the history, it reads the
-        Records of that read from the Store again, so the replay needs the same
-        ``data_converter`` and Stores that still have them. A
-        :py:func:`temporalio.workflow.reduce_stream` takes its value from the
-        history and calls no Store.
+        replay calls no method of its Stores. A
+        :py:func:`temporalio.workflow.take_stream`, ``filter_stream`` or
+        ``reduce_stream`` takes its result from the history, so its replay needs no
+        Stream config.
 
         Note, unlike the worker, for the replayer the workflow_task_executor
         will default to a new thread pool executor with no max_workers set that
