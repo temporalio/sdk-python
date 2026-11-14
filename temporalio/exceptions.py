@@ -293,8 +293,9 @@ class StreamConfigError(RuntimeError):
       Streams on the server, so every Stream call needs a Store.
     * A Workflow's Stream call is made on a Worker whose client has no Stream config.
       This fails the Workflow Task.
-    * A :py:class:`temporalio.client.StreamConfig` has no Store, has two Stores with
-      one name, or has more than one Store and no selector.
+    * A :py:class:`temporalio.client.StreamConfig` has no Store, or has two Stores
+      with one name.
+    * A call names no Store on a config with more than one Store and no selector.
     * A ref names a Store that the config of the client doesn't have.
     * The selector returns a Store that isn't one of the config's Stores.
     * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.

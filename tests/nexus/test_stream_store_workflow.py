@@ -835,6 +835,33 @@ async def test_workflow_ref_of_another_store_fails_the_task(client: Client):
         await handle.terminate()
 
 
+async def test_workflow_create_without_store_on_several_stores_fails_the_task(
+    client: Client,
+):
+    stream_config = StreamConfig(
+        stores=[CountingStore("first"), CountingStore("second")]
+    )
+    stream_client = _with_config(client, stream_config)
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, CreateAndDescribeWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            CreateAndDescribeWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        await assert_task_fail_eventually(
+            handle,
+            message_contains=(
+                "StreamConfig has more than one Store and no store_selector, and the "
+                f"call on the Stream '{stream_id}' names no Store. Name one with "
+                "store=, or set StreamConfig.store_selector."
+            ),
+        )
+        await handle.terminate()
+
+
 async def test_workflow_create_goes_to_the_selected_store(client: Client):
     contexts: list[StreamSelectContext] = []
     first, second, stream_config = _two_counting_stores(contexts)
