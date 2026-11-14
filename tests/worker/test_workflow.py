@@ -10840,3 +10840,42 @@ async def test_workflow_cancel_no_shielded_future_log(
     assert not any(
         "exception in shielded future" in record.message for record in caplog.records
     )
+
+
+deadlock_interruption_disabled_stop = threading.Event()
+deadlock_interruption_disabled_interrupted = False
+
+
+@workflow.defn(sandboxed=False)
+class DeadlockInterruptionDisabledWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # Busy loop that would be interruptible via PyThreadState_SetAsyncExc
+        try:
+            while not deadlock_interruption_disabled_stop.is_set():
+                pass
+        except BaseException:
+            global deadlock_interruption_disabled_interrupted
+            deadlock_interruption_disabled_interrupted = True
+            raise
+
+
+async def test_workflow_deadlock_interruption_disabled(client: Client):
+    async with new_worker(
+        client,
+        DeadlockInterruptionDisabledWorkflow,
+        disable_workflow_deadlock_interruption=True,
+    ) as worker:
+        handle = await client.start_workflow(
+            DeadlockInterruptionDisabledWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await assert_task_fail_eventually(handle, message_contains="deadlock")
+        # Give a would-be interrupt time to land before checking
+        await asyncio.sleep(0.5)
+        assert not deadlock_interruption_disabled_interrupted
+
+        deadlock_interruption_disabled_stop.set()
+        await handle.result()
+    assert not deadlock_interruption_disabled_interrupted

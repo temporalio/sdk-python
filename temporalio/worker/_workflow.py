@@ -123,6 +123,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         ]
         | None,
         disable_safe_eviction: bool,
+        disable_deadlock_interruption: bool,
         should_enforce_versioning_behavior: bool,
         assert_local_activity_valid: Callable[[str], None],
         encode_headers: bool,
@@ -193,6 +194,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._disable_eager_activity_execution = disable_eager_activity_execution
         self._on_eviction_hook = on_eviction_hook
         self._disable_safe_eviction = disable_safe_eviction
+        self._disable_deadlock_interruption = disable_deadlock_interruption
         self._encode_headers = encode_headers
         self._max_workflow_task_external_storage_concurrency = (
             max_workflow_task_external_storage_concurrency
@@ -469,7 +471,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     # interrupt the thread and put this activation task on
                     # the workflow so that the successive eviction can wait
                     # on it before trying to evict.
-                    workflow.attempt_deadlock_interruption()
+                    if not self._disable_deadlock_interruption:
+                        workflow.attempt_deadlock_interruption()
                     # Set the task and raise
                     workflow.deadlocked_activation_task = activate_task
                     raise deadlock_exc from None
