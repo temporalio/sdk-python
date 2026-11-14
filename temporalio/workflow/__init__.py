@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 # BEGIN GENERATED NEXUS SYSTEM EXPORTS
+from temporalio.nexus.system.stream_service.workflow import (
+    create_stream,
+    get_stream,
+)
 from temporalio.nexus.system.workflow_service import (
     signal_with_start_workflow,
 )
@@ -329,6 +333,8 @@ __all__ = [
     "ReturnType",
     "SelfType",
     # BEGIN GENERATED NEXUS SYSTEM __ALL__
+    "create_stream",
+    "get_stream",
     "signal_with_start_workflow",
     # END GENERATED NEXUS SYSTEM __ALL__
 ]

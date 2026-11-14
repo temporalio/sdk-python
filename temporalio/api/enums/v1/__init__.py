@@ -49,6 +49,7 @@ from .nexus_pb2 import (
 from .query_pb2 import QueryRejectCondition, QueryResultType
 from .reset_pb2 import ResetReapplyExcludeType, ResetReapplyType, ResetType
 from .schedule_pb2 import ScheduleOverlapPolicy
+from .stream_pb2 import StreamErrorReason, StreamIdConflictPolicy, StreamStatus
 from .task_queue_pb2 import (
     BuildIdTaskReachability,
     DescribeTaskQueueMode,
@@ -126,6 +127,9 @@ __all__ = [
     "Severity",
     "SignalExternalWorkflowExecutionFailedCause",
     "StartChildWorkflowExecutionFailedCause",
+    "StreamErrorReason",
+    "StreamIdConflictPolicy",
+    "StreamStatus",
     "SuggestContinueAsNewReason",
     "TaskQueueKind",
     "TaskQueueType",
