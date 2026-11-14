@@ -38,15 +38,16 @@ import temporalio.common
 import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus.system.stream_service.client
-from temporalio.nexus.system._support import _StreamCall, _StreamCallKind
+from temporalio.nexus.system._support import (
+    _STREAM_FUNCTION,
+    _StreamCall,
+    _StreamCallKind,
+)
 from temporalio.nexus.system.stream_service.models import (
     StreamRead,
     StreamReadStop,
     StreamRecord,
     StreamReduce,
-)
-from temporalio.nexus.system.stream_service.workflow._resources.stream import (
-    Stream as _WorkflowStream,
 )
 
 from ._stream_store import StreamReplaySource, StreamStore, _store_page_reader
@@ -220,6 +221,8 @@ def _decode_offset(value: str | None) -> bytes | None:
 def _call_function(
     label: str, function: Callable[..., Any], *args: Any, in_local_activity: bool
 ) -> Any:
+    # A Stream method that the function takes reads this, and refuses.
+    _STREAM_FUNCTION.label = label
     try:
         result = function(*args)
     except temporalio.exceptions.ApplicationError:
@@ -231,6 +234,8 @@ def _call_function(
         raise temporalio.exceptions.ApplicationError(
             str(err), type=type(err).__name__, non_retryable=True
         ) from err
+    finally:
+        _STREAM_FUNCTION.label = None
     if inspect.isawaitable(result):
         if inspect.iscoroutine(result):
             result.close()
@@ -892,23 +897,6 @@ async def _read_kept_records(  # pyright: ignore[reportUnusedFunction]
     return records
 
 
-def _client_stream(
-    stream: Any,
-) -> temporalio.nexus.system.stream_service.client.Stream[Any]:
-    if isinstance(stream, temporalio.nexus.system.stream_service.client.Stream):
-        return stream
-    if isinstance(stream, _WorkflowStream) and temporalio.activity.in_activity():
-        # A Workflow Stream outside Workflow code is one that a function of a call or an
-        # Activity got, so it reads through the Activity's client.
-        return temporalio.activity.client().get_stream(
-            stream.ref, body_type=stream.body_type
-        )
-    raise TypeError(
-        "A Workflow Stream can be read only in Workflow code or an Activity. Use "
-        "client.get_stream for a client Stream."
-    )
-
-
 async def _stream_call_outside_workflow(  # pyright: ignore[reportUnusedFunction]
     stream: Any, call: _StreamCall
 ) -> StreamRead[Any] | StreamReduce[Any]:
@@ -917,7 +905,7 @@ async def _stream_call_outside_workflow(  # pyright: ignore[reportUnusedFunction
     The result doesn't go into History, so it has no size limit and isn't encoded.
     """
     outcome = await _scan_and_flush(
-        _ClientPages(_client_stream(stream)), call=call, in_local_activity=False
+        _ClientPages(stream), call=call, in_local_activity=False
     )
     if call.kind is _StreamCallKind.REDUCE:
         return StreamReduce(

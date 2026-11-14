@@ -1,2 +1,3 @@
 Add the `take`, `filter` and `reduce` methods to the client `Stream` and the Workflow `Stream`. Client, Activity and Workflow code call them to scan a Stream until a predicate matches, the Stream is done, or a limit is reached.
 Add `StreamConfig.workflow_read_replay_from`. With `StreamReplaySource.STORE`, a `take` or a `filter` of Workflow code keeps only the offsets and a digest of its Records in History, and a replay reads the Records from the Store again.
+A method of a Workflow `Stream` raises `TypeError` outside Workflow code, and a method of a client `Stream` raises it in Workflow code. Both raise it in a function of a `take`, `filter` or `reduce` call, which can't await, so a write of that function is never lost with no error.

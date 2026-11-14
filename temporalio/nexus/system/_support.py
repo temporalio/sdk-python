@@ -5,6 +5,7 @@ import dataclasses
 import enum
 import functools
 import inspect
+import threading
 import typing
 import urllib.parse
 import uuid
@@ -460,6 +461,46 @@ def versioning_override_from_proto(
     raise ValueError("unknown versioning override proto shape")
 
 
+# The label of the function that a take, filter or reduce call is running on this thread, such
+# as "predicate". A context variable would also reach a timer that the function starts, such
+# as the one of a `BufferedAppender`.
+_STREAM_FUNCTION = threading.local()
+
+
+def check_stream_call(*, target: str, method: str) -> None:
+    """Refuse a Stream method that code takes where that Stream doesn't work.
+
+    The generated ``Stream`` classes call this when code takes a method from a Stream, before
+    a coroutine exists. So a caller that can't await gets the error too, and its call doesn't
+    get lost with no error.
+
+    Raises:
+        TypeError: A function of a ``take``, ``filter`` or ``reduce`` took the method, Workflow
+            code took a method of a client Stream, or other code took a method of a Workflow
+            Stream.
+    """
+    import temporalio.workflow
+
+    label = getattr(_STREAM_FUNCTION, "label", None)
+    if label is not None:
+        hint = " To append in it, use a BufferedAppender." if method == "append" else ""
+        raise TypeError(
+            f"The {label} of a Stream call can't call `{method}` of a Stream. It is a plain "
+            f"function, so it can't await the call.{hint}"
+        )
+    in_workflow = temporalio.workflow.in_workflow()
+    if target == "workflow" and not in_workflow:
+        raise TypeError(
+            f"`{method}` of a Workflow Stream works only in Workflow code. In an Activity or "
+            "a client, get the Stream with `get_stream` of the client."
+        )
+    if target == "client" and in_workflow:
+        raise TypeError(
+            f"`{method}` of a client Stream doesn't work in Workflow code. Get the Stream "
+            "with `temporalio.workflow.get_stream`."
+        )
+
+
 # The take, filter and reduce calls of a Stream. The generated `take`, `filter` and `reduce`
 # methods of the client Stream and of the Workflow Stream call the three functions below.
 
@@ -639,8 +680,9 @@ async def take_stream(
     Task that fails and runs again calls them again, and an appender writes again with a
     higher epoch. The functions run on the Worker's event loop, not in the Workflow's
     thread. They can read Workflow state through a reference such as ``self``, but can't
-    call ``temporalio.workflow``. Each sees a Record once, so a later change of that state
-    doesn't check an earlier Record again.
+    call ``temporalio.workflow`` or a method of a Stream. Such a call raises ``TypeError``,
+    and a function appends to a Stream through a ``BufferedAppender``. Each sees a Record
+    once, so a later change of that state doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to scan.
@@ -758,8 +800,9 @@ async def filter_stream(
     and runs again calls them again, and an appender writes again with a higher epoch. The
     functions run on the Worker's event loop, not in the Workflow's thread. They can read
     Workflow state through a reference such as ``self``, but can't call
-    ``temporalio.workflow``. Each sees a Record once, so a later change of that state
-    doesn't check an earlier Record again.
+    ``temporalio.workflow`` or a method of a Stream. Such a call raises ``TypeError``, and
+    a function appends to a Stream through a ``BufferedAppender``. Each sees a Record once,
+    so a later change of that state doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to scan.
@@ -876,8 +919,9 @@ async def reduce_stream(
     fails and runs again calls them again, and an appender writes again with a higher epoch.
     The functions run on the Worker's event loop, not in the Workflow's thread. They can
     read Workflow state through a reference such as ``self``, but can't call
-    ``temporalio.workflow``. Each sees a Record once, so a later change of that state
-    doesn't check an earlier Record again.
+    ``temporalio.workflow`` or a method of a Stream. Such a call raises ``TypeError``, and a
+    function appends to a Stream through a ``BufferedAppender``. Each sees a Record once, so
+    a later change of that state doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to fold.

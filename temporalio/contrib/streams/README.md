@@ -23,6 +23,10 @@ async with BufferedAppender(tokens) as appender:
 
 The end of the `async with` block writes the Records that are still in the buffer.
 
+A function of a `take`, `filter` or `reduce` call is a plain function, so it can't await a
+method of a Stream. Such a call raises `TypeError`. The function appends through a
+`BufferedAppender`, and the call writes the buffered Records before it returns.
+
 ## `pipeline`
 
 `pipeline` chains steps over a Stream: `filter`, `map`, `take_until` and `limit`. A step runs
