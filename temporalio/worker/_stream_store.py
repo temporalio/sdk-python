@@ -24,6 +24,18 @@ if TYPE_CHECKING:
     from ._workflow_instance import _WorkflowInstanceImpl
 
 
+def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyright: ignore[reportUnusedFunction]
+    # A `StreamConfigError` would fail the Workflow Task, and its retries would fail the
+    # same way for good. A Worker with no config is a setup that a user has to see, so
+    # the Workflow fails instead.
+    return temporalio.exceptions.ApplicationError(
+        "The client of this Worker has no Stream Store. Give one in "
+        "stream_config=StreamConfig(stores=[...]).",
+        type="StreamConfigError",
+        non_retryable=True,
+    )
+
+
 def _workflow_target() -> StorageDriverWorkflowInfo:
     # External storage builds the same value for a Workflow.
     info = temporalio.workflow.info()

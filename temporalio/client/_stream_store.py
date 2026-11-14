@@ -423,6 +423,13 @@ class StreamConfig:
     operation. It holds Stores and a selector, as
     :py:class:`temporalio.converter.ExternalStorage` holds drivers and a selector.
 
+    On a Worker whose client has no config, a Stream call of Workflow code raises
+    :py:class:`temporalio.exceptions.ApplicationError` with the ``type``
+    ``StreamConfigError``, and an uncaught one fails the Workflow. Workflow code can
+    catch this error. A Workflow that catches it must not go on to make the same call
+    on a Worker that has a config, since the History then has no record of the first
+    call.
+
     A ref carries the name of its Store, so a call on a known Stream goes to the
     Store of that name. A create can name its Store with ``store=``. A call whose ref
     names no Store goes to the Store that :py:attr:`store_selector` returns, or to the
