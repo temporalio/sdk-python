@@ -534,7 +534,9 @@ class StreamConfig:
     Activity for a close.
     """
 
-    workflow_read_replay_from: StreamReplaySource = StreamReplaySource.HISTORY
+    workflow_read_replay_from: StreamReplaySource = dataclasses.field(
+        default=StreamReplaySource.HISTORY
+    )
     """Where a replay of a ``take`` or a ``filter`` of Workflow code gets its Records.
 
     It applies to every ``take`` and ``filter`` of Workflow code on a Worker whose client
