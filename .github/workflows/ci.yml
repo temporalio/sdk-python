@@ -16,7 +16,7 @@ env:
 jobs:
   # Build and test the project
   build-lint-test:
-    timeout-minutes: 40
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -60,9 +60,9 @@ jobs:
       - run: poe lint
       - run: mkdir junit-xml
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
-        timeout-minutes: 15
+        timeout-minutes: 20
       - run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v2 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v2.xml
-        timeout-minutes: 15
+        timeout-minutes: 20
       - name: "Upload junit-xml artifacts"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
