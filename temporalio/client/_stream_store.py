@@ -424,8 +424,10 @@ class StreamConfig:
     :py:class:`temporalio.converter.ExternalStorage` holds drivers and a selector.
 
     A ref carries the name of its Store, so a call on a known Stream goes to the
-    Store of that name. A call whose ref names no Store, such as a create, goes to
-    the one Store, or to the Store that :py:attr:`store_selector` returns.
+    Store of that name. A create can name its Store with ``store=``. A call whose ref
+    names no Store goes to the Store that :py:attr:`store_selector` returns, or to the
+    one Store when there is no selector. With more than one Store and no selector,
+    such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
     A Worker with Workflows and this config polls for Activity Tasks, since a Workflow's
     close runs the Store's Activity as a regular Activity. With ``no_remote_activities``
@@ -439,16 +441,18 @@ class StreamConfig:
     """At least one Store. Each Store has a unique name.
 
     A ref carries the :py:attr:`StreamStore.name` of its Store, and a call looks
-    the Store up by that name. With more than one Store, :py:attr:`store_selector`
-    must also be set. A Worker serves every Store of its client.
+    the Store up by that name. With more than one Store and no
+    :py:attr:`store_selector`, each call must name its Store. A Worker serves every
+    Store of its client.
     """
 
     store_selector: Callable[[StreamSelectContext], StreamStore] | None = None
-    """Picks the Store of a new Stream. Required with more than one Store.
+    """Picks the Store of a call whose ref names no Store.
 
-    It gets a :py:class:`StreamSelectContext` for each call whose ref names no
-    Store, and returns one of the instances in :py:attr:`stores`. When it is
-    ``None`` and there is one Store, every new Stream goes to that Store.
+    It gets a :py:class:`StreamSelectContext` for each such call, and returns one of
+    the instances in :py:attr:`stores`. When it is ``None`` and there is one Store,
+    such a call goes to that Store. When it is ``None`` and there is more than one
+    Store, such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
     For a call of Workflow code, the selector runs in Workflow code, also on a
     replay. So it must give the same Store for the same context. The Activity of the
@@ -477,8 +481,7 @@ class StreamConfig:
         """Check the Stores and build the name-keyed map of them.
 
         Raises :py:class:`temporalio.exceptions.StreamConfigError` if there is no
-        Store, if two Stores share a name, or if more than one Store is given
-        without a :py:attr:`store_selector`.
+        Store, or if two Stores share a name.
         """
         if not self.stores:
             raise StreamConfigError("StreamConfig.stores must have at least one Store")
@@ -490,15 +493,17 @@ class StreamConfig:
                     "Each Store needs a unique name."
                 )
             store_map[store.name] = store
-        if len(self.stores) > 1 and self.store_selector is None:
-            raise StreamConfigError(
-                "StreamConfig.store_selector must be set when there is more than one Store"
-            )
         object.__setattr__(self, "_store_map", store_map)
 
     def _select_store(self, context: StreamSelectContext) -> StreamStore:
         selector = self.store_selector
         if selector is None:
+            if len(self.stores) > 1:
+                raise StreamConfigError(
+                    "StreamConfig has more than one Store and no store_selector, and "
+                    f"the call on the Stream '{context.id}' names no Store. Name one "
+                    "with store=, or set StreamConfig.store_selector."
+                )
             return self.stores[0]
         store = selector(context)
         if (
