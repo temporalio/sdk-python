@@ -16,17 +16,10 @@ import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
 import temporalio.converter._payload_converter
-import temporalio.exceptions
 import temporalio.nexus.system._support
 import temporalio.nexus.system.stream_service
 import temporalio.runtime
 import temporalio.workflow
-from temporalio.client._stream_read import (
-    _PENDING_STREAM_READS,
-    _read_until,
-    _ReadLimits,
-    _StreamReadMarker,
-)
 from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
 from temporalio.exceptions import StreamConfigError
 
@@ -145,15 +138,13 @@ class StreamStore(ABC):
     def worker_activities(self) -> Sequence[Callable[..., Any]]:
         """The Activities that a Worker registers for this Store when it runs Workflows.
 
-        The default is two Activities, named for this Store. One answers
-        :py:meth:`call_from_workflow`, which runs it as a Local Activity, or as a regular
-        Activity for a close. The other answers :py:func:`temporalio.workflow.read_stream`
-        and :py:func:`temporalio.workflow.reduce_stream`, which always run it by its name.
-        A Store that overrides :py:meth:`call_from_workflow` overrides this method to
-        match. A Store that overrides this method keeps the read Activity in its list for
-        Workflow code that reads.
+        The default is one Activity, named for this Store, that
+        :py:meth:`call_from_workflow` runs as a Local Activity, or as a regular Activity
+        for a close. A Store that overrides one of the two methods overrides the other to
+        match. The take, filter and reduce calls of Workflow code run an Activity of the
+        SDK that reads the Store through its methods, so this list doesn't need it.
         """
-        return [_store_call_activity(self), _store_read_activity(self)]
+        return [_store_call_activity(self)]
 
     async def call_from_workflow(
         self,
@@ -338,8 +329,8 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
         temporalio.api.streamservice.v1.ReadRecordsResponse,
         workflow_refusal=(
             "Workflow code can't run a ReadRecords operation on a Store. Use "
-            "temporalio.workflow.read_stream or reduce_stream, which read in one "
-            "Local Activity."
+            "temporalio.workflow.take_stream, filter_stream or reduce_stream, which "
+            "read in one Local Activity."
         ),
     ),
     "CloseStream": _StreamOperation(
@@ -403,82 +394,6 @@ def _with_local_activity_producer(
     request.producer.local_activity.epoch.attempt = 1
     if not request.sequence:
         request.sequence = 1
-
-
-_STORE_READ_ACTIVITY = "__temporal_stream_store_read"
-
-
-def _store_read_activity_name(store_name: str) -> str:
-    return f"{_STORE_READ_ACTIVITY}:{store_name}"
-
-
-def _store_read_activity(
-    store: StreamStore,
-) -> Callable[
-    [str, bytes, int, int | None, float | None, float],
-    Awaitable[temporalio.common.RawValue],
-]:
-    @temporalio.activity.defn(name=_store_read_activity_name(store.name))
-    async def read(
-        read_id: str,
-        request: bytes,
-        max_records: int,
-        max_bytes: int | None,
-        idle_timeout_seconds: float | None,
-        timeout_seconds: float,
-    ) -> temporalio.common.RawValue:
-        info = temporalio.activity.info()
-        pending = _PENDING_STREAM_READS.get(info.workflow_run_id or "", read_id)
-        if pending is None:
-            # The functions of the Workflow live in its process, so only a Local
-            # Activity of that Workflow can run this read.
-            raise temporalio.exceptions.ApplicationError(
-                f"The Stream read '{read_id}' has no pending read in this process. "
-                "Only temporalio.workflow.read_stream and reduce_stream run this "
-                "Activity.",
-                non_retryable=True,
-            )
-        read_request = temporalio.api.streamservice.v1.ReadRecordsRequest.FromString(
-            request
-        )
-        # The codec decodes the bodies in each page, so the functions of the Workflow
-        # get the user's values.
-        page_reader = _store_page_reader(
-            store, temporalio.activity.client().data_converter
-        )
-        from_offset = read_request.from_offset or None
-        outcome = await _read_until(
-            page_reader,
-            ref=read_request.ref,
-            from_offset=from_offset,
-            limits=_ReadLimits(
-                max_records=max_records,
-                max_bytes=max_bytes,
-                idle_timeout=idle_timeout_seconds,
-                timeout=timeout_seconds,
-            ),
-            read=pending,
-        )
-        marker = _StreamReadMarker(
-            read_id=read_id,
-            store=store.name,
-            stream_id=read_request.ref.id,
-            from_offset=from_offset,
-            last_offset=outcome.last_offset,
-            record_count=outcome.record_count,
-            stop=outcome.stop,
-            done=outcome.done,
-            digest=outcome.digest,
-            # History keeps the value of a fold, so a replay needs no Store.
-            value=temporalio.activity.payload_converter().to_payload(outcome.value)
-            if pending.fold is not None
-            else None,
-        )
-        if pending.fold is None:
-            pending.fill(marker, outcome.records)
-        return marker.to_raw_value()
-
-    return read
 
 
 def _store_page_reader(

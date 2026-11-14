@@ -1,193 +1,140 @@
-"""The Worker side of :py:func:`temporalio.workflow.read_stream` and ``reduce_stream``.
-
-Workflow code starts the read here, and the Worker gives a replayed read its Records.
-"""
+"""The Workflow side of :py:func:`temporalio.workflow.take_stream`, ``filter_stream`` and
+``reduce_stream``."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import temporalio.api.stream.v1
-import temporalio.bridge.proto.workflow_activation
+import temporalio.api.streamservice.v1
 import temporalio.common
-import temporalio.converter
-import temporalio.exceptions
 import temporalio.workflow
 from temporalio.client._stream_read import (
-    _PENDING_STREAM_READS,
-    _PendingStreamRead,
-    _read_range,
-    _StreamFold,
-    _StreamReadMarker,
+    _PENDING_STREAM_CALLS,
+    _STREAM_CALL_ACTIVITY,
+    _PendingStreamCall,
+    _StreamCallResult,
 )
-from temporalio.client._stream_store import (
-    _STREAM_SERVICE,
-    StreamConfig,
-    _store_page_reader,
-    _store_read_activity_name,
-)
+from temporalio.client._stream_store import _STREAM_SERVICE, StreamConfig
 from temporalio.nexus.system.stream_service.models import (
     ReadRecordsRequest,
     StreamRecord,
 )
 from temporalio.nexus.system.stream_service.workflow._resources.stream import Stream
+from temporalio.workflow._streams import (
+    StreamRead,
+    StreamReduce,
+    _StreamCall,
+    _StreamCallKind,
+)
 
-from ._stream_store import _store_errors, _workflow_target
+from ._stream_store import _no_stream_config_error, _store_errors, _workflow_target
 
 if TYPE_CHECKING:
     from ._workflow_instance import _WorkflowInstanceImpl
 
-# The read Activity gets this much time after the read's own timeout to give its result.
-_READ_ACTIVITY_GRACE = timedelta(seconds=10)
+# The Local Activity gets this much time after the call's own timeout to give its result.
+_STREAM_CALL_GRACE = timedelta(seconds=10)
 
 
-async def _run_read(
+def _describe(
+    kind: _StreamCallKind, store: str | None, stream_id: str, from_offset: bytes | None
+) -> str:
+    start = from_offset.hex() if from_offset else "the beginning"
+    on_store = f" on the Store '{store}'" if store else ""
+    return f"a {kind.value} of the Stream '{stream_id}'{on_store} after {start}"
+
+
+async def _stream_call_in_workflow(  # pyright: ignore[reportUnusedFunction]
     instance: _WorkflowInstanceImpl,
-    config: StreamConfig,
-    stream: Stream[Any],
-    limits: temporalio.workflow._StreamReadLimits,
-    *,
-    until: Callable[..., bool] | None,
-    fold: _StreamFold | None,
-) -> tuple[
-    _StreamReadMarker,
-    list[temporalio.api.stream.v1.StreamRecord],
-    Callable[[temporalio.api.stream.v1.StreamRecord], Any],
-]:
-    """Run the read Activity, and give its marker, its proto Records and their typing."""
-    request = ReadRecordsRequest(ref=stream.ref, from_offset=limits.from_offset)
+    config: StreamConfig | None,
+    stream: Any,
+    call: _StreamCall,
+    call_id: str,
+) -> StreamRead[Any] | StreamReduce[Any]:
+    """Run a call of Workflow code in one Local Activity, or take its result from History."""
+    if not isinstance(stream, Stream):
+        raise TypeError(
+            "Workflow code takes a Workflow Stream, from temporalio.workflow.get_stream "
+            "or create_stream"
+        )
+    if config is None and not instance._is_replaying:
+        raise _no_stream_config_error()
+    request = ReadRecordsRequest(ref=stream.ref, from_offset=call.from_offset)
     payload_converter, _ = instance._system_nexus_converters_for(
         _STREAM_SERVICE.name, "ReadRecords", request
     )
-    request_message = payload_converter._to_transfer_value(request)
-    # The choice runs in Workflow code, as it does for the other Stream calls.
-    store = config._store_for(stream.ref, _workflow_target())
+    message = payload_converter._to_transfer_value(request)
+    assert isinstance(message, temporalio.api.streamservice.v1.ReadRecordsRequest)
     record_type: Any = StreamRecord[stream.body_type]  # type: ignore[name-defined]
 
     def to_record(record: temporalio.api.stream.v1.StreamRecord) -> Any:
         return payload_converter._from_transfer_value(record, record_type)
 
+    # A replay takes the result from History, so it needs no Store and no config. The
+    # choice of a Store runs in Workflow code, as it does for the other Stream calls.
+    store = (
+        config._store_for(stream.ref, _workflow_target())
+        if config is not None
+        else None
+    )
+    store_name = store.name if store is not None else stream.ref.store
     run_id = temporalio.workflow.info().run_id
-    read_id = str(temporalio.workflow.uuid4())
-    pending = _PendingStreamRead(to_record=to_record, until=until, fold=fold)
-    _PENDING_STREAM_READS.add(run_id, read_id, pending)
+    pending = None
+    if store is not None:
+        pending = _PendingStreamCall(
+            call=call, store=store, ref=message.ref, to_record=to_record
+        )
+        _PENDING_STREAM_CALLS.add(run_id, call_id, pending)
     try:
         with _store_errors():
-            result = await temporalio.workflow.execute_local_activity(
-                _store_read_activity_name(store.name),
-                args=[
-                    read_id,
-                    request_message.SerializeToString(),
-                    limits.max_records,
-                    limits.max_bytes,
-                    None
-                    if limits.idle_timeout is None
-                    else limits.idle_timeout.total_seconds(),
-                    limits.timeout.total_seconds(),
-                ],
+            raw = await temporalio.workflow.execute_local_activity(
+                _STREAM_CALL_ACTIVITY,
+                call_id,
                 result_type=temporalio.common.RawValue,
-                start_to_close_timeout=limits.timeout + _READ_ACTIVITY_GRACE,
-                retry_policy=config.workflow_call_options.retry_policy,
+                start_to_close_timeout=call.timeout + _STREAM_CALL_GRACE,
+                retry_policy=config.workflow_call_options.retry_policy
+                if config is not None
+                else None,
             )
-        marker = _StreamReadMarker.from_payload(result.payload)
-        if marker is None or marker.read_id != read_id:
-            raise RuntimeError(
-                f"The read of the Stream '{stream.ref.id}' got a result that is not "
-                "its read marker"
-            )
-        if fold is not None:
-            return marker, [], to_record
-        records = pending.records_for(marker)
-        if records is None:
-            raise RuntimeError(
-                f"The Worker has no Records for the read of {marker.describe_range()}"
-            )
-        return marker, records, to_record
     finally:
-        _PENDING_STREAM_READS.remove(run_id, read_id, pending)
-
-
-async def _read_stream_in_workflow(  # pyright: ignore[reportUnusedFunction]
-    instance: _WorkflowInstanceImpl,
-    config: StreamConfig,
-    stream: Stream[Any],
-    until: Callable[[StreamRecord[Any]], bool] | None,
-    limits: temporalio.workflow._StreamReadLimits,
-) -> temporalio.workflow.StreamRead[Any]:
-    marker, records, to_record = await _run_read(
-        instance, config, stream, limits, until=until, fold=None
-    )
-    return temporalio.workflow.StreamRead(
-        records=[to_record(record) for record in records],
-        last_offset=marker.last_offset,
-        stop=marker.stop,
-        done=marker.done,
-    )
-
-
-async def _reduce_stream_in_workflow(  # pyright: ignore[reportUnusedFunction]
-    instance: _WorkflowInstanceImpl,
-    config: StreamConfig,
-    stream: Stream[Any],
-    fold: _StreamFold,
-    until: Callable[[Any, StreamRecord[Any]], bool] | None,
-    value_type: Any,
-    limits: temporalio.workflow._StreamReadLimits,
-) -> temporalio.workflow.StreamReduce[Any]:
-    marker, _, _ = await _run_read(
-        instance, config, stream, limits, until=until, fold=fold
-    )
-    if marker.value is None:
-        raise RuntimeError(
-            f"The fold of {marker.describe_range()} got a marker with no value"
+        if pending is not None:
+            _PENDING_STREAM_CALLS.remove(run_id, call_id, pending)
+    result = _StreamCallResult.from_payload(raw.payload)
+    if (
+        result is None
+        or result.kind is not call.kind
+        or result.stream_id != message.ref.id
+        or (store_name and result.store != store_name)
+        or result.from_offset != call.from_offset
+    ):
+        recorded = (
+            "no Stream call"
+            if result is None
+            else _describe(
+                result.kind, result.store, result.stream_id, result.from_offset
+            )
         )
-    # A first run and a replay both take the value from the marker.
-    value = instance.workflow_payload_converter().from_payload(marker.value, value_type)
-    return temporalio.workflow.StreamReduce(
-        value=value,
-        count=marker.record_count,
-        last_offset=marker.last_offset,
-        stop=marker.stop,
-        done=marker.done,
+        raise temporalio.workflow.NondeterminismError(
+            f"Stream call {call_id} of the Workflow is "
+            f"{_describe(call.kind, store_name, message.ref.id, call.from_offset)}, "
+            f"and History has {recorded}"
+        )
+    if call.kind is _StreamCallKind.REDUCE:
+        assert result.value is not None
+        return StreamReduce(
+            value=instance.workflow_payload_converter().from_payload(
+                result.value, call.value_type
+            ),
+            count=result.count,
+            last_offset=result.last_offset,
+            stop=result.stop,
+            done=result.done,
+        )
+    return StreamRead(
+        records=[to_record(record) for record in result.records],
+        last_offset=result.last_offset,
+        stop=result.stop,
+        done=result.done,
     )
-
-
-async def _fill_stream_reads(  # pyright: ignore[reportUnusedFunction]
-    act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
-    config: StreamConfig,
-    data_converter: temporalio.converter.DataConverter,
-) -> None:
-    """Give each read that this activation resolves its Records, before the Workflow runs.
-
-    History has only the marker of a read. On a replay, the Records come from the Store
-    again, through the same codec as the read Activity used.
-
-    Raises:
-        RuntimeError: The Store failed, the Records are gone, or they don't match the
-            marker. The activation fails, and so does the Workflow Task.
-    """
-    for job in act.jobs:
-        if not job.HasField("resolve_activity"):
-            continue
-        resolve = job.resolve_activity
-        if not resolve.is_local or not resolve.result.HasField("completed"):
-            continue
-        marker = _StreamReadMarker.from_payload(resolve.result.completed.result)
-        # History has the value of a fold, so its replay needs no Store.
-        if marker is None or marker.value is not None:
-            continue
-        pending = _PENDING_STREAM_READS.get(act.run_id, marker.read_id)
-        # On a first run the read Activity already gave its Records.
-        if pending is None or pending.records_for(marker) is not None:
-            continue
-        try:
-            store = config._get_store_by_name(marker.store)
-        except temporalio.exceptions.StreamConfigError as err:
-            raise RuntimeError(
-                f"The replay of a Workflow read can't read {marker.describe_range()}: "
-                f"{err}"
-            ) from err
-        page_reader = _store_page_reader(store, data_converter)
-        pending.fill(marker, await _read_range(page_reader, marker))

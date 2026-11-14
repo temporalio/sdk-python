@@ -24,6 +24,7 @@ import temporalio.client
 import temporalio.common
 import temporalio.runtime
 import temporalio.service
+from temporalio.client._stream_read import _stream_call_activity
 from temporalio.common import (
     HeaderCodecBehavior,
     VersioningBehavior,
@@ -504,6 +505,8 @@ class Worker:
         if stream_config is not None and config.get("workflows"):
             for store in stream_config.stores:
                 activities.extend(store.worker_activities())
+            # The take, filter and reduce calls of Workflow code run this Local Activity.
+            activities.append(_stream_call_activity)
         if activities:
             _warn_if_activity_executor_max_workers_is_inconsistent(config)
             self._activity_worker = _ActivityWorker(

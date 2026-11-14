@@ -27,6 +27,18 @@ from temporalio.service import (
     ServiceClient,
     TLSConfig,
 )
+from temporalio.workflow._streams import (
+    DEFAULT_STREAM_IDLE_TIMEOUT,
+    DEFAULT_STREAM_MAX_BYTES,
+    DEFAULT_STREAM_MAX_RECORDS,
+    MAX_STREAM_RESULT_BYTES,
+    StreamRead,
+    StreamReadStop,
+    StreamReduce,
+    filter_stream,
+    reduce_stream,
+    take_stream,
+)
 
 from ..common import HeaderCodecBehavior
 from ..types import (
@@ -356,6 +368,16 @@ __all__ = [
     "TaskReachabilityType",
     "CloudOperationsClient",
     "Plugin",
+    "DEFAULT_STREAM_IDLE_TIMEOUT",
+    "DEFAULT_STREAM_MAX_BYTES",
+    "DEFAULT_STREAM_MAX_RECORDS",
+    "MAX_STREAM_RESULT_BYTES",
+    "StreamRead",
+    "StreamReadStop",
+    "StreamReduce",
+    "filter_stream",
+    "reduce_stream",
+    "take_stream",
     "StreamConfig",
     "StreamSelectContext",
     "StreamStore",
