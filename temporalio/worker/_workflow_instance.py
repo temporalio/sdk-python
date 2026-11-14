@@ -99,11 +99,7 @@ from ._interceptor import (
     WorkflowOutboundInterceptor,
 )
 from ._stream_read import _read_stream_in_workflow, _reduce_stream_in_workflow
-from ._stream_store import (
-    _NO_STREAM_STORE_MESSAGE,
-    _no_stream_config_error,
-    _WorkflowStreamStore,
-)
+from ._stream_store import _no_stream_config_error, _WorkflowStreamStore
 
 logger = logging.getLogger(__name__)
 
@@ -2009,7 +2005,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         limits: temporalio.workflow._StreamReadLimits,
     ) -> temporalio.workflow.StreamRead[Any]:
         if self._stream_store is None:
-            raise temporalio.exceptions.StreamConfigError(_NO_STREAM_STORE_MESSAGE)
+            raise _no_stream_config_error()
         return await _read_stream_in_workflow(
             self, self._stream_store.config, stream, until, limits
         )
@@ -2024,7 +2020,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         limits: temporalio.workflow._StreamReadLimits,
     ) -> temporalio.workflow.StreamReduce[Any]:
         if self._stream_store is None:
-            raise temporalio.exceptions.StreamConfigError(_NO_STREAM_STORE_MESSAGE)
+            raise _no_stream_config_error()
         return await _reduce_stream_in_workflow(
             self,
             self._stream_store.config,

@@ -38,7 +38,7 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 # The Workflows and the test share the values of `StreamReadState`, so the sandbox
 # must not load its own copy of the module.
 with workflow.unsafe.imports_passed_through():
-    from tests.helpers import assert_eventually, assert_task_fail_eventually, new_worker
+    from tests.helpers import assert_eventually, new_worker
     from tests.helpers.streams import RecordingStreamStore, StreamReadState
     from tests.test_converter import SimpleCodec
 
@@ -867,22 +867,37 @@ async def _failing_predicate(
         )
 
 
-async def test_read_without_stream_config_fails_the_task(client: Client):
-    async with new_worker(client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            client,
-            ReadArgs(f"stream-{uuid.uuid4()}"),
-            worker.task_queue,
-            execution_timeout=timedelta(seconds=30),
-        )
-        await assert_task_fail_eventually(
-            handle,
-            message_contains=(
+async def test_read_and_reduce_without_stream_config_fail_the_workflow(
+    client: Client,
+):
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(client, ReadUntilKindWorkflow, JoinTextWorkflow) as worker:
+        handles: list[WorkflowHandle[Any, Any]] = [
+            await _start_read(
+                client,
+                ReadArgs(stream_id),
+                worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            ),
+            await client.start_workflow(
+                JoinTextWorkflow.run,
+                ReduceArgs(stream_id),
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            ),
+        ]
+        for handle in handles:
+            with pytest.raises(WorkflowFailureError) as err:
+                await asyncio.wait_for(handle.result(), timeout=10)
+            cause = err.value.cause
+            assert isinstance(cause, ApplicationError)
+            assert cause.type == "StreamConfigError"
+            assert cause.non_retryable
+            assert cause.message == (
                 "The client of this Worker has no Stream Store. Give one in "
                 "stream_config=StreamConfig(stores=[...])."
-            ),
-        )
-        await handle.terminate()
+            )
 
 
 @_RUNNERS
