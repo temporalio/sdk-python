@@ -95,7 +95,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ._stream_store import _WorkflowStreamStore
+from ._stream_store import _no_stream_config_error, _WorkflowStreamStore
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +196,7 @@ class WorkflowInstanceDetails:
     stream_store: _WorkflowStreamStore | None = None
     """The Worker's Stream Stores as Workflow code reaches them, or ``None`` when the
     Worker's client has none. This release has no Streams on the server, so with ``None``
-    a Stream call fails the Workflow Task."""
+    a Stream call fails the Workflow."""
 
 
 class WorkflowInstance(ABC):
@@ -2355,15 +2355,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         # This release has no Streams on the server, so a Worker answers a Stream call with
-        # a Store of its client. On a Worker whose client has none, the `StreamConfigError`
-        # fails the Workflow Task. Every other system Nexus operation goes to the server.
+        # a Store of its client. Every other system Nexus operation goes to the server.
         if input.service == _STREAM_SERVICE.name:
             store = self._stream_store
             if store is None:
-                raise temporalio.exceptions.StreamConfigError(
-                    "The client of this Worker has no Stream Store. Give one in "
-                    "stream_config=StreamConfig(stores=[...])."
-                )
+                raise _no_stream_config_error()
             return store.start_operation(self, input)
         return await self._outbound_start_nexus_operation(input)
 

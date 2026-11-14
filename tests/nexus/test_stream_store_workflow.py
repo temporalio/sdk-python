@@ -32,6 +32,7 @@ from temporalio.client import (
     StreamSelectContext,
     StreamStore,
     StreamStoreCallOptions,
+    WorkflowFailureError,
     WorkflowHandle,
 )
 from temporalio.common import RetryPolicy
@@ -603,7 +604,9 @@ async def test_workflow_stream_replay_does_not_call_store(
     assert replay_store.operations == []
 
 
-async def test_workflow_create_without_store_fails_the_task(client: Client):
+async def test_workflow_create_without_stream_config_fails_the_workflow(
+    client: Client,
+):
     async with new_worker(client, CreateAndDescribeWorkflow) as worker:
         handle = await client.start_workflow(
             CreateAndDescribeWorkflow.run,
@@ -612,14 +615,21 @@ async def test_workflow_create_without_store_fails_the_task(client: Client):
             task_queue=worker.task_queue,
             execution_timeout=timedelta(seconds=30),
         )
-        await assert_task_fail_eventually(
-            handle,
-            message_contains=(
-                "The client of this Worker has no Stream Store. Give one in "
-                "stream_config=StreamConfig(stores=[...])."
-            ),
-        )
-        await handle.terminate()
+        with pytest.raises(WorkflowFailureError) as err:
+            await asyncio.wait_for(handle.result(), timeout=10)
+    cause = err.value.cause
+    assert isinstance(cause, ApplicationError)
+    assert not isinstance(cause, StreamError)
+    assert cause.type == "StreamConfigError"
+    assert cause.non_retryable
+    assert cause.message == (
+        "The client of this Worker has no Stream Store. Give one in "
+        "stream_config=StreamConfig(stores=[...])."
+    )
+    # A Replayer with no Stream config fails the Workflow the same way.
+    await Replayer(workflows=[CreateAndDescribeWorkflow]).replay_workflow(
+        await handle.fetch_history()
+    )
 
 
 async def test_workflow_read_fails_with_store(client: Client):
