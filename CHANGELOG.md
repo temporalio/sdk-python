@@ -7,6 +7,12 @@ This file contains assembled releases only.
 
 # Changelog
 
+## [1.36.1] - 2026-11-13
+
+### Changed
+
+- Disable single-batch workflow activation processing (workflow logic flag 2) by default to preserve legacy signal, condition-wait, and cancellation behavior for unflagged workflows. Histories that already recorded flag 2 continue to use single-batch processing.
+
 ## [1.36.0] - 2026-11-10
 
 ### Added
