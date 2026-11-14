@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
+import types
 import typing
 
+import typing_extensions
+
 import temporalio.nexus.system
+import temporalio.nexus.system._support as _support
 import temporalio.workflow
 
 from ...models import (
+    AppendRecord,
+    AppendRecordsRequest,
+    AppendRecordsResponse,
+    CloseStreamRequest,
+    CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
+    Producer,
     StreamRef,
 )
 
@@ -36,6 +46,45 @@ class Stream(typing.Generic[BodyT]):
     def body_type(self) -> type[BodyT]:
         arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
         return typing.cast("type[BodyT]", arguments[0] if arguments else object)
+
+    async def __aenter__(self) -> typing_extensions.Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: types.TracebackType | None,
+    ) -> None:
+        await self.close()
+
+    async def append(
+        self,
+        *records: BodyT,
+        producer: Producer | None = None,
+        sequence: int | None = None,
+    ) -> AppendRecordsResponse:
+        """Append values, and return the offsets of the batch."""
+        request = AppendRecordsRequest(
+            ref=self.ref,
+            producer=((_support.workflow_producer()) if producer is None else producer),
+            sequence=sequence,
+            records=[AppendRecord(body=value) for value in records],
+        )
+        handle = await _append_records(request)
+        return await handle
+
+    async def close(
+        self,
+        producer: Producer | None = None,
+    ) -> None:
+        """Close the Stream. Readers drain what is left, then end."""
+        request = CloseStreamRequest(
+            ref=self.ref,
+            producer=((_support.workflow_producer()) if producer is None else producer),
+        )
+        handle = await _close_stream(request)
+        await handle
 
     async def describe(
         self,
@@ -84,6 +133,34 @@ def get_stream(
     return Stream[body_type](
         ref=ref,
         created=created,
+    )
+
+
+async def _append_records(
+    request: AppendRecordsRequest[BodyT],
+) -> temporalio.workflow.NexusOperationHandle[AppendRecordsResponse,]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+    )
+    return await nexus_client.start_operation(
+        operation="AppendRecords",
+        input=request,
+        output_type=AppendRecordsResponse,
+    )
+
+
+async def _close_stream(
+    request: CloseStreamRequest[BodyT],
+) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
+    nexus_client = temporalio.workflow.create_nexus_client(
+        service="temporal.api.streamservice.v1.StreamService",
+        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
+    )
+    return await nexus_client.start_operation(
+        operation="CloseStream",
+        input=request,
+        output_type=CloseStreamResponse,
     )
 
 
