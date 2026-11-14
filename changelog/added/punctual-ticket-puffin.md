@@ -1,0 +1,1 @@
+Add `activity.Info.workflow_task` for a Local Activity. It is the Workflow Task attempt that dispatched the execution, so a Local Activity can tell its executions apart, and order them, when its Workflow Task runs again.
