@@ -6,6 +6,7 @@ mod client_rpc_generated;
 mod envconfig;
 mod metric;
 mod runtime;
+mod streams;
 mod testing;
 mod worker;
 
@@ -47,6 +48,16 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<runtime::BufferedLogEntry>()?;
     m.add_function(wrap_pyfunction!(init_runtime, m)?)?;
     m.add_function(wrap_pyfunction!(raise_in_thread, m)?)?;
+
+    // Stream stuff
+    m.add("StreamCallError", py.get_type::<streams::StreamCallError>())?;
+    #[cfg(feature = "streams")]
+    {
+        m.add_class::<streams::StreamRuntimeRef>()?;
+        m.add_function(wrap_pyfunction!(new_memory_stream_runtime, m)?)?;
+        #[cfg(feature = "streams-redis")]
+        m.add_function(wrap_pyfunction!(new_redis_stream_runtime, m)?)?;
+    }
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
@@ -102,6 +113,62 @@ fn init_runtime(options: runtime::RuntimeOptions) -> PyResult<runtime::RuntimeRe
 #[pyfunction]
 fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
+}
+
+#[cfg(feature = "streams")]
+#[pyfunction]
+#[pyo3(signature = (runtime_ref, store_name, retention=None, last_write_ttl=None))]
+fn new_memory_stream_runtime(
+    runtime_ref: &runtime::RuntimeRef,
+    store_name: String,
+    retention: Option<std::time::Duration>,
+    last_write_ttl: Option<std::time::Duration>,
+) -> PyResult<streams::StreamRuntimeRef> {
+    streams::new_memory_stream_runtime(runtime_ref, store_name, retention, last_write_ttl)
+}
+
+#[cfg(feature = "streams-redis")]
+#[pyfunction]
+#[pyo3(signature = (
+    runtime_ref,
+    urls,
+    *,
+    cluster,
+    key_prefix,
+    retention,
+    last_write_ttl,
+    response_timeout,
+    store_name,
+    wait_replicas,
+    wait_timeout,
+))]
+#[allow(clippy::too_many_arguments)]
+fn new_redis_stream_runtime(
+    runtime_ref: &runtime::RuntimeRef,
+    urls: Vec<String>,
+    cluster: bool,
+    key_prefix: Option<String>,
+    retention: Option<std::time::Duration>,
+    last_write_ttl: Option<std::time::Duration>,
+    response_timeout: Option<std::time::Duration>,
+    store_name: String,
+    wait_replicas: i32,
+    wait_timeout: Option<std::time::Duration>,
+) -> PyResult<streams::StreamRuntimeRef> {
+    streams::new_redis_stream_runtime(
+        runtime_ref,
+        streams::RedisStreamOptions {
+            urls,
+            cluster,
+            key_prefix,
+            retention,
+            last_write_ttl,
+            response_timeout,
+            store_name,
+            wait_replicas,
+            wait_timeout,
+        },
+    )
 }
 
 #[pyfunction]
