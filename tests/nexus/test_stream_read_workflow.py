@@ -1,4 +1,4 @@
-"""Tests of a Workflow read of a Stream that waits for a predicate."""
+"""Tests of the take, filter and reduce calls of Workflow code."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import asyncio
 import collections
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
@@ -14,20 +14,26 @@ from typing import Any
 import pytest
 
 from temporalio import workflow
-from temporalio.api.enums.v1 import EventType
+from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import EventType, StreamErrorReason
 from temporalio.api.stream.v1 import StreamRef as StreamRefMessage
 from temporalio.api.streamservice.v1 import ReadRecordsRequest, ReadRecordsResponse
 from temporalio.client import (
+    BufferedAppender,
     Client,
     StreamConfig,
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowHistory,
 )
-from temporalio.client._stream_read import _PENDING_STREAM_READS
-from temporalio.converter import DataConverter
-from temporalio.exceptions import ApplicationError, CancelledError
-from temporalio.nexus.system.stream_service import StreamRecord, StreamRef
+from temporalio.client._stream_read import _PENDING_STREAM_CALLS
+from temporalio.converter import DataConverter, PayloadCodec
+from temporalio.exceptions import ApplicationError, CancelledError, StreamError
+from temporalio.nexus.system.stream_service import (
+    ProducerKindLocalActivity,
+    StreamRecord,
+    StreamRef,
+)
 from temporalio.nexus.system.stream_service.workflow._resources.stream import (
     Stream as WorkflowStream,
 )
@@ -39,10 +45,13 @@ from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 # must not load its own copy of the module.
 with workflow.unsafe.imports_passed_through():
     from tests.helpers import assert_eventually, new_worker
-    from tests.helpers.streams import RecordingStreamStore, StreamReadState
-    from tests.test_converter import SimpleCodec
+    from tests.helpers.streams import (
+        DictStreamStore,
+        RecordingStreamStore,
+        StreamReadState,
+    )
 
-# Every body carries this text, so a search of History shows whether a body leaks.
+# Every body carries this text, so a search of History shows whether a body is readable.
 _BODY_MARK = "secret-body"
 
 
@@ -53,29 +62,50 @@ class Token:
 
 
 @dataclass
-class ReadArgs:
+class CallArgs:
     stream_id: str
+    call: str = "take"
     until_kind: str | None = "done"
     timeout_seconds: float = 10.0
-    max_records: int | None = None
     idle_timeout_seconds: float | None = None
+    max_records: int | None = None
     max_bytes: int | None = None
     from_offset: str | None = None
 
 
 @dataclass
-class ReadResult:
+class CallResult:
     texts: list[str]
+    """The texts of the Records of a take or a filter, or the value of a fold."""
+    count: int
     stop: str
     done: bool
     last_offset: str | None
     typed: bool
 
 
-def _result(read: workflow.StreamRead[Token]) -> ReadResult:
-    return ReadResult(
+def _seconds(value: float | None) -> timedelta | None:
+    return None if value is None else timedelta(seconds=value)
+
+
+def _stream(stream_id: str) -> WorkflowStream[Token]:
+    return workflow.get_stream(StreamRef(id=stream_id), body_type=Token)
+
+
+def _not_skipped(record: StreamRecord[Token]) -> bool:
+    return record.body.kind != "skip"
+
+
+def _collect(value: list[str], record: StreamRecord[Token]) -> list[str]:
+    StreamReadState.function_calls += 1
+    return [*value, record.body.text]
+
+
+def _read_result(read: workflow.StreamRead[Token]) -> CallResult:
+    return CallResult(
         texts=[record.body.text for record in read.records],
-        stop=read.stop.value,
+        count=len(read.records),
+        stop=read.stop.name,
         done=read.done,
         last_offset=read.last_offset.hex() if read.last_offset else None,
         typed=all(
@@ -85,10 +115,11 @@ def _result(read: workflow.StreamRead[Token]) -> ReadResult:
     )
 
 
-def _keep(result: ReadResult) -> ReadResult:
+def _keep(result: CallResult) -> CallResult:
     # A replay gives no result to the test, so the Workflow keeps it here.
     StreamReadState.results[workflow.info().run_id] = (
         tuple(result.texts),
+        result.count,
         result.stop,
         result.done,
         result.last_offset,
@@ -96,37 +127,86 @@ def _keep(result: ReadResult) -> ReadResult:
     return result
 
 
-def _stream(stream_id: str) -> WorkflowStream[Token]:
-    return workflow.get_stream(StreamRef(id=stream_id), body_type=Token)
+async def _call(args: CallArgs, stream: Any = None) -> CallResult:
+    """Run the call of ``args``. Client and Activity code give a client Stream."""
+    stream = stream or _stream(args.stream_id)
+    until_kind = args.until_kind
 
+    def until(record: StreamRecord[Token]) -> bool:
+        StreamReadState.until_calls += 1
+        assert isinstance(record.body, Token)
+        return record.body.kind == until_kind
 
-@workflow.defn
-class ReadUntilKindWorkflow:
-    @workflow.run
-    async def run(self, args: ReadArgs) -> ReadResult:
-        until_kind = args.until_kind
+    def fold_until(value: list[str], record: StreamRecord[Token]) -> bool:
+        StreamReadState.until_calls += 1
+        return record.body.kind == until_kind
 
-        def until(record: StreamRecord[Token]) -> bool:
-            StreamReadState.until_calls += 1
-            assert isinstance(record.body, Token)
-            return record.body.kind == until_kind
-
-        read = await workflow.read_stream(
-            _stream(args.stream_id),
-            until=until if until_kind is not None else None,
-            from_offset=bytes.fromhex(args.from_offset) if args.from_offset else None,
-            idle_timeout=None
-            if args.idle_timeout_seconds is None
-            else timedelta(seconds=args.idle_timeout_seconds),
-            timeout=timedelta(seconds=args.timeout_seconds),
-            max_records=args.max_records,
-            max_bytes=args.max_bytes,
+    timeout = timedelta(seconds=args.timeout_seconds)
+    from_offset = bytes.fromhex(args.from_offset) if args.from_offset else None
+    idle_timeout = _seconds(args.idle_timeout_seconds)
+    # The arguments go by position, in the order that the generated methods use.
+    if args.call == "take":
+        read = await workflow.take_stream(
+            stream,
+            timeout,
+            until if until_kind else None,
+            from_offset,
+            idle_timeout,
+            args.max_records,
+            args.max_bytes,
         )
-        return _keep(_result(read))
+        return _read_result(read)
+    if args.call == "filter":
+        read = await workflow.filter_stream(
+            stream,
+            _not_skipped,
+            timeout,
+            until if until_kind else None,
+            from_offset,
+            idle_timeout,
+            args.max_records,
+            args.max_bytes,
+        )
+        return _read_result(read)
+    reduce = await workflow.reduce_stream(
+        stream,
+        _collect,
+        [],
+        timeout,
+        fold_until if until_kind else None,
+        from_offset,
+        idle_timeout,
+        args.max_records,
+        args.max_bytes,
+    )
+    return CallResult(
+        texts=reduce.value,
+        count=reduce.count,
+        stop=reduce.stop.name,
+        done=reduce.done,
+        last_offset=reduce.last_offset.hex() if reduce.last_offset else None,
+        typed=isinstance(reduce.value, list),
+    )
 
 
 @workflow.defn
-class ReadUntilWantedWorkflow:
+class CallWorkflow:
+    def __init__(self) -> None:
+        self.result: CallResult | None = None
+
+    @workflow.run
+    async def run(self, args: CallArgs) -> CallResult:
+        self.result = _keep(await _call(args))
+        return self.result
+
+    @workflow.query
+    def texts(self) -> list[str]:
+        assert self.result is not None
+        return self.result.texts
+
+
+@workflow.defn
+class TakeUntilWantedWorkflow:
     def __init__(self) -> None:
         self.wanted: str | None = None
 
@@ -135,69 +215,184 @@ class ReadUntilWantedWorkflow:
         self.wanted = text
 
     @workflow.run
-    async def run(self, stream_id: str) -> ReadResult:
-        read = await workflow.read_stream(
+    async def run(self, stream_id: str) -> CallResult:
+        read = await workflow.take_stream(
             _stream(stream_id),
+            timedelta(seconds=20),
             until=lambda record: record.body.text == self.wanted,
-            timeout=timedelta(seconds=20),
+            idle_timeout=timedelta(seconds=20),
         )
-        return _result(read)
+        return _read_result(read)
 
 
 @workflow.defn
-class TwoReadsWorkflow:
+class TwoTakesWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[str]:
         stream = _stream(stream_id)
-        first = await workflow.read_stream(
+        first = await workflow.take_stream(
             stream,
+            timedelta(seconds=10),
             until=lambda record: record.body.text.endswith("m1"),
-            timeout=timedelta(seconds=10),
         )
         await workflow.sleep(timedelta(milliseconds=1))
-        second = await workflow.read_stream(
+        second = await workflow.take_stream(
             stream,
+            timedelta(seconds=10),
             until=lambda record: record.body.text.endswith("m2"),
             from_offset=first.last_offset,
-            timeout=timedelta(seconds=10),
         )
         return [record.body.text for record in [*first.records, *second.records]]
 
 
 @workflow.defn
-class FailTaskOnceAfterReadWorkflow:
+class FailTaskOnceAfterTakeWorkflow:
     @workflow.run
-    async def run(self, stream_id: str) -> ReadResult:
-        read = await workflow.read_stream(
+    async def run(self, stream_id: str) -> CallResult:
+        read = await workflow.take_stream(
             _stream(stream_id),
+            timedelta(seconds=10),
             until=lambda record: record.body.kind == "done",
-            timeout=timedelta(seconds=10),
         )
-        # The failure comes in a later Workflow Task, so the retry replays the read.
+        # The failure comes in a later Workflow Task, so the retry replays the call.
         await workflow.sleep(timedelta(milliseconds=1))
         if StreamReadState.fail_next_task:
             StreamReadState.fail_next_task = False
             raise RuntimeError("Failed the Workflow Task once")
-        return _result(read)
+        return _read_result(read)
 
 
 @workflow.defn
-class TimeoutThenReadWorkflow:
+class FilterLoopWorkflow:
     @workflow.run
-    async def run(self, stream_id: str) -> list[ReadResult]:
+    async def run(self, stream_id: str) -> tuple[list[str], int]:
         stream = _stream(stream_id)
-        first = await workflow.read_stream(
-            stream,
-            until=lambda record: record.body.kind == "done",
-            timeout=timedelta(seconds=1),
+        found: list[str] = []
+        offset: bytes | None = None
+        calls = 0
+        while True:
+            calls += 1
+            # A filter with `max_records=1` gives the next Record that it keeps.
+            read = await workflow.filter_stream(
+                stream,
+                lambda record: record.body.kind == "hit",
+                timedelta(seconds=10),
+                from_offset=offset,
+                idle_timeout=timedelta(0),
+                max_records=1,
+            )
+            found.extend(record.body.text for record in read.records)
+            offset = read.last_offset
+            if read.stop in (
+                workflow.StreamReadStop.Done,
+                workflow.StreamReadStop.Idle,
+            ):
+                return found, calls
+
+
+@workflow.defn
+class TakeLoopWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> list[tuple[int, str]]:
+        stream = _stream(stream_id)
+        pages: list[tuple[int, str]] = []
+        offset: bytes | None = None
+        while True:
+            read = await workflow.take_stream(
+                stream, timedelta(seconds=10), from_offset=offset
+            )
+            pages.append((len(read.records), read.stop.name))
+            offset = read.last_offset
+            if read.stop is not workflow.StreamReadStop.MaxBytes:
+                return pages
+
+
+@workflow.defn
+class OverLimitWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str, call: str) -> str:
+        stream = _stream(stream_id)
+        try:
+            if call == "take":
+                await workflow.take_stream(
+                    stream, timedelta(seconds=10), max_bytes=4 * 1024 * 1024
+                )
+            else:
+                await workflow.reduce_stream(
+                    stream,
+                    lambda value, record: value + "x" * (1024 * 1024),
+                    "",
+                    timedelta(seconds=10),
+                    max_records=1,
+                )
+        except ApplicationError as err:
+            return f"{err.type} {err.non_retryable}: {err.message}"
+        return "no error"
+
+
+@workflow.defn
+class TwoStreamsAtOnceWorkflow:
+    @workflow.run
+    async def run(self, first_id: str, second_id: str) -> list[str]:
+        tasks = [
+            asyncio.create_task(
+                workflow.filter_stream(
+                    _stream(stream_id),
+                    lambda record: record.body.kind == "hit",
+                    timedelta(seconds=10),
+                    max_records=1,
+                )
+            )
+            for stream_id in (first_id, second_id)
+        ]
+        # `workflow.wait` is the deterministic form of `asyncio.wait`.
+        await workflow.wait(tasks)
+        return [record.body.text for task in tasks for record in task.result().records]
+
+
+@workflow.defn
+class VariantWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> list[str]:
+        # A replay sets `variant` to change the code after the first run.
+        variant = StreamReadState.variant
+        if variant == "uuid":
+            workflow.uuid4()
+        if variant == "other_stream":
+            stream_id += "-other"
+        read = await workflow.take_stream(
+            _stream(stream_id),
+            timedelta(seconds=10),
+            from_offset=b"\x01" if variant == "other_offset" else None,
+            idle_timeout=timedelta(0),
         )
-        second = await workflow.read_stream(
-            stream,
-            until=lambda record: record.body.kind == "done",
-            from_offset=first.last_offset,
-            timeout=timedelta(seconds=10),
-        )
-        return [_result(first), _result(second)]
+        return [record.body.text for record in read.records]
+
+
+async def _async_until(record: StreamRecord[Token]) -> bool:
+    return True
+
+
+def _until_that_awaits(record: StreamRecord[Token]) -> Any:
+    return asyncio.sleep(0)
+
+
+@workflow.defn
+class RefusedFunctionWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str, which: str) -> str:
+        stream = _stream(stream_id)
+        try:
+            await workflow.take_stream(
+                stream,
+                timedelta(seconds=10),
+                until=_async_until if which == "coroutine" else _until_that_awaits,
+            )
+        except TypeError as err:
+            return f"TypeError: {err}"
+        except ApplicationError as err:
+            return f"ApplicationError {err.type} {err.non_retryable}: {err.message}"
+        return "no error"
 
 
 def _raise_on_record(record: StreamRecord[Token]) -> bool:
@@ -226,145 +421,8 @@ class FailingPredicateWorkflow:
     @workflow.run
     async def run(self, stream_id: str, predicate: str) -> str:
         try:
-            await workflow.read_stream(
-                _stream(stream_id),
-                until=_PREDICATES[predicate],
-                timeout=timedelta(seconds=10),
-            )
-        except ApplicationError as err:
-            return f"{err.type}: {err.message}"
-        return "no error"
-
-
-@workflow.defn
-class MaxBytesThenNextWorkflow:
-    @workflow.run
-    async def run(self, stream_id: str, max_bytes: int) -> list[ReadResult]:
-        stream = _stream(stream_id)
-        first = await workflow.read_stream(
-            stream,
-            idle_timeout=timedelta(0),
-            timeout=timedelta(seconds=10),
-            max_bytes=max_bytes,
-        )
-        second = await workflow.read_stream(
-            stream,
-            from_offset=first.last_offset,
-            timeout=timedelta(seconds=10),
-            max_records=1,
-        )
-        return [_result(first), _result(second)]
-
-
-@dataclass
-class ReduceArgs:
-    stream_id: str
-    until: str = "done"
-    timeout_seconds: float = 10.0
-
-
-@dataclass
-class ReduceResult:
-    value: str
-    count: int
-    stop: str
-    done: bool
-    last_offset: str | None
-
-
-def _join(value: str, record: StreamRecord[Token]) -> str:
-    StreamReadState.function_calls += 1
-    return value + record.body.text
-
-
-def _until_done(value: str, record: StreamRecord[Token]) -> bool:
-    del value
-    StreamReadState.until_calls += 1
-    return record.body.kind == "done"
-
-
-def _until_tag(value: str, record: StreamRecord[Token]) -> bool:
-    del record
-    StreamReadState.until_calls += 1
-    return value.endswith("tag!")
-
-
-_FOLD_UNTIL: dict[str, Callable[[str, StreamRecord[Token]], bool]] = {
-    "done": _until_done,
-    "tag": _until_tag,
-}
-
-
-def _reduce_result(reduce: workflow.StreamReduce[str]) -> ReduceResult:
-    return ReduceResult(
-        value=reduce.value,
-        count=reduce.count,
-        stop=reduce.stop.value,
-        done=reduce.done,
-        last_offset=reduce.last_offset.hex() if reduce.last_offset else None,
-    )
-
-
-@workflow.defn
-class JoinTextWorkflow:
-    @workflow.run
-    async def run(self, args: ReduceArgs) -> ReduceResult:
-        reduce = await workflow.reduce_stream(
-            _stream(args.stream_id),
-            _join,
-            "",
-            until=_FOLD_UNTIL[args.until],
-            timeout=timedelta(seconds=args.timeout_seconds),
-        )
-        result = _reduce_result(reduce)
-        StreamReadState.results[workflow.info().run_id] = (
-            result.value,
-            result.count,
-            result.stop,
-            result.done,
-            result.last_offset,
-        )
-        return result
-
-
-@workflow.defn
-class TwoFoldsWorkflow:
-    @workflow.run
-    async def run(self, stream_id: str) -> list[ReduceResult]:
-        stream = _stream(stream_id)
-        first = await workflow.reduce_stream(
-            stream,
-            _join,
-            "",
-            until=lambda value, _: value.endswith("m1"),
-            timeout=timedelta(seconds=10),
-        )
-        await workflow.sleep(timedelta(milliseconds=1))
-        second = await workflow.reduce_stream(
-            stream,
-            _join,
-            "",
-            until=lambda value, _: value.endswith("m2"),
-            from_offset=first.last_offset,
-            timeout=timedelta(seconds=10),
-        )
-        return [_reduce_result(first), _reduce_result(second)]
-
-
-def _raise_in_function(value: str, record: StreamRecord[Token]) -> str:
-    raise ValueError(f"bad fold after {value!r} at {record.body.text}")
-
-
-@workflow.defn
-class FailingFunctionWorkflow:
-    @workflow.run
-    async def run(self, stream_id: str) -> str:
-        try:
-            await workflow.reduce_stream(
-                _stream(stream_id),
-                _raise_in_function,
-                "",
-                timeout=timedelta(seconds=10),
+            await workflow.filter_stream(
+                _stream(stream_id), _PREDICATES[predicate], timedelta(seconds=10)
             )
         except ApplicationError as err:
             return f"{err.type}: {err.message}"
@@ -377,49 +435,89 @@ class Summary:
     kinds: list[str]
 
 
-def _summarize(value: Summary, record: StreamRecord[Token]) -> Summary:
+def _summarize(value: Summary | None, record: StreamRecord[Token]) -> Summary:
+    if value is None:
+        value = Summary(0, [])
     return Summary(value.count + 1, [*value.kinds, record.body.kind])
 
 
-def _collect(value: list[str], record: StreamRecord[Token]) -> list[str]:
-    return [*value, record.body.text]
-
-
-@dataclass
-class TypedFoldResult:
-    summary: Summary
-    summary_type: str
-    texts: list[str]
-    texts_type: str
+@workflow.defn
+class FoldTypesWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> list[str]:
+        stream = _stream(stream_id)
+        quick = timedelta(seconds=10)
+        now = timedelta(0)
+        # The return annotation wins over an `initial` of `None`.
+        annotated = await workflow.reduce_stream(
+            stream, _summarize, None, quick, idle_timeout=now
+        )
+        # With no annotation, the type of `initial` decides.
+        of_initial = await workflow.reduce_stream(
+            stream,
+            lambda value, record: Summary(value.count + 1, []),
+            Summary(0, []),
+            quick,
+            idle_timeout=now,
+        )
+        # With no annotation and an `initial` of `None`, there is no type hint.
+        untyped = await workflow.reduce_stream(
+            stream,
+            lambda value, record: Summary(1, [record.body.kind]),
+            None,
+            quick,
+            idle_timeout=now,
+        )
+        explicit = await workflow.reduce_stream(
+            stream,
+            lambda value, record: [*value, record.body.text],
+            (),
+            quick,
+            idle_timeout=now,
+            value_type=list[str],
+        )
+        return [
+            type(result.value).__name__
+            for result in (annotated, of_initial, untyped, explicit)
+        ]
 
 
 @workflow.defn
-class TypedFoldWorkflow:
+class FoldUntilValueWorkflow:
     @workflow.run
-    async def run(self, stream_id: str) -> TypedFoldResult:
-        stream = _stream(stream_id)
-        summary = await workflow.reduce_stream(
-            stream,
-            _summarize,
-            Summary(0, []),
-            idle_timeout=timedelta(0),
-            timeout=timedelta(seconds=10),
+    async def run(self, stream_id: str) -> tuple[str, int, str]:
+        result = await workflow.reduce_stream(
+            _stream(stream_id),
+            lambda value, record: value + record.body.text,
+            "",
+            timedelta(seconds=10),
+            until=lambda value, record: value.endswith("tag!"),
         )
-        no_texts: list[str] = []
-        texts = await workflow.reduce_stream(
-            stream,
-            _collect,
-            no_texts,
-            value_type=list[str],
-            idle_timeout=timedelta(0),
-            timeout=timedelta(seconds=10),
-        )
-        return TypedFoldResult(
-            summary=summary.value,
-            summary_type=type(summary.value).__name__,
-            texts=texts.value,
-            texts_type=type(texts.value).__name__,
-        )
+        return result.value, result.count, result.stop.name
+
+
+@workflow.defn
+class FoldThatAppendsWorkflow:
+    @workflow.run
+    async def run(self, source_id: str, target_id: str) -> str:
+        target = workflow.get_stream(StreamRef(id=target_id), body_type=str)
+        appender = BufferedAppender(target)
+
+        def append_upper(value: int, record: StreamRecord[Token]) -> int:
+            appender.append(record.body.text.upper())
+            return value + 1
+
+        try:
+            result = await workflow.reduce_stream(
+                _stream(source_id),
+                append_upper,
+                0,
+                timedelta(seconds=10),
+                idle_timeout=timedelta(0),
+            )
+        except StreamError as err:
+            return StreamErrorReason.Name(err.reason)
+        return f"{result.count} {result.stop.name}"
 
 
 class TrackingStore(RecordingStreamStore):
@@ -441,12 +539,42 @@ class TrackingStore(RecordingStreamStore):
             self.active_reads -= 1
 
 
-def _tokens(count: int, *, prefix: str = "t") -> list[Token]:
-    return [Token("text", f"{_BODY_MARK}-{prefix}{index}") for index in range(count)]
+class XorCodec(PayloadCodec):
+    """A codec that leaves no text of a payload readable."""
+
+    async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return [
+            Payload(metadata={"xor-codec": b"true"}, data=_xor(payload))
+            for payload in payloads
+        ]
+
+    async def decode(self, payloads: Sequence[Payload]) -> list[Payload]:
+        return [
+            Payload.FromString(bytes(byte ^ 0x5A for byte in payload.data))
+            for payload in payloads
+        ]
+
+
+def _xor(payload: Payload) -> bytes:
+    return bytes(byte ^ 0x5A for byte in payload.SerializeToString())
+
+
+def _tokens(count: int, *, prefix: str = "t", kind: str = "text") -> list[Token]:
+    return [Token(kind, f"{_BODY_MARK}-{prefix}{index}") for index in range(count)]
 
 
 def _done(text: str = "done") -> Token:
     return Token("done", f"{_BODY_MARK}-{text}")
+
+
+def _with_store(
+    client: Client, store: Any, data_converter: DataConverter | None = None
+) -> Client:
+    config = client.config()
+    config["stream_config"] = StreamConfig(stores=[store])
+    if data_converter is not None:
+        config["data_converter"] = data_converter
+    return Client(**config)
 
 
 async def _new_stream(
@@ -455,11 +583,7 @@ async def _new_stream(
     data_converter: DataConverter | None = None,
 ) -> tuple[Client, Any, str]:
     store = store or MemoryStreamStore()
-    config = client.config()
-    config["stream_config"] = StreamConfig(stores=[store])
-    if data_converter is not None:
-        config["data_converter"] = data_converter
-    stream_client = Client(**config)
+    stream_client = _with_store(client, store, data_converter)
     stream_id = f"stream-{uuid.uuid4()}"
     await stream_client.create_stream(id=stream_id, body_type=Token)
     return stream_client, store, stream_id
@@ -468,6 +592,15 @@ async def _new_stream(
 async def _append(stream_client: Client, stream_id: str, *tokens: Token) -> None:
     stream = stream_client.get_stream(StreamRef(id=stream_id), body_type=Token)
     await stream.append(*tokens)
+
+
+async def _close(stream_client: Client, stream_id: str) -> None:
+    await stream_client.get_stream(StreamRef(id=stream_id), body_type=Token).close()
+
+
+async def _offsets(stream_client: Client, stream_id: str) -> list[str]:
+    stream = stream_client.get_stream(StreamRef(id=stream_id), body_type=Token)
+    return [record.offset.hex() async for record in stream.iter_read_items()]
 
 
 async def _append_over(
@@ -482,7 +615,7 @@ async def _append_over(
     return last
 
 
-def _texts(tokens: list[Token]) -> list[str]:
+def _texts(tokens: Sequence[Token]) -> list[str]:
     return [token.text for token in tokens]
 
 
@@ -494,6 +627,15 @@ def _markers(history: WorkflowHistory) -> list[str]:
     ]
 
 
+def _marker_payload(history: WorkflowHistory, index: int = 0) -> Payload:
+    markers = [
+        event.marker_recorded_event_attributes
+        for event in history.events
+        if event.event_type == EventType.EVENT_TYPE_MARKER_RECORDED
+    ]
+    return markers[index].details["result"].payloads[0]
+
+
 def _event_counts(history: WorkflowHistory) -> dict[str, int]:
     counts = collections.Counter(
         EventType.Name(event.event_type).removeprefix("EVENT_TYPE_")
@@ -502,28 +644,32 @@ def _event_counts(history: WorkflowHistory) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def _assert_no_bodies(history: WorkflowHistory) -> None:
-    # The Workflow returns the bodies, so only its completion event has them.
-    events = [
-        event
-        for event in history.events
-        if event.event_type != EventType.EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED
-    ]
-    assert len(events) == len(history.events) - 1
-    # The JSON has payload data in base64, so the raw events are searched too.
-    assert _BODY_MARK not in WorkflowHistory(history.workflow_id, events).to_json()
-    for event in events:
-        assert _BODY_MARK.encode() not in event.SerializeToString()
-
-
-async def _start_read(
+async def _run_workflow(
     stream_client: Client,
-    args: ReadArgs,
-    task_queue: str,
-    **kwargs: Any,
-) -> WorkflowHandle[ReadUntilKindWorkflow, ReadResult]:
+    workflow_class: type,
+    *args: Any,
+    worker_options: dict[str, Any] | None = None,
+    **start_options: Any,
+) -> tuple[WorkflowHandle[Any, Any], Any]:
+    run = getattr(workflow_class, "run")
+    async with new_worker(
+        stream_client, workflow_class, **(worker_options or {})
+    ) as worker:
+        handle = await stream_client.start_workflow(
+            run,
+            args=list(args),
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            **start_options,
+        )
+        return handle, await handle.result()
+
+
+async def _start_call(
+    stream_client: Client, args: CallArgs, task_queue: str, **kwargs: Any
+) -> WorkflowHandle[CallWorkflow, CallResult]:
     return await stream_client.start_workflow(
-        ReadUntilKindWorkflow.run,
+        CallWorkflow.run,
         args,
         id=f"workflow-{uuid.uuid4()}",
         task_queue=task_queue,
@@ -531,59 +677,328 @@ async def _start_read(
     )
 
 
-_RUNNERS = pytest.mark.parametrize(
-    "runner",
-    [SandboxedWorkflowRunner(), UnsandboxedWorkflowRunner()],
-    ids=["sandboxed", "unsandboxed"],
-)
+_CALLS = pytest.mark.parametrize("call", ["take", "filter", "reduce"])
+_STOPS = ["Match", "Done", "MaxRecords", "MaxBytes", "Idle", "Timeout"]
+
+# The five Records of a stop test. The filter drops the Record of the kind "skip".
+_STOP_TOKENS = [
+    Token("text", f"{_BODY_MARK}-t0"),
+    Token("skip", f"{_BODY_MARK}-s1"),
+    Token("text", f"{_BODY_MARK}-t2"),
+    Token("text", f"{_BODY_MARK}-t3"),
+    Token("text", f"{_BODY_MARK}-t4"),
+]
 
 
-async def _run_match(
-    client: Client,
-    runner: WorkflowRunner = SandboxedWorkflowRunner(),
-    data_converter: DataConverter | None = None,
-) -> tuple[Client, Any, WorkflowHandle[Any, ReadResult], ReadResult, list[Token]]:
-    stream_client, store, stream_id = await _new_stream(
-        client, data_converter=data_converter
+def _stop_case(
+    call: str, stop: str
+) -> tuple[list[Token], dict[str, Any], list[int], int]:
+    """Give the Records, the arguments, the indexes of the result and of ``last_offset``."""
+    tokens = list(_STOP_TOKENS)
+    every = [0, 1, 2, 3, 4]
+    kept = every if call != "filter" else [0, 2, 3, 4]
+    if stop == "Match":
+        tokens[3] = _done()
+        return tokens, {}, [index for index in kept if index <= 3], 3
+    if stop == "Done":
+        return tokens, {"until_kind": None}, kept, 4
+    if stop == "MaxRecords":
+        return tokens, {"max_records": 2}, kept[:2], kept[1]
+    if stop == "MaxBytes":
+        # The first Record passes the cap and comes back, and the next kept one stops the
+        # call. A filter looks at the dropped Record in between.
+        return tokens, {"max_bytes": 1}, kept[:1], 1 if call == "filter" else 0
+    if stop == "Idle":
+        return tokens, {"idle_timeout_seconds": 0.3, "until_kind": None}, kept, 4
+    return (
+        tokens,
+        {"timeout_seconds": 1, "idle_timeout_seconds": 30, "until_kind": None},
+        kept,
+        4,
     )
-    tokens = [*_tokens(4), _done()]
+
+
+async def _check_stop(
+    stream_client: Client,
+    call: str,
+    stop: str,
+    run: Callable[[str, dict[str, Any]], Any],
+) -> None:
+    """Append the Records of a stop case, run the call, and check its result."""
+    stream_id = f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=stream_id, body_type=Token)
+    tokens, options, indexes, last = _stop_case(call, stop)
     await _append(stream_client, stream_id, *tokens)
-    async with new_worker(
-        stream_client, ReadUntilKindWorkflow, workflow_runner=runner
-    ) as worker:
-        handle = await _start_read(
-            stream_client, ReadArgs(stream_id), worker.task_queue
-        )
-        return stream_client, store, handle, await handle.result(), tokens
-
-
-@_RUNNERS
-async def test_read_until_match(client: Client, runner: WorkflowRunner):
-    _, _, handle, result, tokens = await _run_match(client, runner)
-    assert result == ReadResult(
-        texts=_texts(tokens),
-        stop="MATCH",
-        done=False,
-        last_offset=result.last_offset,
-        typed=True,
+    if stop == "Done":
+        await _close(stream_client, stream_id)
+    offsets = await _offsets(stream_client, stream_id)
+    result = await run(stream_id, options)
+    texts = [tokens[index].text for index in indexes]
+    if call == "reduce":
+        # A fold gets every Record that it looks at.
+        texts = [tokens[index].text for index in range(last + 1)]
+    assert (result.stop, result.texts, result.last_offset) == (
+        stop,
+        texts,
+        offsets[last],
     )
-    assert result.last_offset
+    assert result.count == len(texts)
+    assert result.done == (stop == "Done")
+
+
+@_CALLS
+@pytest.mark.parametrize("stop", _STOPS)
+async def test_call_stop_and_last_offset(client: Client, call: str, stop: str):
+    stream_client = _with_store(client, MemoryStreamStore())
+
+    async def run(stream_id: str, options: dict[str, Any]) -> CallResult:
+        _, result = await _run_workflow(
+            stream_client, CallWorkflow, CallArgs(stream_id, call=call, **options)
+        )
+        assert result.typed
+        return result
+
+    await _check_stop(stream_client, call, stop, run)
+
+
+async def test_filter_loop_reads_to_the_end(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    tokens: list[Token] = []
+    for index in range(20):
+        kind = "hit" if index % 4 == 1 else "text"
+        tokens.append(Token(kind, f"{_BODY_MARK}-{kind}{index}"))
+    await _append(stream_client, stream_id, *tokens)
+    await _close(stream_client, stream_id)
+    handle, (found, calls) = await _run_workflow(
+        stream_client, FilterLoopWorkflow, stream_id
+    )
+    hits = [token.text for token in tokens if token.kind == "hit"]
+    assert found == hits
+    # One call for each of the 5 matches, and one that reaches the end.
+    assert calls == 6
+    history = await handle.fetch_history()
+    assert len(_markers(history)) == 6
+    print(
+        f"\nC. A filter loop over 5 matches, History events: {_event_counts(history)}"
+    )
+
+
+async def test_filter_until_accepts_a_dropped_record(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    tokens = [
+        Token("text", f"{_BODY_MARK}-t0"),
+        Token("skip", f"{_BODY_MARK}-s1"),
+        Token("text", f"{_BODY_MARK}-t2"),
+    ]
+    await _append(stream_client, stream_id, *tokens)
+    offsets = await _offsets(stream_client, stream_id)
+    _, result = await _run_workflow(
+        stream_client,
+        CallWorkflow,
+        CallArgs(stream_id, call="filter", until_kind="skip"),
+    )
+    assert result.texts == _texts(tokens[:1])
+    assert result.stop == "Match"
+    assert result.last_offset == offsets[1]
+
+
+@_CALLS
+async def test_replay_needs_no_stream_config_and_calls_no_store(
+    client: Client, call: str
+):
+    store = RecordingStreamStore(MemoryStreamStore())
+    stream_client, _, stream_id = await _new_stream(client, store)
+    await _append(stream_client, stream_id, *_STOP_TOKENS[:3], _done())
+    handle, _ = await _run_workflow(
+        stream_client, CallWorkflow, CallArgs(stream_id, call=call)
+    )
+    run_id = handle.result_run_id
+    assert run_id
+    first_run = StreamReadState.results.pop(run_id)
     history = await handle.fetch_history()
     assert _markers(history) == ["core_local_activity"]
-    _assert_no_bodies(history)
+    StreamReadState.until_calls = 0
+    StreamReadState.function_calls = 0
+    operations = len(store.operations)
+    await Replayer(workflows=[CallWorkflow]).replay_workflow(history)
+    assert StreamReadState.results.pop(run_id) == first_run
+    await Replayer(
+        workflows=[CallWorkflow], stream_config=StreamConfig(stores=[store])
+    ).replay_workflow(history)
+    assert StreamReadState.results.pop(run_id) == first_run
+    assert len(store.operations) == operations
+    assert StreamReadState.until_calls == 0
+    assert StreamReadState.function_calls == 0
 
 
-async def test_read_waits_for_records(client: Client):
+async def test_query_after_the_stream_is_deleted(client: Client):
+    store = DictStreamStore()
+    stream_client, _, stream_id = await _new_stream(client, store)
+    tokens = [*_tokens(3), _done()]
+    await _append(stream_client, stream_id, *tokens)
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with new_worker(stream_client, CallWorkflow, task_queue=task_queue):
+        handle = await _start_call(
+            stream_client, CallArgs(stream_id, idle_timeout_seconds=0), task_queue
+        )
+        assert (await handle.result()).texts == _texts(tokens)
+    del store.streams[stream_id]
+    # A new Worker has no cache, so the Query replays the whole History.
+    async with new_worker(stream_client, CallWorkflow, task_queue=task_queue):
+        assert await handle.query(CallWorkflow.texts) == _texts(tokens)
+    assert stream_id not in store.streams
+
+
+async def test_take_loop_over_max_bytes(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    # 40 Records of about 10 KiB pass the default cap of 256 KiB.
+    tokens = [
+        Token("text", f"{_BODY_MARK}-{index}-" + "x" * 10_000) for index in range(40)
+    ]
+    for start in range(0, len(tokens), 10):
+        await _append(stream_client, stream_id, *tokens[start : start + 10])
+    await _close(stream_client, stream_id)
+    _, pages = await _run_workflow(stream_client, TakeLoopWorkflow, stream_id)
+    assert [stop for _, stop in pages] == ["MaxBytes", "Done"]
+    assert sum(count for count, _ in pages) == len(tokens)
+    print(f"\nTake loop over 400 KiB: {pages}")
+
+
+@pytest.mark.parametrize("call", ["take", "reduce"])
+async def test_result_over_the_limit_raises_at_the_await(client: Client, call: str):
+    stream_client, _, stream_id = await _new_stream(client)
+    tokens = [Token("text", "x" * 20_000) for _ in range(60)]
+    for start in range(0, len(tokens), 10):
+        await _append(stream_client, stream_id, *tokens[start : start + 10])
+    await _close(stream_client, stream_id)
+    _, message = await _run_workflow(stream_client, OverLimitWorkflow, stream_id, call)
+    prefix = f"StreamResultTooLarge True: The result of the {call} of the Stream "
+    assert message.startswith(prefix + f"'{stream_id}' is ")
+    assert "bytes encoded, over the limit of 1048576 bytes." in message
+
+
+@pytest.mark.parametrize(
+    "variant", ["other_stream", "other_offset", "uuid"], ids=lambda value: value
+)
+async def test_replay_checks_the_stream_and_offset_of_a_call(
+    client: Client, variant: str
+):
+    stream_client, _, stream_id = await _new_stream(client)
+    await _append(stream_client, stream_id, *_tokens(2))
+    StreamReadState.variant = ""
+    handle, _ = await _run_workflow(stream_client, VariantWorkflow, stream_id)
+    history = await handle.fetch_history()
+    StreamReadState.variant = variant
+    try:
+        result = await Replayer(workflows=[VariantWorkflow]).replay_workflow(
+            history, raise_on_replay_failure=False
+        )
+    finally:
+        StreamReadState.variant = ""
+    if variant == "uuid":
+        assert result.replay_failure is None
+        return
+    failure = str(result.replay_failure)
+    # The Workflow code raised the SDK's non-determinism error, which failed the task.
+    assert 'r#type: "NondeterminismError"' in failure
+    assert "Stream call 1 of the Workflow is a take of the Stream" in failure
+    assert f"History has a take of the Stream '{stream_id}' on the Store" in failure
+
+
+async def test_payload_codec_hides_every_body_in_history(client: Client):
+    data_converter = DataConverter(payload_codec=XorCodec())
+    stream_client, _, stream_id = await _new_stream(
+        client, data_converter=data_converter
+    )
+    await _append(stream_client, stream_id, *_tokens(3), _done())
+    for call in ("take", "filter", "reduce"):
+        handle, result = await _run_workflow(
+            stream_client, CallWorkflow, CallArgs(stream_id, call=call)
+        )
+        assert result.count == 4 and result.stop == "Match"
+        history = await handle.fetch_history()
+        payload = _marker_payload(history)
+        assert payload.metadata["xor-codec"] == b"true"
+        assert _BODY_MARK not in history.to_json()
+        for event in history.events:
+            assert _BODY_MARK.encode() not in event.SerializeToString()
+        await Replayer(
+            workflows=[CallWorkflow], data_converter=data_converter
+        ).replay_workflow(history)
+
+
+@pytest.mark.parametrize("which", ["coroutine", "awaitable"])
+async def test_function_must_be_plain(client: Client, which: str):
+    stream_client, _, stream_id = await _new_stream(client)
+    await _append(stream_client, stream_id, *_tokens(1))
+    _, message = await _run_workflow(
+        stream_client, RefusedFunctionWorkflow, stream_id, which
+    )
+    if which == "coroutine":
+        assert message.startswith("TypeError: until must be a plain function")
+    else:
+        assert message == (
+            "ApplicationError TypeError True: The until of a Stream call returned an "
+            "awaitable. It must be a plain function that returns its answer."
+        )
+
+
+async def test_fold_value_types(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    await _append(stream_client, stream_id, *_tokens(2))
+    _, names = await _run_workflow(stream_client, FoldTypesWorkflow, stream_id)
+    assert names == ["Summary", "Summary", "dict", "list"]
+
+
+async def test_fold_until_sees_the_value(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    texts = ["x", "ta", "g!", "y"]
+    await _append(stream_client, stream_id, *[Token("text", text) for text in texts])
+    _, result = await _run_workflow(stream_client, FoldUntilValueWorkflow, stream_id)
+    assert list(result) == ["xtag!", 3, "Match"]
+
+
+async def test_two_calls_on_two_streams_at_once(client: Client):
+    stream_client, _, first_id = await _new_stream(client)
+    second_id = f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=second_id, body_type=Token)
+    await _append(stream_client, first_id, *_tokens(2), Token("hit", "first-hit"))
+    await _append(stream_client, second_id, Token("hit", "second-hit"))
+    handle, texts = await _run_workflow(
+        stream_client, TwoStreamsAtOnceWorkflow, first_id, second_id
+    )
+    assert texts == ["first-hit", "second-hit"]
+    assert _markers(await handle.fetch_history()) == ["core_local_activity"] * 2
+
+
+async def test_default_idle_stop_on_a_quiet_stream(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    start = time.monotonic()
+    handle, result = await _run_workflow(
+        stream_client, CallWorkflow, CallArgs(stream_id, timeout_seconds=30)
+    )
+    seconds = time.monotonic() - start
+    assert result.stop == "Idle" and result.texts == []
+    assert 1 <= seconds < 3
+    counts = _event_counts(await handle.fetch_history())
+    # The one Workflow Task held the call, so no heartbeat added a task.
+    assert counts["WORKFLOW_TASK_COMPLETED"] == 1
+    print(f"\nB. A quiet Stream with the default idle stop, History events: {counts}")
+
+
+async def test_take_waits_for_records(client: Client):
     stream_client, _, stream_id = await _new_stream(client)
     tokens = [*_tokens(4), _done()]
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            stream_client, ReadArgs(stream_id), worker.task_queue
+    async with new_worker(stream_client, CallWorkflow) as worker:
+        handle = await _start_call(
+            stream_client,
+            CallArgs(stream_id, idle_timeout_seconds=5),
+            worker.task_queue,
         )
         await _append_over(stream_client, stream_id, tokens, 1.0)
         result = await handle.result()
     assert result.texts == _texts(tokens)
-    assert result.stop == "MATCH"
+    assert result.stop == "Match"
     assert _markers(await handle.fetch_history()) == ["core_local_activity"]
 
 
@@ -604,19 +1019,24 @@ async def _wait_for_signal_delivery(handle: WorkflowHandle[Any, Any]) -> None:
     await assert_eventually(delivered)
 
 
+_RUNNERS = pytest.mark.parametrize(
+    "runner",
+    [SandboxedWorkflowRunner(), UnsandboxedWorkflowRunner()],
+    ids=["sandboxed", "unsandboxed"],
+)
+
+
 @_RUNNERS
-async def test_read_predicate_reads_workflow_state(
-    client: Client, runner: WorkflowRunner
-):
+async def test_until_reads_workflow_state(client: Client, runner: WorkflowRunner):
     stream_client, store, stream_id = await _new_stream(client, TrackingStore())
     first = _tokens(2)
     wanted = Token("text", f"{_BODY_MARK}-wanted")
     await _append(stream_client, stream_id, *first)
     async with new_worker(
-        stream_client, ReadUntilWantedWorkflow, workflow_runner=runner
+        stream_client, TakeUntilWantedWorkflow, workflow_runner=runner
     ) as worker:
         handle = await stream_client.start_workflow(
-            ReadUntilWantedWorkflow.run,
+            TakeUntilWantedWorkflow.run,
             stream_id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
@@ -627,34 +1047,17 @@ async def test_read_predicate_reads_workflow_state(
             assert store.active_reads == 1
 
         await assert_eventually(read_waits)
-        await handle.signal(ReadUntilWantedWorkflow.want, wanted.text)
+        await handle.signal(TakeUntilWantedWorkflow.want, wanted.text)
         # A Workflow Task heartbeat brings the Signal while the Local Activity reads.
         await _wait_for_signal_delivery(handle)
         await asyncio.sleep(0.5)
         await _append(stream_client, stream_id, wanted, *_tokens(2, prefix="after"))
         result = await handle.result()
     assert result.texts == _texts([*first, wanted])
-    assert result.stop == "MATCH"
+    assert result.stop == "Match"
 
 
-async def test_read_replays_with_replayer(client: Client):
-    _, store, handle, result, _ = await _run_match(client)
-    run_id = handle.result_run_id
-    assert run_id
-    first_run = StreamReadState.results.pop(run_id)
-    replay_store = RecordingStreamStore(store)
-    StreamReadState.until_calls = 0
-    await Replayer(
-        workflows=[ReadUntilKindWorkflow],
-        stream_config=StreamConfig(stores=[replay_store]),
-    ).replay_workflow(await handle.fetch_history())
-    assert StreamReadState.results.pop(run_id) == first_run
-    assert first_run[0] == tuple(result.texts)
-    assert replay_store.operations == ["ReadRecords"]
-    assert StreamReadState.until_calls == 0
-
-
-async def test_read_replays_on_a_worker_without_cache(client: Client):
+async def test_calls_on_a_worker_without_cache(client: Client):
     stream_client, store, stream_id = await _new_stream(
         client, RecordingStreamStore(MemoryStreamStore())
     )
@@ -662,148 +1065,100 @@ async def test_read_replays_on_a_worker_without_cache(client: Client):
         Token("text", f"{_BODY_MARK}-{text}") for text in ["a", "m1", "b", "m2", "c"]
     ]
     await _append(stream_client, stream_id, *tokens)
-    async with new_worker(
-        stream_client, TwoReadsWorkflow, max_cached_workflows=0
-    ) as worker:
-        handle = await stream_client.start_workflow(
-            TwoReadsWorkflow.run,
-            stream_id,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        assert await handle.result() == _texts(tokens[:4])
-    history = await handle.fetch_history()
-    assert _markers(history) == ["core_local_activity", "core_local_activity"]
-    # Two reads, plus a replay of the first read before the Workflow Task of the second.
-    reads = store.operations.count("ReadRecords")
-    print(f"\nWorker without cache: {reads} ReadRecords calls")
-    assert reads >= 3
+    handle, texts = await _run_workflow(
+        stream_client,
+        TwoTakesWorkflow,
+        stream_id,
+        worker_options={"max_cached_workflows": 0},
+    )
+    assert texts == _texts(tokens[:4])
+    assert _markers(await handle.fetch_history()) == ["core_local_activity"] * 2
+    # The Workflow Task of the second call replays the first from History.
+    assert store.operations.count("ReadRecords") == 2
 
 
-async def test_read_replay_fails_when_records_are_gone(client: Client):
-    _, _, handle, _, _ = await _run_match(client)
-    history = await handle.fetch_history()
-    with pytest.raises(Exception) as err:
-        await Replayer(
-            workflows=[ReadUntilKindWorkflow],
-            stream_config=StreamConfig(stores=[MemoryStreamStore()]),
-        ).replay_workflow(history)
-    stream_id = history.events[0].workflow_execution_started_event_attributes
-    assert "can't read the Stream" in str(err.value)
-    assert f"'{_stream_id_of(stream_id)}'" in str(err.value)
-
-
-def _stream_id_of(started: Any) -> str:
-    return DataConverter.default.payload_converter.from_payloads(
-        started.input.payloads, [ReadArgs]
-    )[0].stream_id
-
-
-async def test_read_survives_a_failed_workflow_task(client: Client):
+async def test_call_survives_a_failed_workflow_task(client: Client):
     stream_client, _, stream_id = await _new_stream(client)
     tokens = [*_tokens(3), _done()]
     await _append(stream_client, stream_id, *tokens)
     StreamReadState.fail_next_task = True
-    async with new_worker(stream_client, FailTaskOnceAfterReadWorkflow) as worker:
-        handle = await stream_client.start_workflow(
-            FailTaskOnceAfterReadWorkflow.run,
-            stream_id,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        result = await handle.result()
+    handle, result = await _run_workflow(
+        stream_client, FailTaskOnceAfterTakeWorkflow, stream_id
+    )
     assert result.texts == _texts(tokens)
-    assert result.stop == "MATCH"
+    assert result.stop == "Match"
     counts = _event_counts(await handle.fetch_history())
     assert counts["WORKFLOW_TASK_FAILED"] == 1
     assert counts["MARKER_RECORDED"] == 1
 
 
-async def test_read_timeout_gives_records_so_far(client: Client):
+async def _failing_predicate(
+    client: Client,
+    predicate: str,
+    runner: WorkflowRunner = SandboxedWorkflowRunner(),
+) -> str:
     stream_client, _, stream_id = await _new_stream(client)
-    first = _tokens(3)
-    rest = [*_tokens(2, prefix="rest"), _done()]
-    await _append(stream_client, stream_id, *first)
-    async with new_worker(stream_client, TimeoutThenReadWorkflow) as worker:
-        handle = await stream_client.start_workflow(
-            TimeoutThenReadWorkflow.run,
-            stream_id,
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        await asyncio.sleep(1.5)
-        await _append(stream_client, stream_id, *rest)
-        timed_out, matched = await handle.result()
-    assert timed_out.texts == _texts(first)
-    assert timed_out.stop == "TIMEOUT" and not timed_out.done
-    assert matched.texts == _texts(rest)
-    assert matched.stop == "MATCH"
-
-
-async def test_read_stops_at_max_records(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = _tokens(10)
-    await _append(stream_client, stream_id, *tokens)
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            stream_client,
-            ReadArgs(stream_id, until_kind=None, max_records=3),
-            worker.task_queue,
-        )
-        result = await handle.result()
-    assert result.texts == _texts(tokens[:3])
-    assert result.stop == "MAX_RECORDS" and not result.done
-
-
-async def test_read_of_closed_stream_is_done(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = _tokens(4)
-    await _append(stream_client, stream_id, *tokens)
-    await stream_client.get_stream(StreamRef(id=stream_id), body_type=Token).close()
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            stream_client, ReadArgs(stream_id), worker.task_queue
-        )
-        result = await handle.result()
-    assert result.texts == _texts(tokens)
-    assert result.stop == "DONE" and result.done
-
-
-async def test_read_with_payload_codec(client: Client):
-    data_converter = DataConverter(payload_codec=SimpleCodec())
-    StreamReadState.until_calls = 0
-    _, store, handle, result, tokens = await _run_match(
-        client, data_converter=data_converter
+    await _append(stream_client, stream_id, *_tokens(1))
+    _, result = await _run_workflow(
+        stream_client,
+        FailingPredicateWorkflow,
+        stream_id,
+        predicate,
+        worker_options={"workflow_runner": runner},
     )
-    assert result.texts == _texts(tokens)
-    assert result.typed and result.stop == "MATCH"
-    # The predicate saw each Record decoded, or its type check would have raised.
-    assert StreamReadState.until_calls == len(tokens)
-    run_id = handle.result_run_id
-    assert run_id
-    first_run = StreamReadState.results.pop(run_id)
-    history = await handle.fetch_history()
-    marker = next(
-        event.marker_recorded_event_attributes
-        for event in history.events
-        if event.event_type == EventType.EVENT_TYPE_MARKER_RECORDED
+    return result
+
+
+async def test_predicate_that_raises(client: Client):
+    assert await _failing_predicate(client, "raise") == (
+        f"ValueError: bad token {_BODY_MARK}-t0"
     )
-    assert marker.details["result"].payloads[0].metadata["simple-codec"] == b"true"
-    await Replayer(
-        workflows=[ReadUntilKindWorkflow],
-        data_converter=data_converter,
-        stream_config=StreamConfig(stores=[store]),
-    ).replay_workflow(history)
-    assert StreamReadState.results.pop(run_id) == first_run
 
 
-async def _cancel_waiting_read(client: Client, task_timeout: timedelta | None) -> float:
-    """Cancel a Workflow while its read waits, and give the seconds until it ends."""
+@_RUNNERS
+async def test_predicate_cannot_call_workflow_functions(
+    client: Client, runner: WorkflowRunner
+):
+    # The predicate runs on the Worker's event loop, where no Workflow runs.
+    assert await _failing_predicate(client, "workflow_now", runner) == (
+        "_NotInWorkflowEventLoopError: Not in workflow event loop"
+    )
+
+
+async def test_predicate_in_sandbox_keeps_its_restrictions(client: Client):
+    sandboxed = await _failing_predicate(client, "datetime_now")
+    assert sandboxed.startswith("RestrictedWorkflowAccessError: ")
+    unsandboxed = await _failing_predicate(
+        client, "datetime_now", UnsandboxedWorkflowRunner()
+    )
+    assert unsandboxed == "no error"
+
+
+async def test_calls_without_stream_config_fail_the_workflow(client: Client):
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(client, CallWorkflow) as worker:
+        for call in ("take", "filter", "reduce"):
+            handle = await _start_call(
+                client,
+                CallArgs(stream_id, call=call),
+                worker.task_queue,
+                execution_timeout=timedelta(seconds=30),
+            )
+            with pytest.raises(WorkflowFailureError) as err:
+                await asyncio.wait_for(handle.result(), timeout=10)
+            cause = err.value.cause
+            assert isinstance(cause, ApplicationError)
+            assert cause.type == "StreamConfigError"
+            assert cause.non_retryable
+
+
+async def _cancel_waiting_call(client: Client, task_timeout: timedelta | None) -> float:
+    """Cancel a Workflow while its call waits, and give the seconds until it ends."""
     stream_client, store, stream_id = await _new_stream(client, TrackingStore())
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
+    async with new_worker(stream_client, CallWorkflow) as worker:
+        handle = await _start_call(
             stream_client,
-            ReadArgs(stream_id, timeout_seconds=30),
+            CallArgs(stream_id, timeout_seconds=30, idle_timeout_seconds=30),
             worker.task_queue,
             task_timeout=task_timeout,
         )
@@ -835,351 +1190,35 @@ async def _cancel_waiting_read(client: Client, task_timeout: timedelta | None) -
         "about 8 s with the default task timeout of 10 s."
     ),
 )
-async def test_read_cancel(client: Client):
-    assert await _cancel_waiting_read(client, None) < 5
+async def test_cancel_of_a_long_wait(client: Client):
+    assert await _cancel_waiting_call(client, None) < 5
 
 
-async def test_read_cancel_with_short_task_timeout(client: Client):
-    assert await _cancel_waiting_read(client, timedelta(seconds=2)) < 5
+async def test_cancel_with_short_task_timeout(client: Client):
+    assert await _cancel_waiting_call(client, timedelta(seconds=2)) < 5
 
 
-async def test_read_predicate_that_raises(client: Client):
-    assert await _failing_predicate(client, "raise") == (
-        f"ValueError: bad token {_BODY_MARK}-t0"
-    )
-
-
-async def _failing_predicate(
-    client: Client,
-    predicate: str,
-    runner: WorkflowRunner = SandboxedWorkflowRunner(),
-) -> str:
-    stream_client, _, stream_id = await _new_stream(client)
-    await _append(stream_client, stream_id, *_tokens(1))
-    async with new_worker(
-        stream_client, FailingPredicateWorkflow, workflow_runner=runner
-    ) as worker:
-        return await stream_client.execute_workflow(
-            FailingPredicateWorkflow.run,
-            args=[stream_id, predicate],
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-
-
-async def test_read_and_reduce_without_stream_config_fail_the_workflow(
-    client: Client,
-):
-    stream_id = f"stream-{uuid.uuid4()}"
-    async with new_worker(client, ReadUntilKindWorkflow, JoinTextWorkflow) as worker:
-        handles: list[WorkflowHandle[Any, Any]] = [
-            await _start_read(
-                client,
-                ReadArgs(stream_id),
-                worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            ),
-            await client.start_workflow(
-                JoinTextWorkflow.run,
-                ReduceArgs(stream_id),
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-                execution_timeout=timedelta(seconds=30),
-            ),
-        ]
-        for handle in handles:
-            with pytest.raises(WorkflowFailureError) as err:
-                await asyncio.wait_for(handle.result(), timeout=10)
-            cause = err.value.cause
-            assert isinstance(cause, ApplicationError)
-            assert cause.type == "StreamConfigError"
-            assert cause.non_retryable
-            assert cause.message == (
-                "The client of this Worker has no Stream Store. Give one in "
-                "stream_config=StreamConfig(stores=[...])."
-            )
-
-
-@_RUNNERS
-async def test_read_predicate_cannot_call_workflow_functions(
-    client: Client, runner: WorkflowRunner
-):
-    # The predicate runs on the Worker's event loop, where no Workflow runs.
-    assert await _failing_predicate(client, "workflow_now", runner) == (
-        "_NotInWorkflowEventLoopError: Not in workflow event loop"
-    )
-
-
-async def test_read_predicate_in_sandbox_keeps_its_restrictions(client: Client):
-    sandboxed = await _failing_predicate(client, "datetime_now")
-    assert sandboxed.startswith("RestrictedWorkflowAccessError: ")
-    unsandboxed = await _failing_predicate(
-        client, "datetime_now", UnsandboxedWorkflowRunner()
-    )
-    assert unsandboxed == "no error"
-
-
-async def _run_flowing_read(
-    client: Client, *, task_timeout: timedelta | None = None, seconds: float = 2.0
-) -> tuple[WorkflowHistory, float]:
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = [*_tokens(39), _done()]
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            stream_client,
-            ReadArgs(stream_id, timeout_seconds=30),
-            worker.task_queue,
-            task_timeout=task_timeout,
-        )
-        appended = await _append_over(stream_client, stream_id, tokens, seconds)
-        result = await handle.result()
-        latency = time.monotonic() - appended
-    assert result.texts == _texts(tokens)
-    return await handle.fetch_history(), latency
-
-
-async def test_measure_flowing_read(client: Client):
-    history, _ = await _run_flowing_read(client)
-    print(f"\nA. 40 Records over 2 s, History events: {_event_counts(history)}")
-
-
-async def test_measure_idle_wait(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    async with new_worker(stream_client, ReadUntilKindWorkflow) as worker:
-        handle = await _start_read(
-            stream_client,
-            ReadArgs(stream_id, timeout_seconds=30),
-            worker.task_queue,
-            task_timeout=timedelta(seconds=2),
-        )
-        await asyncio.sleep(6)
-        await _append(stream_client, stream_id, _done())
-        await handle.result()
-    counts = _event_counts(await handle.fetch_history())
-    print(f"\nB. Idle wait of 6 s, History events: {counts}")
-    print(f"B. Workflow Tasks: {counts['WORKFLOW_TASK_COMPLETED']} completed")
-
-
-async def test_measure_match_latency(client: Client):
-    latencies = []
-    for _ in range(5):
-        _, latency = await _run_flowing_read(client)
-        latencies.append(latency)
-    print(
-        "\nC. Append of the match to the end of the Workflow: "
-        + ", ".join(f"{latency * 1000:.0f} ms" for latency in latencies)
-    )
-
-
-async def _run_workflow(
-    stream_client: Client,
-    workflow_class: type,
-    *args: Any,
-    worker_options: dict[str, Any] | None = None,
-    **start_options: Any,
-) -> tuple[WorkflowHandle[Any, Any], Any]:
-    run = getattr(workflow_class, "run")
-    async with new_worker(
-        stream_client, workflow_class, **(worker_options or {})
-    ) as worker:
-        handle = await stream_client.start_workflow(
-            run,
-            args=list(args),
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-            **start_options,
-        )
-        return handle, await handle.result()
-
-
-async def test_read_idle_timeout(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = _tokens(3)
-    await _append(stream_client, stream_id, *tokens)
-    start = time.monotonic()
-    _, result = await _run_workflow(
-        stream_client,
-        ReadUntilKindWorkflow,
-        ReadArgs(stream_id, idle_timeout_seconds=1, timeout_seconds=30),
-    )
-    seconds = time.monotonic() - start
-    assert result.texts == _texts(tokens)
-    assert result.stop == "IDLE" and not result.done
-    assert 1 <= seconds < 3
-
-
-async def test_read_idle_timeout_zero(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    empty_id = f"stream-{uuid.uuid4()}"
-    await stream_client.create_stream(id=empty_id, body_type=Token)
-    tokens = _tokens(3)
-    await _append(stream_client, stream_id, *tokens)
-    for read_id, expected in [(stream_id, _texts(tokens)), (empty_id, [])]:
-        start = time.monotonic()
-        _, result = await _run_workflow(
-            stream_client,
-            ReadUntilKindWorkflow,
-            ReadArgs(read_id, idle_timeout_seconds=0, timeout_seconds=30),
-        )
-        assert result.texts == expected
-        assert result.stop == "IDLE"
-        assert time.monotonic() - start < 1
-
-
-async def _record_sizes(store: Any, stream_id: str) -> list[int]:
-    response = await store.read_records(
-        ReadRecordsRequest(ref=StreamRefMessage(id=stream_id, store=store.name))
-    )
-    return [record.ByteSize() for record in response.records]
-
-
-@pytest.mark.parametrize(
-    "stop",
-    ["MATCH", "DONE", "IDLE", "TIMEOUT", "MAX_RECORDS", "MAX_BYTES"],
-)
-async def test_read_stop_reason(client: Client, stop: str):
-    stream_client, store, stream_id = await _new_stream(client)
-    tokens = _tokens(5)
-    if stop == "MATCH":
-        tokens[2] = _done()
-    await _append(stream_client, stream_id, *tokens)
-    if stop == "DONE":
-        await stream_client.get_stream(StreamRef(id=stream_id), body_type=Token).close()
-    if stop == "MAX_BYTES":
-        sizes = await _record_sizes(store, stream_id)
-        # The third Record passes the cap by one byte.
-        cap = sum(sizes[:3]) - 1
-        _, (first, second) = await _run_workflow(
-            stream_client, MaxBytesThenNextWorkflow, stream_id, cap
-        )
-        assert first.texts == _texts(tokens[:2])
-        assert first.stop == "MAX_BYTES"
-        assert second.texts == _texts(tokens[2:3])
-        # A cap below the first Record still gives that Record.
-        _, (alone, _) = await _run_workflow(
-            stream_client, MaxBytesThenNextWorkflow, stream_id, 1
-        )
-        assert alone.texts == _texts(tokens[:1])
-        assert alone.stop == "MAX_BYTES"
-        return
-    args = {
-        "MATCH": ReadArgs(stream_id),
-        "DONE": ReadArgs(stream_id),
-        "IDLE": ReadArgs(stream_id, idle_timeout_seconds=0.5, timeout_seconds=30),
-        "TIMEOUT": ReadArgs(stream_id, timeout_seconds=1),
-        "MAX_RECORDS": ReadArgs(stream_id, max_records=3),
-    }[stop]
-    _, result = await _run_workflow(stream_client, ReadUntilKindWorkflow, args)
-    assert result.stop == stop
-    expected = {"MATCH": tokens[:3], "MAX_RECORDS": tokens[:3]}.get(stop, tokens)
-    assert result.texts == _texts(expected)
-    assert result.done == (stop == "DONE")
-
-
-async def test_reduce_joins_text_and_replays_without_store(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = [*_tokens(3), _done(), *_tokens(2, prefix="after")]
-    await _append(stream_client, stream_id, *tokens)
-    handle, result = await _run_workflow(
-        stream_client, JoinTextWorkflow, ReduceArgs(stream_id)
-    )
-    assert result == ReduceResult(
-        value="".join(_texts(tokens[:4])),
-        count=4,
-        stop="MATCH",
-        done=False,
-        last_offset=result.last_offset,
-    )
-    history = await handle.fetch_history()
-    assert _markers(history) == ["core_local_activity"]
-    run_id = handle.result_run_id
-    assert run_id
-    first_run = StreamReadState.results.pop(run_id)
-    empty_store = RecordingStreamStore(MemoryStreamStore())
-    StreamReadState.function_calls = 0
-    StreamReadState.until_calls = 0
-    await Replayer(
-        workflows=[JoinTextWorkflow],
-        stream_config=StreamConfig(stores=[empty_store]),
-    ).replay_workflow(history)
-    assert StreamReadState.results.pop(run_id) == first_run
-    assert empty_store.operations == []
-    assert StreamReadState.function_calls == 0
-    assert StreamReadState.until_calls == 0
-
-
-async def test_reduce_until_sees_the_value(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    texts = ["x", "ta", "g!", "y"]
-    await _append(stream_client, stream_id, *[Token("text", text) for text in texts])
-    _, result = await _run_workflow(
-        stream_client, JoinTextWorkflow, ReduceArgs(stream_id, until="tag")
-    )
-    assert result.value == "xtag!"
-    assert result.count == 3
-    assert result.stop == "MATCH"
-
-
-async def test_reduce_on_a_worker_without_cache(client: Client):
-    stream_client, store, stream_id = await _new_stream(
-        client, RecordingStreamStore(MemoryStreamStore())
-    )
-    texts = ["a", "m1", "b", "m2", "c"]
-    await _append(stream_client, stream_id, *[Token("text", text) for text in texts])
-    handle, (first, second) = await _run_workflow(
-        stream_client,
-        TwoFoldsWorkflow,
-        stream_id,
-        worker_options={"max_cached_workflows": 0},
-    )
-    assert (first.value, first.count, first.stop) == ("am1", 2, "MATCH")
-    assert (second.value, second.count, second.stop) == ("bm2", 2, "MATCH")
-    assert _markers(await handle.fetch_history()) == ["core_local_activity"] * 2
-    # A replay of the first fold takes its value from History.
-    assert store.operations.count("ReadRecords") == 2
-
-
-async def test_reduce_function_that_raises(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    await _append(stream_client, stream_id, *_tokens(1))
-    _, result = await _run_workflow(stream_client, FailingFunctionWorkflow, stream_id)
-    assert result == f"ValueError: bad fold after '' at {_BODY_MARK}-t0"
-
-
-async def test_reduce_typed_values(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = [*_tokens(2), _done()]
-    await _append(stream_client, stream_id, *tokens)
-    _, result = await _run_workflow(stream_client, TypedFoldWorkflow, stream_id)
-    assert result == TypedFoldResult(
-        summary=Summary(3, ["text", "text", "done"]),
-        summary_type="Summary",
-        texts=_texts(tokens),
-        texts_type="list",
-    )
-
-
-async def test_read_spans_heartbeats_on_a_worker_without_cache(client: Client):
+async def test_call_spans_heartbeats_on_a_worker_without_cache(client: Client):
     stream_client, store, stream_id = await _new_stream(client, TrackingStore())
     first = _tokens(2)
     await _append(stream_client, stream_id, *first)
     async with new_worker(
-        stream_client, ReadUntilKindWorkflow, max_cached_workflows=0
+        stream_client, CallWorkflow, max_cached_workflows=0
     ) as worker:
-        handle = await _start_read(
+        handle = await _start_call(
             stream_client,
-            ReadArgs(stream_id, timeout_seconds=30),
+            CallArgs(stream_id, timeout_seconds=30, idle_timeout_seconds=30),
             worker.task_queue,
             task_timeout=timedelta(seconds=2),
         )
-        # The registry keeps the entry of the read at every sample while it waits.
+        # The registry keeps the entry of the call at every sample while it waits.
         samples = []
         for _ in range(16):
             await asyncio.sleep(0.25)
             samples.append(
                 any(
                     run_id == handle.result_run_id
-                    for run_id, _ in _PENDING_STREAM_READS.keys()
+                    for run_id, _ in _PENDING_STREAM_CALLS.keys()
                 )
             )
         await _append(stream_client, stream_id, _done())
@@ -1192,28 +1231,143 @@ async def test_read_spans_heartbeats_on_a_worker_without_cache(client: Client):
         f"{len(samples)} samples"
     )
     assert result.texts == _texts([*first, _done()])
-    assert result.stop == "MATCH"
+    assert result.stop == "Match"
     # Heartbeats happened, and the one Local Activity ran through them uncancelled.
     assert counts["WORKFLOW_TASK_COMPLETED"] >= 3
     assert reads == 2
     assert store.cancelled_reads == 0
     assert all(samples)
     assert not any(
-        run_id == handle.result_run_id for run_id, _ in _PENDING_STREAM_READS.keys()
+        run_id == handle.result_run_id for run_id, _ in _PENDING_STREAM_CALLS.keys()
+    )
+
+
+async def _record_sizes(store: Any, stream_id: str) -> list[int]:
+    response = await store.read_records(
+        ReadRecordsRequest(ref=StreamRefMessage(id=stream_id, store=store.name))
+    )
+    return [record.ByteSize() for record in response.records]
+
+
+async def test_take_max_bytes_boundary(client: Client):
+    stream_client, store, stream_id = await _new_stream(client)
+    tokens = _tokens(5)
+    await _append(stream_client, stream_id, *tokens)
+    sizes = await _record_sizes(store, stream_id)
+    # The third Record passes the cap by one byte.
+    _, result = await _run_workflow(
+        stream_client,
+        CallWorkflow,
+        CallArgs(stream_id, until_kind=None, max_bytes=sum(sizes[:3]) - 1),
+    )
+    assert result.texts == _texts(tokens[:2])
+    assert result.stop == "MaxBytes"
+
+
+async def _run_flowing_take(
+    client: Client, *, seconds: float = 2.0
+) -> tuple[WorkflowHistory, float]:
+    stream_client, _, stream_id = await _new_stream(client)
+    tokens = [*_tokens(39), _done()]
+    async with new_worker(stream_client, CallWorkflow) as worker:
+        handle = await _start_call(
+            stream_client,
+            CallArgs(stream_id, timeout_seconds=30, idle_timeout_seconds=5),
+            worker.task_queue,
+        )
+        appended = await _append_over(stream_client, stream_id, tokens, seconds)
+        result = await handle.result()
+        latency = time.monotonic() - appended
+    assert result.texts == _texts(tokens)
+    return await handle.fetch_history(), latency
+
+
+async def test_measure_flowing_take(client: Client):
+    history, _ = await _run_flowing_take(client)
+    payload = _marker_payload(history)
+    print(f"\nA. 40 Records over 2 s, History events: {_event_counts(history)}")
+    print(f"A. Result payload: {payload.ByteSize()} bytes")
+
+
+async def test_measure_take_of_forty(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    await _append(stream_client, stream_id, *_tokens(40))
+    await _close(stream_client, stream_id)
+    handle, result = await _run_workflow(
+        stream_client, CallWorkflow, CallArgs(stream_id, until_kind=None)
+    )
+    assert (result.count, result.stop) == (40, "Done")
+    payload = _marker_payload(await handle.fetch_history())
+    header = Payloads.FromString(payload.data).payloads[0].data.decode()
+    print(f"\nResult of a take of 40 small Records: {payload.ByteSize()} bytes")
+    print(f"Its header: {header}")
+
+
+@workflow.defn
+class KeepHitsWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> int:
+        read = await workflow.filter_stream(
+            _stream(stream_id),
+            lambda record: record.body.kind == "hit",
+            timedelta(seconds=10),
+            idle_timeout=timedelta(0),
+        )
+        return len(read.records)
+
+
+async def test_measure_filter_that_keeps_five(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    tokens = [
+        Token("hit" if index % 8 == 0 else "text", f"{_BODY_MARK}-{index}")
+        for index in range(40)
+    ]
+    await _append(stream_client, stream_id, *tokens)
+    await _close(stream_client, stream_id)
+    handle, kept = await _run_workflow(stream_client, KeepHitsWorkflow, stream_id)
+    assert kept == 5
+    payload = _marker_payload(await handle.fetch_history())
+    print(f"\nResult of a filter that keeps 5 of 40: {payload.ByteSize()} bytes")
+
+
+async def test_measure_idle_wait(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    async with new_worker(stream_client, CallWorkflow) as worker:
+        handle = await _start_call(
+            stream_client,
+            CallArgs(stream_id, timeout_seconds=30, idle_timeout_seconds=30),
+            worker.task_queue,
+            task_timeout=timedelta(seconds=2),
+        )
+        await asyncio.sleep(6)
+        await _append(stream_client, stream_id, _done())
+        await handle.result()
+    counts = _event_counts(await handle.fetch_history())
+    print(f"\nA wait of 6 s with idle_timeout=30 s, History events: {counts}")
+
+
+async def test_measure_match_latency(client: Client):
+    latencies = []
+    for _ in range(5):
+        _, latency = await _run_flowing_take(client)
+        latencies.append(latency)
+    print(
+        "\nAppend of the match to the end of the Workflow: "
+        + ", ".join(f"{latency * 1000:.0f} ms" for latency in latencies)
     )
 
 
 async def _signal_wait(client: Client) -> float:
     stream_client, _, stream_id = await _new_stream(client)
-    async with new_worker(stream_client, ReadUntilWantedWorkflow) as worker:
+    async with new_worker(stream_client, TakeUntilWantedWorkflow) as worker:
         handle = await stream_client.start_workflow(
-            ReadUntilWantedWorkflow.run,
+            TakeUntilWantedWorkflow.run,
             stream_id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
         await asyncio.sleep(1)
-        await handle.signal(ReadUntilWantedWorkflow.want, "never")
+        await handle.signal(TakeUntilWantedWorkflow.want, "never")
 
         async def delivered() -> float:
             events = (await handle.fetch_history()).events
@@ -1244,7 +1398,7 @@ async def _signal_wait(client: Client) -> float:
 async def test_measure_signal_wait(client: Client):
     waits = [await _signal_wait(client) for _ in range(3)]
     print(
-        "\nD. Signal to the next Workflow Task Started while a read waits: "
+        "\nSignal to the next Workflow Task Started while a call waits: "
         + ", ".join(f"{wait:.2f} s" for wait in waits)
     )
 
@@ -1252,25 +1406,68 @@ async def test_measure_signal_wait(client: Client):
 async def test_measure_flowing_fold(client: Client):
     stream_client, _, stream_id = await _new_stream(client)
     tokens = [*_tokens(39), _done()]
-    async with new_worker(stream_client, JoinTextWorkflow) as worker:
-        handle = await stream_client.start_workflow(
-            JoinTextWorkflow.run,
-            ReduceArgs(stream_id, timeout_seconds=30),
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
+    async with new_worker(stream_client, CallWorkflow) as worker:
+        handle = await _start_call(
+            stream_client,
+            CallArgs(
+                stream_id, call="reduce", timeout_seconds=30, idle_timeout_seconds=5
+            ),
+            worker.task_queue,
         )
         await _append_over(stream_client, stream_id, tokens, 2.0)
         result = await handle.result()
     assert result.count == 40
     history = await handle.fetch_history()
-    marker = next(
-        event.marker_recorded_event_attributes
-        for event in history.events
-        if event.event_type == EventType.EVENT_TYPE_MARKER_RECORDED
-    )
-    payload = marker.details["result"].payloads[0]
-    print(f"\nE. 40 Records folded over 2 s, History events: {_event_counts(history)}")
+    payload = _marker_payload(history)
     print(
-        f"E. Marker payload: {payload.ByteSize()} bytes, data {len(payload.data)} "
-        f"bytes, folded value {len(result.value)} characters"
+        f"\nD. A fold over 40 Records over 2 s, History events: {_event_counts(history)}"
     )
+    print(f"D. Result payload: {payload.ByteSize()} bytes")
+
+
+async def test_fold_appends_each_record_to_another_stream(client: Client):
+    store = RecordingStreamStore(MemoryStreamStore())
+    stream_client, _, source_id = await _new_stream(client, store)
+    target_id = f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=target_id, body_type=str)
+    tokens = _tokens(40)
+    await _append(stream_client, source_id, *tokens)
+    await _close(stream_client, source_id)
+    handle, result = await _run_workflow(
+        stream_client, FoldThatAppendsWorkflow, source_id, target_id
+    )
+    assert result == "40 Done"
+    target = stream_client.get_stream(StreamRef(id=target_id), body_type=str)
+    records = [record async for record in target.iter_read_items()]
+    assert [record.body for record in records] == [
+        text.upper() for text in _texts(tokens)
+    ]
+    run_id = handle.result_run_id
+    producer = records[0].producer
+    assert producer is not None and isinstance(producer.kind, ProducerKindLocalActivity)
+    assert producer.kind.value.run_id == run_id
+    history = await handle.fetch_history()
+    counts = _event_counts(history)
+    # One marker for the fold. The appends went to the Store from its Local Activity.
+    assert _markers(history) == ["core_local_activity"]
+    assert "TIMER_STARTED" not in counts
+    print(f"\nE. A fold that appends 40 Records to another Stream: {counts}")
+    operations = len(store.operations)
+    await Replayer(workflows=[FoldThatAppendsWorkflow]).replay_workflow(history)
+    await Replayer(
+        workflows=[FoldThatAppendsWorkflow], stream_config=StreamConfig(stores=[store])
+    ).replay_workflow(history)
+    assert len(store.operations) == operations
+    assert len([record async for record in target.iter_read_items()]) == 40
+
+
+async def test_failed_append_in_a_function_fails_the_call(client: Client):
+    stream_client, _, source_id = await _new_stream(client)
+    await _append(stream_client, source_id, *_tokens(2))
+    _, result = await _run_workflow(
+        stream_client,
+        FoldThatAppendsWorkflow,
+        source_id,
+        f"stream-{uuid.uuid4()}",
+    )
+    assert result == "STREAM_ERROR_REASON_NOT_FOUND"
