@@ -642,8 +642,9 @@ async def test_workflow_read_fails_with_store(client: Client):
             task_queue=worker.task_queue,
         )
     assert result == (
-        "Workflow code can't read a Stream on a Store in this release. "
-        "Call an Activity that reads it through its client."
+        "Workflow code can't run a ReadRecords operation on a Store. Use "
+        "temporalio.workflow.read_stream or reduce_stream, which read in one "
+        "Local Activity."
     )
 
 
