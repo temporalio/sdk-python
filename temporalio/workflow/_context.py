@@ -21,6 +21,8 @@ from ..types import AnyType, ParamType
 from ._exceptions import _NotInWorkflowEventLoopError
 
 if TYPE_CHECKING:
+    from temporalio.nexus.system._support import _StreamCall
+
     from ._activities import ActivityCancellationType, ActivityHandle
     from ._event_groups import EventGroup
     from ._exceptions import ContinueAsNewVersioningBehavior, VersioningIntent
@@ -398,6 +400,9 @@ class _Runtime(ABC):
 
     @abstractmethod
     def workflow_random(self) -> Random: ...
+
+    @abstractmethod
+    async def workflow_stream_call(self, stream: Any, call: _StreamCall) -> Any: ...
 
     @abstractmethod
     def workflow_set_query_handler(

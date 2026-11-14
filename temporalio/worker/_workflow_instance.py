@@ -58,6 +58,7 @@ import temporalio.converter
 import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
+import temporalio.nexus.system._support
 import temporalio.workflow
 from temporalio.client._stream_store import _STREAM_SERVICE
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
@@ -95,6 +96,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
+from ._stream_read import _stream_call_in_workflow
 from ._stream_store import _no_stream_config_error, _WorkflowStreamStore
 
 logger = logging.getLogger(__name__)
@@ -314,6 +316,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # reads the previous run's result and failure with the same context.
         self._nexus_serialization_context = det.nexus_serialization_context
         self._stream_store = det.stream_store
+        self._stream_call_count = 0
         if self._nexus_serialization_context:
             self._result_payload_converter = self._payload_converter_with_context(
                 self._nexus_serialization_context
@@ -1994,6 +1997,20 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         else [update.value]
                     )
 
+    async def workflow_stream_call(
+        self, stream: Any, call: temporalio.nexus.system._support._StreamCall
+    ) -> Any:
+        # A counter of the instance, and not a random value, numbers the calls. A change of
+        # the code's random calls then leaves the numbers of a replay alone.
+        self._stream_call_count += 1
+        return await _stream_call_in_workflow(
+            self,
+            self._stream_store.config if self._stream_store is not None else None,
+            stream,
+            call,
+            str(self._stream_call_count),
+        )
+
     async def workflow_sleep(
         self,
         duration: float,
@@ -2369,10 +2386,18 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         temporalio.nexus.system._SystemNexusPayloadConverter,
         temporalio.converter.FailureConverter,
     ]:
+        return self._system_nexus_converters_for(
+            input.service, input.operation_name, input.input
+        )
+
+    def _system_nexus_converters_for(
+        self, service: str, operation: str, request: Any
+    ) -> tuple[
+        temporalio.nexus.system._SystemNexusPayloadConverter,
+        temporalio.converter.FailureConverter,
+    ]:
         serialization_context = temporalio.nexus.system._get_serialization_context(
-            input.service,
-            input.operation_name,
-            input.input,
+            service, operation, request
         )
         user_payload_converter = self._context_free_payload_converter
         user_failure_converter = self._context_free_failure_converter

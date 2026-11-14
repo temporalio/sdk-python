@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import dataclasses
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
 from typing import TYPE_CHECKING, Any
 
 from nexusrpc import OutputT
@@ -34,6 +35,33 @@ def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyri
         type="StreamConfigError",
         non_retryable=True,
     )
+
+
+@contextlib.contextmanager
+def _store_errors() -> Iterator[None]:
+    """Give Workflow code the Store's error of an Activity, not its wrapper."""
+    try:
+        yield
+    except temporalio.exceptions.ApplicationError as err:
+        # Core hands back a failed Local Activity's error without a wrapper.
+        stream_error = temporalio.exceptions._stream_error_from_failure(err)
+        if stream_error is not None:
+            raise stream_error from None
+        raise
+    except temporalio.exceptions.ActivityError as err:
+        if err.cause is not None:
+            stream_error = temporalio.exceptions._stream_error_from_failure(err.cause)
+            if stream_error is not None:
+                raise stream_error from None
+        if isinstance(
+            err.cause,
+            (
+                temporalio.exceptions.ApplicationError,
+                temporalio.exceptions.TimeoutError,
+            ),
+        ):
+            raise err.cause
+        raise
 
 
 def _workflow_target() -> StorageDriverWorkflowInfo:
@@ -80,33 +108,10 @@ class _WorkflowStreamStore:
         options = self.config.workflow_call_options
 
         async def result() -> OutputT:
-            try:
+            with _store_errors():
                 response = await store.call_from_workflow(
                     input.operation_name, request, options
                 )
-            except temporalio.exceptions.ApplicationError as err:
-                # Core hands back a failed Local Activity's error without a wrapper.
-                stream_error = temporalio.exceptions._stream_error_from_failure(err)
-                if stream_error is not None:
-                    raise stream_error from None
-                raise
-            except temporalio.exceptions.ActivityError as err:
-                # Workflow code gets the Store's error, not the Local Activity's wrapper.
-                if err.cause is not None:
-                    stream_error = temporalio.exceptions._stream_error_from_failure(
-                        err.cause
-                    )
-                    if stream_error is not None:
-                        raise stream_error from None
-                if isinstance(
-                    err.cause,
-                    (
-                        temporalio.exceptions.ApplicationError,
-                        temporalio.exceptions.TimeoutError,
-                    ),
-                ):
-                    raise err.cause
-                raise
             return payload_converter._from_transfer_value(
                 stream_operation.check_response(store, response), input.output_type
             )

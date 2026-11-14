@@ -27,6 +27,7 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.client._stream_read import _PENDING_STREAM_CALLS
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
@@ -40,6 +41,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
+from ._stream_read import _read_store_records
 from ._stream_store import _WorkflowStreamStore
 from ._workflow_instance import (
     _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
@@ -432,6 +434,13 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 await self._decode_nexus_previous_run_outcome(
                     act.run_id, init_job, previous_run_outcome, download_metrics
                 )
+            # A marker of a take or a filter can hold only the offsets of its Records, so
+            # they come from the Store before the Workflow sees the result.
+            await _read_store_records(
+                act,
+                self._stream_store.config if self._stream_store is not None else None,
+                self._data_converter,
+            )
             if not workflow:
                 assert init_job
                 workflow = _RunningWorkflow(
@@ -678,6 +687,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         # Remove from map and send completion
         if act.run_id in self._running_workflows:
             del self._running_workflows[act.run_id]
+        _PENDING_STREAM_CALLS.drop_run(act.run_id)
         try:
             await self._bridge_worker().complete_workflow_activation(
                 temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion(

@@ -38,7 +38,17 @@ def _stream_status_from_proto(value: int) -> StreamStatus:
         return StreamStatus.StreamStatusUnspecified
 
 
+class StreamReadStop(enum.IntEnum):
+    Match = 0
+    Done = 1
+    MaxRecords = 2
+    MaxBytes = 3
+    Idle = 4
+    Timeout = 5
+
+
 BodyT = typing.TypeVar("BodyT")
+ValueT = typing.TypeVar("ValueT")
 _BodyT = typing_extensions.TypeVar("_BodyT", default=object)
 
 
@@ -1334,6 +1344,27 @@ class _DescribeStreamResponseTransferTypeConverter(
 temporalio.converter.transfer_type_convertible(
     _DescribeStreamResponseTransferTypeConverter
 )(DescribeStreamResponse)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class StreamRead(typing.Generic[BodyT]):
+    """What one read of many pages gave."""
+
+    records: list[StreamRecord[BodyT]]
+    last_offset: bytes | None = None
+    stop: StreamReadStop
+    done: bool
+
+
+@dataclasses.dataclass(slots=True, kw_only=True)
+class StreamReduce(typing.Generic[ValueT]):
+    """What one fold of many pages gave."""
+
+    value: ValueT
+    count: int
+    last_offset: bytes | None = None
+    stop: StreamReadStop
+    done: bool
 
 
 @dataclasses.dataclass(slots=True)
