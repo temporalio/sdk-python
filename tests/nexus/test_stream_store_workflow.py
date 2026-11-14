@@ -39,11 +39,8 @@ from temporalio.converter import DataConverter, StorageDriverWorkflowInfo
 from temporalio.exceptions import ApplicationError, StreamError
 from temporalio.nexus.system import TEMPORAL_SYSTEM_ENDPOINT
 from temporalio.nexus.system.stream_service import (
-    AppendRecord,
-    AppendRecordsRequest,
     AppendRecordsResponse,
     ClientProducer,
-    CloseStreamRequest,
     Producer,
     ProducerKindClient,
     ProducerKindLocalActivity,
@@ -52,6 +49,7 @@ from temporalio.nexus.system.stream_service import (
     StreamRecord,
     StreamRef,
     StreamService,
+    StreamStatus,
 )
 from temporalio.nexus.system.stream_service.workflow import create_stream, get_stream
 from temporalio.nexus.system.stream_service.workflow._resources.stream import (
@@ -63,6 +61,11 @@ from temporalio.worker import (
     ExecuteActivityInput,
     Interceptor,
     Replayer,
+    StartActivityInput,
+    Worker,
+    WorkflowInboundInterceptor,
+    WorkflowInterceptorClassInput,
+    WorkflowOutboundInterceptor,
 )
 from tests.helpers import assert_task_fail_eventually, new_worker
 from tests.helpers.streams import DictStreamStore, RecordingStreamStore
@@ -144,16 +147,10 @@ class ExplicitProducerWorkflow:
 class RefusedOperationWorkflow:
     @workflow.run
     async def run(self, operation: str) -> str:
-        # The Workflow `Stream` has no method for these operations, so the test starts
-        # them through a Nexus client, as Workflow code still can.
-        ref = StreamRef[str](id="stream")
-        producer = Producer(id="workflow", kind=ProducerKindClient(ClientProducer()))
+        # The Workflow `Stream` has no `read`, so the test starts its operation through
+        # a Nexus client, as Workflow code still can.
         requests: dict[str, Any] = {
-            "AppendRecords": AppendRecordsRequest(
-                ref=ref, records=[AppendRecord(body="a")], producer=producer
-            ),
-            "CloseStream": CloseStreamRequest(ref=ref, producer=producer),
-            "ReadRecords": ReadRecordsRequest(ref=ref),
+            "ReadRecords": ReadRecordsRequest(ref=StreamRef[str](id="stream")),
         }
         nexus_client = workflow.create_nexus_client(
             service=StreamService, endpoint=TEMPORAL_SYSTEM_ENDPOINT
@@ -335,6 +332,86 @@ class LostAnswerStore(RecordingStreamStore):
                     reason=StreamErrorReason.STREAM_ERROR_REASON_STORAGE_UNAVAILABLE,
                 )
         return response
+
+
+class CloseRequestStore(RecordingStreamStore):
+    """Keeps each close request."""
+
+    def __init__(self) -> None:
+        super().__init__(MemoryStreamStore())
+        self.closes: list[temporalio.api.streamservice.v1.CloseStreamRequest] = []
+
+    async def close_stream(
+        self, request: temporalio.api.streamservice.v1.CloseStreamRequest
+    ) -> temporalio.api.streamservice.v1.CloseStreamResponse:
+        kept = temporalio.api.streamservice.v1.CloseStreamRequest()
+        kept.CopyFrom(request)
+        self.closes.append(kept)
+        return await super().close_stream(request)
+
+
+@workflow.defn
+class CloseWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> StreamRef[str]:
+        stream = await create_stream(id=stream_id, body_type=str)
+        await stream.append("a")
+        await stream.close()
+        return stream.ref
+
+
+@workflow.defn
+class AsyncWithCloseWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> str:
+        async with create_stream(id=stream_id, body_type=str) as stream:
+            await stream.append("a")
+            described = await stream.describe()
+        assert described.status is not None
+        return described.status.name
+
+
+_fail_close_task = True
+_started_activities: list[str] = []
+
+
+@workflow.defn(sandboxed=False)
+class CloseThenFailTaskOnceWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> None:
+        stream = await create_stream(
+            id=stream_id,
+            body_type=str,
+            id_conflict_policy=StreamIdConflictPolicy.StreamIdConflictPolicyUseExisting,
+        )
+        await stream.append("a")
+        close = asyncio.create_task(stream.close())
+        # A few turns of the loop let the close schedule its Activity in this task.
+        for _ in range(10):
+            await asyncio.sleep(0)
+        global _fail_close_task
+        if _fail_close_task:
+            _fail_close_task = False
+            raise RuntimeError("Failed the Workflow Task once")
+        await close
+
+
+class StartedActivityInterceptor(Interceptor):
+    def workflow_interceptor_class(
+        self, input: WorkflowInterceptorClassInput
+    ) -> type[WorkflowInboundInterceptor]:
+        return _StartedActivityInbound
+
+
+class _StartedActivityInbound(WorkflowInboundInterceptor):
+    def init(self, outbound: WorkflowOutboundInterceptor) -> None:
+        super().init(_StartedActivityOutbound(outbound))
+
+
+class _StartedActivityOutbound(WorkflowOutboundInterceptor):
+    def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle[Any]:
+        _started_activities.append(str(input.activity))
+        return super().start_activity(input)
 
 
 class RecordingInterceptor(Interceptor):
@@ -545,33 +622,19 @@ async def test_workflow_create_without_store_fails_the_task(client: Client):
         await handle.terminate()
 
 
-@pytest.mark.parametrize(
-    "operation, message",
-    [
-        (
-            "CloseStream",
-            "Workflow code can't close a Stream on a Store in this release. "
-            "Call an Activity that closes it through its client.",
-        ),
-        (
-            "ReadRecords",
-            "Workflow code can't read a Stream on a Store in this release. "
-            "Call an Activity that reads it through its client.",
-        ),
-    ],
-)
-async def test_workflow_stream_operation_fails_with_store(
-    client: Client, operation: str, message: str
-):
+async def test_workflow_read_fails_with_store(client: Client):
     stream_client = _with_store(client, MemoryStreamStore())
     async with new_worker(stream_client, RefusedOperationWorkflow) as worker:
         result = await stream_client.execute_workflow(
             RefusedOperationWorkflow.run,
-            operation,
+            "ReadRecords",
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-    assert result == message
+    assert result == (
+        "Workflow code can't read a Stream on a Store in this release. "
+        "Call an Activity that reads it through its client."
+    )
 
 
 def test_workflow_stream_has_append_and_close_and_no_read():
@@ -981,3 +1044,127 @@ async def test_workflow_explicit_producer_reaches_store(client: Client):
     assert request.producer.id == "mine"
     assert request.producer.WhichOneof("kind") == "client"
     assert request.sequence == 0
+
+
+async def _describe_status(client: Client, stream_id: str) -> StreamStatus | None:
+    stream = client.get_stream(StreamRef(id=stream_id), body_type=str)
+    return (await stream.describe()).status
+
+
+async def test_workflow_close_runs_in_activity_after_its_task(client: Client):
+    store = CloseRequestStore()
+    stream_client = _with_store(client, store)
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, CloseWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            CloseWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        ref = await handle.result()
+    assert await _describe_status(stream_client, stream_id) == (
+        StreamStatus.StreamStatusClosed
+    )
+    with pytest.raises(StreamError) as err:
+        await stream_client.get_stream(ref, body_type=str).append("b")
+    assert err.value.reason == StreamErrorReason.STREAM_ERROR_REASON_CLOSED
+    # The close keeps the Workflow Producer of the request.
+    [close] = store.closes
+    assert close.producer.WhichOneof("kind") == "workflow"
+    assert close.producer.workflow.run_id == handle.result_run_id
+    events = (await handle.fetch_history()).events
+    scheduled = [
+        event.activity_task_scheduled_event_attributes
+        for event in events
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
+    ]
+    assert [attributes.activity_type.name for attributes in scheduled] == [
+        "__temporal_stream_store_call:memory"
+    ]
+    assert scheduled[0].task_queue.name == worker.task_queue
+    markers = [
+        event.marker_recorded_event_attributes.marker_name
+        for event in events
+        if event.event_type == EventType.EVENT_TYPE_MARKER_RECORDED
+    ]
+    # One marker for the create and one for the append, and none for the close.
+    assert markers == ["core_local_activity", "core_local_activity"]
+
+
+async def test_workflow_async_with_closes_the_stream(client: Client):
+    stream_client = _with_store(client, MemoryStreamStore())
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, AsyncWithCloseWorkflow) as worker:
+        status = await stream_client.execute_workflow(
+            AsyncWithCloseWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert status == StreamStatus.StreamStatusOpen.name
+    assert await _describe_status(stream_client, stream_id) == (
+        StreamStatus.StreamStatusClosed
+    )
+    records = await _read_all(stream_client, stream_id)
+    assert [record.body for record in records] == ["a"]
+
+
+async def test_worker_with_workflows_only_runs_the_close(client: Client):
+    stream_client = _with_store(client, MemoryStreamStore())
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with Worker(
+        stream_client, task_queue=str(uuid.uuid4()), workflows=[CloseWorkflow]
+    ) as worker:
+        await stream_client.execute_workflow(
+            CloseWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert await _describe_status(stream_client, stream_id) == (
+        StreamStatus.StreamStatusClosed
+    )
+
+
+async def test_failed_workflow_task_leaves_the_stream_open(client: Client):
+    global _fail_close_task
+    _fail_close_task = True
+    _started_activities.clear()
+    stream_client = _with_store(client, MemoryStreamStore())
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(
+        stream_client,
+        CloseThenFailTaskOnceWorkflow,
+        interceptors=[StartedActivityInterceptor()],
+    ) as worker:
+        await stream_client.execute_workflow(
+            CloseThenFailTaskOnceWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    # The failed task started the close too, but the server never scheduled it.
+    assert _started_activities == ["__temporal_stream_store_call:memory"] * 2
+    records = await _read_all(stream_client, stream_id)
+    # The retried task appends again to the open Stream, and then closes it.
+    assert [record.body for record in records] == ["a", "a"]
+    assert await _describe_status(stream_client, stream_id) == (
+        StreamStatus.StreamStatusClosed
+    )
+
+
+async def test_activity_interceptors_see_the_close_activity(client: Client):
+    interceptor = RecordingInterceptor()
+    stream_client = _with_store(client, MemoryStreamStore())
+    async with new_worker(
+        stream_client, CloseWorkflow, interceptors=[interceptor]
+    ) as worker:
+        await stream_client.execute_workflow(
+            CloseWorkflow.run,
+            f"stream-{uuid.uuid4()}",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    # The create and the append run as Local Activities, and the close as an Activity.
+    assert interceptor.activity_types == ["__temporal_stream_store_call:memory"] * 3

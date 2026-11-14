@@ -74,6 +74,16 @@ class AppendWorkflow:
         return stream.ref
 
 
+@workflow.defn
+class AppendAndCloseWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> StreamRef[str]:
+        stream = await create_stream(id=stream_id, body_type=str)
+        await stream.append("a", "b")
+        await stream.close()
+        return stream.ref
+
+
 @activity.defn
 async def append_in_activity(stream_id: str) -> None:
     stream = activity.client().get_stream(StreamRef(id=stream_id), body_type=str)
@@ -138,6 +148,31 @@ async def test_workflow_local_activity_appends_with_local_activity_producer(
         assert record.producer is not None
         assert isinstance(record.producer.kind, ProducerKindLocalActivity)
         assert record.producer.kind.value.run_id == run_id
+
+
+async def test_workflow_appends_and_closes(client: Client):
+    stream_client = _with_store(client, _store())
+    async with new_worker(stream_client, AppendAndCloseWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            AppendAndCloseWorkflow.run,
+            f"stream-{uuid.uuid4()}",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        ref = await handle.result()
+
+    stream = stream_client.get_stream(ref, body_type=str)
+    records = [record async for record in stream.iter_read_items()]
+    assert [record.body for record in records] == ["a", "b"]
+    run_id = handle.result_run_id
+    for record in records:
+        assert record.producer is not None
+        assert isinstance(record.producer.kind, ProducerKindLocalActivity)
+        assert record.producer.kind.value.run_id == run_id
+    described = await stream.describe()
+    assert described.status == StreamStatus.StreamStatusClosed
+    err = await _stream_error(stream.append("c"))
+    assert err.reason == StreamErrorReason.STREAM_ERROR_REASON_CLOSED
 
 
 async def test_activity_appends_with_activity_producer(client: Client):

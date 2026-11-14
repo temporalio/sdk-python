@@ -668,14 +668,15 @@ class Worker:
                 # are not running an activity worker at all. Otherwise shutdown
                 # will not proceed properly.
                 no_remote_activities=config.get("no_remote_activities")
-                or not config.get("activities"),
+                or self._activity_worker is None,
                 task_types=temporalio.bridge.worker.WorkerTaskTypes(
                     enable_workflows=self._workflow_worker is not None,
                     enable_local_activities=self._activity_worker is not None
                     and self._workflow_worker is not None,
-                    # The Activities of the Stream Stores run as Local Activities, so
-                    # alone they don't make this worker poll for Activity Tasks.
-                    enable_remote_activities=bool(config.get("activities"))
+                    # A Workflow's Stream close runs a Store's Activity as a regular
+                    # Activity, so the Activities of the Stream Stores alone make this
+                    # worker poll for Activity Tasks.
+                    enable_remote_activities=self._activity_worker is not None
                     and not config.get("no_remote_activities"),
                     enable_nexus=self._nexus_worker is not None,
                 ),
