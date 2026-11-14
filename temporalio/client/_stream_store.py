@@ -337,8 +337,9 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
         temporalio.api.streamservice.v1.ReadRecordsRequest,
         temporalio.api.streamservice.v1.ReadRecordsResponse,
         workflow_refusal=(
-            "Workflow code can't read a Stream on a Store in this release. "
-            "Call an Activity that reads it through its client."
+            "Workflow code can't run a ReadRecords operation on a Store. Use "
+            "temporalio.workflow.read_stream or reduce_stream, which read in one "
+            "Local Activity."
         ),
     ),
     "CloseStream": _StreamOperation(
