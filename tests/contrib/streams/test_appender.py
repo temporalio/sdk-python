@@ -9,7 +9,8 @@ from google.protobuf.message import Message
 
 import temporalio.api.streamservice.v1
 from temporalio.api.enums.v1 import StreamErrorReason
-from temporalio.client import BufferedAppender, Client
+from temporalio.client import Client
+from temporalio.contrib.streams import BufferedAppender
 from temporalio.nexus.system.stream_service import StreamRef
 from temporalio.nexus.system.stream_service.client import Stream
 from temporalio.testing import MemoryStreamStore

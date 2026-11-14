@@ -1,4 +1,8 @@
-"""A helper that batches the appends of one Stream."""
+"""A helper that batches the appends of one Stream.
+
+.. warning::
+    This module is experimental and subject to change.
+"""
 
 from __future__ import annotations
 
@@ -12,11 +16,9 @@ from typing_extensions import Self
 import temporalio.nexus.system.stream_service.client
 import temporalio.workflow
 
-from ._stream_store import _check_not_negative
-
 if TYPE_CHECKING:
-    # The generated Workflow modules import `temporalio.workflow`, which a runtime import
-    # here would pull into the client package.
+    # The Workflow Stream class is in a private module of the generated code. Only its type
+    # is needed, since the appender calls the same `append` on both Streams.
     import temporalio.nexus.system.stream_service.workflow._resources.stream
 
 BodyT = TypeVar("BodyT")
@@ -84,7 +86,8 @@ class BufferedAppender(Generic[BodyT]):
         Raises:
             ValueError: ``max_delay`` is negative, or it is set in Workflow code.
         """
-        _check_not_negative(max_delay=max_delay)
+        if max_delay is not None and max_delay < timedelta():
+            raise ValueError("max_delay must not be negative")
         self._stream = stream
         self._max_delay = max_delay
         self._check_delay()
