@@ -229,7 +229,7 @@ jobs:
       - run: uv sync --all-extras
       - run: cargo install --locked nexgen --version 0.2.8 --features advanced --force
       # The Stream package needs `@nexus.helper`, which only a fork of nexgen has yet.
-      - run: cargo install --locked --git https://github.com/moetemp/nexgen --rev 4eab992027a449192a18ee3b3ab190a23e5ae174 --features advanced --root "$RUNNER_TEMP/nexgen-stream" nexgen
+      - run: cargo install --locked --git https://github.com/moetemp/nexgen --rev 9055618618e580b68d61c7d7e52d8f25aea3824c --features advanced --root "$RUNNER_TEMP/nexgen-stream" nexgen
       - run: echo "NEX_GEN_STREAM_BIN=$RUNNER_TEMP/nexgen-stream/bin/nexgen" >> "$GITHUB_ENV"
       - run: poe build-develop
       - run: poe gen-protos
