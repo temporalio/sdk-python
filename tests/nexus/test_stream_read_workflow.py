@@ -31,6 +31,8 @@ from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ApplicationError, CancelledError, StreamError
 from temporalio.nexus.system.stream_service import (
     ProducerKindLocalActivity,
+    StreamRead,
+    StreamReadStop,
     StreamRecord,
     StreamRef,
 )
@@ -101,7 +103,7 @@ def _collect(value: list[str], record: StreamRecord[Token]) -> list[str]:
     return [*value, record.body.text]
 
 
-def _read_result(read: workflow.StreamRead[Token]) -> CallResult:
+def _read_result(read: StreamRead[Token]) -> CallResult:
     return CallResult(
         texts=[record.body.text for record in read.records],
         count=len(read.records),
@@ -147,8 +149,7 @@ async def _call(args: CallArgs, stream: Any = None) -> CallResult:
     idle_timeout = _seconds(args.idle_timeout_seconds)
     # The arguments go by position, in the order that the generated methods use.
     if args.call == "take":
-        read = await workflow.take_stream(
-            stream,
+        read = await stream.take(
             timeout,
             until if until_kind else None,
             from_offset,
@@ -158,8 +159,7 @@ async def _call(args: CallArgs, stream: Any = None) -> CallResult:
         )
         return _read_result(read)
     if args.call == "filter":
-        read = await workflow.filter_stream(
-            stream,
+        read = await stream.filter(
             _not_skipped,
             timeout,
             until if until_kind else None,
@@ -170,8 +170,7 @@ async def _call(args: CallArgs, stream: Any = None) -> CallResult:
         )
         return _read_result(read)
     no_texts: list[str] = []
-    reduce = await workflow.reduce_stream(
-        stream,
+    reduce = await stream.reduce(
         _collect,
         no_texts,
         timeout,
@@ -218,8 +217,7 @@ class TakeUntilWantedWorkflow:
 
     @workflow.run
     async def run(self, stream_id: str) -> CallResult:
-        read = await workflow.take_stream(
-            _stream(stream_id),
+        read = await _stream(stream_id).take(
             timedelta(seconds=20),
             until=lambda record: record.body.text == self.wanted,
             idle_timeout=timedelta(seconds=20),
@@ -232,14 +230,12 @@ class TwoTakesWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[str]:
         stream = _stream(stream_id)
-        first = await workflow.take_stream(
-            stream,
+        first = await stream.take(
             timedelta(seconds=10),
             until=lambda record: record.body.text.endswith("m1"),
         )
         await workflow.sleep(timedelta(milliseconds=1))
-        second = await workflow.take_stream(
-            stream,
+        second = await stream.take(
             timedelta(seconds=10),
             until=lambda record: record.body.text.endswith("m2"),
             from_offset=first.last_offset,
@@ -251,8 +247,7 @@ class TwoTakesWorkflow:
 class FailTaskOnceAfterTakeWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> CallResult:
-        read = await workflow.take_stream(
-            _stream(stream_id),
+        read = await _stream(stream_id).take(
             timedelta(seconds=10),
             until=lambda record: record.body.kind == "done",
         )
@@ -275,8 +270,7 @@ class FilterLoopWorkflow:
         while True:
             calls += 1
             # A filter with `max_records=1` gives the next Record that it keeps.
-            read = await workflow.filter_stream(
-                stream,
+            read = await stream.filter(
                 lambda record: record.body.kind == "hit",
                 timedelta(seconds=10),
                 from_offset=offset,
@@ -286,8 +280,8 @@ class FilterLoopWorkflow:
             found.extend(record.body.text for record in read.records)
             offset = read.last_offset
             if read.stop in (
-                workflow.StreamReadStop.Done,
-                workflow.StreamReadStop.Idle,
+                StreamReadStop.Done,
+                StreamReadStop.Idle,
             ):
                 return found, calls
 
@@ -300,12 +294,10 @@ class TakeLoopWorkflow:
         pages: list[tuple[int, str]] = []
         offset: bytes | None = None
         while True:
-            read = await workflow.take_stream(
-                stream, timedelta(seconds=10), from_offset=offset
-            )
+            read = await stream.take(timedelta(seconds=10), from_offset=offset)
             pages.append((len(read.records), read.stop.name))
             offset = read.last_offset
-            if read.stop is not workflow.StreamReadStop.MaxBytes:
+            if read.stop is not StreamReadStop.MaxBytes:
                 return pages
 
 
@@ -316,12 +308,9 @@ class OverLimitWorkflow:
         stream = _stream(stream_id)
         try:
             if call == "take":
-                await workflow.take_stream(
-                    stream, timedelta(seconds=10), max_bytes=4 * 1024 * 1024
-                )
+                await stream.take(timedelta(seconds=10), max_bytes=4 * 1024 * 1024)
             else:
-                await workflow.reduce_stream(
-                    stream,
+                await stream.reduce(
                     lambda value, record: value + "x" * (1024 * 1024),
                     "",
                     timedelta(seconds=10),
@@ -338,8 +327,7 @@ class TwoStreamsAtOnceWorkflow:
     async def run(self, first_id: str, second_id: str) -> list[str]:
         tasks = [
             asyncio.create_task(
-                workflow.filter_stream(
-                    _stream(stream_id),
+                _stream(stream_id).filter(
                     lambda record: record.body.kind == "hit",
                     timedelta(seconds=10),
                     max_records=1,
@@ -362,8 +350,7 @@ class VariantWorkflow:
             workflow.uuid4()
         if variant == "other_stream":
             stream_id += "-other"
-        read = await workflow.take_stream(
-            _stream(stream_id),
+        read = await _stream(stream_id).take(
             timedelta(seconds=10),
             from_offset=b"\x01" if variant == "other_offset" else None,
             idle_timeout=timedelta(0),
@@ -389,7 +376,7 @@ class RefusedFunctionWorkflow:
         # The type checker refuses both functions, and the call refuses them at run time.
         until: Any = _async_until if which == "coroutine" else _until_that_awaits
         try:
-            await workflow.take_stream(stream, timedelta(seconds=10), until=until)
+            await stream.take(timedelta(seconds=10), until=until)
         except TypeError as err:
             return f"TypeError: {err}"
         except ApplicationError as err:
@@ -423,8 +410,8 @@ class FailingPredicateWorkflow:
     @workflow.run
     async def run(self, stream_id: str, predicate: str) -> str:
         try:
-            await workflow.filter_stream(
-                _stream(stream_id), _PREDICATES[predicate], timedelta(seconds=10)
+            await _stream(stream_id).filter(
+                _PREDICATES[predicate], timedelta(seconds=10)
             )
         except ApplicationError as err:
             return f"{err.type}: {err.message}"
@@ -443,6 +430,10 @@ def _summarize(value: Summary | None, record: StreamRecord[Token]) -> Summary:
     return Summary(value.count + 1, [*value.kinds, record.body.kind])
 
 
+def _texts_so_far(value: Sequence[str], record: StreamRecord[Token]) -> list[str]:
+    return [*value, record.body.text]
+
+
 @workflow.defn
 class FoldTypesWorkflow:
     @workflow.run
@@ -451,36 +442,28 @@ class FoldTypesWorkflow:
         quick = timedelta(seconds=10)
         now = timedelta(0)
         # The return annotation wins over an `initial` of `None`.
-        annotated = await workflow.reduce_stream(
-            stream, _summarize, None, quick, idle_timeout=now
-        )
+        annotated = await stream.reduce(_summarize, None, quick, idle_timeout=now)
         # With no annotation, the type of `initial` decides.
-        of_initial = await workflow.reduce_stream(
-            stream,
+        of_initial = await stream.reduce(
             lambda value, record: Summary(value.count + 1, []),
             Summary(0, []),
             quick,
             idle_timeout=now,
         )
         # With no annotation and an `initial` of `None`, there is no type hint.
-        untyped = await workflow.reduce_stream(
-            stream,
+        untyped = await stream.reduce(
             lambda value, record: Summary(1, [record.body.kind]),
             cast(Any, None),
             quick,
             idle_timeout=now,
         )
-        explicit = await workflow.reduce_stream(
-            stream,
-            lambda value, record: [*value, record.body.text],
-            cast(Any, ()),
-            quick,
-            idle_timeout=now,
-            value_type=list[str],
+        # The return annotation wins over the type of `initial` too.
+        over_initial = await stream.reduce(
+            _texts_so_far, cast(Any, ()), quick, idle_timeout=now
         )
         return [
             type(result.value).__name__
-            for result in (annotated, of_initial, untyped, explicit)
+            for result in (annotated, of_initial, untyped, over_initial)
         ]
 
 
@@ -488,8 +471,7 @@ class FoldTypesWorkflow:
 class FoldUntilValueWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> tuple[str, int, str]:
-        result = await workflow.reduce_stream(
-            _stream(stream_id),
+        result = await _stream(stream_id).reduce(
             lambda value, record: value + record.body.text,
             "",
             timedelta(seconds=10),
@@ -510,8 +492,7 @@ class FoldThatAppendsWorkflow:
             return value + 1
 
         try:
-            result = await workflow.reduce_stream(
-                _stream(source_id),
+            result = await _stream(source_id).reduce(
                 append_upper,
                 0,
                 timedelta(seconds=10),
@@ -1309,8 +1290,7 @@ async def test_measure_take_of_forty(client: Client):
 class KeepHitsWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> int:
-        read = await workflow.filter_stream(
-            _stream(stream_id),
+        read = await _stream(stream_id).filter(
             lambda record: record.body.kind == "hit",
             timedelta(seconds=10),
             idle_timeout=timedelta(0),

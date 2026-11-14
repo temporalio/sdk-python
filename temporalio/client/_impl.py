@@ -24,6 +24,7 @@ import temporalio.api.enums.v1
 import temporalio.api.errordetails.v1
 import temporalio.api.failure.v1
 import temporalio.api.schedule.v1
+import temporalio.api.streamservice.v1
 import temporalio.api.taskqueue.v1
 import temporalio.api.update.v1
 import temporalio.api.workflowservice.v1
@@ -126,6 +127,7 @@ from ._schedule import (
     ScheduleUpdate,
     ScheduleUpdateInput,
 )
+from ._stream_read import _note_page_sizes
 from ._stream_store import (
     _STREAM_SERVICE,
     StreamConfig,
@@ -1686,6 +1688,8 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         response = await _call_stream_store(
             store, data_converter, input.operation, request
         )
+        if isinstance(response, temporalio.api.streamservice.v1.ReadRecordsResponse):
+            _note_page_sizes(response)
         handle: NexusOperationHandle[Any] = NexusOperationHandle(
             self._client,
             input.id,

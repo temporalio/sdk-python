@@ -16,17 +16,14 @@ from temporalio.client._stream_read import (
     _StreamCallResult,
 )
 from temporalio.client._stream_store import _STREAM_SERVICE, StreamConfig
+from temporalio.nexus.system._support import _StreamCall, _StreamCallKind
 from temporalio.nexus.system.stream_service.models import (
     ReadRecordsRequest,
+    StreamRead,
     StreamRecord,
+    StreamReduce,
 )
 from temporalio.nexus.system.stream_service.workflow._resources.stream import Stream
-from temporalio.workflow._streams import (
-    StreamRead,
-    StreamReduce,
-    _StreamCall,
-    _StreamCallKind,
-)
 
 from ._stream_store import _no_stream_config_error, _store_errors, _workflow_target
 
