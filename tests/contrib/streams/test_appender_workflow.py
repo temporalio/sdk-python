@@ -11,7 +11,8 @@ import temporalio.api.streamservice.v1
 from temporalio import workflow
 from temporalio.api.enums.v1 import EventType, StreamErrorReason
 from temporalio.api.history.v1 import HistoryEvent
-from temporalio.client import BufferedAppender, Client, WorkflowHandle
+from temporalio.client import Client, WorkflowHandle
+from temporalio.contrib.streams import BufferedAppender
 from temporalio.exceptions import StreamError
 from temporalio.nexus.system.stream_service import StreamRef
 from temporalio.nexus.system.stream_service.workflow import create_stream, get_stream
