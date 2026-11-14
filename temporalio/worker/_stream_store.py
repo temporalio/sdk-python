@@ -42,7 +42,7 @@ def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyri
 
 @contextlib.contextmanager
 def _store_errors() -> Iterator[None]:
-    """Give Workflow code the Store's error of a Local Activity, not its wrapper."""
+    """Give Workflow code the Store's error of an Activity, not its wrapper."""
     try:
         yield
     except temporalio.exceptions.ApplicationError as err:
