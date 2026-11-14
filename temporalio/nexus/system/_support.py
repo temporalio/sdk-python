@@ -635,11 +635,12 @@ async def take_stream(
     fails with :py:class:`temporalio.exceptions.StreamReplayError`. A replay follows the
     marker, not the setting. Records that the scan looked at and didn't keep stay out of
     History. The Worker's data converter, with its payload codec, encodes the marker. A
-    replay doesn't call the functions, so an appender in them writes nothing. A Workflow Task that fails and runs again calls them
-    again, and an appender writes again with a higher epoch. The functions run on the
-    Worker's event loop, not in the Workflow's thread. They can read Workflow state through
-    a reference such as ``self``, but can't call ``temporalio.workflow``. Each sees a Record
-    once, so a later change of that state doesn't check an earlier Record again.
+    replay doesn't call the functions, so an appender in them writes nothing. A Workflow
+    Task that fails and runs again calls them again, and an appender writes again with a
+    higher epoch. The functions run on the Worker's event loop, not in the Workflow's
+    thread. They can read Workflow state through a reference such as ``self``, but can't
+    call ``temporalio.workflow``. Each sees a Record once, so a later change of that state
+    doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to scan.
@@ -753,11 +754,12 @@ async def filter_stream(
     :py:class:`temporalio.exceptions.StreamReplayError`. A replay follows the marker, not
     the setting. Records that the scan looked at and didn't keep stay out of History. The
     Worker's data converter, with its payload codec, encodes the marker. A replay doesn't
-    call the functions, so an appender in them writes nothing. A Workflow Task that fails and runs again
-    calls them again, and an appender writes again with a higher epoch. The functions run
-    on the Worker's event loop, not in the Workflow's thread. They can read Workflow state
-    through a reference such as ``self``, but can't call ``temporalio.workflow``. Each sees
-    a Record once, so a later change of that state doesn't check an earlier Record again.
+    call the functions, so an appender in them writes nothing. A Workflow Task that fails
+    and runs again calls them again, and an appender writes again with a higher epoch. The
+    functions run on the Worker's event loop, not in the Workflow's thread. They can read
+    Workflow state through a reference such as ``self``, but can't call
+    ``temporalio.workflow``. Each sees a Record once, so a later change of that state
+    doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to scan.

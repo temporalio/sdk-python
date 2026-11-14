@@ -52,11 +52,12 @@ class BufferedAppender(Generic[BodyT]):
       Activity and one marker in History. A replay takes the results from History and writes
       nothing.
     * In a function of the ``take``, ``filter`` or ``reduce`` of a Stream, the appender
-      writes as in an Activity, also when it was made with a Workflow Stream. In Workflow code that function runs in the call's Local Activity,
-      so the Records get the Producer and epoch of that Local Activity. The call writes
-      the buffered Records before it returns, and a failed write fails the call. A replay
-      doesn't call the function, so it writes nothing. A Workflow Task that fails and runs
-      again calls it again, and the appender writes again with a higher epoch.
+      writes as in an Activity, also when it was made with a Workflow Stream. In Workflow
+      code that function runs in the call's Local Activity, so the Records get the Producer
+      and epoch of that Local Activity. The call writes the buffered Records before it
+      returns, and a failed write fails the call. A replay doesn't call the function, so it
+      writes nothing. A Workflow Task that fails and runs again calls it again, and the
+      appender writes again with a higher epoch.
 
     Use it in ``async with``, which writes the remaining Records at the end of the block, or
     await :py:meth:`flush`. Without ``async with`` or a :py:meth:`flush`, the Records still in

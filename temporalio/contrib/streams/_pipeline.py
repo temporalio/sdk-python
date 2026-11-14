@@ -266,8 +266,9 @@ class Pipeline(Generic[ItemT]):
 
         In Workflow code the value goes into History with the counts of the chain, so its
         encoded size must fit in 1 MiB. This holds under both values of
-        ``StreamConfig.workflow_read_replay_from``, since a replay can't run the function. Workflow code decodes the value as the return
-        annotation of ``function``, else as the type of ``initial``.
+        ``StreamConfig.workflow_read_replay_from``, since a replay can't run the function.
+        Workflow code decodes the value as the return annotation of ``function``, else as the
+        type of ``initial``.
 
         Args:
             function: Gives the next value from the value so far and an item.
