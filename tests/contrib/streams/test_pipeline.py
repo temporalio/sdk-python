@@ -12,7 +12,12 @@ from google.protobuf.message import Message
 
 import temporalio.api.streamservice.v1
 from temporalio import workflow
-from temporalio.client import Client, StreamConfig, StreamStoreCallOptions
+from temporalio.client import (
+    Client,
+    StreamConfig,
+    StreamReplaySource,
+    StreamStoreCallOptions,
+)
 from temporalio.common import RetryPolicy
 from temporalio.contrib.streams import Pipeline, pipeline
 from temporalio.nexus.system.stream_service import (
@@ -24,16 +29,21 @@ from temporalio.nexus.system.stream_service import (
 )
 from temporalio.testing import MemoryStreamStore
 from temporalio.worker import Replayer
-from tests.helpers import new_worker
-from tests.helpers.streams import RecordingStreamStore
 from tests.nexus.test_stream_read_workflow import (
+    _BODY_MARK,
     Token,
     _append,
     _close,
+    _marker_payload,
     _markers,
     _offsets,
     _with_store,
 )
+
+# The Workflows and the test share the values of `StreamReadState`.
+with workflow.unsafe.imports_passed_through():
+    from tests.helpers import new_worker
+    from tests.helpers.streams import RecordingStreamStore, StreamReadState
 
 _QUICK = timedelta(seconds=10)
 _NOW = timedelta(0)
@@ -237,6 +247,24 @@ class LimitAndUntilWorkflow:
         ]
 
 
+@workflow.defn
+class RecordsEndsWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> list[int]:
+        stream = _workflow_stream(stream_id)
+        line = (
+            await pipeline(stream)
+            .filter(_is_text)
+            .take_until(_record_ends_line)
+            .records(_QUICK, idle_timeout=_NOW)
+        )
+        first = await pipeline(stream).limit(3).records(_QUICK, idle_timeout=_NOW)
+        StreamReadState.results[workflow.info().run_id] = tuple(
+            tuple(record.body.text for record in read.records) for read in (line, first)
+        )
+        return [len(line.records), len(first.records)]
+
+
 class SmallPagesStore(RecordingStreamStore):
     """Gives two Records a page, and fails one read of the scan when it is armed."""
 
@@ -385,3 +413,35 @@ async def test_typed_ends(client: Client):
     assert joined.value == "ab\ncd\ne"
     assert items.value == ["a", "b\n", "c", "d\n", "e"]
     assert count.value == 5
+
+
+async def test_records_end_follows_the_replay_setting(client: Client):
+    store = MemoryStreamStore()
+    config = client.config()
+    config["stream_config"] = StreamConfig(
+        stores=[store], workflow_read_replay_from=StreamReplaySource.STORE
+    )
+    stream_client = Client(**config)
+    tokens = [Token(token.kind, f"{_BODY_MARK}-{token.text}") for token in _TOKENS]
+    stream_id = f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=stream_id, body_type=Token)
+    await _append(stream_client, stream_id, *tokens)
+    handle, counts = await _execute(stream_client, RecordsEndsWorkflow, stream_id)
+    # A filter and a take, each with no body in its marker.
+    assert counts == [2, 3]
+    history = await handle.fetch_history()
+    assert _markers(history) == ["core_local_activity"] * 2
+    for index in (0, 1):
+        marker = _marker_payload(history, index)
+        assert marker.metadata["temporal-stream-replay-from"] == b"store"
+    assert _BODY_MARK not in history.to_json()
+    run_id = handle.result_run_id or ""
+    first_run = StreamReadState.results.pop(run_id)
+    assert first_run == (
+        tuple(token.text for token in tokens[:3] if token.kind == "text"),
+        tuple(token.text for token in tokens[:3]),
+    )
+    await Replayer(
+        workflows=[RecordsEndsWorkflow], stream_config=StreamConfig(stores=[store])
+    ).replay_workflow(history)
+    assert StreamReadState.results.pop(run_id) == first_run
