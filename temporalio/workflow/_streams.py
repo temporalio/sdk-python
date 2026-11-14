@@ -209,10 +209,10 @@ async def read_stream(
 
     Raises:
         temporalio.exceptions.StreamError: The Store failed the read.
-        temporalio.exceptions.ApplicationError: ``until`` raised. The error has the
-            message of the exception.
-        temporalio.exceptions.StreamConfigError: The Worker's client has no Stream
-            config. This fails the Workflow Task.
+        temporalio.exceptions.ApplicationError: ``until`` raised, and the error has
+            the message of the exception. Or the Worker's client has no Stream config,
+            and the error has the ``type`` ``StreamConfigError``. That one is not
+            retryable, so an uncaught one fails the Workflow.
 
     .. warning::
         This API is an experimental prototype and subject to change.
@@ -275,10 +275,10 @@ async def reduce_stream(
 
     Raises:
         temporalio.exceptions.StreamError: The Store failed the read.
-        temporalio.exceptions.ApplicationError: ``function`` or ``until`` raised. The
-            error has the message of the exception.
-        temporalio.exceptions.StreamConfigError: The Worker's client has no Stream
-            config. This fails the Workflow Task.
+        temporalio.exceptions.ApplicationError: ``function`` or ``until`` raised, and
+            the error has the message of the exception. Or the Worker's client has no
+            Stream config, and the error has the ``type`` ``StreamConfigError``. That
+            one is not retryable, so an uncaught one fails the Workflow.
 
     .. warning::
         This API is an experimental prototype and subject to change.
