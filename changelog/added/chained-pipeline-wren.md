@@ -1,0 +1,1 @@
+Add `temporalio.contrib.streams.pipeline`, which chains `filter`, `map`, `take_until` and `limit` steps over a Stream and runs the whole chain as one `take`, `filter` or `reduce` call. In Workflow code a chain is one Local Activity and one marker in History.
