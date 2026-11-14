@@ -25,13 +25,16 @@ from ...models import (
     Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
+    StreamRead,
     StreamRecord,
+    StreamReduce,
     StreamRef,
 )
 from ...services import StreamService
 from .._poll import PollIterator
 
 BodyT = typing.TypeVar("BodyT")
+ValueT = typing.TypeVar("ValueT")
 
 
 class Stream(typing.Generic[BodyT]):
@@ -256,6 +259,73 @@ class Stream(typing.Generic[BodyT]):
             rpc_timeout=rpc_timeout,
         )
         return await handle.result()
+
+    async def take(
+        self,
+        timeout: datetime.timedelta,
+        until: collections.abc.Callable[[StreamRecord[BodyT]], bool] | None = None,
+        from_offset: bytes | None = None,
+        idle_timeout: datetime.timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamRead[BodyT]:
+        """Read every Record up to a stop."""
+        return await _support.take_stream(
+            self,
+            timeout=timeout,
+            until=until,
+            from_offset=from_offset,
+            idle_timeout=idle_timeout,
+            max_records=max_records,
+            max_bytes=max_bytes,
+        )
+
+    async def filter(
+        self,
+        predicate: collections.abc.Callable[[StreamRecord[BodyT]], bool],
+        timeout: datetime.timedelta,
+        until: collections.abc.Callable[[StreamRecord[BodyT]], bool] | None = None,
+        from_offset: bytes | None = None,
+        idle_timeout: datetime.timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamRead[BodyT]:
+        """Read the Records that the predicate keeps, up to a stop."""
+        return await _support.filter_stream(
+            self,
+            predicate=predicate,
+            timeout=timeout,
+            until=until,
+            from_offset=from_offset,
+            idle_timeout=idle_timeout,
+            max_records=max_records,
+            max_bytes=max_bytes,
+        )
+
+    async def reduce(
+        self,
+        function: collections.abc.Callable[[ValueT, StreamRecord[BodyT]], ValueT],
+        initial: ValueT,
+        timeout: datetime.timedelta,
+        until: collections.abc.Callable[[ValueT, StreamRecord[BodyT]], bool]
+        | None = None,
+        from_offset: bytes | None = None,
+        idle_timeout: datetime.timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamReduce[ValueT]:
+        """Fold the Records into one value, up to a stop."""
+        return await _support.reduce_stream(
+            self,
+            function=function,
+            initial=initial,
+            timeout=timeout,
+            until=until,
+            from_offset=from_offset,
+            idle_timeout=idle_timeout,
+            max_records=max_records,
+            max_bytes=max_bytes,
+        )
 
 
 __all__ = ["Stream"]
