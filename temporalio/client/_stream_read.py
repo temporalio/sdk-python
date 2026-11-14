@@ -1,10 +1,10 @@
-"""The process side of a Stream read that Workflow code waits on.
+"""The process side of a Stream read or fold that Workflow code waits on.
 
-A Workflow's read runs in a Local Activity, and the Local Activity calls a predicate
-of the Workflow. A predicate is a closure and can't be serialized, and the Records
-must stay out of History. So both pass through the registry of this module, in the
-memory of the Worker process. History keeps only a small marker with the range of
-offsets of the read.
+A Workflow's read runs in a Local Activity, and the Local Activity calls functions of
+the Workflow. A function is a closure and can't be serialized, and the Records must
+stay out of History. So both pass through the registry of this module, in the memory
+of the Worker process. History keeps only a small marker with the range of offsets of
+the read, and the value of a fold.
 
 .. warning::
     This API is an experimental prototype and subject to change.
@@ -28,37 +28,50 @@ import temporalio.api.stream.v1
 import temporalio.api.streamservice.v1
 import temporalio.common
 import temporalio.exceptions
+from temporalio.workflow._streams import StreamReadStop
 
 _MARKER_METADATA_KEY = "temporal-stream-read"
-_MARKER_METADATA_VALUE = b"v1"
+_MARKER_METADATA_VALUE = b"v2"
 _MAX_PAGE_RECORDS = 1000
 # A Store waits at most this long for one page.
-_MAX_PAGE_WAIT = timedelta(seconds=60)
+_MAX_PAGE_WAIT = 60.0
 _DIGEST_SIZE = 16
 
 
-def _encode_offset(offset: bytes | None) -> str | None:
-    return None if offset is None else base64.b64encode(offset).decode()
+def _encode_bytes(value: bytes | None) -> str | None:
+    return None if value is None else base64.b64encode(value).decode()
 
 
-def _decode_offset(offset: str | None) -> bytes | None:
-    return None if offset is None else base64.b64decode(offset)
+def _decode_bytes(value: str | None) -> bytes | None:
+    return None if value is None else base64.b64decode(value)
+
+
+class _RecordDigest:
+    """A SHA-256 over the offsets and bodies of Records, in the order that they come.
+
+    A length before each part keeps two different splits of the same bytes apart.
+    """
+
+    def __init__(self) -> None:
+        self._hash = hashlib.sha256()
+
+    def update(self, record: temporalio.api.stream.v1.StreamRecord) -> None:
+        body = record.body.SerializeToString(deterministic=True)
+        for part in (record.offset, body):
+            self._hash.update(struct.pack(">Q", len(part)))
+            self._hash.update(part)
+
+    def digest(self) -> bytes:
+        return self._hash.digest()[:_DIGEST_SIZE]
 
 
 def _records_digest(
     records: Sequence[temporalio.api.stream.v1.StreamRecord],
 ) -> bytes:
-    """Give the first bytes of a SHA-256 over the offsets and bodies of ``records``.
-
-    A length before each part keeps two different splits of the same bytes apart.
-    """
-    digest = hashlib.sha256()
+    digest = _RecordDigest()
     for record in records:
-        body = record.body.SerializeToString(deterministic=True)
-        for part in (record.offset, body):
-            digest.update(struct.pack(">Q", len(part)))
-            digest.update(part)
-    return digest.digest()[:_DIGEST_SIZE]
+        digest.update(record)
+    return digest.digest()
 
 
 @dataclasses.dataclass(frozen=True)
@@ -71,34 +84,11 @@ class _StreamReadMarker:
     from_offset: bytes | None
     last_offset: bytes | None
     record_count: int
-    matched: bool
+    stop: StreamReadStop
     done: bool
     digest: bytes
-
-    @classmethod
-    def for_records(
-        cls,
-        *,
-        read_id: str,
-        store: str,
-        stream_id: str,
-        from_offset: bytes | None,
-        records: Sequence[temporalio.api.stream.v1.StreamRecord],
-        matched: bool,
-        done: bool,
-    ) -> _StreamReadMarker:
-        """Build the marker of a read that gave ``records``."""
-        return cls(
-            read_id=read_id,
-            store=store,
-            stream_id=stream_id,
-            from_offset=from_offset,
-            last_offset=records[-1].offset if records else from_offset,
-            record_count=len(records),
-            matched=matched,
-            done=done,
-            digest=_records_digest(records),
-        )
+    value: temporalio.api.common.v1.Payload | None = None
+    """The value of a fold. A read of Records has none."""
 
     def to_raw_value(self) -> temporalio.common.RawValue:
         """Give the marker as a payload that a Worker can find in any activation."""
@@ -106,12 +96,17 @@ class _StreamReadMarker:
             "read_id": self.read_id,
             "store": self.store,
             "stream_id": self.stream_id,
-            "from_offset": _encode_offset(self.from_offset),
-            "last_offset": _encode_offset(self.last_offset),
+            "from_offset": _encode_bytes(self.from_offset),
+            "last_offset": _encode_bytes(self.last_offset),
             "record_count": self.record_count,
-            "matched": self.matched,
+            "stop": self.stop.value,
             "done": self.done,
             "digest": self.digest.hex(),
+            "value": _encode_bytes(
+                None
+                if self.value is None
+                else self.value.SerializeToString(deterministic=True)
+            ),
         }
         return temporalio.common.RawValue(
             temporalio.api.common.v1.Payload(
@@ -131,16 +126,20 @@ class _StreamReadMarker:
         if payload.metadata.get(_MARKER_METADATA_KEY) != _MARKER_METADATA_VALUE:
             return None
         data = json.loads(payload.data)
+        value = _decode_bytes(data["value"])
         return cls(
             read_id=data["read_id"],
             store=data["store"],
             stream_id=data["stream_id"],
-            from_offset=_decode_offset(data["from_offset"]),
-            last_offset=_decode_offset(data["last_offset"]),
+            from_offset=_decode_bytes(data["from_offset"]),
+            last_offset=_decode_bytes(data["last_offset"]),
             record_count=data["record_count"],
-            matched=data["matched"],
+            stop=StreamReadStop(data["stop"]),
             done=data["done"],
             digest=bytes.fromhex(data["digest"]),
+            value=None
+            if value is None
+            else temporalio.api.common.v1.Payload.FromString(value),
         )
 
     def describe_range(self) -> str:
@@ -153,15 +152,29 @@ class _StreamReadMarker:
         )
 
 
+@dataclasses.dataclass(frozen=True)
+class _StreamFold:
+    """The function and the start value of a fold."""
+
+    function: Callable[[Any, Any], Any]
+    initial: Any
+
+
 @dataclasses.dataclass(eq=False)
 class _PendingStreamRead:
     """One read of Workflow code, from the start of its Local Activity to its result."""
 
-    until: Callable[[Any], bool] | None
-    """The predicate of the Workflow, or ``None``."""
-
     to_record: Callable[[temporalio.api.stream.v1.StreamRecord], Any]
     """Turns a proto Record into the typed Record of the Workflow."""
+
+    until: Callable[..., bool] | None
+    """The predicate of the Workflow, or ``None``.
+
+    A read calls it with the typed Record, and a fold with the value and the Record.
+    """
+
+    fold: _StreamFold | None = None
+    """The fold, or ``None`` for a read that gives its Records."""
 
     _result: (
         tuple[_StreamReadMarker, list[temporalio.api.stream.v1.StreamRecord]] | None
@@ -217,9 +230,9 @@ class _PendingStreamReads:
             for key in [key for key in self._reads if key[0] == run_id]:
                 del self._reads[key]
 
-    def __len__(self) -> int:
+    def keys(self) -> list[tuple[str, str]]:
         with self._lock:
-            return len(self._reads)
+            return list(self._reads)
 
 
 _PENDING_STREAM_READS = _PendingStreamReads()
@@ -231,10 +244,80 @@ _ReadPage = Callable[
 
 
 @dataclasses.dataclass(frozen=True)
-class _ReadUntilResult:
+class _ReadLimits:
+    """The stops of a read, as the read Activity gets them."""
+
+    max_records: int
+    max_bytes: int | None
+    idle_timeout: float | None
+    """Seconds with no new Record before the read ends, or ``None``."""
+    timeout: float
+    """Seconds for the whole read."""
+
+
+@dataclasses.dataclass(frozen=True)
+class _ReadOutcome:
     records: list[temporalio.api.stream.v1.StreamRecord]
-    matched: bool
+    """The Records of a read. A fold keeps none."""
+    record_count: int
+    last_offset: bytes | None
+    digest: bytes
+    stop: StreamReadStop
     done: bool
+    value: Any
+    """The value of a fold, or ``None`` for a read."""
+
+
+class _ReadState:
+    """What a read got so far, for one attempt of its Activity."""
+
+    def __init__(self, read: _PendingStreamRead, from_offset: bytes | None) -> None:
+        self._read = read
+        self._digest = _RecordDigest()
+        self.records: list[temporalio.api.stream.v1.StreamRecord] = []
+        self.count = 0
+        self.bytes = 0
+        self.last_offset = from_offset
+        self.value = read.fold.initial if read.fold is not None else None
+
+    def take(self, record: temporalio.api.stream.v1.StreamRecord, size: int) -> bool:
+        """Add ``record`` to the read, and give whether ``until`` is true after it."""
+        self.count += 1
+        self.bytes += size
+        self.last_offset = record.offset
+        self._digest.update(record)
+        read = self._read
+        if read.fold is None:
+            self.records.append(record)
+            if read.until is None:
+                return False
+            return bool(_call_workflow_function(read.until, read.to_record(record)))
+        typed = read.to_record(record)
+        self.value = _call_workflow_function(read.fold.function, self.value, typed)
+        if read.until is None:
+            return False
+        return bool(_call_workflow_function(read.until, self.value, typed))
+
+    def end(self, stop: StreamReadStop, *, done: bool = False) -> _ReadOutcome:
+        return _ReadOutcome(
+            records=self.records,
+            record_count=self.count,
+            last_offset=self.last_offset,
+            digest=self._digest.digest(),
+            stop=stop,
+            done=done,
+            value=self.value,
+        )
+
+
+def _call_workflow_function(function: Callable[..., Any], *args: Any) -> Any:
+    try:
+        return function(*args)
+    except Exception as err:
+        # The Workflow gets this error from its Local Activity, in Workflow code.
+        raise temporalio.exceptions.ApplicationError(
+            str(err), type=type(err).__name__, non_retryable=True
+        ) from err
 
 
 async def _read_until(  # pyright: ignore[reportUnusedFunction]
@@ -242,50 +325,72 @@ async def _read_until(  # pyright: ignore[reportUnusedFunction]
     *,
     ref: temporalio.api.stream.v1.StreamRef,
     from_offset: bytes | None,
-    max_records: int,
-    timeout: timedelta,
+    limits: _ReadLimits,
     read: _PendingStreamRead,
-) -> _ReadUntilResult:
-    """Read pages until the predicate of ``read`` is true, or a limit stops the read."""
-    deadline = time.monotonic() + timeout.total_seconds()
-    records: list[temporalio.api.stream.v1.StreamRecord] = []
-    cursor = from_offset
-    while len(records) < max_records:
-        time_left = deadline - time.monotonic()
-        if time_left <= 0:
-            break
+) -> _ReadOutcome:
+    """Read pages until a stop of :py:class:`StreamReadStop` holds."""
+    start = time.monotonic()
+    deadline = start + limits.timeout
+    # The idle stop counts from the last page that gave a Record.
+    last_arrival = start
+    state = _ReadState(read, from_offset)
+
+    def idle(now: float) -> bool:
+        return (
+            limits.idle_timeout is not None
+            and now - last_arrival >= limits.idle_timeout
+        )
+
+    while True:
+        if state.count >= limits.max_records:
+            return state.end(StreamReadStop.MAX_RECORDS)
+        bytes_left = None
+        if limits.max_bytes is not None:
+            bytes_left = limits.max_bytes - state.bytes
+            # Every Record has some bytes, so none fits in a cap that is used up.
+            if bytes_left <= 0:
+                return state.end(StreamReadStop.MAX_BYTES)
+        now = time.monotonic()
+        if now >= deadline:
+            return state.end(
+                StreamReadStop.IDLE if idle(now) else StreamReadStop.TIMEOUT
+            )
+        wait = min(_MAX_PAGE_WAIT, deadline - now)
+        if limits.idle_timeout is not None:
+            wait = min(wait, max(0.0, last_arrival + limits.idle_timeout - now))
         request = temporalio.api.streamservice.v1.ReadRecordsRequest(
             ref=ref,
-            from_offset=cursor or b"",
-            max_records=min(max_records - len(records), _MAX_PAGE_RECORDS),
+            from_offset=state.last_offset or b"",
+            max_records=min(limits.max_records - state.count, _MAX_PAGE_RECORDS),
+            max_bytes=bytes_left or 0,
         )
-        request.wait.FromTimedelta(min(timedelta(seconds=time_left), _MAX_PAGE_WAIT))
+        request.wait.FromTimedelta(timedelta(seconds=wait))
         response = await read_page(request)
-        page = list(response.records)[: max_records - len(records)]
-        for index, record in enumerate(page):
-            records.append(record)
-            if read.until is not None and _call_until(read, record):
-                # A done page ends with the last Record, so a match on it is the end too.
-                last = index == len(response.records) - 1
-                return _ReadUntilResult(records, True, response.done and last)
-        if response.done and len(page) == len(response.records):
-            return _ReadUntilResult(records, False, True)
-        if page:
-            cursor = page[-1].offset
-    return _ReadUntilResult(records, False, False)
-
-
-def _call_until(
-    read: _PendingStreamRead, record: temporalio.api.stream.v1.StreamRecord
-) -> bool:
-    assert read.until is not None
-    try:
-        return bool(read.until(read.to_record(record)))
-    except Exception as err:
-        # The Workflow gets this error from its Local Activity, in Workflow code.
-        raise temporalio.exceptions.ApplicationError(
-            str(err), type=type(err).__name__, non_retryable=True
-        ) from err
+        if response.records:
+            last_arrival = time.monotonic()
+        for index, record in enumerate(response.records):
+            if state.count >= limits.max_records:
+                return state.end(StreamReadStop.MAX_RECORDS)
+            size = record.ByteSize()
+            # A Store gives the first Record of a page even when it passes the cap, and
+            # the read keeps it only when it is the first Record of the read.
+            if (
+                limits.max_bytes is not None
+                and state.count > 0
+                and state.bytes + size > limits.max_bytes
+            ):
+                return state.end(StreamReadStop.MAX_BYTES)
+            matched = state.take(record, size)
+            # A done page ends with the last Record of the Stream.
+            done = response.done and index == len(response.records) - 1
+            if matched:
+                return state.end(StreamReadStop.MATCH, done=done)
+            if done:
+                return state.end(StreamReadStop.DONE, done=True)
+        if response.done and not response.records:
+            return state.end(StreamReadStop.DONE, done=True)
+        if not response.records and idle(time.monotonic()):
+            return state.end(StreamReadStop.IDLE)
 
 
 async def _read_range(  # pyright: ignore[reportUnusedFunction]

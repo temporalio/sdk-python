@@ -194,5 +194,6 @@ class StreamReadState:
     """
 
     until_calls = 0
+    function_calls = 0
     fail_next_task = False
     results: dict[str, tuple[object, ...]] = {}
