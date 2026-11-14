@@ -61,3 +61,11 @@ scan stopped, so a loop that gives it as the next `from_offset` loses and repeat
 `limit` as its last step. For any other chain it raises `TypeError`, and `collect` or
 `reduce` runs it. In Workflow code a result must fit in 1 MiB once encoded, since it goes
 into History.
+
+The table shows the default. A Worker whose `StreamConfig` has
+`workflow_read_replay_from=StreamReplaySource.STORE` keeps the Records of `records`, and of
+`collect` with no `map`, out of History. Their marker then holds the offsets of the Records, a
+count and a digest, with no size limit and no default `max_bytes`. A replay reads the Records
+from the Store again, so they must stay there for as long as the Workflow can replay. The
+folding ends, `reduce`, `count` and `collect` with a `map`, keep their value in History under
+both settings.
