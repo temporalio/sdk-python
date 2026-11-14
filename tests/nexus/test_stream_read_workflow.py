@@ -13,7 +13,7 @@ from typing import Any, cast
 
 import pytest
 
-from temporalio import workflow
+from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload, Payloads
 from temporalio.api.enums.v1 import EventType, StreamErrorReason
 from temporalio.api.stream.v1 import StreamRef as StreamRefMessage
@@ -398,11 +398,48 @@ def _call_datetime_now(record: StreamRecord[Token]) -> bool:
     return datetime.now() > datetime.min
 
 
+def _append_to_workflow_stream(record: StreamRecord[Token]) -> bool:
+    # The type checker refuses an `append` that nothing awaits, so the Stream is an `Any`.
+    stream: Any = workflow.get_stream(StreamRef(id="other"), body_type=str)
+    stream.append(record.body.text)
+    return True
+
+
+def _schedule_an_append(record: StreamRecord[Token]) -> bool:
+    stream = workflow.get_stream(StreamRef(id="other"), body_type=str)
+    asyncio.ensure_future(stream.append(record.body.text))
+    return True
+
+
+def _append_to_client_stream(record: StreamRecord[Token]) -> bool:
+    stream: Any = activity.client().get_stream(StreamRef(id="other"), body_type=str)
+    stream.append(record.body.text)
+    return True
+
+
 _PREDICATES: dict[str, Callable[[StreamRecord[Token]], bool]] = {
     "raise": _raise_on_record,
     "workflow_now": _call_workflow_now,
     "datetime_now": _call_datetime_now,
+    "append_to_workflow_stream": _append_to_workflow_stream,
+    "schedule_an_append": _schedule_an_append,
+    "append_to_client_stream": _append_to_client_stream,
 }
+
+
+# The sandbox has its own copy of this module, so the Workflow below runs outside it.
+_CLIENT_STREAMS: dict[str, Any] = {}
+
+
+@workflow.defn(sandboxed=False)
+class ClientStreamInWorkflowCodeWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> str:
+        try:
+            _CLIENT_STREAMS[stream_id].describe()
+        except TypeError as err:
+            return str(err)
+        return "no error"
 
 
 @workflow.defn
@@ -1105,6 +1142,47 @@ async def test_predicate_cannot_call_workflow_functions(
     # The predicate runs on the Worker's event loop, where no Workflow runs.
     assert await _failing_predicate(client, "workflow_now", runner) == (
         "_NotInWorkflowEventLoopError: Not in workflow event loop"
+    )
+
+
+@pytest.mark.parametrize(
+    "predicate",
+    ["append_to_workflow_stream", "schedule_an_append", "append_to_client_stream"],
+)
+async def test_predicate_cannot_call_a_stream(client: Client, predicate: str):
+    # A plain function can't await, so its `append` would write nothing and report nothing.
+    assert await _failing_predicate(client, predicate) == (
+        "TypeError: The predicate of a Stream call can't call `append` of a Stream. It is a "
+        "plain function, so it can't await the call. To append in it, use a BufferedAppender."
+    )
+
+
+def test_workflow_stream_works_only_in_workflow_code():
+    stream: Any = workflow.get_stream(StreamRef(id="chat"), body_type=str)
+    for method in ("append", "close", "describe", "take", "filter", "reduce"):
+        with pytest.raises(
+            TypeError,
+            match=f"`{method}` of a Workflow Stream works only in Workflow code",
+        ):
+            getattr(stream, method)
+    # The ref is data, so code reads it anywhere.
+    assert stream.ref.id == "chat"
+
+
+async def test_client_stream_does_not_work_in_workflow_code(client: Client):
+    stream_client, _, stream_id = await _new_stream(client)
+    _CLIENT_STREAMS[stream_id] = stream_client.get_stream(
+        StreamRef(id=stream_id), body_type=Token
+    )
+    try:
+        _, result = await _run_workflow(
+            stream_client, ClientStreamInWorkflowCodeWorkflow, stream_id
+        )
+    finally:
+        del _CLIENT_STREAMS[stream_id]
+    assert result == (
+        "`describe` of a client Stream doesn't work in Workflow code. Get the Stream with "
+        "`temporalio.workflow.get_stream`."
     )
 
 
