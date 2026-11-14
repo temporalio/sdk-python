@@ -15,6 +15,8 @@ import temporalio.bridge._visitor
 import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._payload_converter
+import temporalio.nexus.system._support
 import temporalio.nexus.system.stream_service
 import temporalio.runtime
 import temporalio.workflow
@@ -49,7 +51,9 @@ class StreamStoreCallOptions:
     retry_policy: temporalio.common.RetryPolicy = dataclasses.field(
         default_factory=lambda: temporalio.common.RetryPolicy(maximum_attempts=1)
     )
-    """Retries of a failed call. The default is one attempt."""
+    """Retries of a failed call. The default is one attempt. In one Workflow Task, each
+    attempt of a Workflow's append without an explicit ``producer`` sends the same
+    Producer, epoch and sequence, so the Store writes the batch once."""
 
     def __post_init__(self) -> None:
         """Check that a timeout is set."""
@@ -152,8 +156,8 @@ class StreamStore(ABC):
         calls no method of this Store.
 
         Args:
-            operation: The Nexus operation name, ``CreateStream`` or ``DescribeStream``
-                in this release.
+            operation: The Nexus operation name, ``CreateStream``, ``AppendRecords``
+                or ``DescribeStream`` in this release.
             request: The request message of ``temporalio.api.streamservice.v1``.
             options: The :py:attr:`StreamConfig.workflow_call_options` of the config.
 
@@ -161,8 +165,8 @@ class StreamStore(ABC):
             The response message of the operation.
         """
         stream_operation = _STREAM_OPERATIONS[operation]
-        # Workflow code can start only a create and a describe in this release, and their
-        # messages carry no payload. So the Local Activity has no payload codec step.
+        # Workflow code runs no payload codec, so the Activity encodes the bodies of an
+        # append before the Store gets them.
         response = await temporalio.workflow.execute_local_activity(
             _store_call_activity_name(self.name),
             args=[operation, request.SerializeToString()],
@@ -297,10 +301,6 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
         "append_records",
         temporalio.api.streamservice.v1.AppendRecordsRequest,
         temporalio.api.streamservice.v1.AppendRecordsResponse,
-        workflow_refusal=(
-            "Workflow code can't append to a Stream on a Store in this release. "
-            "Call a Local Activity that appends through its client."
-        ),
     ),
     "ReadRecords": _StreamOperation(
         "read_records",
@@ -341,13 +341,41 @@ def _store_call_activity(
 ) -> Callable[[str, bytes], Awaitable[bytes]]:
     @temporalio.activity.defn(name=_store_call_activity_name(store.name))
     async def call(operation: str, request: bytes) -> bytes:
-        stream_operation = _STREAM_OPERATIONS[operation]
-        response = await stream_operation.call(
-            store, stream_operation.request_type.FromString(request)
+        message = _STREAM_OPERATIONS[operation].request_type.FromString(request)
+        if isinstance(message, temporalio.api.streamservice.v1.AppendRecordsRequest):
+            _with_local_activity_producer(message)
+        response = await _call_stream_store(
+            store, temporalio.activity.client().data_converter, operation, message
         )
         return response.SerializeToString()
 
     return call
+
+
+def _with_local_activity_producer(
+    request: temporalio.api.streamservice.v1.AppendRecordsRequest,
+) -> None:
+    # On a Store, a Workflow appends as the Local Activity that runs the append, so the
+    # Store can fence the write of a failed Workflow Task. A Producer that Workflow code
+    # gave of another kind reaches the Store as it is.
+    if (
+        request.producer.WhichOneof("kind") != "workflow"
+        or not temporalio.activity.info().is_local
+    ):
+        return
+    converter = temporalio.converter._payload_converter._get_transfer_type_converter(
+        temporalio.nexus.system.stream_service.Producer
+    )
+    if converter is None:
+        raise TypeError("The generated Producer has no proto transfer type")
+    request.producer.CopyFrom(
+        converter.to_transfer_type(temporalio.nexus.system._support.default_producer())
+    )
+    # Each retry of this Local Activity in one Workflow Task sends the same Producer, epoch
+    # and sequence, so the Store writes the batch once and gives back its first offsets.
+    request.producer.local_activity.epoch.attempt = 1
+    if not request.sequence:
+        request.sequence = 1
 
 
 @dataclasses.dataclass(frozen=True)
