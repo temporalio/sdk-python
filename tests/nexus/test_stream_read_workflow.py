@@ -9,7 +9,7 @@ import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -138,6 +138,7 @@ async def _call(args: CallArgs, stream: Any = None) -> CallResult:
         return record.body.kind == until_kind
 
     def fold_until(value: list[str], record: StreamRecord[Token]) -> bool:
+        del value
         StreamReadState.until_calls += 1
         return record.body.kind == until_kind
 
@@ -168,10 +169,11 @@ async def _call(args: CallArgs, stream: Any = None) -> CallResult:
             args.max_bytes,
         )
         return _read_result(read)
+    no_texts: list[str] = []
     reduce = await workflow.reduce_stream(
         stream,
         _collect,
-        [],
+        no_texts,
         timeout,
         fold_until if until_kind else None,
         from_offset,
@@ -370,10 +372,12 @@ class VariantWorkflow:
 
 
 async def _async_until(record: StreamRecord[Token]) -> bool:
+    del record
     return True
 
 
 def _until_that_awaits(record: StreamRecord[Token]) -> Any:
+    del record
     return asyncio.sleep(0)
 
 
@@ -382,12 +386,10 @@ class RefusedFunctionWorkflow:
     @workflow.run
     async def run(self, stream_id: str, which: str) -> str:
         stream = _stream(stream_id)
+        # The type checker refuses both functions, and the call refuses them at run time.
+        until: Any = _async_until if which == "coroutine" else _until_that_awaits
         try:
-            await workflow.take_stream(
-                stream,
-                timedelta(seconds=10),
-                until=_async_until if which == "coroutine" else _until_that_awaits,
-            )
+            await workflow.take_stream(stream, timedelta(seconds=10), until=until)
         except TypeError as err:
             return f"TypeError: {err}"
         except ApplicationError as err:
@@ -464,14 +466,14 @@ class FoldTypesWorkflow:
         untyped = await workflow.reduce_stream(
             stream,
             lambda value, record: Summary(1, [record.body.kind]),
-            None,
+            cast(Any, None),
             quick,
             idle_timeout=now,
         )
         explicit = await workflow.reduce_stream(
             stream,
             lambda value, record: [*value, record.body.text],
-            (),
+            cast(Any, ()),
             quick,
             idle_timeout=now,
             value_type=list[str],

@@ -1,5 +1,4 @@
-"""The scan of :py:func:`temporalio.workflow.take_stream`, ``filter_stream`` and
-``reduce_stream``, for client, Activity and Workflow code.
+"""The scan of the take, filter and reduce calls, for client, Activity and Workflow code.
 
 Client and Activity code run the scan straight against the Store. Workflow code runs it in a
 Local Activity, and the result of that Local Activity is the result of the call. The
@@ -31,7 +30,6 @@ import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.nexus.system.stream_service.client
-import temporalio.workflow
 from temporalio.nexus.system.stream_service.models import (
     ReadRecordsRequest,
     StreamRecord,
@@ -466,7 +464,9 @@ _STREAM_CALL_ACTIVITY = "__temporal_stream_call"
 
 
 @temporalio.activity.defn(name=_STREAM_CALL_ACTIVITY)
-async def _stream_call_activity(call_id: str) -> temporalio.common.RawValue:
+async def _stream_call_activity(  # pyright: ignore[reportUnusedFunction]
+    call_id: str,
+) -> temporalio.common.RawValue:
     """Run the scan of one call of Workflow code, and give its result."""
     info = temporalio.activity.info()
     pending = _PENDING_STREAM_CALLS.get(info.workflow_run_id or "", call_id)
