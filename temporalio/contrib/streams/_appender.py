@@ -7,12 +7,15 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from types import TracebackType
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 
 from typing_extensions import Self
 
+import temporalio.activity
 import temporalio.nexus.system.stream_service.client
 import temporalio.workflow
 
@@ -28,6 +31,12 @@ BodyT = TypeVar("BodyT")
 _MAX_BATCH_RECORDS = 1000
 
 _DEFAULT_MAX_DELAY = timedelta(milliseconds=100)
+
+# The appenders that the functions of one take, filter or reduce call used, so the call
+# writes their Records before it returns. It is unset outside such a function.
+_CALL_APPENDERS: contextvars.ContextVar[list[BufferedAppender[Any]] | None] = (
+    contextvars.ContextVar("temporal_stream_call_appenders", default=None)
+)
 
 
 class BufferedAppender(Generic[BodyT]):
@@ -48,6 +57,13 @@ class BufferedAppender(Generic[BodyT]):
       one write. Each write is the Workflow ``append`` of the Stream, so it is one Local
       Activity and one marker in History. A replay takes the results from History and writes
       nothing.
+    * In a function of :py:func:`temporalio.workflow.take_stream`, ``filter_stream`` or
+      ``reduce_stream``, the appender writes as in an Activity, also when it was made with
+      a Workflow Stream. In Workflow code that function runs in the call's Local Activity,
+      so the Records get the Producer and epoch of that Local Activity. The call writes
+      the buffered Records before it returns, and a failed write fails the call. A replay
+      doesn't call the function, so it writes nothing. A Workflow Task that fails and runs
+      again calls it again, and the appender writes again with a higher epoch.
 
     Use it in ``async with``, which writes the remaining Records at the end of the block, or
     await :py:meth:`flush`. Without ``async with`` or a :py:meth:`flush`, the Records still in
@@ -103,6 +119,10 @@ class BufferedAppender(Generic[BodyT]):
         self._error: BaseException | None = None
         self._last_offset: bytes | None = None
         self._unwritten = 0
+        # A Workflow Stream can't append outside Workflow code, so it writes through this.
+        self._client_stream: (
+            temporalio.nexus.system.stream_service.client.Stream[BodyT] | None
+        ) = None
 
     def append(self, *records: BodyT) -> None:
         """Add one Record for each value to the buffer, and return at once.
@@ -118,6 +138,11 @@ class BufferedAppender(Generic[BodyT]):
         if not records:
             raise TypeError("append takes one or more values")
         self._check_delay()
+        if not temporalio.workflow.in_workflow():
+            self._client_stream = self._outside_workflow_stream()
+            appenders = _CALL_APPENDERS.get()
+            if appenders is not None and self not in appenders:
+                appenders.append(self)
         loop = asyncio.get_running_loop()
         if not self._buffer:
             self._first_at = loop.time()
@@ -171,6 +196,24 @@ class BufferedAppender(Generic[BodyT]):
         if self._error is not None:
             raise self._error
 
+    def _outside_workflow_stream(
+        self,
+    ) -> temporalio.nexus.system.stream_service.client.Stream[BodyT]:
+        stream = self._stream
+        if isinstance(stream, temporalio.nexus.system.stream_service.client.Stream):
+            return stream
+        if self._client_stream is not None:
+            return self._client_stream
+        if not temporalio.activity.in_activity():
+            raise TypeError(
+                "A BufferedAppender of a Workflow Stream appends only in Workflow code, "
+                "in an Activity, or in a function of a Stream call"
+            )
+        # The Activity's client reaches the Store, as a client Stream of the Activity does.
+        return temporalio.activity.client().get_stream(
+            stream.ref, body_type=stream.body_type
+        )
+
     def _check_delay(self) -> None:
         if self._max_delay is not None and temporalio.workflow.in_workflow():
             raise ValueError(
@@ -209,7 +252,12 @@ class BufferedAppender(Generic[BodyT]):
             # The Store numbers each batch, since the appender sends no `sequence` and never
             # sends a batch twice. A `sequence` counts for a Producer on a Stream, and two
             # appenders of one Activity attempt would each start at 1.
-            response = await self._stream.append(*batch)
+            append: Callable[..., Awaitable[Any]] = (
+                self._stream.append
+                if temporalio.workflow.in_workflow() or self._client_stream is None
+                else self._client_stream.append
+            )
+            response = await append(*batch)
             self._last_offset = response.last_offset
         except asyncio.CancelledError:
             # A later call must not report a cancel that its caller didn't ask for.
@@ -233,3 +281,15 @@ class BufferedAppender(Generic[BodyT]):
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None
+
+
+async def _flush_call_appenders(  # pyright: ignore[reportUnusedFunction]
+    appenders: list[BufferedAppender[Any]], *, raise_error: bool
+) -> None:
+    """Write the Records of the appenders that the functions of a Stream call used."""
+    for appender in appenders:
+        try:
+            await appender.flush()
+        except Exception:
+            if raise_error:
+                raise

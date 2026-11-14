@@ -46,6 +46,7 @@ from temporalio.workflow._streams import (
 )
 
 from ._client import Client
+from ._stream_appender import _CALL_APPENDERS, _flush_call_appenders
 from ._stream_store import (
     _STREAM_SERVICE,
     StreamStore,
@@ -242,6 +243,38 @@ async def _scan(
             return state.end(StreamReadStop.Done, done=True)
         if not response.records and idle(time.monotonic()):
             return state.end(StreamReadStop.Idle)
+
+
+async def _scan_and_flush(
+    read_page: _ReadPage,
+    *,
+    ref: temporalio.api.stream.v1.StreamRef,
+    call: _StreamCall,
+    to_record: _ToRecord,
+    in_local_activity: bool,
+) -> _ScanOutcome:
+    """Run :py:func:`_scan`, then write the Records that the caller's functions appended.
+
+    In Workflow code the result goes into History only after those Records are in the Store.
+    """
+    appenders: list[Any] = []
+    token = _CALL_APPENDERS.set(appenders)
+    try:
+        outcome = await _scan(
+            read_page,
+            ref=ref,
+            call=call,
+            to_record=to_record,
+            in_local_activity=in_local_activity,
+        )
+    except Exception:
+        # The error of the scan wins over an error of the write.
+        await _flush_call_appenders(appenders, raise_error=False)
+        raise
+    finally:
+        _CALL_APPENDERS.reset(token)
+    await _flush_call_appenders(appenders, raise_error=True)
+    return outcome
 
 
 @dataclasses.dataclass(frozen=True)
@@ -447,7 +480,7 @@ async def _stream_call_activity(call_id: str) -> temporalio.common.RawValue:
             non_retryable=True,
         )
     # The codec decodes the bodies of each page, so the caller's functions get its values.
-    outcome = await _scan(
+    outcome = await _scan_and_flush(
         _store_page_reader(pending.store, temporalio.activity.client().data_converter),
         ref=pending.ref,
         call=pending.call,
@@ -510,7 +543,7 @@ async def _stream_call_outside_workflow(  # pyright: ignore[reportUnusedFunction
     def to_record(record: temporalio.api.stream.v1.StreamRecord) -> Any:
         return payload_converter._from_transfer_value(record, record_type)
 
-    outcome = await _scan(
+    outcome = await _scan_and_flush(
         _store_page_reader(store, data_converter),
         ref=message.ref,
         call=call,
