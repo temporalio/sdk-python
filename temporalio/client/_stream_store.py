@@ -396,7 +396,7 @@ def _with_local_activity_producer(
         request.sequence = 1
 
 
-def _store_page_reader(
+def _store_page_reader(  # pyright: ignore[reportUnusedFunction]
     store: StreamStore, data_converter: temporalio.converter.DataConverter
 ) -> Callable[
     [temporalio.api.streamservice.v1.ReadRecordsRequest],

@@ -164,19 +164,23 @@ async def test_client_functions_must_be_plain(client: Client):
     stream = _client_stream(stream_client, stream_id)
 
     async def coroutine_until(record: StreamRecord[Token]) -> bool:
+        del record
         return True
 
+    # The type checker refuses both functions, and the call refuses them at run time.
+    awaiting: Any = coroutine_until
+
     with pytest.raises(TypeError, match="until must be a plain function"):
-        await take_stream(stream, timedelta(seconds=5), coroutine_until)
+        await take_stream(stream, timedelta(seconds=5), awaiting)
     with pytest.raises(ApplicationError) as err:
         await filter_stream(
-            stream, lambda record: coroutine_until(record), timedelta(seconds=5)
+            stream, lambda record: awaiting(record), timedelta(seconds=5)
         )
     assert err.value.non_retryable
     assert err.value.message.startswith("The predicate of a Stream call returned an")
 
     def raises(value: int, record: StreamRecord[Token]) -> int:
-        raise ValueError("bad fold")
+        raise ValueError(f"bad fold after {value} at {record.offset.hex()}")
 
     # In a client, the error of the caller's function reaches it as it is.
     with pytest.raises(ValueError, match="bad fold"):

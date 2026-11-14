@@ -1,5 +1,4 @@
-"""The Workflow side of :py:func:`temporalio.workflow.take_stream`, ``filter_stream`` and
-``reduce_stream``."""
+"""The Workflow side of the take, filter and reduce calls of a Stream."""
 
 from __future__ import annotations
 

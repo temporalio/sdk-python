@@ -214,9 +214,7 @@ class _StreamCall:
         )
 
 
-def _check_plain_function(
-    label: str, value: Callable[..., object] | None, *, required: bool
-) -> None:
+def _check_plain_function(label: str, value: object, *, required: bool) -> None:
     if value is None:
         if required:
             raise TypeError(f"{label} is required")
