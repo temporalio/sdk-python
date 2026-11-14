@@ -93,8 +93,8 @@ dev = [
 ]
 
 [tool.poe.tasks]
-build-develop = "uv run maturin develop --uv"
-build-develop-with-release = { cmd = "uv run maturin develop --release --uv" }
+build-develop = "uv run maturin develop --uv --features streams-redis"
+build-develop-with-release = { cmd = "uv run maturin develop --release --uv --features streams-redis" }
 # FIPS builds: swap the rustls stack onto aws-lc-rs FIPS mode (aws-lc-fips-sys), eliminating `ring`.
 build-develop-fips = { cmd = "uv run maturin develop --uv --no-default-features --features fips", env = { TEMPORALIO_FIPS = "1" } }
 build-wheel-fips = { cmd = "uv run maturin build --release --no-default-features --features fips", env = { TEMPORALIO_FIPS = "1" } }
@@ -153,18 +153,20 @@ filterwarnings = [
 before-all = "pip install protoc-wheel-0"
 build = "cp311-win_amd64 cp311-manylinux_x86_64 cp311-manylinux_aarch64 cp311-musllinux_x86_64 cp311-musllinux_aarch64 cp311-macosx_x86_64 cp311-macosx_arm64"
 build-verbosity = 1
+# The official wheels link the Stream runtime.
+environment = { MATURIN_PEP517_ARGS = "--features streams-redis" }
 
 [tool.cibuildwheel.macos]
-environment = { MACOSX_DEPLOYMENT_TARGET = "10.12" }
+environment = { MACOSX_DEPLOYMENT_TARGET = "10.12", MATURIN_PEP517_ARGS = "--features streams-redis" }
 
 [tool.cibuildwheel.linux]
 before-all = "sh scripts/cibuildwheel_before_all_linux.sh"
 before-build = "sh scripts/cibuildwheel_before_build_linux.sh"
-environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true" }
+environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true", MATURIN_PEP517_ARGS = "--features streams-redis" }
 
 [[tool.cibuildwheel.overrides]]
 select = "*musllinux*"
-environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true", RUSTFLAGS = "-C target-feature=-crt-static" }
+environment = { PATH = "$PATH:$HOME/.cargo/bin", CARGO_NET_GIT_FETCH_WITH_CLI = "true", RUSTFLAGS = "-C target-feature=-crt-static", MATURIN_PEP517_ARGS = "--features streams-redis" }
 
 [tool.mypy]
 ignore_missing_imports = true
@@ -173,10 +175,15 @@ exclude = [
   'temporalio/api',
   'temporalio/bridge/proto',
   'temporalio/nexus/system/workflow_service',
+  'temporalio/nexus/system/stream_service',
 ]
 
 [[tool.mypy.overrides]]
 module = "temporalio.nexus.system.workflow_service.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "temporalio.nexus.system.stream_service.*"
 ignore_errors = true
 
 [tool.pydocstyle]

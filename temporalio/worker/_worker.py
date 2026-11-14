@@ -34,6 +34,7 @@ from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
 from ._plugin import Plugin
+from ._stream_store import _WorkflowStreamStore
 from ._tuning import WorkerTuner
 from ._workflow import (
     _DEFAULT_WORKFLOW_TASK_EXTERNAL_STORAGE_CONCURRENCY,
@@ -498,7 +499,11 @@ class Worker:
             or bridge_client.config.runtime
             or temporalio.runtime.Runtime.default()
         )
-        activities = config.get("activities")
+        activities = list(config.get("activities") or [])
+        stream_config = client_config.get("stream_config")
+        if stream_config is not None and config.get("workflows"):
+            for store in stream_config.stores:
+                activities.extend(store.worker_activities())
         if activities:
             _warn_if_activity_executor_max_workers_is_inconsistent(config)
             self._activity_worker = _ActivityWorker(
@@ -578,6 +583,7 @@ class Worker:
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
                 max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
+                stream_store=_WorkflowStreamStore.from_config(stream_config),
             )
 
         tuner = config.get("tuner")
@@ -662,11 +668,14 @@ class Worker:
                 # are not running an activity worker at all. Otherwise shutdown
                 # will not proceed properly.
                 no_remote_activities=config.get("no_remote_activities")
-                or not config.get("activities"),
+                or self._activity_worker is None,
                 task_types=temporalio.bridge.worker.WorkerTaskTypes(
                     enable_workflows=self._workflow_worker is not None,
                     enable_local_activities=self._activity_worker is not None
                     and self._workflow_worker is not None,
+                    # A Workflow's Stream close runs a Store's Activity as a regular
+                    # Activity, so the Activities of the Stream Stores alone make this
+                    # worker poll for Activity Tasks.
                     enable_remote_activities=self._activity_worker is not None
                     and not config.get("no_remote_activities"),
                     enable_nexus=self._nexus_worker is not None,
@@ -751,12 +760,18 @@ class Worker:
         Changing the client will make sure the worker starts using it for the
         next calls it makes. However, outstanding client calls will still
         complete with the existing client. The new client cannot be "lazy" and
-        must be using the same runtime as the current client.
+        must be using the same runtime and Stream Stores as the current client.
         """
         bridge_client = _extract_bridge_client_for_worker(value)
         if self._runtime is not bridge_client._runtime:
             raise ValueError(
                 "New client is not on the same runtime as the existing client"
+            )
+        # Running Workflows route their Stream calls by the Store that the worker
+        # started with, so a new client can't change it.
+        if _stream_config_stores(value) != _stream_config_stores(self.client):
+            raise ValueError(
+                "New client doesn't have the Stream Stores of the existing client"
             )
         assert bridge_client._bridge_client
         self._bridge_worker.replace_client(bridge_client._bridge_client)
@@ -1011,6 +1026,13 @@ class Worker:
         # Only re-raise our exception if present and exc_type is cancel
         if exc_type is asyncio.CancelledError and self._async_context_run_exception:
             raise self._async_context_run_exception
+
+
+def _stream_config_stores(
+    client: temporalio.client.Client,
+) -> list[temporalio.client.StreamStore]:
+    config = client.config(active_config=True).get("stream_config")
+    return list(config.stores) if config is not None else []
 
 
 class WorkerConfig(TypedDict, total=False):

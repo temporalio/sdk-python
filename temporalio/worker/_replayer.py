@@ -22,6 +22,7 @@ import temporalio.workflow
 
 from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
+from ._stream_store import _WorkflowStreamStore
 from ._worker import load_default_build_id
 from ._workflow import _WorkflowWorker
 from ._workflow_instance import (
@@ -56,6 +57,7 @@ class Replayer:
         runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        stream_config: temporalio.client.StreamConfig | None = None,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -63,6 +65,12 @@ class Replayer:
         most of the arguments. Most of the same arguments need to be passed to
         the replayer that were passed to the worker when the workflow originally
         ran.
+
+        ``stream_config`` takes the Stream config of the client that the
+        worker had, so a replay makes the same commands. A history that records a
+        Stream call needs it. With no Stream config, Workflow code gets an error in
+        place of that call, and the replay fails with a nondeterminism error. A
+        replay calls no method of its Stores.
 
         Note, unlike the worker, for the replayer the workflow_task_executor
         will default to a new thread pool executor with no max_workers set that
@@ -86,6 +94,7 @@ class Replayer:
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
+            stream_config=stream_config,
         )
         self._initial_config = self._config.copy()
         self._default_workflow_logic_flags = set(_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS)
@@ -287,6 +296,9 @@ class Replayer:
                 default_workflow_logic_flags=frozenset(
                     self._default_workflow_logic_flags
                 ),
+                stream_store=_WorkflowStreamStore.from_config(
+                    self._config.get("stream_config")
+                ),
             )
             external_storage = data_converter.external_storage
             storage_driver_types = (
@@ -435,6 +447,7 @@ class ReplayerConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
+    stream_config: temporalio.client.StreamConfig | None
 
 
 @dataclass(frozen=True)
