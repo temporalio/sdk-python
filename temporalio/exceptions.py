@@ -291,8 +291,8 @@ class StreamConfigError(RuntimeError):
 
     * A Stream call is made on a client with no Stream config. This release has no
       Streams on the server, so every Stream call needs a Store.
-    * A Workflow's Stream call is made on a Worker whose client has no Stream config.
-      This fails the Workflow Task.
+    * A Workflow's Stream call has a ref that names no Store, on a Worker whose
+      client has more than one Store and no selector. This fails the Workflow Task.
     * A :py:class:`temporalio.client.StreamConfig` has no Store, or has two Stores
       with one name.
     * A call names no Store on a config with more than one Store and no selector.
@@ -302,6 +302,13 @@ class StreamConfigError(RuntimeError):
     * A Workflow's Stream call has a ref that names a Store that the config of the
       Worker's client doesn't have. This fails the Workflow Task.
     * This build of temporalio has no Stream runtime, or no Redis Stream Store.
+
+    A Workflow's Stream call on a Worker whose client has no Stream config doesn't
+    raise this class. Workflow code gets an :py:class:`ApplicationError` with the
+    ``type`` ``StreamConfigError`` and ``non_retryable`` set, so an uncaught one fails
+    the Workflow. Workflow code can catch this error. A Workflow that catches it must
+    not go on to make the same call on a Worker that has a config, since the History
+    then has no record of the first call.
 
     .. warning::
         This API is experimental and subject to change.
