@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextvars
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from types import TracebackType
@@ -16,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from typing_extensions import Self
 
 import temporalio.activity
+import temporalio.client._stream_read
 import temporalio.nexus.system.stream_service.client
 import temporalio.workflow
 
@@ -31,12 +31,6 @@ BodyT = TypeVar("BodyT")
 _MAX_BATCH_RECORDS = 1000
 
 _DEFAULT_MAX_DELAY = timedelta(milliseconds=100)
-
-# The appenders that the functions of one take, filter or reduce call used, so the call
-# writes their Records before it returns. It is unset outside such a function.
-_CALL_APPENDERS: contextvars.ContextVar[list[BufferedAppender[Any]] | None] = (
-    contextvars.ContextVar("temporal_stream_call_appenders", default=None)
-)
 
 
 class BufferedAppender(Generic[BodyT]):
@@ -140,9 +134,9 @@ class BufferedAppender(Generic[BodyT]):
         self._check_delay()
         if not temporalio.workflow.in_workflow():
             self._client_stream = self._outside_workflow_stream()
-            appenders = _CALL_APPENDERS.get()
-            if appenders is not None and self not in appenders:
-                appenders.append(self)
+            flushes = temporalio.client._stream_read._CALL_FLUSHES.get()
+            if flushes is not None and self not in flushes:
+                flushes.append(self)
         loop = asyncio.get_running_loop()
         if not self._buffer:
             self._first_at = loop.time()
@@ -281,15 +275,3 @@ class BufferedAppender(Generic[BodyT]):
         if self._timer is not None:
             self._timer.cancel()
             self._timer = None
-
-
-async def _flush_call_appenders(  # pyright: ignore[reportUnusedFunction]
-    appenders: list[BufferedAppender[Any]], *, raise_error: bool
-) -> None:
-    """Write the Records of the appenders that the functions of a Stream call used."""
-    for appender in appenders:
-        try:
-            await appender.flush()
-        except Exception:
-            if raise_error:
-                raise

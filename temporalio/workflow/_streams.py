@@ -281,8 +281,8 @@ async def take_stream(
 
     The functions of the caller must be plain functions that change no state. The scan calls
     each one for a Record and uses its answer at once. A
-    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
-    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.contrib.streams.BufferedAppender` can append in them, and the call
+    writes the appender's Records before it returns. A failed write fails the call with the
     :py:class:`temporalio.exceptions.StreamError`.
 
     In Workflow code only, the scan runs in one Local Activity and History gets one marker.
@@ -375,8 +375,8 @@ async def filter_stream(
 
     The functions of the caller must be plain functions that change no state. The scan calls
     each one for a Record and uses its answer at once. A
-    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
-    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.contrib.streams.BufferedAppender` can append in them, and the call
+    writes the appender's Records before it returns. A failed write fails the call with the
     :py:class:`temporalio.exceptions.StreamError`.
 
     In Workflow code only, the scan runs in one Local Activity and History gets one marker.
@@ -473,8 +473,8 @@ async def reduce_stream(
 
     The functions of the caller must be plain functions that change no state. The scan calls
     each one for a Record and uses its answer at once. A
-    :py:class:`temporalio.client.BufferedAppender` can append in them, and the call writes
-    the appender's Records before it returns. A failed write fails the call with the
+    :py:class:`temporalio.contrib.streams.BufferedAppender` can append in them, and the call
+    writes the appender's Records before it returns. A failed write fails the call with the
     :py:class:`temporalio.exceptions.StreamError`.
 
     In Workflow code only, the scan runs in one Local Activity and History gets one marker.

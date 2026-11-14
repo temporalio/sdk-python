@@ -12,6 +12,7 @@ registry of this module, in the memory of the Worker process.
 from __future__ import annotations
 
 import base64
+import contextvars
 import dataclasses
 import inspect
 import json
@@ -19,7 +20,7 @@ import threading
 import time
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Any
+from typing import Any, Protocol
 
 import temporalio.activity
 import temporalio.api.common.v1
@@ -44,7 +45,6 @@ from temporalio.workflow._streams import (
 )
 
 from ._client import Client
-from ._stream_appender import _CALL_APPENDERS, _flush_call_appenders
 from ._stream_store import (
     _STREAM_SERVICE,
     StreamStore,
@@ -58,6 +58,19 @@ _RECORDS_MESSAGE_TYPE = b"temporal.api.streamservice.v1.ReadRecordsResponse"
 _MAX_PAGE_RECORDS = 1000
 # A Store waits at most this long for one page.
 _MAX_PAGE_WAIT = 60.0
+
+
+class _CallFlush(Protocol):
+    """A writer that a function of a call used, such as a ``BufferedAppender``."""
+
+    async def flush(self) -> object: ...
+
+
+# The writers that the functions of one take, filter or reduce call used, so the call writes
+# their Records before it returns. It is unset outside such a function.
+_CALL_FLUSHES: contextvars.ContextVar[list[_CallFlush] | None] = contextvars.ContextVar(
+    "temporal_stream_call_flushes", default=None
+)
 
 _ReadPage = Callable[
     [temporalio.api.streamservice.v1.ReadRecordsRequest],
@@ -255,8 +268,8 @@ async def _scan_and_flush(
 
     In Workflow code the result goes into History only after those Records are in the Store.
     """
-    appenders: list[Any] = []
-    token = _CALL_APPENDERS.set(appenders)
+    flushes: list[_CallFlush] = []
+    token = _CALL_FLUSHES.set(flushes)
     try:
         outcome = await _scan(
             read_page,
@@ -267,12 +280,21 @@ async def _scan_and_flush(
         )
     except Exception:
         # The error of the scan wins over an error of the write.
-        await _flush_call_appenders(appenders, raise_error=False)
+        await _flush_all(flushes, raise_error=False)
         raise
     finally:
-        _CALL_APPENDERS.reset(token)
-    await _flush_call_appenders(appenders, raise_error=True)
+        _CALL_FLUSHES.reset(token)
+    await _flush_all(flushes, raise_error=True)
     return outcome
+
+
+async def _flush_all(flushes: list[_CallFlush], *, raise_error: bool) -> None:
+    for flush in flushes:
+        try:
+            await flush.flush()
+        except Exception:
+            if raise_error:
+                raise
 
 
 @dataclasses.dataclass(frozen=True)

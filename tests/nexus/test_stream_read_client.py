@@ -10,13 +10,13 @@ import pytest
 
 from temporalio import activity, workflow
 from temporalio.client import (
-    BufferedAppender,
     Client,
     StreamReadStop,
     filter_stream,
     reduce_stream,
     take_stream,
 )
+from temporalio.contrib.streams import BufferedAppender
 from temporalio.exceptions import ApplicationError
 from temporalio.nexus.system.stream_service import StreamRecord, StreamRef
 from temporalio.testing import MemoryStreamStore

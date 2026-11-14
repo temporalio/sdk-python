@@ -19,7 +19,6 @@ from temporalio.api.enums.v1 import EventType, StreamErrorReason
 from temporalio.api.stream.v1 import StreamRef as StreamRefMessage
 from temporalio.api.streamservice.v1 import ReadRecordsRequest, ReadRecordsResponse
 from temporalio.client import (
-    BufferedAppender,
     Client,
     StreamConfig,
     WorkflowFailureError,
@@ -27,6 +26,7 @@ from temporalio.client import (
     WorkflowHistory,
 )
 from temporalio.client._stream_read import _PENDING_STREAM_CALLS
+from temporalio.contrib.streams import BufferedAppender
 from temporalio.converter import DataConverter, PayloadCodec
 from temporalio.exceptions import ApplicationError, CancelledError, StreamError
 from temporalio.nexus.system.stream_service import (
