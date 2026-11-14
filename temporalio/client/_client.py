@@ -25,6 +25,7 @@ import temporalio.activity
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.nexus.system.stream_service.client
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -94,6 +95,7 @@ from ._schedule import (
     ScheduleBackfill,
     ScheduleHandle,
 )
+from ._stream_store import StreamConfig, _refuse_store_plugins
 from ._worker_versioning import (
     BuildIdOp,
     TaskReachabilityType,
@@ -114,7 +116,9 @@ if TYPE_CHECKING:
     from ._plugin import Plugin
 
 
-class Client:
+class Client(
+    temporalio.nexus.system.stream_service.client.StreamServiceClientExtension
+):
     """Client for accessing Temporal.
 
     Most users will use :py:meth:`connect` to create a client. The
@@ -156,6 +160,7 @@ class Client:
         grpc_compression: GrpcCompression = GrpcCompression.GZIP,
         payload_limits: PayloadLimitsConfig = PayloadLimitsConfig(),
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        stream_config: StreamConfig | None = None,
     ) -> Self:
         """Connect to a Temporal server.
 
@@ -225,7 +230,18 @@ class Client:
             payload_limits: Warning thresholds for outbound payload/memo sizes. Over-threshold
                 fields are logged but still sent. Set a threshold to 0 to disable it.
             header_codec_behavior: Encoding behavior for headers sent by the client.
+            stream_config: The Stream Stores of this client and the selector that
+                picks one for a new Stream, as
+                :py:class:`temporalio.converter.ExternalStorage` holds drivers and a
+                selector. A client with it sends each Stream operation to one of its
+                Stores. This release has no Streams on the server, so with ``None`` a
+                Stream operation raises
+                :py:class:`temporalio.exceptions.StreamConfigError`.
+
+                .. warning::
+                    This API is experimental and subject to change.
         """
+        _refuse_store_plugins(plugins)
         connect_config = temporalio.service.ConnectConfig(
             target_host=target_host,
             api_key=api_key,
@@ -262,6 +278,7 @@ class Client:
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
             plugins=plugins,
+            stream_config=stream_config,
         )
 
     def __init__(
@@ -275,11 +292,13 @@ class Client:
         default_workflow_query_reject_condition: None
         | (temporalio.common.QueryRejectCondition) = None,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        stream_config: StreamConfig | None = None,
     ):
         """Create a Temporal client from a service client.
 
         See :py:meth:`connect` for details on the parameters.
         """
+        _refuse_store_plugins(plugins)
         # Store the config for tracking
         config = ClientConfig(
             service_client=service_client,
@@ -289,6 +308,7 @@ class Client:
             interceptors=interceptors,
             default_workflow_query_reject_condition=default_workflow_query_reject_condition,
             header_codec_behavior=header_codec_behavior,
+            stream_config=stream_config,
         )
         self._initial_config = config.copy()
 
@@ -3029,6 +3049,7 @@ class ClientConnectConfig(TypedDict, total=False):
     grpc_compression: GrpcCompression
     payload_limits: PayloadLimitsConfig
     header_codec_behavior: HeaderCodecBehavior
+    stream_config: StreamConfig | None
 
 
 class ClientConfig(TypedDict, total=False):
@@ -3043,3 +3064,4 @@ class ClientConfig(TypedDict, total=False):
         temporalio.common.QueryRejectCondition | None
     ]
     header_codec_behavior: Required[HeaderCodecBehavior]
+    stream_config: Required[StreamConfig | None]

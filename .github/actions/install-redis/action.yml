@@ -1,0 +1,25 @@
+name: Install Redis
+description: Install and start a Redis server for the tests of the Redis Stream Store.
+runs:
+  using: composite
+  steps:
+    - if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends redis-server
+    - if: runner.os == 'macOS'
+      shell: bash
+      run: brew install redis
+    # Redis has no official Windows build, so the Redis Store tests skip there. The port is not the
+    # default one, since the Linux package starts its own server on 6379.
+    - if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        redis-server --port 6380 --save "" --appendonly no --daemonize yes
+        for _ in $(seq 1 50); do
+          redis-cli -p 6380 ping && break
+          sleep 0.1
+        done
+        redis-cli -p 6380 ping
+        echo "STREAMS_REDIS_URL=redis://127.0.0.1:6380" >> "$GITHUB_ENV"

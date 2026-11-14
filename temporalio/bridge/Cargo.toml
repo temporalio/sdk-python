@@ -29,14 +29,21 @@ default = ["tls-ring"]
 tls-ring = [
     "temporalio-sdk-core/tls-ring",
     "temporalio-client/tls-ring",
+    "temporalio-streams-redis?/tls-ring",
     "tokio-rustls/ring",
 ]
 tls-aws-lc = [
     "temporalio-sdk-core/tls-aws-lc",
     "temporalio-client/tls-aws-lc",
+    "temporalio-streams-redis?/tls-aws-lc",
     "tokio-rustls/aws_lc_rs",
 ]
-fips = ["tls-aws-lc", "dep:aws-lc-rs"]
+fips = ["tls-aws-lc", "dep:aws-lc-rs", "streams-redis", "temporalio-streams-redis/fips"]
+# Links the Stream runtime and its memory Store. Off by default.
+streams = ["dep:temporalio-streams"]
+# Adds the Redis Store and turns on `streams`. The official builds turn it on. Cargo fetches the
+# git dependency below for every build, with this feature off too.
+streams-redis = ["streams", "dep:temporalio-streams-redis"]
 
 [dependencies]
 anyhow = "1.0"
@@ -72,6 +79,10 @@ temporalio-sdk-core = { version = "0.11.0", path = "./sdk-core/crates/sdk-core",
     "envconfig",
     "prometheus",
 ] }
+# The Stream runtime and its memory Store, from the submodule.
+temporalio-streams = { path = "./sdk-core/crates/streams", optional = true }
+# The Redis Store, which lives in its own repo.
+temporalio-streams-redis = { git = "https://github.com/temporal-community/sdk-streams", rev = "63799c4fd9431a9f12bed78fdff66f144f1e0ac4", default-features = false, optional = true }
 tokio = "1.26"
 # Matches the sdk-core client crate's rustls stack; used to build the custom
 # server certificate verifier for ClientTlsConfig.verification_server_name.
@@ -83,6 +94,13 @@ tokio-stream = "0.1"
 tonic = "0.14"
 tracing = "0.1"
 url = "2.2"
+
+# The Redis crate takes temporalio-common and temporalio-streams from crates.io. This makes it use
+# the submodule's crates, so the bridge sees one copy of each type. The versions must be semver
+# compatible.
+[patch.crates-io]
+temporalio-common = { path = "./sdk-core/crates/common" }
+temporalio-streams = { path = "./sdk-core/crates/streams" }
 
 [profile.release]
 opt-level = 3

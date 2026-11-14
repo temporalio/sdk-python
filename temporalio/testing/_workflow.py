@@ -102,6 +102,7 @@ class WorkflowEnvironment:
         dev_server_download_ttl: timedelta | None = None,
         dev_server_startup_timeout: timedelta | None = None,
         ui_port: int | None = None,
+        stream_config: temporalio.client.StreamConfig | None = None,
     ) -> WorkflowEnvironment:
         """Start a full Temporal server locally, downloading if necessary.
 
@@ -165,6 +166,8 @@ class WorkflowEnvironment:
                 become ready after spawning. Defaults to 5 seconds and does not
                 include download time.
             ui_port: UI port to use if UI is enabled.
+            stream_config: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
 
         Returns:
             The started CLI dev server workflow environment.
@@ -194,6 +197,7 @@ class WorkflowEnvironment:
             dev_server_download_ttl=dev_server_download_ttl,
             dev_server_startup_timeout=dev_server_startup_timeout,
             ui_port=ui_port,
+            stream_config=stream_config,
         )
 
     @classmethod
@@ -216,6 +220,7 @@ class WorkflowEnvironment:
         test_server_extra_args: Sequence[str] = [],
         test_server_download_ttl: timedelta | None = None,
         test_server_startup_timeout: timedelta | None = None,
+        stream_config: temporalio.client.StreamConfig | None = None,
     ) -> WorkflowEnvironment:
         """Start a V1 time skipping workflow environment.
 
@@ -276,6 +281,8 @@ class WorkflowEnvironment:
             test_server_startup_timeout: Maximum time to wait for the test server to
                 become ready after spawning. Defaults to 5 seconds and does not
                 include download time.
+            stream_config: See parameter of the same name on
+                :py:meth:`temporalio.client.Client.connect`.
 
         Returns:
             The started workflow environment with time skipping.
@@ -296,6 +303,7 @@ class WorkflowEnvironment:
             test_server_extra_args=test_server_extra_args,
             test_server_download_ttl=test_server_download_ttl,
             test_server_startup_timeout=test_server_startup_timeout,
+            stream_config=stream_config,
         )
 
     @classmethod
@@ -582,6 +590,7 @@ class _HasAServer(WorkflowEnvironment):
         dev_server_download_ttl: timedelta | None = None,
         dev_server_startup_timeout: timedelta | None = None,
         ui_port: int | None = None,
+        stream_config: temporalio.client.StreamConfig | None = None,
     ) -> tuple[
         temporalio.bridge.testing.EphemeralServer,
         temporalio.client.Client,
@@ -649,6 +658,7 @@ class _HasAServer(WorkflowEnvironment):
                 rpc_metadata=rpc_metadata,
                 identity=identity,
                 runtime=runtime,
+                stream_config=stream_config,
             )
         except:
             try:
@@ -719,6 +729,7 @@ class _V1WorkflowEnvironment(_HasAServer):
         test_server_extra_args: Sequence[str],
         test_server_download_ttl: timedelta | None,
         test_server_startup_timeout: timedelta | None,
+        stream_config: temporalio.client.StreamConfig | None,
     ) -> _V1WorkflowEnvironment:
         runtime = runtime or temporalio.runtime.Runtime.default()
         download_ttl_ms = None
@@ -753,6 +764,7 @@ class _V1WorkflowEnvironment(_HasAServer):
                 rpc_metadata=rpc_metadata,
                 identity=identity,
                 runtime=runtime,
+                stream_config=stream_config,
             )
         except:
             try:

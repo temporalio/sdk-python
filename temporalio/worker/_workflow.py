@@ -40,6 +40,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
+from ._stream_store import _WorkflowStreamStore
 from ._workflow_instance import (
     _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
     PatchActivationInput,
@@ -128,6 +129,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
         default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
+        stream_store: _WorkflowStreamStore | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
         debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
@@ -197,6 +199,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         self._max_workflow_task_external_storage_concurrency = (
             max_workflow_task_external_storage_concurrency
         )
+        self._stream_store = stream_store
         self._throw_after_activation: Exception | None = None
 
         # If debug mode is enabled, disable deadlock detection
@@ -819,6 +822,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             nexus_serialization_context=temporalio.converter._serialization_context._propagated_nexus_serialization_context(
                 init
             ),
+            stream_store=self._stream_store,
         )
         if defn.sandboxed:
             return self._workflow_runner.create_instance(det)

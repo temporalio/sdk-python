@@ -1,0 +1,1 @@
+Add the experimental Streams API. Client and Activity code create a Stream, append Records to it, read them and close it, and Workflow code creates and describes one. A client takes its Stream Stores in `stream_config=StreamConfig(stores=[...])`, such as `temporalio.contrib.redis.streams.RedisStreamStore`, or `temporalio.testing.MemoryStreamStore` in tests.
