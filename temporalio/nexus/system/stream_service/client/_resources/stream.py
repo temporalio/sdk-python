@@ -7,6 +7,7 @@ import datetime
 import types
 import typing
 import uuid as _uuid
+from typing import TYPE_CHECKING
 
 import typing_extensions
 
@@ -56,6 +57,25 @@ class Stream(typing.Generic[BodyT]):
             raise TypeError("Generic resource subclasses are not supported")
         self.ref = ref
         self.created = created
+
+    if not TYPE_CHECKING:
+
+        def __getattribute__(self, name: str) -> typing.Any:
+            # The body of an `async def` runs only when it is awaited. So the guard runs when
+            # code takes the method, and a caller that can't await gets its error too.
+            if name in {
+                "append",
+                "close",
+                "describe",
+                "filter",
+                "iter_read",
+                "iter_read_items",
+                "read",
+                "reduce",
+                "take",
+            }:
+                _support.check_stream_call(target="client", method=name)
+            return object.__getattribute__(self, name)
 
     @property
     def body_type(self) -> type[BodyT]:
