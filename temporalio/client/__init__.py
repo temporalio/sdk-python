@@ -187,6 +187,7 @@ from ._schedule import (
 )
 from ._stream_store import (
     StreamConfig,
+    StreamReplaySource,
     StreamSelectContext,
     StreamStore,
     StreamStoreCallOptions,
@@ -357,6 +358,7 @@ __all__ = [
     "CloudOperationsClient",
     "Plugin",
     "StreamConfig",
+    "StreamReplaySource",
     "StreamSelectContext",
     "StreamStore",
     "StreamStoreCallOptions",

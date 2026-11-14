@@ -104,8 +104,11 @@ class Pipeline(Generic[ItemT]):
     Each step gives a new chain and runs nothing. An item is a ``StreamRecord`` until the
     first :py:meth:`map`, and the value of that map after it. An end makes one ``take``,
     ``filter`` or ``reduce`` call of the Stream, so in Workflow code the chain is one Local
-    Activity and one marker in History. Client, Activity and Workflow code get the same
-    result.
+    Activity and one marker in History. The marker of :py:meth:`records` follows the
+    Worker's :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`, as a
+    ``take`` or a ``filter`` does. The folding ends, :py:meth:`reduce`, :py:meth:`collect`
+    with a ``map``, and :py:meth:`count`, keep their value in History under both values.
+    Client, Activity and Workflow code get the same result.
 
     The functions of the steps must be plain functions that keep no state. In Workflow code
     a Local Activity can run them again after a failure, with the same function objects.
@@ -173,8 +176,12 @@ class Pipeline(Generic[ItemT]):
         count the Records that the chain keeps. A limit ends the call with the stop
         ``MaxRecords``, and a take_until with ``Match``.
 
-        In Workflow code the Records of the result go into History, so their encoded size
-        must fit in 1 MiB. ``max_bytes``, 256 KiB by default, keeps them under it.
+        In Workflow code the marker in History follows the Worker's
+        :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With
+        ``HISTORY``, the default, the Records of the result go into History, so their
+        encoded size must fit in 1 MiB. ``max_bytes``, 256 KiB by default, keeps them under
+        it. With ``STORE``, only their offsets and a digest go into History, there is no
+        size limit and no default cap, and a replay reads the Records from the Store again.
 
         The chain may hold any number of :py:meth:`filter` steps, at most one
         :py:meth:`take_until`, and at most one :py:meth:`limit` as its last step.
@@ -258,7 +265,8 @@ class Pipeline(Generic[ItemT]):
         take_until or a limit that ends the chain ends the call with the stop ``Match``.
 
         In Workflow code the value goes into History with the counts of the chain, so its
-        encoded size must fit in 1 MiB. Workflow code decodes the value as the return
+        encoded size must fit in 1 MiB. This holds under both values of
+        ``StreamConfig.workflow_read_replay_from``, since a replay can't run the function. Workflow code decodes the value as the return
         annotation of ``function``, else as the type of ``initial``.
 
         Args:
@@ -299,9 +307,10 @@ class Pipeline(Generic[ItemT]):
         :py:meth:`reduce` does. A Record can't be the value of a fold, so a chain with no
         ``map`` runs as :py:meth:`records`, with one ``take`` or ``filter`` call.
 
-        In Workflow code the list goes into History, so its encoded size must fit in 1 MiB.
+        In Workflow code the list of a ``map`` goes into History under both values of
+        ``StreamConfig.workflow_read_replay_from``, so its encoded size must fit in 1 MiB.
         The items of a map are decoded as the return annotation of its function. Records
-        go into History as :py:meth:`records` puts them there.
+        go into History as :py:meth:`records` puts them there, so they follow the setting.
 
         Args:
             timeout: As in the call of the Stream.
@@ -365,7 +374,8 @@ class Pipeline(Generic[ItemT]):
 
         It makes one ``reduce`` call of the Stream, as :py:meth:`reduce` does. In Workflow
         code the count goes into History with the counts of the chain, a few bytes that fit
-        well in the 1 MiB of a result.
+        well in the 1 MiB of a result. This holds under both values of
+        ``StreamConfig.workflow_read_replay_from``.
 
         Args:
             timeout: As in ``reduce`` of the Stream.

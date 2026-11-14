@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
@@ -25,6 +26,40 @@ from temporalio.exceptions import StreamConfigError
 
 if TYPE_CHECKING:
     import temporalio.bridge.streams
+
+
+class StreamReplaySource(enum.Enum):
+    """Where a replay of a ``take`` or a ``filter`` of Workflow code gets its Records.
+
+    :py:attr:`StreamConfig.workflow_read_replay_from` holds it. It decides what a new call
+    records in History. A replay follows what History holds, so a change of the setting
+    doesn't break a Workflow that is running. A ``reduce`` always keeps its value in
+    History, since a replay can't run the function again. Client and Activity code have no
+    History, so the setting doesn't touch them.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    HISTORY = "history"
+    """The marker in History holds the kept Records with their bodies.
+
+    A replay takes the Records from History, so it calls no Store and needs no Stream
+    config. The encoded result must fit in
+    :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. This is the default.
+    """
+
+    STORE = "store"
+    """The marker in History holds no Record and no body.
+
+    It holds the offsets of the kept Records, their count and a digest of them. A replay
+    reads the Records from the Store again before the Workflow sees them, and checks the
+    count and the digest. So the replay needs the Stream config, the same payload codec,
+    and the Records. The Records of a call must stay in the Store, and Retention must keep
+    them, for as long as the Workflow can replay. When they can't be read, the Workflow
+    Task fails with :py:class:`temporalio.exceptions.StreamReplayError`. The result has no
+    size limit, and ``max_bytes=None`` means no cap on the bytes of a call.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -497,6 +532,20 @@ class StreamConfig:
     :py:meth:`StreamStore.call_from_workflow` gets them. The default runs the Store's
     Activity with their timeouts and retry policy, as a Local Activity, or as a regular
     Activity for a close.
+    """
+
+    workflow_read_replay_from: StreamReplaySource = StreamReplaySource.HISTORY
+    """Where a replay of a ``take`` or a ``filter`` of Workflow code gets its Records.
+
+    It applies to every ``take`` and ``filter`` of Workflow code on a Worker whose client
+    has this config, and decides what a new call records in History.
+    :py:attr:`StreamReplaySource.HISTORY`, the default, puts the kept Records with their
+    bodies into History, so a replay needs no Store. :py:attr:`StreamReplaySource.STORE`
+    puts only their offsets, their count and a digest into History, so a replay reads
+    them from the Store again. With ``STORE`` the Records of a call must stay in the
+    Store for as long as the Workflow can replay. A replay follows the marker in History
+    and not this setting, so a Workflow that is running replays after a change of it.
+    ``reduce`` always keeps its value in History.
     """
 
     _store_map: dict[str, StreamStore] = dataclasses.field(

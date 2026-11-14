@@ -315,6 +315,31 @@ class StreamConfigError(RuntimeError):
     """
 
 
+class StreamReplayError(RuntimeError):
+    """A replay can't read the Records of a ``take`` or a ``filter`` from the Store again.
+
+    A call of Workflow code on a Worker whose
+    :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from` is ``STORE`` keeps
+    only the offsets, the count and a digest of its Records in History. Before a replay
+    gives the call its result, the Worker reads those Records from the Store. When the
+    Records expired, the Stream is gone, the Store fails, the Worker or the ``Replayer``
+    has no Stream config, or the Records differ from the digest, the Worker raises this
+    error. It fails the Workflow Task and not the Workflow, so the task runs again later.
+    The message names the Stream, the offsets and the cause.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    def __init__(self, message: str, *, store: str, stream_id: str) -> None:
+        """Initialize the error with the Store and the Stream that the replay reads."""
+        super().__init__(message)
+        self.store = store
+        """The name of the Store of the call."""
+        self.stream_id = stream_id
+        """The id of the Stream of the call."""
+
+
 class CancelledError(FailureError):
     """Error raised on workflow/activity cancellation."""
 

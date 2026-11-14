@@ -1,21 +1,36 @@
-"""The Workflow side of the take, filter and reduce calls of a Stream."""
+"""The Workflow side of the take, filter and reduce calls of a Stream.
+
+Workflow code runs a call here, and the Worker reads the Records of a replayed call from the
+Store when its marker in History has only their offsets.
+"""
 
 from __future__ import annotations
 
+import dataclasses
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import temporalio.api.stream.v1
 import temporalio.api.streamservice.v1
+import temporalio.bridge.proto.workflow_activation
 import temporalio.common
+import temporalio.converter
+import temporalio.exceptions
 import temporalio.workflow
 from temporalio.client._stream_read import (
     _PENDING_STREAM_CALLS,
     _STREAM_CALL_ACTIVITY,
     _PendingStreamCall,
+    _read_kept_records,
+    _replay_error,
     _StreamCallResult,
 )
-from temporalio.client._stream_store import _STREAM_SERVICE, StreamConfig
+from temporalio.client._stream_store import (
+    _STREAM_SERVICE,
+    StreamConfig,
+    StreamReplaySource,
+    _store_page_reader,
+)
 from temporalio.nexus.system._support import _StreamCall, _StreamCallKind
 from temporalio.nexus.system.stream_service.models import (
     ReadRecordsRequest,
@@ -68,8 +83,8 @@ async def _stream_call_in_workflow(  # pyright: ignore[reportUnusedFunction]
     def to_record(record: temporalio.api.stream.v1.StreamRecord) -> Any:
         return payload_converter._from_transfer_value(record, record_type)
 
-    # A replay takes the result from History, so it needs no Store and no config. The
-    # choice of a Store runs in Workflow code, as it does for the other Stream calls.
+    # A replay of a marker with Records needs no Store and no config. The choice of a
+    # Store runs in Workflow code, as it does for the other Stream calls.
     store = (
         config._store_for(stream.ref, _workflow_target())
         if config is not None
@@ -79,8 +94,22 @@ async def _stream_call_in_workflow(  # pyright: ignore[reportUnusedFunction]
     run_id = temporalio.workflow.info().run_id
     pending = None
     if store is not None:
+        assert config is not None
+        replay_from = config.workflow_read_replay_from
+        if (
+            replay_from is StreamReplaySource.STORE
+            and call.kind is not _StreamCallKind.REDUCE
+            and call.default_max_bytes
+        ):
+            # No body goes into History, so the default cap that keeps a marker small
+            # has no use here.
+            call = dataclasses.replace(call, max_bytes=None)
         pending = _PendingStreamCall(
-            call=call, store=store, ref=message.ref, to_record=to_record
+            call=call,
+            store=store,
+            ref=message.ref,
+            to_record=to_record,
+            replay_from=replay_from,
         )
         _PENDING_STREAM_CALLS.add(run_id, call_id, pending)
     try:
@@ -104,6 +133,7 @@ async def _stream_call_in_workflow(  # pyright: ignore[reportUnusedFunction]
         or result.stream_id != message.ref.id
         or (store_name and result.store != store_name)
         or result.from_offset != call.from_offset
+        or (result.replay is not None and result.replay.call_id != call_id)
     ):
         recorded = (
             "no Stream call"
@@ -128,9 +158,63 @@ async def _stream_call_in_workflow(  # pyright: ignore[reportUnusedFunction]
             stop=result.stop,
             done=result.done,
         )
+    records = result.records
+    if result.replay is not None:
+        # The Worker read these Records before the activation, or the Local Activity of
+        # the first run kept them.
+        filled = pending.records_for(result) if pending is not None else None
+        if filled is None:
+            raise _replay_error(
+                result,
+                "the Worker has no Stream config"
+                if config is None
+                else "the Worker read no Records for this call",
+            )
+        records = filled
     return StreamRead(
-        records=[to_record(record) for record in result.records],
+        records=[to_record(record) for record in records],
         last_offset=result.last_offset,
         stop=result.stop,
         done=result.done,
     )
+
+
+async def _read_store_records(  # pyright: ignore[reportUnusedFunction]
+    act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
+    config: StreamConfig | None,
+    data_converter: temporalio.converter.DataConverter,
+) -> None:
+    """Read the Records of each marker without Records in this activation.
+
+    It runs before the Workflow sees the activation. The read goes through the same codec
+    as the Local Activity of the first run. It runs for every such marker, whatever the
+    Worker's ``workflow_read_replay_from`` is.
+
+    Raises:
+        temporalio.exceptions.StreamReplayError: The Worker has no Stream config, the
+            Store failed, or the Records are gone or differ. The Workflow Task fails.
+    """
+    for job in act.jobs:
+        if not job.HasField("resolve_activity"):
+            continue
+        resolve = job.resolve_activity
+        if not resolve.is_local or not resolve.result.HasField("completed"):
+            continue
+        result = _StreamCallResult.from_payload(resolve.result.completed.result)
+        if result is None or result.replay is None:
+            continue
+        if config is None:
+            raise _replay_error(result, "the Worker has no Stream config")
+        pending = _PENDING_STREAM_CALLS.get(act.run_id, result.replay.call_id)
+        # Without a pending call, the Workflow code makes no such call, and its own check
+        # reports that. A first run already has the Records of its Local Activity.
+        if pending is None or pending.records_for(result) is not None:
+            continue
+        try:
+            store = config._get_store_by_name(result.store)
+        except temporalio.exceptions.StreamConfigError as err:
+            raise _replay_error(result, str(err)) from err
+        records = await _read_kept_records(
+            _store_page_reader(store, data_converter), result
+        )
+        pending.fill(result, records)
