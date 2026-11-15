@@ -43,7 +43,7 @@ from temporalio.converter import (
 from temporalio.exceptions import ActivityError, ApplicationError
 from temporalio.testing._workflow import WorkflowEnvironment
 from temporalio.worker import Replayer
-from tests.helpers import assert_task_fail_eventually, new_worker
+from tests.helpers import assert_task_fail_eventually, new_worker, wait_until_polling
 from tests.test_extstore import InMemoryTestDriver, RecordingPayloadCodec
 
 
@@ -830,6 +830,7 @@ async def test_worker_storage_drivers_populated_from_client(
             client, ExtStoreWorkflow, activities=[ext_store_activity]
         ) as worker:
             assert worker._storage_drivers == [driver1, driver2, driver3]
+            await wait_until_polling(client, worker)
 
     assert len(captured_config) == 1
     assert captured_config[0].storage_drivers == {driver1.type(), driver3.type()}
@@ -843,6 +844,7 @@ async def test_worker_storage_drivers_empty_without_external_storage(
         env.client, ExtStoreWorkflow, activities=[ext_store_activity]
     ) as worker:
         assert worker._storage_drivers == []
+        await wait_until_polling(env.client, worker)
 
 
 # ---------------------------------------------------------------------------

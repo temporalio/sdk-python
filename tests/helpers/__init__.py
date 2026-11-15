@@ -18,15 +18,18 @@ from typing import (
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
-from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.enums.v1 import IndexedValueType, TaskQueueType
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
+from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflow.v1 import PendingActivityInfo
 from temporalio.api.workflowservice.v1 import (
+    DescribeNamespaceRequest,
+    DescribeTaskQueueRequest,
     PauseActivityRequest,
     PollWorkflowExecutionUpdateRequest,
     UnpauseActivityRequest,
@@ -92,6 +95,40 @@ async def assert_eventually(
             if timedelta(seconds=time.monotonic() - start_sec) >= timeout:
                 raise
         await asyncio.sleep(interval.total_seconds())
+
+
+async def wait_until_polling(client: Client, worker: Worker) -> None:
+    # With this capability, Core waits for the server to end open polls at shutdown. The server
+    # can miss a first poll that reaches it just after the `ShutdownWorker` call. That poll then
+    # stays open for about a minute. Tests that don't cover this race shut down a Worker only
+    # after the server sees it polling.
+    namespace = await client.workflow_service.describe_namespace(
+        DescribeNamespaceRequest(namespace=client.namespace)
+    )
+    if not namespace.namespace_info.capabilities.worker_poll_complete_on_shutdown:
+        return
+
+    config = worker.config()
+    task_queue_types = []
+    if config.get("workflows"):
+        task_queue_types.append(TaskQueueType.TASK_QUEUE_TYPE_WORKFLOW)
+    if config.get("activities"):
+        task_queue_types.append(TaskQueueType.TASK_QUEUE_TYPE_ACTIVITY)
+    if config.get("nexus_service_handlers"):
+        task_queue_types.append(TaskQueueType.TASK_QUEUE_TYPE_NEXUS)
+
+    async def all_types_polled() -> None:
+        for task_queue_type in task_queue_types:
+            resp = await client.workflow_service.describe_task_queue(
+                DescribeTaskQueueRequest(
+                    namespace=client.namespace,
+                    task_queue=TaskQueue(name=worker.task_queue),
+                    task_queue_type=task_queue_type,
+                )
+            )
+            assert resp.pollers, f"No poller yet for {task_queue_type}"
+
+    await assert_eventually(all_types_polled, interval=timedelta(milliseconds=20))
 
 
 async def assert_eq_eventually(

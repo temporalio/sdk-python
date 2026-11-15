@@ -67,6 +67,7 @@ from tests.helpers import (
     assert_eventually,
     find_free_port,
     new_worker,
+    wait_until_polling,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
 from tests.helpers.nexus import make_nexus_endpoint_name
@@ -151,8 +152,10 @@ async def test_worker_fatal_error_run(client: Client):
     worker = create_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
+            run_task = asyncio.create_task(worker.run())
+            await wait_until_polling(client, worker)
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
-            await worker.run()
+            await run_task
     assert str(err.value) == "Workflow worker failed"
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
@@ -160,8 +163,10 @@ async def test_worker_fatal_error_run(client: Client):
     worker = create_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
+            run_task = asyncio.create_task(worker.run())
+            await wait_until_polling(client, worker)
             inj.activity.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
-            await worker.run()
+            await run_task
     assert str(err.value) == "Activity worker failed"
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
@@ -170,21 +175,23 @@ async def test_worker_fatal_error_run(client: Client):
     worker = create_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
+            run_task = asyncio.create_task(worker.run())
+            await wait_until_polling(client, worker)
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
             inj.activity.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
-            await worker.run()
+            await run_task
     assert str(err.value).endswith("worker failed")
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
 
 async def test_worker_fatal_error_with(client: Client):
-    # Start the worker, wait a short bit, fail it, wait for long time (will be
-    # cancelled)
+    # Start the worker, wait until it polls, fail it, wait for long time (will
+    # be cancelled)
     worker = create_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
-                await asyncio.sleep(0.1)
+                await wait_until_polling(client, worker)
                 inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
                 await asyncio.sleep(1000)
     assert str(err.value) == "Workflow worker failed"
@@ -195,6 +202,7 @@ async def test_worker_fatal_error_with(client: Client):
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
+                await wait_until_polling(client, worker)
                 raise RuntimeError("IN WITH")
     assert str(err.value) == "IN WITH"
 
@@ -203,6 +211,7 @@ async def test_worker_fatal_error_with(client: Client):
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
+                await wait_until_polling(client, worker)
                 inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
                 try:
                     await asyncio.sleep(1000)
@@ -223,7 +232,7 @@ async def test_worker_fatal_error_callback(client: Client):
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
-                await asyncio.sleep(0.1)
+                await wait_until_polling(client, worker)
                 inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
                 await asyncio.sleep(1000)
     assert err.value is callback_err
@@ -233,7 +242,7 @@ async def test_worker_cancel_run(client: Client):
     worker = create_worker(client)
     assert not worker.is_running and not worker.is_shutdown
     run_task = asyncio.create_task(worker.run())
-    await asyncio.sleep(0.3)
+    await wait_until_polling(client, worker)
     assert worker.is_running and not worker.is_shutdown
     run_task.cancel()
     with pytest.raises(asyncio.CancelledError):
@@ -297,6 +306,7 @@ async def test_worker_run_after_shutdown_raises_already_started(client: Client):
             assert worker.is_running
 
         await assert_eventually(is_running)
+        await wait_until_polling(client, worker)
     assert worker.is_shutdown
     with pytest.raises(RuntimeError, match="^Already started$"):
         await worker.run()
@@ -344,6 +354,7 @@ async def test_worker_run_inside_async_with_raises_already_started(client: Clien
     # `async with` already runs the worker in the background
     with pytest.raises(RuntimeError, match="^Already started$"):
         async with create_worker(client) as worker:
+            await wait_until_polling(client, worker)
             await worker.run()
 
 
@@ -488,8 +499,8 @@ async def test_warns_when_workers_too_low(client: Client):
                 activities=[say_hello],
                 tuner=tuner,
                 activity_executor=executor,
-            ):
-                pass
+            ) as w:
+                await wait_until_polling(client, w)
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with pytest.warns(
             UserWarning,
@@ -501,8 +512,8 @@ async def test_warns_when_workers_too_low(client: Client):
                 nexus_service_handlers=[NeverRunService()],
                 tuner=tuner,
                 nexus_task_executor=executor,
-            ):
-                pass
+            ) as w:
+                await wait_until_polling(client, w)
 
 
 @nexusrpc.handler.service_handler
