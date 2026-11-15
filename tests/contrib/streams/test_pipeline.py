@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -21,6 +22,7 @@ from temporalio.client import (
 from temporalio.common import RetryPolicy
 from temporalio.contrib.streams import Pipeline, pipeline
 from temporalio.nexus.system.stream_service import (
+    ProducerKindLocalActivity,
     StreamRead,
     StreamReadStop,
     StreamRecord,
@@ -34,6 +36,7 @@ from tests.nexus.test_stream_read_workflow import (
     Token,
     _append,
     _close,
+    _event_counts,
     _marker_payload,
     _markers,
     _offsets,
@@ -265,6 +268,43 @@ class RecordsEndsWorkflow:
         return [len(line.records), len(first.records)]
 
 
+@workflow.defn
+class AppendToWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str, lines_id: str, copies_id: str) -> list[str]:
+        tokens = pipeline(_workflow_stream(stream_id))
+        lines = workflow.get_stream(StreamRef(id=lines_id), body_type=str)
+        copies = workflow.get_stream(StreamRef(id=copies_id), body_type=Token)
+        first_line = await (
+            tokens.filter(_is_text)
+            .map(_text)
+            .take_until(_ends_line)
+            .append_to(lines, _QUICK, idle_timeout=_NOW)
+        )
+        # A chain with no map appends the body of each Record.
+        text_tokens = await tokens.filter(_is_text).append_to(
+            copies, _QUICK, idle_timeout=_NOW
+        )
+        return [
+            f"{result.value} {result.count} {result.stop.name}"
+            for result in (first_line, text_tokens)
+        ]
+
+
+@workflow.defn
+class AppendToWhileOpenWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str, lines_id: str) -> str:
+        lines = workflow.get_stream(StreamRef(id=lines_id), body_type=str)
+        result = await (
+            pipeline(_workflow_stream(stream_id))
+            .filter(_is_text)
+            .map(_text)
+            .append_to(lines, _QUICK, idle_timeout=_QUICK)
+        )
+        return f"{result.value} {result.stop.name}"
+
+
 class SmallPagesStore(RecordingStreamStore):
     """Gives two Records a page, and fails one read of the scan when it is armed."""
 
@@ -445,3 +485,127 @@ async def test_records_end_follows_the_replay_setting(client: Client):
         workflows=[RecordsEndsWorkflow], stream_config=StreamConfig(stores=[store])
     ).replay_workflow(history)
     assert StreamReadState.results.pop(run_id) == first_run
+
+
+async def _targets(stream_client: Client) -> tuple[str, str]:
+    lines_id, copies_id = f"stream-{uuid.uuid4()}", f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=lines_id, body_type=str)
+    await stream_client.create_stream(id=copies_id, body_type=Token)
+    return lines_id, copies_id
+
+
+async def _appended(
+    stream_client: Client, stream_id: str, body_type: Any
+) -> list[StreamRecord[Any]]:
+    stream = stream_client.get_stream(StreamRef(id=stream_id), body_type=body_type)
+    return [record async for record in stream.iter_read_items()]
+
+
+_TEXT_TOKENS = [token for token in _TOKENS if token.kind == "text"]
+
+
+async def test_append_to_from_a_client(client: Client):
+    stream_client, stream_id, _ = await _stream_of_tokens(client)
+    lines_id, copies_id = await _targets(stream_client)
+    tokens = pipeline(
+        stream_client.get_stream(StreamRef(id=stream_id), body_type=Token)
+    )
+    first_line = await (
+        tokens.filter(_is_text)
+        .map(_text)
+        .take_until(_ends_line)
+        .append_to(
+            stream_client.get_stream(StreamRef(id=lines_id), body_type=str),
+            _QUICK,
+            idle_timeout=_NOW,
+        )
+    )
+    text_tokens = await tokens.filter(_is_text).append_to(
+        stream_client.get_stream(StreamRef(id=copies_id), body_type=Token),
+        _QUICK,
+        idle_timeout=_NOW,
+    )
+    assert (first_line.value, first_line.stop.name) == (2, "Match")
+    assert (text_tokens.value, text_tokens.stop.name) == (5, "Done")
+    lines = await _appended(stream_client, lines_id, str)
+    copies = await _appended(stream_client, copies_id, Token)
+    assert [record.body for record in lines] == ["a", "b\n"]
+    assert [record.body for record in copies] == _TEXT_TOKENS
+
+
+async def test_append_to_in_workflow_code(client: Client):
+    store = RecordingStreamStore(MemoryStreamStore())
+    stream_client, stream_id, _ = await _stream_of_tokens(
+        client, _with_store(client, store)
+    )
+    lines_id, copies_id = await _targets(stream_client)
+    handle, results = await _execute(
+        stream_client, AppendToWorkflow, stream_id, lines_id, copies_id
+    )
+    assert results == ["2 2 Match", "5 5 Done"]
+    lines = await _appended(stream_client, lines_id, str)
+    copies = await _appended(stream_client, copies_id, Token)
+    assert [record.body for record in lines] == ["a", "b\n"]
+    assert [record.body for record in copies] == _TEXT_TOKENS
+    producer = lines[0].producer
+    assert producer is not None
+    assert isinstance(producer.kind, ProducerKindLocalActivity)
+    history = await handle.fetch_history()
+    # One marker for each chain. The appends add no marker and no timer.
+    assert _markers(history) == ["core_local_activity"] * 2
+    assert "TIMER_STARTED" not in _event_counts(history)
+    operations = len(store.operations)
+    await Replayer(workflows=[AppendToWorkflow]).replay_workflow(history)
+    assert len(store.operations) == operations
+
+
+async def test_append_to_appends_again_when_its_local_activity_runs_again(
+    client: Client,
+):
+    store = SmallPagesStore(fail_read=2)
+    stream_client, stream_id, _ = await _stream_of_tokens(
+        client, _retrying_client(client, store)
+    )
+    lines_id, copies_id = await _targets(stream_client)
+    store.armed = True
+    _, results = await _execute(
+        stream_client, AppendToWorkflow, stream_id, lines_id, copies_id
+    )
+    store.armed = False
+    assert results == ["2 2 Match", "5 5 Done"]
+    lines = await _appended(stream_client, lines_id, str)
+    # The first attempt appended "a" before its second read failed.
+    assert [record.body for record in lines] == ["a", "a", "b\n"]
+    attempts = []
+    for record in lines:
+        assert record.producer is not None
+        assert isinstance(record.producer.kind, ProducerKindLocalActivity)
+        attempts.append(record.producer.kind.value.epoch.attempt)
+    assert attempts == [1, 2, 2]
+
+
+async def test_append_to_writes_while_the_call_still_runs(client: Client):
+    stream_client = _with_store(client, MemoryStreamStore())
+    stream_id, lines_id = f"stream-{uuid.uuid4()}", f"stream-{uuid.uuid4()}"
+    await stream_client.create_stream(id=stream_id, body_type=Token)
+    await stream_client.create_stream(id=lines_id, body_type=str)
+    await _append(stream_client, stream_id, Token("text", "a"), Token("text", "b"))
+    async with new_worker(stream_client, AppendToWhileOpenWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            AppendToWhileOpenWorkflow.run,
+            args=[stream_id, lines_id],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        # The source Stream is still open, so the call waits for more Records.
+        lines: list[StreamRecord[Any]] = []
+        for _ in range(50):
+            lines = await _appended(stream_client, lines_id, str)
+            if len(lines) == 2:
+                break
+            await asyncio.sleep(0.1)
+        assert [record.body for record in lines] == ["a", "b"]
+        description = await handle.describe()
+        assert description.close_time is None
+        await _close(stream_client, stream_id)
+        assert await handle.result() == "2 Done"
