@@ -46,11 +46,11 @@ class StreamReplaySource(enum.Enum):
 
     A replay takes the Records from History, so it calls no Store and needs no Stream
     config. The encoded result must fit in
-    :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. This is the default.
+    :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`.
     """
 
     STORE = "store"
-    """The marker in History holds no Record and no body.
+    """The marker in History holds no Record and no body. This is the default.
 
     It holds the offsets of the kept Records, their count and a digest of them. A replay
     reads the Records from the Store again before the Workflow sees them, and checks the
@@ -535,19 +535,19 @@ class StreamConfig:
     """
 
     workflow_read_replay_from: StreamReplaySource = dataclasses.field(
-        default=StreamReplaySource.HISTORY
+        default=StreamReplaySource.STORE
     )
     """Where a replay of a ``take`` or a ``filter`` of Workflow code gets its Records.
 
     It applies to every ``take`` and ``filter`` of Workflow code on a Worker whose client
     has this config, and decides what a new call records in History.
-    :py:attr:`StreamReplaySource.HISTORY`, the default, puts the kept Records with their
-    bodies into History, so a replay needs no Store. :py:attr:`StreamReplaySource.STORE`
-    puts only their offsets, their count and a digest into History, so a replay reads
-    them from the Store again. With ``STORE`` the Records of a call must stay in the
-    Store for as long as the Workflow can replay. A replay follows the marker in History
-    and not this setting, so a Workflow that is running replays after a change of it.
-    ``reduce`` always keeps its value in History.
+    :py:attr:`StreamReplaySource.STORE`, the default, puts only the offsets, the count and
+    a digest of the kept Records into History, so a replay reads them from the Store again.
+    The Records of a call must then stay in the Store for as long as the Workflow can
+    replay. The option :py:attr:`StreamReplaySource.HISTORY` puts the kept Records with
+    their bodies into History, so a replay needs no Store. A replay follows the marker in
+    History and not this setting, so a Workflow that is running replays after a change of
+    it. ``reduce`` always keeps its value in History.
     """
 
     _store_map: dict[str, StreamStore] = dataclasses.field(

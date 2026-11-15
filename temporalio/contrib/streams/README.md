@@ -56,16 +56,16 @@ scan stopped, so a loop that gives it as the next `from_offset` loses and repeat
 
 | End | Call of the Stream | Gives back | Goes into History in Workflow code |
 | --- | --- | --- | --- |
-| `records(...)` | one `filter`, or one `take` when the chain keeps every Record | `StreamRead[BodyT]` with the kept Records | the Records |
+| `records(...)` | one `filter`, or one `take` when the chain keeps every Record | `StreamRead[BodyT]` with the kept Records | the offsets of the Records, a count and a digest |
 | `reduce(function, initial, ...)` | one `reduce` | `StreamReduce[ValueT]` with the folded value | the value |
-| `collect(...)` | one `reduce`, or as `records` when the chain has no `map` | `StreamReduce[list[T]]` with the items | the list |
+| `collect(...)` | one `reduce`, or as `records` when the chain has no `map` | `StreamReduce[list[T]]` with the items | the list, or as `records` with no `map` |
 | `count(...)` | one `reduce` | `StreamReduce[int]` with the number of items | the count |
 | `append_to(stream, ...)` | one `reduce` | `StreamReduce[int]` with the number of appended items | the count |
 
 `records` runs only a chain of `filter` steps, with at most one `take_until` and at most one
 `limit` as its last step. For any other chain it raises `TypeError`, and `collect` or
-`reduce` runs it. In Workflow code a result must fit in 1 MiB once encoded, since it goes
-into History.
+`reduce` runs it. In Workflow code the value of a folding end must fit in 1 MiB once encoded,
+since it goes into History.
 
 `append_to` is the end that collects nothing. It appends each item to another Stream while
 the scan runs, so a reader of that Stream doesn't wait for the end of the call. A chain with no
@@ -81,10 +81,11 @@ count = await (
 )
 ```
 
-The table shows the default. A Worker whose `StreamConfig` has
-`workflow_read_replay_from=StreamReplaySource.STORE` keeps the Records of `records`, and of
-`collect` with no `map`, out of History. Their marker then holds the offsets of the Records, a
-count and a digest, with no size limit and no default `max_bytes`. A replay reads the Records
-from the Store again, so they must stay there for as long as the Workflow can replay. The
-folding ends, `reduce`, `count` and `collect` with a `map`, keep their value in History under
-both settings.
+The table shows the default. The Records of `records`, and of `collect` with no `map`, stay
+out of History. Their marker holds the offsets of the Records, a count and a digest, with no
+size limit and no default `max_bytes`. A replay reads the Records from the Store again, so they
+must stay there for as long as the Workflow can replay. The option
+`workflow_read_replay_from=StreamReplaySource.HISTORY` of `StreamConfig` puts the Records into
+History, so a replay needs no Store. Then a default `max_bytes` of 256 KiB and the 1 MiB limit
+apply. The folding ends, `reduce`, `count` and `collect` with a `map`, keep their value in
+History under both settings.

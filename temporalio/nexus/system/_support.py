@@ -666,15 +666,15 @@ async def take_stream(
 
     In Workflow code only, the scan runs in one Local Activity and History gets one marker.
     What the marker holds follows the Worker's
-    :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With ``HISTORY``,
-    the default, it holds the Records and their bodies, so the encoded result must fit in
-    :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. A replay then takes the result
-    from History, so it calls no Store and needs no Stream config. With ``STORE``, it holds
-    the range of offsets, the count and a digest of the Records, and no body, with no size
-    limit. A replay then reads the Records from the Store again, so they must stay there
-    for as long as the Workflow can replay. When it can't read them, the Workflow Task
-    fails with :py:class:`temporalio.exceptions.StreamReplayError`. A replay follows the
-    marker, not the setting. Records that the scan looked at and didn't keep stay out of
+    :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With ``STORE``, the
+    default, it holds the range of offsets, the count and a digest of the Records, and no
+    body, with no size limit. A replay then reads the Records from the Store again, so they
+    must stay there for as long as the Workflow can replay. When it can't read them, the
+    Workflow Task fails with :py:class:`temporalio.exceptions.StreamReplayError`. With the
+    option ``HISTORY``, it holds the Records and their bodies, so the encoded result must
+    fit in :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. A replay then takes the
+    result from History, so it calls no Store and needs no Stream config. A replay follows
+    the marker, not the setting. Records that the scan looked at and didn't keep stay out of
     History. The Worker's data converter, with its payload codec, encodes the marker. A
     replay doesn't call the functions, so an appender in them writes nothing. A Workflow
     Task that fails and runs again calls them again, and an appender writes again with a
@@ -707,8 +707,8 @@ async def take_stream(
             would pass the cap ends the call before that Record, and the next call gets it.
             The first Record of a call is always taken, also when it is larger. ``None`` is
             :py:data:`temporalio.common.DEFAULT_STREAM_MAX_BYTES`, 256 KiB. In Workflow
-            code on a Worker whose ``workflow_read_replay_from`` is ``STORE``, ``None`` is
-            no cap.
+            code ``None`` is no cap, unless ``workflow_read_replay_from`` is the option
+            ``HISTORY``.
 
     Returns:
         The Records, where the scan stopped, and why.
@@ -785,24 +785,24 @@ async def filter_stream(
 
     In Workflow code only, the scan runs in one Local Activity and History gets one marker.
     What the marker holds follows the Worker's
-    :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With ``HISTORY``,
-    the default, it holds the kept Records and their bodies, so the encoded result must fit
-    in :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. A replay then takes the result
-    from History, so it calls no Store and needs no Stream config. With ``STORE``, it holds
-    the offset of each kept Record and of the Record before it, the count and a digest,
-    and no body, with no size limit. A replay then reads only the kept Records from the
-    Store again, so they must stay there for as long as the Workflow can replay. When it
-    can't read them, the Workflow Task fails with
-    :py:class:`temporalio.exceptions.StreamReplayError`. A replay follows the marker, not
-    the setting. Records that the scan looked at and didn't keep stay out of History. The
-    Worker's data converter, with its payload codec, encodes the marker. A replay doesn't
-    call the functions, so an appender in them writes nothing. A Workflow Task that fails
-    and runs again calls them again, and an appender writes again with a higher epoch. The
-    functions run on the Worker's event loop, not in the Workflow's thread. They can read
-    Workflow state through a reference such as ``self``, but can't call
-    ``temporalio.workflow`` or a method of a Stream. Such a call raises ``TypeError``, and
-    a function appends to a Stream through a ``BufferedAppender``. Each sees a Record once,
-    so a later change of that state doesn't check an earlier Record again.
+    :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With ``STORE``, the
+    default, it holds the offset of each kept Record and of the Record before it, the count
+    and a digest, and no body, with no size limit. A replay then reads only the kept Records
+    from the Store again, so they must stay there for as long as the Workflow can replay.
+    When it can't read them, the Workflow Task fails with
+    :py:class:`temporalio.exceptions.StreamReplayError`. With the option ``HISTORY``, it
+    holds the kept Records and their bodies, so the encoded result must fit in
+    :py:data:`temporalio.common.MAX_STREAM_RESULT_BYTES`. A replay then takes the result
+    from History, so it calls no Store and needs no Stream config. A replay follows the
+    marker, not the setting. Records that the scan looked at and didn't keep stay out of
+    History. The Worker's data converter, with its payload codec, encodes the marker. A
+    replay doesn't call the functions, so an appender in them writes nothing. A Workflow
+    Task that fails and runs again calls them again, and an appender writes again with a
+    higher epoch. The functions run on the Worker's event loop, not in the Workflow's
+    thread. They can read Workflow state through a reference such as ``self``, but can't
+    call ``temporalio.workflow`` or a method of a Stream. Such a call raises ``TypeError``,
+    and a function appends to a Stream through a ``BufferedAppender``. Each sees a Record
+    once, so a later change of that state doesn't check an earlier Record again.
 
     Args:
         stream: The Stream to scan.
@@ -828,8 +828,8 @@ async def filter_stream(
             would pass the cap ends the call before that Record, and the next call gets it.
             The first Record of a call is always taken, also when it is larger. ``None`` is
             :py:data:`temporalio.common.DEFAULT_STREAM_MAX_BYTES`, 256 KiB. In Workflow
-            code on a Worker whose ``workflow_read_replay_from`` is ``STORE``, ``None`` is
-            no cap.
+            code ``None`` is no cap, unless ``workflow_read_replay_from`` is the option
+            ``HISTORY``.
 
     Returns:
         The kept Records, where the scan stopped, and why.

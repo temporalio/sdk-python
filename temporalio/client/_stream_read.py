@@ -6,9 +6,9 @@ the marker of the call in History. The functions of the caller can't be serializ
 reach the Local Activity through the registry of this module, in the memory of the Worker
 process.
 
-A marker of a ``take`` or a ``filter`` holds the kept Records, or only their offsets and a
-digest when the Worker's ``StreamConfig.workflow_read_replay_from`` is ``STORE``. A replay
-of the second kind reads the Records from the Store again with :py:func:`_read_kept_records`.
+A marker of a ``take`` or a ``filter`` holds only the offsets and a digest of the kept
+Records by default. A replay of it reads the Records from the Store again with
+:py:func:`_read_kept_records`. With the option ``HISTORY`` the marker holds the Records.
 
 .. warning::
     This API is an experimental prototype and subject to change.
@@ -134,7 +134,7 @@ class _Pages(ABC, Generic[_RecordT]):
 class _StorePages(_Pages[temporalio.api.stream.v1.StreamRecord]):
     """The pages of the Local Activity of Workflow code, read from its Store.
 
-    The Records stay proto Records, so the result in History keeps the bodies as the Store
+    The Records stay proto Records, so a result with Records keeps the bodies as the Store
     gave them.
     """
 
@@ -695,7 +695,7 @@ class _PendingStreamCall:
     to_record: _ToRecord
     """Turns a proto Record into the typed Record of the Workflow."""
 
-    replay_from: StreamReplaySource = StreamReplaySource.HISTORY
+    replay_from: StreamReplaySource = StreamReplaySource.STORE
     """What the marker of a new call holds, from the Worker's Stream config."""
 
     _filled: (

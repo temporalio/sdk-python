@@ -184,10 +184,10 @@ class Pipeline(Generic[ItemT]):
 
         In Workflow code the marker in History follows the Worker's
         :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`. With
-        ``HISTORY``, the default, the Records of the result go into History, so their
-        encoded size must fit in 1 MiB. ``max_bytes``, 256 KiB by default, keeps them under
-        it. With ``STORE``, only their offsets and a digest go into History, there is no
-        size limit and no default cap, and a replay reads the Records from the Store again.
+        ``STORE``, the default, only the offsets of the Records and a digest go into History.
+        There is no size limit and no default cap, and a replay reads the Records from the
+        Store again. With the option ``HISTORY``, the Records go into History, so their
+        encoded size must fit in 1 MiB. ``max_bytes``, 256 KiB by default, keeps them under it.
 
         The chain may hold any number of :py:meth:`filter` steps, at most one
         :py:meth:`take_until`, and at most one :py:meth:`limit` as its last step.

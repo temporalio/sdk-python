@@ -1476,9 +1476,9 @@ It applies when the call's ``max_records`` is ``None``.
 DEFAULT_STREAM_MAX_BYTES = 256 * 1024
 """The most bytes of the Records of one ``take``, ``filter`` or ``reduce`` of a Stream.
 
-It applies when the call's ``max_bytes`` is ``None``. A ``take`` or a ``filter`` of Workflow
-code on a Worker whose ``StreamConfig.workflow_read_replay_from`` is ``STORE`` has no default
-cap, since no body goes into History.
+It applies when the call's ``max_bytes`` is ``None``. By default a ``take`` or a ``filter`` of
+Workflow code has no such cap, since no body goes into History. It has this cap when
+``StreamConfig.workflow_read_replay_from`` is the option ``HISTORY``.
 
 .. warning::
     This API is experimental and subject to change.
@@ -1490,9 +1490,9 @@ MAX_STREAM_RESULT_BYTES = 1024 * 1024
 In Workflow code the result of a ``take``, ``filter`` or ``reduce`` goes into History, so this
 bounds what one call adds to it. A call over it raises
 :py:class:`temporalio.exceptions.ApplicationError`. Client and Activity code have no such
-limit, since their result doesn't go into History and isn't encoded. A ``take`` or a
-``filter`` on a Worker whose ``StreamConfig.workflow_read_replay_from`` is ``STORE`` has no
-such limit either, since its marker holds offsets and no Record.
+limit, since their result doesn't go into History and isn't encoded. By default a ``take`` or
+a ``filter`` has no such limit either, since its marker holds offsets and no Record. It has
+it when ``StreamConfig.workflow_read_replay_from`` is the option ``HISTORY``.
 
 .. warning::
     This API is experimental and subject to change.
