@@ -102,10 +102,16 @@ async def wait_until_polling(client: Client, worker: Worker) -> None:
     # can miss a first poll that reaches it just after the `ShutdownWorker` call. That poll then
     # stays open for about a minute. Tests that don't cover this race shut down a Worker only
     # after the server sees it polling.
-    namespace = await client.workflow_service.describe_namespace(
-        DescribeNamespaceRequest(namespace=client.namespace)
-    )
-    if not namespace.namespace_info.capabilities.worker_poll_complete_on_shutdown:
+
+    async def server_ends_polls_at_shutdown() -> bool:
+        namespace = await client.workflow_service.describe_namespace(
+            DescribeNamespaceRequest(namespace=client.namespace)
+        )
+        return namespace.namespace_info.capabilities.worker_poll_complete_on_shutdown
+
+    # `assert_eventually` also retries a call that the transport cancelled, which a call next to
+    # a Worker's start hits now and then on Windows.
+    if not await assert_eventually(server_ends_polls_at_shutdown):
         return
 
     config = worker.config()
