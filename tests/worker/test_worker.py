@@ -960,6 +960,9 @@ async def test_worker_with_worker_deployment_config(
         await set_current_deployment_version(
             client, describe_resp.conflict_token, worker_v1
         )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v1.build_id
+        )
 
         # Start workflow 1 which will use the 1.0 worker on auto-upgrade
         wf1 = await client.start_workflow(
@@ -973,6 +976,9 @@ async def test_worker_with_worker_deployment_config(
         await set_current_deployment_version(
             client, describe_resp2.conflict_token, worker_v2
         )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v2.build_id
+        )
 
         wf2 = await client.start_workflow(
             DeploymentVersioningWorkflowV2Pinned.run,
@@ -984,6 +990,9 @@ async def test_worker_with_worker_deployment_config(
         describe_resp3 = await wait_until_worker_deployment_visible(client, worker_v3)
         await set_current_deployment_version(
             client, describe_resp3.conflict_token, worker_v3
+        )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v3.build_id
         )
 
         wf3 = await client.start_workflow(
@@ -1149,6 +1158,9 @@ async def _test_worker_deployment_dynamic_workflow(
         await set_current_deployment_version(
             client, describe_resp.conflict_token, worker_v1
         )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v1.build_id
+        )
 
         wf = await client.start_workflow(
             "cooldynamicworkflow",
@@ -1262,6 +1274,9 @@ async def test_workflows_can_use_default_versioning_behavior(
         await set_current_deployment_version(
             client, describe_resp.conflict_token, worker_v1
         )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v1.build_id
+        )
 
         wf = await client.start_workflow(
             NoVersioningAnnotationWorkflow.run,
@@ -1359,6 +1374,9 @@ async def test_workflows_can_use_versioning_override(
         )
         await set_current_deployment_version(
             client, describe_resp.conflict_token, worker_v1
+        )
+        await wait_for_worker_deployment_routing_config_propagation(
+            client, deployment_name, worker_v1.build_id
         )
 
         handle = await client.start_workflow(
@@ -1651,9 +1669,8 @@ async def wait_for_worker_deployment_routing_config_propagation(
     expected_ramping_percentage: float | None = None,
 ) -> None:
     """Wait for routing config to be propagated to all task queues."""
-    import temporalio.api.enums.v1
 
-    async def check() -> bool:
+    async def check() -> None:
         resp = await client.workflow_service.describe_worker_deployment(
             DescribeWorkerDeploymentRequest(
                 namespace=client.namespace,
@@ -1662,38 +1679,24 @@ async def wait_for_worker_deployment_routing_config_propagation(
             retry=True,
         )
         routing_config = resp.worker_deployment_info.routing_config
-        if (
+        assert (
             routing_config.current_deployment_version.build_id
-            != expected_current_build_id
-        ):
-            return False
-        if (
+            == expected_current_build_id
+        )
+        assert (
             routing_config.ramping_deployment_version.build_id
-            != expected_ramping_build_id
-        ):
-            return False
-        if (
-            expected_ramping_percentage is not None
-            and routing_config.ramping_version_percentage != expected_ramping_percentage
-        ):
-            return False
-        state = resp.worker_deployment_info.routing_config_update_state
-        if (
-            state
-            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_COMPLETED
-        ):
-            return True
-        if (
-            state
-            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_UNSPECIFIED
-        ):
-            return True  # unimplemented
-        if (
-            state
-            == temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
-        ):
-            return False
-        return False
+            == expected_ramping_build_id
+        )
+        if expected_ramping_percentage is not None:
+            assert (
+                routing_config.ramping_version_percentage == expected_ramping_percentage
+            )
+        # The set calls can return before the task queues get the new routing. A server that
+        # doesn't report this state leaves it unspecified.
+        assert (
+            resp.worker_deployment_info.routing_config_update_state
+            != temporalio.api.enums.v1.RoutingConfigUpdateState.ROUTING_CONFIG_UPDATE_STATE_IN_PROGRESS
+        )
 
     await assert_eventually(check)
 
