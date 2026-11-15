@@ -1,4 +1,5 @@
 import asyncio
+import faulthandler
 import gc
 import multiprocessing.context
 import os
@@ -57,6 +58,28 @@ def pytest_addoption(parser):  # type: ignore[reportMissingParameterType]
         default="local",
         help="Which workflow environment to use ('local', 'time-skipping-v1', 'time-skipping-v2', 'envconfig', or ip:port for existing server)",
     )
+    parser.addini(
+        "test_hang_limit",
+        "Seconds one test may take with its fixtures before the process dumps all stacks and exits",
+        default="300",
+    )
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item: pytest.Item):
+    # pytest-timeout only covers the test call, and its signal can't stop a main thread that is
+    # blocked outside Python. A hang in a fixture or in native code then stalls the whole run.
+    # This timer runs on a C thread, so it also fires there. It prints every stack and ends the
+    # process, and xdist then reports the test as crashed.
+    faulthandler.dump_traceback_later(
+        float(item.config.getini("test_hang_limit")),
+        exit=True,
+        file=sys.__stderr__ or sys.stderr,
+    )
+    try:
+        yield
+    finally:
+        faulthandler.cancel_dump_traceback_later()
 
 
 def _uses_envconfig_server(env_type: str | None) -> bool:
