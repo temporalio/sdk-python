@@ -1975,6 +1975,11 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
         await assert_workflow_exists_eventually(
             client, WaitForCancelWorkflow.run, f"{handle.id}_child"
         )
+        # The child can exist before the parent sees it start. A Signal in that same Workflow
+        # Task runs its handler before `run` resumes, so wait until the parent holds the child.
+        await assert_eq_eventually(
+            True, lambda: handle.query(CancelChildWorkflow.ready)
+        )
         # Send cancel signal and wait on the handle
         await handle.signal(CancelChildWorkflow.cancel_child)
         with pytest.raises(WorkflowFailureError) as err:
