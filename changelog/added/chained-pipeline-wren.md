@@ -1,1 +1,2 @@
 Add `temporalio.contrib.streams.pipeline`, which chains `filter`, `map`, `take_until` and `limit` steps over a Stream and runs the whole chain as one `take`, `filter` or `reduce` call. In Workflow code a chain is one Local Activity and one marker in History.
+Add the `append_to` end of a pipeline. It appends each item of the chain to another Stream while the scan runs, and in Workflow code only the number of the items goes into History.

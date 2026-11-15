@@ -12,14 +12,19 @@ import types
 import typing
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
-from typing import Any, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, overload
 
 import temporalio.common
+from temporalio.contrib.streams._appender import BufferedAppender
 from temporalio.nexus.system.stream_service import (
     StreamRead,
     StreamRecord,
     StreamReduce,
 )
+
+if TYPE_CHECKING:
+    import temporalio.nexus.system.stream_service.client
+    import temporalio.nexus.system.stream_service.workflow._resources.stream
 
 BodyT = TypeVar("BodyT")
 ItemT = TypeVar("ItemT")
@@ -108,7 +113,8 @@ class Pipeline(Generic[ItemT]):
     Worker's :py:attr:`temporalio.client.StreamConfig.workflow_read_replay_from`, as a
     ``take`` or a ``filter`` does. The folding ends, :py:meth:`reduce`, :py:meth:`collect`
     with a ``map``, and :py:meth:`count`, keep their value in History under both values.
-    Client, Activity and Workflow code get the same result.
+    :py:meth:`append_to` writes its items to another Stream while the scan runs, and keeps
+    only their number. Client, Activity and Workflow code get the same result.
 
     The functions of the steps must be plain functions that keep no state. In Workflow code
     a Local Activity can run them again after a failure, with the same function objects.
@@ -390,6 +396,89 @@ class Pipeline(Generic[ItemT]):
         """
         return await self._fold(
             _add_one,
+            0,
+            int,
+            timeout=timeout,
+            from_offset=from_offset,
+            idle_timeout=idle_timeout,
+            max_records=max_records,
+            max_bytes=max_bytes,
+        )
+
+    @overload
+    async def append_to(
+        self: Pipeline[StreamRecord[BodyT]],
+        stream: temporalio.nexus.system.stream_service.client.Stream[BodyT]
+        | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[
+            BodyT
+        ],
+        timeout: timedelta,
+        from_offset: bytes | None = None,
+        idle_timeout: timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamReduce[int]: ...
+
+    @overload
+    async def append_to(
+        self,
+        stream: temporalio.nexus.system.stream_service.client.Stream[ItemT]
+        | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[
+            ItemT
+        ],
+        timeout: timedelta,
+        from_offset: bytes | None = None,
+        idle_timeout: timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamReduce[int]: ...
+
+    async def append_to(
+        self,
+        stream: Any,
+        timeout: timedelta,
+        from_offset: bytes | None = None,
+        idle_timeout: timedelta | None = None,
+        max_records: int | None = None,
+        max_bytes: int | None = None,
+    ) -> StreamReduce[int]:
+        """Append the items that reach the end of the chain to another Stream.
+
+        It makes one ``reduce`` call of the Stream of the chain. Each item goes to ``stream``
+        through a :py:class:`BufferedAppender` while the scan runs, so a reader of ``stream``
+        doesn't wait for the end of the call. A chain with no :py:meth:`map` appends the body
+        of each Record. The call writes the last buffered items before it returns, and a
+        failed write fails the call.
+
+        The items don't go into the result. In Workflow code the appends run in the Local
+        Activity of the call, and History gets one marker with the number of items. A replay
+        appends nothing. If that Local Activity or its Workflow Task runs again, it appends
+        the items again with a higher epoch.
+
+        Args:
+            stream: The Stream to append to, a client Stream or a Workflow Stream.
+            timeout: As in ``reduce`` of the Stream.
+            from_offset: As in ``reduce`` of the Stream.
+            idle_timeout: As in ``reduce`` of the Stream.
+            max_records: As in ``reduce`` of the Stream.
+            max_bytes: As in ``reduce`` of the Stream.
+
+        Returns:
+            The number of appended items, where the scan stopped, and why.
+        """
+        bodies = not any(step.kind is _StepKind.MAP for step in self._steps)
+        appenders: list[BufferedAppender[Any]] = []
+
+        def append(count: int, item: Any) -> int:
+            if count == 0:
+                # A Local Activity can run its scan again with this same function, and the
+                # appender of the run before could hold the error of a failed batch.
+                appenders[:] = [BufferedAppender(stream)]
+            appenders[0].append(item.body if bodies else item)
+            return count + 1
+
+        return await self._fold(
+            append,
             0,
             int,
             timeout=timeout,

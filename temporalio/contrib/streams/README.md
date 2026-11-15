@@ -60,11 +60,26 @@ scan stopped, so a loop that gives it as the next `from_offset` loses and repeat
 | `reduce(function, initial, ...)` | one `reduce` | `StreamReduce[ValueT]` with the folded value | the value |
 | `collect(...)` | one `reduce`, or as `records` when the chain has no `map` | `StreamReduce[list[T]]` with the items | the list |
 | `count(...)` | one `reduce` | `StreamReduce[int]` with the number of items | the count |
+| `append_to(stream, ...)` | one `reduce` | `StreamReduce[int]` with the number of appended items | the count |
 
 `records` runs only a chain of `filter` steps, with at most one `take_until` and at most one
 `limit` as its last step. For any other chain it raises `TypeError`, and `collect` or
 `reduce` runs it. In Workflow code a result must fit in 1 MiB once encoded, since it goes
 into History.
+
+`append_to` is the end that collects nothing. It appends each item to another Stream while
+the scan runs, so a reader of that Stream doesn't wait for the end of the call. A chain with no
+`map` appends the body of each Record. If the Local Activity of the call runs again, it
+appends the items again with a higher epoch.
+
+```python
+count = await (
+    pipeline(tokens)
+    .filter(lambda record: record.body.kind == "text")
+    .map(lambda record: record.body.text)
+    .append_to(shown, timeout=timedelta(minutes=1))
+)
+```
 
 The table shows the default. A Worker whose `StreamConfig` has
 `workflow_read_replay_from=StreamReplaySource.STORE` keeps the Records of `records`, and of
