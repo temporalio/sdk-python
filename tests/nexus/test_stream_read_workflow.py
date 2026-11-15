@@ -21,6 +21,7 @@ from temporalio.api.streamservice.v1 import ReadRecordsRequest, ReadRecordsRespo
 from temporalio.client import (
     Client,
     StreamConfig,
+    StreamReplaySource,
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowHistory,
@@ -588,22 +589,40 @@ def _done(text: str = "done") -> Token:
 
 
 def _with_store(
-    client: Client, store: Any, data_converter: DataConverter | None = None
+    client: Client,
+    store: Any,
+    data_converter: DataConverter | None = None,
+    *,
+    replay_from: StreamReplaySource | None = None,
 ) -> Client:
+    """Give a client with ``store``. ``replay_from=None`` leaves the setting at its default."""
     config = client.config()
-    config["stream_config"] = StreamConfig(stores=[store])
+    config["stream_config"] = (
+        StreamConfig(stores=[store])
+        if replay_from is None
+        else StreamConfig(stores=[store], workflow_read_replay_from=replay_from)
+    )
     if data_converter is not None:
         config["data_converter"] = data_converter
     return Client(**config)
+
+
+def _mode(stream_client: Client) -> str:
+    """Name the setting that a measurement ran under."""
+    stream_config = stream_client.config()["stream_config"]
+    assert stream_config is not None
+    return stream_config.workflow_read_replay_from.name
 
 
 async def _new_stream(
     client: Client,
     store: Any = None,
     data_converter: DataConverter | None = None,
+    *,
+    replay_from: StreamReplaySource | None = None,
 ) -> tuple[Client, Any, str]:
     store = store or MemoryStreamStore()
-    stream_client = _with_store(client, store, data_converter)
+    stream_client = _with_store(client, store, data_converter, replay_from=replay_from)
     stream_id = f"stream-{uuid.uuid4()}"
     await stream_client.create_stream(id=stream_id, body_type=Token)
     return stream_client, store, stream_id
@@ -827,7 +846,9 @@ async def test_replay_needs_no_stream_config_and_calls_no_store(
     client: Client, call: str
 ):
     store = RecordingStreamStore(MemoryStreamStore())
-    stream_client, _, stream_id = await _new_stream(client, store)
+    stream_client, _, stream_id = await _new_stream(
+        client, store, replay_from=StreamReplaySource.HISTORY
+    )
     await _append(stream_client, stream_id, *_STOP_TOKENS[:3], _done())
     handle, _ = await _run_workflow(
         stream_client, CallWorkflow, CallArgs(stream_id, call=call)
@@ -853,7 +874,10 @@ async def test_replay_needs_no_stream_config_and_calls_no_store(
 
 async def test_query_after_the_stream_is_deleted(client: Client):
     store = DictStreamStore()
-    stream_client, _, stream_id = await _new_stream(client, store)
+    # The Query replays a History that holds the Records, so it needs no Stream.
+    stream_client, _, stream_id = await _new_stream(
+        client, store, replay_from=StreamReplaySource.HISTORY
+    )
     tokens = [*_tokens(3), _done()]
     await _append(stream_client, stream_id, *tokens)
     task_queue = f"tq-{uuid.uuid4()}"
@@ -870,8 +894,10 @@ async def test_query_after_the_stream_is_deleted(client: Client):
 
 
 async def test_take_loop_over_max_bytes(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    # 40 Records of about 10 KiB pass the default cap of 256 KiB.
+    stream_client, _, stream_id = await _new_stream(
+        client, replay_from=StreamReplaySource.HISTORY
+    )
+    # 40 Records of about 10 KiB pass the default cap of 256 KiB of HISTORY.
     tokens = [
         Token("text", f"{_BODY_MARK}-{index}-" + "x" * 10_000) for index in range(40)
     ]
@@ -886,7 +912,10 @@ async def test_take_loop_over_max_bytes(client: Client):
 
 @pytest.mark.parametrize("call", ["take", "reduce"])
 async def test_result_over_the_limit_raises_at_the_await(client: Client, call: str):
-    stream_client, _, stream_id = await _new_stream(client)
+    # A take has the limit only under HISTORY, and a reduce has it under both.
+    stream_client, _, stream_id = await _new_stream(
+        client, replay_from=StreamReplaySource.HISTORY if call == "take" else None
+    )
     tokens = [Token("text", "x" * 20_000) for _ in range(60)]
     for start in range(0, len(tokens), 10):
         await _append(stream_client, stream_id, *tokens[start : start + 10])
@@ -903,16 +932,16 @@ async def test_result_over_the_limit_raises_at_the_await(client: Client, call: s
 async def test_replay_checks_the_stream_and_offset_of_a_call(
     client: Client, variant: str
 ):
-    stream_client, _, stream_id = await _new_stream(client)
+    stream_client, store, stream_id = await _new_stream(client)
     await _append(stream_client, stream_id, *_tokens(2))
     StreamReadState.variant = ""
     handle, _ = await _run_workflow(stream_client, VariantWorkflow, stream_id)
     history = await handle.fetch_history()
     StreamReadState.variant = variant
     try:
-        result = await Replayer(workflows=[VariantWorkflow]).replay_workflow(
-            history, raise_on_replay_failure=False
-        )
+        result = await Replayer(
+            workflows=[VariantWorkflow], stream_config=StreamConfig(stores=[store])
+        ).replay_workflow(history, raise_on_replay_failure=False)
     finally:
         StreamReadState.variant = ""
     if variant == "uuid":
@@ -927,8 +956,9 @@ async def test_replay_checks_the_stream_and_offset_of_a_call(
 
 async def test_payload_codec_hides_every_body_in_history(client: Client):
     data_converter = DataConverter(payload_codec=XorCodec())
+    # HISTORY puts the bodies of a take and a filter into History, for the codec to hide.
     stream_client, _, stream_id = await _new_stream(
-        client, data_converter=data_converter
+        client, data_converter=data_converter, replay_from=StreamReplaySource.HISTORY
     )
     await _append(stream_client, stream_id, *_tokens(3), _done())
     for call in ("take", "filter", "reduce"):
@@ -1079,7 +1109,9 @@ async def test_until_reads_workflow_state(client: Client, runner: WorkflowRunner
 
 async def test_calls_on_a_worker_without_cache(client: Client):
     stream_client, store, stream_id = await _new_stream(
-        client, RecordingStreamStore(MemoryStreamStore())
+        client,
+        RecordingStreamStore(MemoryStreamStore()),
+        replay_from=StreamReplaySource.HISTORY,
     )
     tokens = [
         Token("text", f"{_BODY_MARK}-{text}") for text in ["a", "m1", "b", "m2", "c"]
@@ -1326,9 +1358,12 @@ async def test_take_max_bytes_boundary(client: Client):
 
 
 async def _run_flowing_take(
-    client: Client, *, seconds: float = 2.0
-) -> tuple[WorkflowHistory, float]:
-    stream_client, _, stream_id = await _new_stream(client)
+    client: Client,
+    *,
+    seconds: float = 2.0,
+    replay_from: StreamReplaySource | None = None,
+) -> tuple[WorkflowHistory, float, str]:
+    stream_client, _, stream_id = await _new_stream(client, replay_from=replay_from)
     tokens = [*_tokens(39), _done()]
     async with new_worker(stream_client, CallWorkflow) as worker:
         handle = await _start_call(
@@ -1340,28 +1375,39 @@ async def _run_flowing_take(
         result = await handle.result()
         latency = time.monotonic() - appended
     assert result.texts == _texts(tokens)
-    return await handle.fetch_history(), latency
+    return await handle.fetch_history(), latency, _mode(stream_client)
+
+
+# What a marker holds changes its size, so a measurement of one runs under each setting.
+_BOTH_SETTINGS = (None, StreamReplaySource.HISTORY)
 
 
 async def test_measure_flowing_take(client: Client):
-    history, _ = await _run_flowing_take(client)
-    payload = _marker_payload(history)
-    print(f"\nA. 40 Records over 2 s, History events: {_event_counts(history)}")
-    print(f"A. Result payload: {payload.ByteSize()} bytes")
+    for replay_from in _BOTH_SETTINGS:
+        history, _, mode = await _run_flowing_take(client, replay_from=replay_from)
+        payload = _marker_payload(history)
+        print(
+            f"\nA. {mode}: 40 Records over 2 s, History events: {_event_counts(history)}"
+        )
+        print(f"A. {mode}: Result payload: {payload.ByteSize()} bytes")
 
 
 async def test_measure_take_of_forty(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    await _append(stream_client, stream_id, *_tokens(40))
-    await _close(stream_client, stream_id)
-    handle, result = await _run_workflow(
-        stream_client, CallWorkflow, CallArgs(stream_id, until_kind=None)
-    )
-    assert (result.count, result.stop) == (40, "Done")
-    payload = _marker_payload(await handle.fetch_history())
-    header = Payloads.FromString(payload.data).payloads[0].data.decode()
-    print(f"\nResult of a take of 40 small Records: {payload.ByteSize()} bytes")
-    print(f"Its header: {header}")
+    for replay_from in _BOTH_SETTINGS:
+        stream_client, _, stream_id = await _new_stream(client, replay_from=replay_from)
+        await _append(stream_client, stream_id, *_tokens(40))
+        await _close(stream_client, stream_id)
+        handle, result = await _run_workflow(
+            stream_client, CallWorkflow, CallArgs(stream_id, until_kind=None)
+        )
+        assert (result.count, result.stop) == (40, "Done")
+        payload = _marker_payload(await handle.fetch_history())
+        header = Payloads.FromString(payload.data).payloads[0].data.decode()
+        mode = _mode(stream_client)
+        print(
+            f"\n{mode}: Result of a take of 40 small Records: {payload.ByteSize()} bytes"
+        )
+        print(f"{mode}: Its header: {header}")
 
 
 @workflow.defn
@@ -1377,17 +1423,21 @@ class KeepHitsWorkflow:
 
 
 async def test_measure_filter_that_keeps_five(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
-    tokens = [
-        Token("hit" if index % 8 == 0 else "text", f"{_BODY_MARK}-{index}")
-        for index in range(40)
-    ]
-    await _append(stream_client, stream_id, *tokens)
-    await _close(stream_client, stream_id)
-    handle, kept = await _run_workflow(stream_client, KeepHitsWorkflow, stream_id)
-    assert kept == 5
-    payload = _marker_payload(await handle.fetch_history())
-    print(f"\nResult of a filter that keeps 5 of 40: {payload.ByteSize()} bytes")
+    for replay_from in _BOTH_SETTINGS:
+        stream_client, _, stream_id = await _new_stream(client, replay_from=replay_from)
+        tokens = [
+            Token("hit" if index % 8 == 0 else "text", f"{_BODY_MARK}-{index}")
+            for index in range(40)
+        ]
+        await _append(stream_client, stream_id, *tokens)
+        await _close(stream_client, stream_id)
+        handle, kept = await _run_workflow(stream_client, KeepHitsWorkflow, stream_id)
+        assert kept == 5
+        payload = _marker_payload(await handle.fetch_history())
+        print(
+            f"\n{_mode(stream_client)}: Result of a filter that keeps 5 of 40: "
+            f"{payload.ByteSize()} bytes"
+        )
 
 
 async def test_measure_idle_wait(client: Client):
@@ -1403,21 +1453,25 @@ async def test_measure_idle_wait(client: Client):
         await _append(stream_client, stream_id, _done())
         await handle.result()
     counts = _event_counts(await handle.fetch_history())
-    print(f"\nA wait of 6 s with idle_timeout=30 s, History events: {counts}")
+    print(
+        f"\n{_mode(stream_client)}: A wait of 6 s with idle_timeout=30 s, "
+        f"History events: {counts}"
+    )
 
 
 async def test_measure_match_latency(client: Client):
     latencies = []
+    mode = ""
     for _ in range(5):
-        _, latency = await _run_flowing_take(client)
+        _, latency, mode = await _run_flowing_take(client)
         latencies.append(latency)
     print(
-        "\nAppend of the match to the end of the Workflow: "
+        f"\n{mode}: Append of the match to the end of the Workflow: "
         + ", ".join(f"{latency * 1000:.0f} ms" for latency in latencies)
     )
 
 
-async def _signal_wait(client: Client) -> float:
+async def _signal_wait(client: Client) -> tuple[float, str]:
     stream_client, _, stream_id = await _new_stream(client)
     async with new_worker(stream_client, TakeUntilWantedWorkflow) as worker:
         handle = await stream_client.start_workflow(
@@ -1451,15 +1505,15 @@ async def _signal_wait(client: Client) -> float:
 
         seconds = await assert_eventually(delivered, timeout=timedelta(seconds=15))
         await handle.terminate()
-    return seconds
+    return seconds, _mode(stream_client)
 
 
 @pytest.mark.timeout(120)
 async def test_measure_signal_wait(client: Client):
     waits = [await _signal_wait(client) for _ in range(3)]
     print(
-        "\nSignal to the next Workflow Task Started while a call waits: "
-        + ", ".join(f"{wait:.2f} s" for wait in waits)
+        f"\n{waits[0][1]}: Signal to the next Workflow Task Started while a call waits: "
+        + ", ".join(f"{wait:.2f} s" for wait, _ in waits)
     )
 
 
@@ -1479,10 +1533,12 @@ async def test_measure_flowing_fold(client: Client):
     assert result.count == 40
     history = await handle.fetch_history()
     payload = _marker_payload(history)
+    mode = _mode(stream_client)
     print(
-        f"\nD. A fold over 40 Records over 2 s, History events: {_event_counts(history)}"
+        f"\nD. {mode}: A fold over 40 Records over 2 s, "
+        f"History events: {_event_counts(history)}"
     )
-    print(f"D. Result payload: {payload.ByteSize()} bytes")
+    print(f"D. {mode}: Result payload: {payload.ByteSize()} bytes")
 
 
 async def test_fold_appends_each_record_to_another_stream(client: Client):

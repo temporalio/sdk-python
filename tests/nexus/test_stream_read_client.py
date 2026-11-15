@@ -15,6 +15,7 @@ from temporalio.client import (
     NexusOperationHandle,
     OutboundInterceptor,
     StartNexusOperationInput,
+    StreamReplaySource,
 )
 from temporalio.contrib.streams import BufferedAppender
 from temporalio.exceptions import ApplicationError
@@ -200,7 +201,10 @@ async def test_client_functions_must_be_plain(client: Client):
 
 
 async def test_client_result_has_no_limit(client: Client):
-    stream_client, _, stream_id = await _new_stream(client)
+    # The Workflow at the end shows the limit, which a take has only under HISTORY.
+    stream_client, _, stream_id = await _new_stream(
+        client, replay_from=StreamReplaySource.HISTORY
+    )
     for _ in range(6):
         await _append(stream_client, stream_id, *[Token("text", "x" * 20_000)] * 10)
     await _close(stream_client, stream_id)

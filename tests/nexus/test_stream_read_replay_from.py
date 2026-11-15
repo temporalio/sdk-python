@@ -222,6 +222,35 @@ async def test_store_keeps_every_body_out_of_history_and_replays(
         assert len(store.reads) == 1
 
 
+@_READ_CALLS
+async def test_config_with_no_setting_behaves_as_store(client: Client, call: str):
+    store = RequestsStore(MemoryStreamStore())
+    stream_config = StreamConfig(stores=[store])
+    assert stream_config.workflow_read_replay_from is _STORE
+    config = client.config()
+    config["stream_config"] = stream_config
+    default_client = Client(**config)
+    stream_id = await _stream_of(default_client, *_CALL_TOKENS)
+    history, count = await _run(
+        default_client, QuietCallWorkflow, CallArgs(stream_id, call=call)
+    )
+    first_run = _run_result(history)
+    kept = [0, 2, 4, 5] if call == "filter" else [0, 1, 2, 3, 4, 5]
+    assert first_run[0] == tuple(_CALL_TOKENS[index].text for index in kept)
+    assert count == len(kept)
+    assert _no_body_in(history)
+    assert _replays_from_store(await _plain_marker(history))
+
+    store.reads.clear()
+    await Replayer(
+        workflows=[QuietCallWorkflow], stream_config=StreamConfig(stores=[store])
+    ).replay_workflow(history)
+    assert _run_result(history) == first_run
+    assert store.reads
+    no_config = await _replay_failure(history, QuietCallWorkflow)
+    assert 'r#type: "StreamReplayError"' in no_config
+
+
 @pytest.mark.parametrize("call", ["take", "filter"])
 async def test_measure_store_marker(client: Client, call: str):
     sizes: dict[StreamReplaySource, int] = {}

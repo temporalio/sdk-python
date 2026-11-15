@@ -436,9 +436,11 @@ async def test_replayer_replays_each_end(client: Client):
     stream_client, stream_id, offsets = await _stream_of_tokens(client)
     handle, results = await _execute(stream_client, ChainsWorkflow, stream_id)
     assert results == _expected(offsets)
-    await Replayer(workflows=[ChainsWorkflow]).replay_workflow(
-        await handle.fetch_history()
-    )
+    # The markers of the Records ends hold no Record, so the replay reads the Store.
+    await Replayer(
+        workflows=[ChainsWorkflow],
+        stream_config=stream_client.config()["stream_config"],
+    ).replay_workflow(await handle.fetch_history())
 
 
 async def test_typed_ends(client: Client):
