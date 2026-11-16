@@ -1092,15 +1092,9 @@ async def test_sync_response(
                 if op_definition_type == OpDefinitionType.SHORTHAND
                 else "sync_or_async_operation"
             )
-        elif request_cancel:
-            # The response was synchronous, so the result had already arrived when the
-            # workflow cancelled the handle. Single-batch activations keep that task
-            # cancellation instead of returning the completed result. See explanation
-            # below.
-            with pytest.raises(WorkflowFailureError) as ei:
-                await caller_wf_handle.result()
-            assert isinstance(ei.value.cause, CancelledError)
         else:
+            # Under the default legacy ordering, cancellation does not override
+            # an already-completed synchronous result.
             result = await caller_wf_handle.result()
             assert result.op_output.value == "sync response"
 
@@ -1759,7 +1753,7 @@ async def assert_handler_workflow_has_link_to_caller_workflow(
 # awaited, because both resolve_nexus_operation_start and resolve_nexus_operation jobs
 # were sent in the same activation and hence the task's fut_waiter was already finished.
 #
-# With single-batch activations (workflow logic flag 2, the default) the SDK re-raises
+# With single-batch activations (workflow logic flag 2) the SDK re-raises
 # the task cancellation even though the result future is already done, so awaiting the
 # handle raises CancelledError in the sync case as well.
 #
