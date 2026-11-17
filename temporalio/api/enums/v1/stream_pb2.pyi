@@ -92,7 +92,7 @@ class _StreamErrorReasonEnumTypeWrapper(
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
     """Nobody created the Stream. NOT_FOUND."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
-    """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
+    """The Stream's Retention or its Producer idle TTL passed. NOT_FOUND."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
     """The Stream is closed. FAILED_PRECONDITION."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
@@ -139,7 +139,7 @@ STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 """Nobody created the Stream. NOT_FOUND."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
-"""The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
+"""The Stream's Retention or its Producer idle TTL passed. NOT_FOUND."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
 """The Stream is closed. FAILED_PRECONDITION."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
