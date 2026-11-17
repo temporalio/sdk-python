@@ -209,7 +209,7 @@ mod python_store {
                 }),
                 Ok(Err((value, message))) => match reason(value) {
                     Some(reason) => Err(StreamError::new(reason, message)),
-                    None => Err(StreamError::storage_unavailable(format!(
+                    None => Err(StreamError::storage_corrupt(format!(
                         "The Stream Store failed with the unknown reason {value}: {message}"
                     ))),
                 },

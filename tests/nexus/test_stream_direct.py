@@ -1660,7 +1660,7 @@ class PythonStoreErrorWorkflow:
             else:
                 await stream.read()
         except StreamError as err:
-            return [StreamErrorReason.Name(err.reason), err.message]
+            return [StreamErrorReason.Name(err.reason), err.message, err.non_retryable]
         return ["no error"]
 
 
@@ -1670,7 +1670,44 @@ async def test_python_store_error_reaches_workflow_code_with_its_reason(
     stream_client = _stream_client(client, ClosedOnAppendStore())
     ref = await _filled_stream(stream_client, [], close=False)
     _, result = await _run(stream_client, PythonStoreErrorWorkflow, ref, "append")
-    assert result == ["STREAM_ERROR_REASON_CLOSED", "The Store closed the Stream"]
+    assert result == [
+        "STREAM_ERROR_REASON_CLOSED",
+        "The Store closed the Stream",
+        True,
+    ]
+
+
+class UnavailableTwiceStore(DictStreamStore):
+    """A Store whose first two appends fail with an outage."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.failed_appends = 0
+
+    async def append_records(
+        self, request: AppendRecordsRequest
+    ) -> AppendRecordsResponse:
+        if self.failed_appends < 2:
+            self.failed_appends += 1
+            raise StreamError(
+                "The Store is down",
+                reason=StreamErrorReason.STREAM_ERROR_REASON_STORAGE_UNAVAILABLE,
+            )
+        return await super().append_records(request)
+
+
+async def test_python_store_outage_is_tried_again(client: Client):
+    store = UnavailableTwiceStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, [], close=False)
+    _, offsets = await _run(stream_client, AppendWorkflow, ref)
+    # Core tried the append again after each outage, and the third try wrote it.
+    assert store.failed_appends == 2
+    assert offsets == [(1).to_bytes(8, "big").hex(), (2).to_bytes(8, "big").hex()]
+    assert [record.body for record in await _read_all(stream_client, ref)] == [
+        "a",
+        "b",
+    ]
 
 
 async def test_python_store_exception_is_a_stream_failure_and_the_worker_goes_on(
@@ -1681,16 +1718,18 @@ async def test_python_store_exception_is_a_stream_failure_and_the_worker_goes_on
     async with new_worker(
         stream_client, PythonStoreErrorWorkflow, PythonStoreAppendCloseWorkflow
     ) as worker:
-        # Core tries a Store that fails again for 30 s, as for an unavailable Store.
-        result = await stream_client.execute_workflow(
+        handle = await stream_client.start_workflow(
             PythonStoreErrorWorkflow.run,
             args=[ref, "read"],
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
+        # A retry can't fix the Store, so Core gives the failure on the first try.
+        result = await asyncio.wait_for(handle.result(), timeout=10)
         assert result == [
-            "STREAM_ERROR_REASON_STORAGE_UNAVAILABLE",
+            "STREAM_ERROR_REASON_STORAGE_CORRUPT",
             "The Stream Store 'dict' raised RuntimeError: the read broke",
+            True,
         ]
         # The same Worker serves the next Workflow.
         await stream_client.execute_workflow(

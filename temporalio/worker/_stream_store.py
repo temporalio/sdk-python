@@ -415,8 +415,10 @@ def _bridge_read_min_gap(config: StreamConfig | None) -> timedelta | None:  # py
     return config.workflow_read_min_gap if config is not None else None
 
 
-_STORAGE_UNAVAILABLE = (
-    temporalio.api.enums.v1.StreamErrorReason.STREAM_ERROR_REASON_STORAGE_UNAVAILABLE
+# A Store that raises something other than a `StreamError` with a reason has a fault that a
+# retry reads again, as with corrupt data, so Core gives the failure on the first try.
+_STORE_FAULT = (
+    temporalio.api.enums.v1.StreamErrorReason.STREAM_ERROR_REASON_STORAGE_CORRUPT
 )
 
 
@@ -485,7 +487,7 @@ class _CoreStoreCaller:
                 return
             done(
                 None,
-                _STORAGE_UNAVAILABLE,
+                _STORE_FAULT,
                 f"The Stream Store '{name}' raised a StreamError with no reason: "
                 f"{err.message}",
             )
@@ -496,7 +498,7 @@ class _CoreStoreCaller:
             )
             done(
                 None,
-                _STORAGE_UNAVAILABLE,
+                _STORE_FAULT,
                 f"The Stream Store '{name}' raised {type(err).__name__}: {err}",
             )
         else:

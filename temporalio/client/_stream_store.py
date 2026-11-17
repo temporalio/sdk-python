@@ -181,8 +181,10 @@ class StreamStore(ABC):
     * An outage raises :py:class:`temporalio.exceptions.StreamError` with the reason
       ``STREAM_ERROR_REASON_STORAGE_UNAVAILABLE``. Core then tries a call of Workflow
       code again for up to 30 s. Every other reason reaches Workflow code on the first
-      try. Any other exception, or a ``StreamError`` with no reason, counts as an outage,
-      and the Worker logs it. Its message tells the type of the exception.
+      try. Any other exception, or a ``StreamError`` with no reason, is a fault that a
+      retry can't fix. Workflow code gets it on the first try as a non-retryable
+      ``STREAM_ERROR_REASON_STORAGE_CORRUPT``, whose message tells the type of the
+      exception, and the Worker logs it.
 
     .. warning::
         This API is experimental and subject to change.

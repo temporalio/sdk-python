@@ -168,8 +168,8 @@ loop, never on a Workflow thread. For Workflow code, such a Store must do these 
 - `close_stream` of a closed Stream succeeds.
 - The Store keeps the Records with their offsets for as long as a replay reads them.
 - An outage raises `StreamError` with `STREAM_ERROR_REASON_STORAGE_UNAVAILABLE`, and Core tries
-  the call again for up to 30 s. Any other exception counts as an outage too, and its type is in
-  the message that Workflow code gets.
+  the call again for up to 30 s. Any other exception is not tried again. Workflow code gets it
+  as a non-retryable `STREAM_ERROR_REASON_STORAGE_CORRUPT`, with its type in the message.
 
 ## Metrics
 
