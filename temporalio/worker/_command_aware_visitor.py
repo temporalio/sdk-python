@@ -16,8 +16,13 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveNexusOperationStart,
     ResolveRequestCancelExternalWorkflow,
     ResolveSignalExternalWorkflow,
+    ResolveStreamAppend,
+    ResolveStreamClose,
+    ResolveStreamRead,
+    StreamReadEnd,
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
+    AppendToStream,
     CompleteWorkflowExecution,
     FailWorkflowExecution,
     ScheduleActivity,
@@ -37,6 +42,8 @@ class CommandInfo:
     command_type: CommandType.ValueType
     command_seq: int
     update_protocol_instance_id: str | None = None
+    stream: bool = False
+    """Whether the payloads are the bodies of a Stream append or the Records of a read."""
 
 
 current_command_info: contextvars.ContextVar[CommandInfo | None] = (
@@ -57,6 +64,7 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
         skip_search_attributes: bool = False,
         skip_headers: bool = False,
         concurrency_limit: int = 1,
+        skip_stream_bodies: bool = False,
     ) -> None:
         """Creates a new command-aware payload visitor.
 
@@ -65,12 +73,53 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
             skip_headers: If True, headers are not visited.
             concurrency_limit: Maximum number of payload visits that may run
                 concurrently during a single call to visit(). Defaults to 1.
+            skip_stream_bodies: If True, the bodies of a Stream append are not
+                visited.
         """
         super().__init__(
             skip_search_attributes=skip_search_attributes,
             skip_headers=skip_headers,
             concurrency_limit=concurrency_limit,
         )
+        self.skip_stream_bodies = skip_stream_bodies
+
+    # A Store keeps the bodies of a Workflow's append as a client and an Activity write
+    # them: with the codec, with no serialization context and with no external storage. So
+    # every reader decodes them. Each body is one Record, so the codec gets each body alone,
+    # as for those paths.
+    async def _visit_coresdk_workflow_commands_AppendToStream(
+        self, fs: VisitorFunctions, o: AppendToStream
+    ) -> None:
+        if self.skip_stream_bodies:
+            return
+        with current_command(CommandType.COMMAND_TYPE_UNSPECIFIED, o.seq, stream=True):
+            for body in o.bodies:
+                await self._visit_temporal_api_common_v1_Payload(fs, body)
+
+    # The Records of a read come from any writer of the Stream, so the codec decodes them
+    # with no serialization context, as a client and an Activity do.
+    async def _visit_coresdk_workflow_activation_ResolveStreamRead(
+        self, fs: VisitorFunctions, o: ResolveStreamRead
+    ) -> None:
+        with current_command(CommandType.COMMAND_TYPE_UNSPECIFIED, o.seq, stream=True):
+            await super()._visit_coresdk_workflow_activation_ResolveStreamRead(fs, o)
+
+    # Core builds the failure of a Stream read, append or close itself, with no codec, so no
+    # pass may decode it.
+    async def _visit_coresdk_workflow_activation_StreamReadEnd(
+        self, fs: VisitorFunctions, o: StreamReadEnd
+    ) -> None:
+        pass
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamAppend(
+        self, fs: VisitorFunctions, o: ResolveStreamAppend
+    ) -> None:
+        pass
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamClose(
+        self, fs: VisitorFunctions, o: ResolveStreamClose
+    ) -> None:
+        pass
 
     # Workflow commands with payloads
     async def _visit_coresdk_workflow_commands_CompleteWorkflowExecution(
@@ -218,6 +267,7 @@ def current_command(
     command_seq: int,
     *,
     update_protocol_instance_id: str | None = None,
+    stream: bool = False,
 ) -> Iterator[None]:
     """Context manager for setting command info."""
     token = current_command_info.set(
@@ -225,6 +275,7 @@ def current_command(
             command_type=command_type,
             command_seq=command_seq,
             update_protocol_instance_id=update_protocol_instance_id,
+            stream=stream,
         )
     )
     try:

@@ -59,10 +59,7 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
-from temporalio.client._stream_store import (
-    _STREAM_SERVICE,
-    _workflow_stream_call_error,
-)
+from temporalio.client._stream_store import _STREAM_SERVICE
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.nexus.system.stream_service.workflow._system_nexus_interceptor import (
     _start_system_nexus_operation as _start_stream_system_nexus_operation,
@@ -97,6 +94,14 @@ from ._interceptor import (
     StartNexusOperationInput,
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
+)
+from ._stream_store import (
+    _DirectRead,
+    _no_stream_config_error,
+    _ReadKey,
+    _start_replayed_direct_call,
+    _stream_error_from_core,
+    _WorkflowStreamStore,
 )
 
 logger = logging.getLogger(__name__)
@@ -195,6 +200,10 @@ class WorkflowInstanceDetails:
         temporalio.converter.NexusSerializationContext | None
     ) = None
     """Serialization context of the Nexus operation handler that started the workflow, if any."""
+    stream_store: _WorkflowStreamStore | None = None
+    """The Worker's Stream Stores as Workflow code reaches them, or ``None`` when the
+    Worker's client has none. This release has no Streams on the server, so with ``None``
+    a Stream call fails the Workflow."""
 
 
 class WorkflowInstance(ABC):
@@ -264,6 +273,17 @@ class WorkflowInstance(ABC):
         return None
 
 
+def _is_completion(
+    command: temporalio.bridge.proto.workflow_commands.workflow_commands_pb2.WorkflowCommand,
+) -> bool:
+    return (
+        command.HasField("complete_workflow_execution")
+        or command.HasField("continue_as_new_workflow_execution")
+        or command.HasField("fail_workflow_execution")
+        or command.HasField("cancel_workflow_execution")
+    )
+
+
 class UnsandboxedWorkflowRunner(WorkflowRunner):
     """Workflow runner that does not do any sandboxing."""
 
@@ -311,6 +331,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # the Nexus caller, which decodes them with the handler's Nexus context. A retried or cron run
         # reads the previous run's result and failure with the same context.
         self._nexus_serialization_context = det.nexus_serialization_context
+        self._stream_store = det.stream_store
         if self._nexus_serialization_context:
             self._result_payload_converter = self._payload_converter_with_context(
                 self._nexus_serialization_context
@@ -358,6 +379,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._pending_nexus_operations: dict[int, _NexusOperationHandle] = {}
         self._pending_external_signals: dict[int, tuple[asyncio.Future, str]] = {}
         self._pending_external_cancels: dict[int, tuple[asyncio.Future, str]] = {}
+        # Core reads that run, by seq.
+        self._pending_stream_reads: dict[int, _DirectRead] = {}
+        # Reads that no call waits on, by what the next call must match. Each holds the
+        # Core read and the Records that it gave.
+        self._parked_stream_reads: dict[_ReadKey, list[_DirectRead]] = {}
+        self._pending_stream_appends: dict[
+            int,
+            asyncio.Future[temporalio.bridge.proto.workflow_activation.StreamAppended],
+        ] = {}
+        self._pending_stream_closes: dict[int, asyncio.Future[None]] = {}
+        # Reads that the SDK closed. A job of one of them can still come in the activation
+        # that the close answers, and is dropped.
+        self._closed_stream_reads: set[int] = set()
         # Keyed by type
         self._curr_seqs: dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
@@ -571,6 +605,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     self._run_once(
                         check_conditions=index == 1 or index == 2, jobs=act.jobs
                     )
+
+            # A query-only activation sends no command, and the end of the Workflow
+            # stops every read in Core.
+            if (
+                not job_sets[3]
+                and not self._deleting
+                and not any(
+                    map(_is_completion, self._current_completion.successful.commands)
+                )
+            ):
+                self._close_parked_stream_reads()
         except Exception as err:
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
@@ -635,17 +680,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 )
                 self._current_completion.failed.failure.application_failure_info.SetInParent()
 
-        def is_completion(
-            command: temporalio.bridge.proto.workflow_commands.workflow_commands_pb2.WorkflowCommand,
-        ):
-            return (
-                command.HasField("complete_workflow_execution")
-                or command.HasField("continue_as_new_workflow_execution")
-                or command.HasField("fail_workflow_execution")
-                or command.HasField("cancel_workflow_execution")
-            )
-
-        if any(map(is_completion, self._current_completion.successful.commands)):
+        if any(map(_is_completion, self._current_completion.successful.commands)):
             self._warn_if_unfinished_handlers()
 
         return self._current_completion
@@ -687,6 +722,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._apply_resolve_signal_external_workflow(
                 job.resolve_signal_external_workflow
             )
+        elif job.HasField("resolve_stream_read"):
+            self._apply_resolve_stream_read(job.resolve_stream_read)
+        elif job.HasField("resolve_stream_append"):
+            self._apply_resolve_stream_append(job.resolve_stream_append)
+        elif job.HasField("resolve_stream_close"):
+            self._apply_resolve_stream_close(job.resolve_stream_close)
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
         elif job.HasField("initialize_workflow"):
@@ -937,6 +978,64 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Cancel everything
         for task in self._tasks:
             task.cancel()
+
+    def _apply_resolve_stream_read(
+        self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamRead
+    ) -> None:
+        read = self._pending_stream_reads.get(job.seq)
+        if read is None:
+            if job.seq in self._closed_stream_reads:
+                return
+            raise RuntimeError(f"Failed finding Stream read for sequence {job.seq}")
+        error: BaseException | None = None
+        end = job.HasField("end")
+        if end:
+            del self._pending_stream_reads[job.seq]
+            if job.end.HasField("failure"):
+                error = _stream_error_from_core(job.end.failure)
+                if error is None:
+                    error = self._context_free_failure_converter.from_failure(
+                        job.end.failure, self._context_free_payload_converter
+                    )
+        read.take(job.records, end=end, done=job.end.done, error=error)
+
+    def _apply_resolve_stream_append(
+        self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamAppend
+    ) -> None:
+        fut = self._pending_stream_appends.pop(job.seq, None)
+        if fut is None:
+            raise RuntimeError(f"Failed finding Stream append for sequence {job.seq}")
+        # Code that stopped waiting for the append has cancelled the future.
+        if fut.done():
+            return
+        if job.HasField("appended"):
+            fut.set_result(job.appended)
+            return
+        error: BaseException | None = _stream_error_from_core(job.failed)
+        if error is None:
+            error = self._context_free_failure_converter.from_failure(
+                job.failed, self._context_free_payload_converter
+            )
+        fut.set_exception(error)
+
+    def _apply_resolve_stream_close(
+        self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamClose
+    ) -> None:
+        fut = self._pending_stream_closes.pop(job.seq, None)
+        if fut is None:
+            raise RuntimeError(f"Failed finding Stream close for sequence {job.seq}")
+        # Code that stopped waiting for the close has cancelled the future.
+        if fut.done():
+            return
+        if not job.HasField("failed"):
+            fut.set_result(None)
+            return
+        error: BaseException | None = _stream_error_from_core(job.failed)
+        if error is None:
+            error = self._context_free_failure_converter.from_failure(
+                job.failed, self._context_free_payload_converter
+            )
+        fut.set_exception(error)
 
     def _apply_resolve_activity(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveActivity
@@ -1770,6 +1869,66 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
         )
 
+    def _start_stream_read(
+        self, start: temporalio.bridge.proto.workflow_commands.StartStreamRead
+    ) -> _DirectRead:
+        start.seq = self._next_seq("stream_read")
+        self._add_command().start_stream_read.CopyFrom(start)
+        read = _DirectRead(start.seq)
+        self._pending_stream_reads[start.seq] = read
+        return read
+
+    def _take_stream_read(self, key: _ReadKey) -> _DirectRead | None:
+        reads = self._parked_stream_reads.get(key)
+        if not reads:
+            return None
+        read = reads.pop(0)
+        if not reads:
+            del self._parked_stream_reads[key]
+        return read
+
+    def _park_stream_read(self, read: _DirectRead, key: _ReadKey) -> None:
+        if read.kept():
+            self._parked_stream_reads.setdefault(key, []).append(read)
+
+    def _close_parked_stream_reads(self) -> None:
+        # A Core read holds its Workflow Task open, so one that no call waits on closes
+        # before the activation completes. Its Records stay for a later call.
+        for key, reads in list(self._parked_stream_reads.items()):
+            for read in reads:
+                if read.running:
+                    self._add_command().close_stream_read.seq = read.seq
+                    self._closed_stream_reads.add(read.seq)
+                    del self._pending_stream_reads[read.seq]
+                    read.close()
+            kept = [read for read in reads if read.kept()]
+            if kept:
+                self._parked_stream_reads[key] = kept
+            else:
+                del self._parked_stream_reads[key]
+
+    def _start_stream_append(
+        self, append: temporalio.bridge.proto.workflow_commands.AppendToStream
+    ) -> asyncio.Future[temporalio.bridge.proto.workflow_activation.StreamAppended]:
+        command = self._add_command()
+        append.seq = self._next_seq("stream_append")
+        command.append_to_stream.CopyFrom(append)
+        fut: asyncio.Future[
+            temporalio.bridge.proto.workflow_activation.StreamAppended
+        ] = self.create_future()
+        self._pending_stream_appends[append.seq] = fut
+        return fut
+
+    def _start_stream_close(
+        self, close: temporalio.bridge.proto.workflow_commands.CloseStream
+    ) -> asyncio.Future[None]:
+        command = self._add_command()
+        close.seq = self._next_seq("stream_close")
+        command.close_stream.CopyFrom(close)
+        fut: asyncio.Future[None] = self.create_future()
+        self._pending_stream_closes[close.seq] = fut
+        return fut
+
     def workflow_start_local_activity(
         self,
         activity: Any,
@@ -2312,25 +2471,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         if temporalio.nexus.system.is_system_endpoint(input.endpoint):
-            serialization_context = temporalio.nexus.system._get_serialization_context(
-                input.service,
-                input.operation_name,
-                input.input,
-            )
-            user_payload_converter = self._context_free_payload_converter
-            user_failure_converter = self._context_free_failure_converter
-            if serialization_context is not None:
-                user_payload_converter = self._payload_converter_with_context(
-                    serialization_context
-                )
-                user_failure_converter = self._failure_converter_with_context(
-                    serialization_context
-                )
-            payload_converter = temporalio.nexus.system._get_payload_converter(
-                user_payload_converter,
-                user_failure_converter,
-            )
-            failure_converter = user_failure_converter
+            payload_converter, failure_converter = self._system_nexus_converters(input)
         else:
             serialization_context = temporalio.converter.NexusSerializationContext(
                 endpoint=input.endpoint,
@@ -2369,11 +2510,47 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        # The server has no Streams, and Workflow code reaches no Store. So a Stream call
-        # stops here, after the interceptors saw it.
+        # This release has no Streams on the server, so a Worker answers a Stream call with
+        # a Store of its client. Every other system Nexus operation goes to the server.
         if input.service == _STREAM_SERVICE.name:
-            raise _workflow_stream_call_error()
+            store = self._stream_store
+            if store is None:
+                replayed = (
+                    _start_replayed_direct_call(self, input)
+                    if self._is_replaying
+                    else None
+                )
+                if replayed is None:
+                    raise _no_stream_config_error()
+                return replayed
+            return store.start_operation(self, input)
         return await self._outbound_start_nexus_operation(input)
+
+    def _system_nexus_converters(
+        self, input: StartNexusOperationInput[Any, Any]
+    ) -> tuple[
+        temporalio.nexus.system._SystemNexusPayloadConverter,
+        temporalio.converter.FailureConverter,
+    ]:
+        serialization_context = temporalio.nexus.system._get_serialization_context(
+            input.service,
+            input.operation_name,
+            input.input,
+        )
+        user_payload_converter = self._context_free_payload_converter
+        user_failure_converter = self._context_free_failure_converter
+        if serialization_context is not None:
+            user_payload_converter = self._payload_converter_with_context(
+                serialization_context
+            )
+            user_failure_converter = self._failure_converter_with_context(
+                serialization_context
+            )
+        payload_converter = temporalio.nexus.system._get_payload_converter(
+            user_payload_converter,
+            user_failure_converter,
+        )
+        return payload_converter, user_failure_converter
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
@@ -2540,6 +2717,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 namespace=self._info.namespace,
                 workflow_id=self._info.workflow_id,
             )
+
+        if command_info.stream:
+            # Stream bodies take the codec with no context on every path, so a client, an
+            # Activity and a Workflow read what each other wrote.
+            return None
 
         if self._nexus_serialization_context and command_info.command_type in (
             temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_COMPLETE_WORKFLOW_EXECUTION,

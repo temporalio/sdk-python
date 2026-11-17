@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import dataclasses
+import enum
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Sequence
-from typing import Any
+from collections.abc import Awaitable, Callable, Sequence
+from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
 import google.protobuf.message
 import nexusrpc
@@ -11,10 +13,17 @@ import nexusrpc
 import temporalio.activity
 import temporalio.api.streamservice.v1
 import temporalio.bridge._visitor
+import temporalio.bridge.runtime
+import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system.stream_service
-from temporalio.converter import StorageDriverActivityInfo
+import temporalio.runtime
+import temporalio.workflow
+from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
 from temporalio.exceptions import StreamConfigError
+
+if TYPE_CHECKING:
+    import temporalio.bridge.streams
 
 _MAX_RECORD_BYTES = 1536 * 1024
 _MAX_BATCH_BYTES = 4 * 1024 * 1024
@@ -58,16 +67,94 @@ class StreamBatchLimits:
                 raise ValueError(f"{name} must be from 1 to {most}, not {value}")
 
 
+class StreamReplaySource(enum.Enum):
+    """Where a replay of a read of Workflow code gets the Records of the read.
+
+    :py:attr:`StreamConfig.workflow_read_replay_from` holds it. It decides what a new read
+    records in History. A replay follows what History holds, so a change of the setting
+    doesn't break a Workflow that is running. Client and Activity code have no History, so
+    the setting doesn't touch them.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    HISTORY = "history"
+    """The marker in History holds the Records of the read with their bodies.
+
+    A replay takes the Records from History, so it reads no Store and needs no Stream
+    config. Each Record adds to History. The marker of one Workflow Task holds at most
+    1 MiB of Records, and a read goes on in the next task after that.
+    """
+
+    STORE = "store"
+    """The marker in History holds no Record and no body. This is the default.
+
+    For each Workflow Task of a read, the marker holds the range of offsets, the count
+    and a digest of the Records that the Workflow got. A replay reads the Records from the
+    Store again and checks the count and the digest. So the replay needs the Stream config
+    and the Records. The Records must stay in the Store, and Retention must keep them, for
+    as long as the Workflow can replay. When they can't be read, the Workflow Task fails
+    with a message that starts with ``StreamReplayError``. A Store that stays unavailable
+    for 5 s fails the task with a message that starts with ``StreamReplayUnavailable``
+    in its place. A replay on a Worker with no cache reads the Store again on every
+    Workflow Task.
+    """
+
+
+@dataclasses.dataclass(frozen=True)
+class StreamStoreCallOptions:
+    """Options of the Local Activity that creates or describes a Stream for Workflow code.
+
+    Workflow code can't do I/O, so the default
+    :py:meth:`StreamStore.call_from_workflow` calls its Store from a Local Activity.
+    Core makes a read, an append and a close of Workflow code itself, with no Activity,
+    so these options don't apply to them. Core tries such a call again while its Store
+    is unavailable, for at most 30 s.
+
+    A :py:class:`StreamConfig` holds them in
+    :py:attr:`StreamConfig.workflow_call_options`, and every Store of that config
+    gets the same options.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    start_to_close_timeout: timedelta | None = timedelta(seconds=60)
+    """Most time for one attempt."""
+
+    schedule_to_close_timeout: timedelta | None = None
+    """Most time for all attempts."""
+
+    retry_policy: temporalio.common.RetryPolicy = dataclasses.field(
+        default_factory=lambda: temporalio.common.RetryPolicy(maximum_attempts=1)
+    )
+    """Retries of a failed call. The default is one attempt."""
+
+    def __post_init__(self) -> None:
+        """Check that a timeout is set."""
+        if not self.start_to_close_timeout and not self.schedule_to_close_timeout:
+            raise ValueError(
+                "start_to_close_timeout or schedule_to_close_timeout must be set"
+            )
+
+
 class StreamStore(ABC):
     """A Store that answers the Stream operations of a client.
 
     A client with a Store sends each Stream operation to it. This release has no
     Streams on the server, so a client needs a Store for any Stream operation. Use a
     Store of a package, such as ``RedisStreamStore`` of ``temporalio-streams-redis``, or
-    ``MemoryStreamStore`` of ``temporalio-streams-memory`` in tests.
+    :py:class:`temporalio.testing.MemoryStreamStore` in tests.
 
-    To keep Streams in another system, write a Store that implements :py:attr:`name`
-    and the five operations. Each operation takes and gives a message of
+    The SDK's Stores run on the bridge, in Rust, and this class isn't meant to be
+    subclassed in Python. A Store that is written in Python works for a client and an
+    Activity, for example as a double in a test. Core can't call it, so Workflow code has
+    no Direct call on it. A read, an append and a close of Workflow code then fail the
+    Workflow. A create and a describe still run in the Store's Local Activity.
+
+    Such a Store implements :py:attr:`name` and the five operations. Each operation
+    takes and gives a message of
     ``temporalio.api.streamservice.v1``. The bodies of the Records arrive as payloads
     that the SDK already encoded with the data converter and the payload codec, so a
     Store keeps payloads and not the user's types. A failed call raises
@@ -137,6 +224,136 @@ class StreamStore(ABC):
         """Give the status and the newest offset of a Stream."""
         ...
 
+    def worker_activities(self) -> Sequence[Callable[..., Any]]:
+        """The Activities that a Worker registers for this Store when it runs Workflows.
+
+        The default is one Activity, named for this Store, that
+        :py:meth:`call_from_workflow` runs as a Local Activity. A Store that overrides
+        one of the two methods overrides the other to match.
+        """
+        return [_store_call_activity(self)]
+
+    async def call_from_workflow(
+        self,
+        operation: str,
+        request: google.protobuf.message.Message,
+        options: StreamStoreCallOptions,
+    ) -> google.protobuf.message.Message:
+        """Answer a create or a describe of a Stream for Workflow code.
+
+        It runs in Workflow code, so it does no I/O itself. The default runs the
+        Activity of :py:meth:`worker_activities` as a Local Activity for each operation.
+        It takes the timeouts and the retry policy of ``options``. A replay takes the
+        result from History and calls no method of this Store.
+
+        Core makes a read, an append and a close of Workflow code itself, so this method
+        gets none of them.
+
+        Args:
+            operation: The Nexus operation name, ``CreateStream`` or ``DescribeStream``.
+            request: The request message of ``temporalio.api.streamservice.v1``.
+            options: The :py:attr:`StreamConfig.workflow_call_options` of the config.
+
+        Returns:
+            The response message of the operation.
+        """
+        stream_operation = _STREAM_OPERATIONS[operation]
+        response = await temporalio.workflow.execute_local_activity(
+            _store_call_activity_name(self.name),
+            args=[operation, request.SerializeToString()],
+            result_type=bytes,
+            schedule_to_close_timeout=options.schedule_to_close_timeout,
+            start_to_close_timeout=options.start_to_close_timeout,
+            retry_policy=options.retry_policy,
+        )
+        return stream_operation.response_type.FromString(response)
+
+
+class _BridgeStreamStore(StreamStore):  # pyright: ignore[reportUnusedClass]
+    """A Store that runs on the Stream runtime of the bridge.
+
+    It builds the runtime at its first call, or when a Worker with Workflows gives it to
+    Core, so the Store can be built before the Runtime and its Tokio threads exist.
+    """
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        runtime: temporalio.runtime.Runtime | None,
+    ) -> None:
+        self._name = name
+        self._runtime = runtime
+        self._stream_runtime: temporalio.bridge.streams.StreamRuntime | None = None
+
+    @property
+    def name(self) -> str:
+        """Name of the Store."""
+        return self._name
+
+    @abstractmethod
+    def _new_stream_runtime(
+        self, runtime: temporalio.bridge.runtime.Runtime
+    ) -> temporalio.bridge.streams.StreamRuntime: ...
+
+    async def create_stream(
+        self, request: temporalio.api.streamservice.v1.CreateStreamRequest
+    ) -> temporalio.api.streamservice.v1.CreateStreamResponse:
+        """See base class."""
+        return await self._call_bridge("CreateStream", request)
+
+    async def append_records(
+        self, request: temporalio.api.streamservice.v1.AppendRecordsRequest
+    ) -> temporalio.api.streamservice.v1.AppendRecordsResponse:
+        """See base class."""
+        return await self._call_bridge("AppendRecords", request)
+
+    async def read_records(
+        self, request: temporalio.api.streamservice.v1.ReadRecordsRequest
+    ) -> temporalio.api.streamservice.v1.ReadRecordsResponse:
+        """See base class."""
+        return await self._call_bridge("ReadRecords", request)
+
+    async def close_stream(
+        self, request: temporalio.api.streamservice.v1.CloseStreamRequest
+    ) -> temporalio.api.streamservice.v1.CloseStreamResponse:
+        """See base class."""
+        return await self._call_bridge("CloseStream", request)
+
+    async def describe_stream(
+        self, request: temporalio.api.streamservice.v1.DescribeStreamRequest
+    ) -> temporalio.api.streamservice.v1.DescribeStreamResponse:
+        """See base class."""
+        return await self._call_bridge("DescribeStream", request)
+
+    def _get_stream_runtime(self) -> temporalio.bridge.streams.StreamRuntime:
+        """Give the Stream runtime of the bridge, and build it at the first use.
+
+        Raises:
+            temporalio.exceptions.StreamConfigError: This build of temporalio has no
+                Stream runtime, or not this Store.
+        """
+        if self._stream_runtime is None:
+            runtime = self._runtime or temporalio.runtime.Runtime.default()
+            self._stream_runtime = self._new_stream_runtime(runtime._core_runtime)
+        return self._stream_runtime
+
+    async def _call_bridge(
+        self, operation: str, request: google.protobuf.message.Message
+    ) -> Any:
+        """Answer one Stream operation with the Stream runtime of the bridge.
+
+        Raises:
+            temporalio.exceptions.StreamError: The call failed.
+            temporalio.exceptions.StreamConfigError: This build of temporalio has no
+                Stream runtime.
+        """
+        # The bridge takes and gives the messages in their wire form.
+        response = await self._get_stream_runtime().call(
+            operation, request.SerializeToString()
+        )
+        return _STREAM_OPERATIONS[operation].response_type.FromString(response)
+
 
 @dataclasses.dataclass(frozen=True)
 class _StreamOperation:
@@ -200,6 +417,27 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
 }
 """The operations of the Stream service, by their Nexus operation name."""
 
+_STORE_CALL_ACTIVITY = "__temporal_stream_store_call"
+
+
+def _store_call_activity_name(store_name: str) -> str:
+    # The name carries the Store's name, so two Stores on one Worker don't clash.
+    return f"{_STORE_CALL_ACTIVITY}:{store_name}"
+
+
+def _store_call_activity(
+    store: StreamStore,
+) -> Callable[[str, bytes], Awaitable[bytes]]:
+    @temporalio.activity.defn(name=_store_call_activity_name(store.name))
+    async def call(operation: str, request: bytes) -> bytes:
+        message = _STREAM_OPERATIONS[operation].request_type.FromString(request)
+        response = await _call_stream_store(
+            store, temporalio.activity.client().data_converter, operation, message
+        )
+        return response.SerializeToString()
+
+    return call
+
 
 @dataclasses.dataclass(frozen=True)
 class StreamSelectContext:
@@ -212,8 +450,12 @@ class StreamSelectContext:
     id: str
     """The id of the Stream."""
 
-    target: StorageDriverActivityInfo | None = None
-    """The Activity that makes the call, or ``None`` for a plain client."""
+    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None
+    """The Workflow or Activity that makes the call, or ``None`` for a plain client.
+
+    A call in an Activity has that Activity here. A Workflow's call runs the selector
+    in Workflow code, and has that Workflow here.
+    """
 
 
 @dataclasses.dataclass(frozen=True)
@@ -226,16 +468,70 @@ class StreamConfig:
     operation. It holds Stores and a selector, as
     :py:class:`temporalio.converter.ExternalStorage` holds drivers and a selector.
 
+    On a Worker whose client has no config, a Stream call of Workflow code raises
+    :py:class:`temporalio.exceptions.ApplicationError` with the ``type``
+    ``StreamConfigError``, and an uncaught one fails the Workflow. Workflow code can
+    catch this error. A Workflow that catches it must not go on to make the same call
+    on a Worker that has a config, since the History then has no record of the first
+    call.
+
     A ref carries the name of its Store, so a call on a known Stream goes to the
     Store of that name. A create can name its Store with ``store=``. A call whose ref
     names no Store goes to the Store that :py:attr:`store_selector` returns, or to the
     one Store when there is no selector. With more than one Store and no selector,
     such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
-    An Activity reaches the Stores of its Worker's client through
-    :py:func:`temporalio.activity.client`. Workflow code can't call a Stream in this
-    version. A Stream call of Workflow code raises ``RuntimeError``, which fails the
-    Workflow Task.
+    An append or a close of Workflow code writes as the Workflow, with the Workflow Task
+    that runs it as its epoch. So the Store fences a late write of a failed Workflow
+    Task. A ``producer=`` of another kind raises
+    :py:class:`temporalio.exceptions.StreamError` with the reason
+    ``STREAM_ERROR_REASON_INVALID``. Core keeps the appends and the close of one Workflow on one Stream in the order
+    of the calls.
+
+    Core appends and closes for Workflow code itself, with no Activity. Core closes the
+    Stream only after the server took the Workflow Task of the close, so a failed task
+    closes nothing. A create and a describe of Workflow code run in the Store's Local
+    Activity. So Workflow code needs no Worker that polls for Activity Tasks.
+
+    Workflow code reads with the same ``read``, ``iter_read`` and ``iter_read_items`` as
+    a client. On a Store with a Rust runtime, Core reads the Store inside the Workflow
+    Task. A page that Workflow code gets in one activation has at most 256 Records, and
+    the rest come in the next activation with no wait. A loop that asks for its next page in the same
+    activation keeps one read open in Core. A read that no code waits on closes before
+    the activation completes, so it never holds a Workflow Task open.
+
+    .. code-block:: python
+
+        async for record in events.iter_read_items(wait=timedelta(seconds=10)):
+            if record.body.kind == "tool_call":
+                tools.append(
+                    workflow.start_activity(
+                        run_tool,
+                        record.body.tool_call,
+                        start_to_close_timeout=timedelta(minutes=1),
+                    )
+                )
+
+    The loop ends after the page that is ``done``, when the Stream is closed and the
+    read gave its last Record. With a ``wait``, a quiet Stream gives empty pages, and
+    the loop goes on. So a loop on a Stream that can be quiet for long uses
+    ``iter_read`` and leaves after an empty page. A read has these costs.
+
+    * A call keeps its Workflow Task open while it waits for its page. A Signal, an
+      Update, a cancel or an Activity result reaches the Workflow at the next Workflow
+      Task, at the heartbeat of the task at the latest. That is about 8 s with the
+      default task timeout of 10 s.
+    * The calls of one Workflow Task write one marker in History, whatever the number of
+      Records.
+    * With the default :py:attr:`StreamReplaySource.STORE`, History holds no Record. A
+      replay reads the Records from the Store again, so they must stay in the Store for
+      as long as the Workflow can replay.
+    * A replay on a Worker with no cache reads the Store again on every Workflow Task.
+
+    On a Store written in Python, a read, an append and a close of Workflow code fail
+    the Workflow with a non-retryable
+    :py:class:`temporalio.exceptions.ApplicationError`. Code in a Query handler or an
+    Update validator can't read.
 
     .. warning::
         This API is experimental and subject to change.
@@ -246,7 +542,8 @@ class StreamConfig:
 
     A ref carries the :py:attr:`StreamStore.name` of its Store, and a call looks
     the Store up by that name. With more than one Store and no
-    :py:attr:`store_selector`, each call must name its Store.
+    :py:attr:`store_selector`, each call must name its Store. A Worker serves every
+    Store of its client.
     """
 
     store_selector: Callable[[StreamSelectContext], StreamStore] | None = None
@@ -257,8 +554,45 @@ class StreamConfig:
     such a call goes to that Store. When it is ``None`` and there is more than one
     Store, such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
-    A Stream that code builds from an id only goes through the selector on each
-    call, so the selector must give the same Store for the same id.
+    For a call of Workflow code, the selector runs in Workflow code, also on a
+    replay. So it must give the same Store for the same context. The call of the chosen
+    Store is in History, and another answer on a replay is a non-determinism error. A Stream that code builds from an id only goes through the
+    selector on each call, so the selector must also give the same Store for the same
+    id.
+    """
+
+    workflow_call_options: StreamStoreCallOptions = dataclasses.field(
+        default_factory=StreamStoreCallOptions
+    )
+    """Options of a create and a describe of Workflow code, for every Store of this config.
+
+    :py:meth:`StreamStore.call_from_workflow` gets them. The default runs the Store's
+    Local Activity with their timeouts and retry policy.
+    """
+
+    workflow_read_replay_from: StreamReplaySource = dataclasses.field(
+        default=StreamReplaySource.STORE
+    )
+    """Where a replay of a read of Workflow code gets the Records of the read.
+
+    It applies to every read of Workflow code on a Worker whose client has this config,
+    and decides what a new read records in History. :py:attr:`StreamReplaySource.STORE`,
+    the default, puts only the range of offsets, the count and a digest of the Records
+    into History, so a replay reads them from the Store again. The Records must then stay
+    in the Store for as long as the Workflow can replay. The option
+    :py:attr:`StreamReplaySource.HISTORY` puts the Records with their bodies into
+    History, so a replay needs no Store. A replay follows the marker in History and not
+    this setting, so a Workflow that is running replays after a change of it.
+    """
+
+    workflow_read_ahead_bytes: int | None = None
+    """The most bytes of one read's Records that wait in the Worker for Workflow code.
+
+    A read of Workflow code stops asking the Store while this many bytes of its Records
+    wait in the Worker's memory for Workflow code to take them. The read goes
+    on when Workflow code takes Records. The first page of a read always comes. ``None``
+    takes Core's default of 4 MiB. Set a larger value for large Records, and a smaller one
+    for a Worker with little memory, since each open read can hold this much.
     """
 
     _store_map: dict[str, StreamStore] = dataclasses.field(
@@ -270,8 +604,14 @@ class StreamConfig:
         """Check the Stores and build the name-keyed map of them.
 
         Raises :py:class:`temporalio.exceptions.StreamConfigError` if there is no
-        Store, or if two Stores share a name.
+        Store, or if two Stores share a name, and ``ValueError`` if
+        :py:attr:`workflow_read_ahead_bytes` is below 1.
         """
+        if (
+            self.workflow_read_ahead_bytes is not None
+            and self.workflow_read_ahead_bytes < 1
+        ):
+            raise ValueError("workflow_read_ahead_bytes must be at least 1")
         if not self.stores:
             raise StreamConfigError("StreamConfig.stores must have at least one Store")
         store_map: dict[str, StreamStore] = {}
@@ -313,10 +653,24 @@ class StreamConfig:
             )
         return store
 
+    def _bridge_stream_runtimes(
+        self,
+    ) -> list[tuple[str, temporalio.bridge.streams.StreamRuntime]]:
+        """Give the Stream runtime of each Store that runs on the bridge, by Store name.
+
+        Core reads and appends a Stream of Workflow code through these runtimes. A Store
+        that a user wrote in Python has none.
+        """
+        return [
+            (store.name, store._get_stream_runtime())
+            for store in self.stores
+            if isinstance(store, _BridgeStreamStore)
+        ]
+
     def _store_for(
         self,
         ref: temporalio.nexus.system.stream_service.StreamRef[Any],
-        target: StorageDriverActivityInfo | None,
+        target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None,
     ) -> StreamStore:
         if ref.store:
             return self._get_store_by_name(ref.store)
@@ -360,6 +714,12 @@ def _refuse_store_plugins(  # pyright: ignore[reportUnusedFunction]
             )
 
 
+def _check_not_negative(**durations: timedelta | None) -> None:  # pyright: ignore[reportUnusedFunction]
+    for label, value in durations.items():
+        if value is not None and value < timedelta():
+            raise ValueError(f"{label} must not be negative")
+
+
 def _stream_service() -> nexusrpc.ServiceDefinition:
     service = nexusrpc.get_service_definition(
         temporalio.nexus.system.stream_service.StreamService
@@ -370,15 +730,6 @@ def _stream_service() -> nexusrpc.ServiceDefinition:
 
 
 _STREAM_SERVICE = _stream_service()
-
-
-def _workflow_stream_call_error() -> RuntimeError:  # pyright: ignore[reportUnusedFunction]
-    # Not an `ApplicationError`, so it fails the Workflow Task and not the Workflow. A
-    # Worker with code that has no Stream call can then finish the Workflow.
-    return RuntimeError(
-        "Workflow code can't call a Stream in this version. Call it from an Activity "
-        "through activity.client()."
-    )
 
 
 async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]

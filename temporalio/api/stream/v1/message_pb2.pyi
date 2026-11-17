@@ -167,8 +167,8 @@ global___ActivityEpoch = ActivityEpoch
 @typing.final
 class WorkflowProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
-    Workflow Task. On a Store, Workflow code writes through a Local Activity, so its writes carry a
+    A Workflow run Producer. Workflow code that writes in its Workflow Task writes as this
+    Producer, with that task as the epoch. A write that it makes through a Local Activity has a
     Local Activity Producer.
     """
 
@@ -180,7 +180,9 @@ class WorkflowProducer(google.protobuf.message.Message):
     """Required. The run id of the Workflow run, not of its chain. Each run is its own Producer."""
     @property
     def epoch(self) -> global___WorkflowTaskEpoch:
-        """The Workflow Task of the write."""
+        """The Workflow Task of the write. Workflow code leaves it empty, and the SDK sets it before
+        the write goes to the Store.
+        """
 
     def __init__(
         self,

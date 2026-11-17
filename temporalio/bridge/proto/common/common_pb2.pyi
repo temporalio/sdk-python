@@ -21,6 +21,45 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
+class _StreamReadStop:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _StreamReadStopEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _StreamReadStop.ValueType
+    ],
+    builtins.type,
+):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    STREAM_READ_STOP_UNSPECIFIED: _StreamReadStop.ValueType  # 0
+    STREAM_READ_STOP_DONE: _StreamReadStop.ValueType  # 1
+    """The Stream is closed, and the read gave its last Record."""
+    STREAM_READ_STOP_MAX_RECORDS: _StreamReadStop.ValueType  # 2
+    """The read gave `max_records` Records."""
+    STREAM_READ_STOP_MAX_BYTES: _StreamReadStop.ValueType  # 3
+    """The next Record would pass `max_bytes`."""
+    STREAM_READ_STOP_IDLE: _StreamReadStop.ValueType  # 4
+    """No Record came for `idle_timeout`."""
+    STREAM_READ_STOP_TIMEOUT: _StreamReadStop.ValueType  # 5
+    """`timeout` passed since the read started."""
+
+class StreamReadStop(_StreamReadStop, metaclass=_StreamReadStopEnumTypeWrapper):
+    """Why a read of a Stream ended. A read that failed has no stop."""
+
+STREAM_READ_STOP_UNSPECIFIED: StreamReadStop.ValueType  # 0
+STREAM_READ_STOP_DONE: StreamReadStop.ValueType  # 1
+"""The Stream is closed, and the read gave its last Record."""
+STREAM_READ_STOP_MAX_RECORDS: StreamReadStop.ValueType  # 2
+"""The read gave `max_records` Records."""
+STREAM_READ_STOP_MAX_BYTES: StreamReadStop.ValueType  # 3
+"""The next Record would pass `max_bytes`."""
+STREAM_READ_STOP_IDLE: StreamReadStop.ValueType  # 4
+"""No Record came for `idle_timeout`."""
+STREAM_READ_STOP_TIMEOUT: StreamReadStop.ValueType  # 5
+"""`timeout` passed since the read started."""
+global___StreamReadStop = StreamReadStop
+
 class _VersioningIntent:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType

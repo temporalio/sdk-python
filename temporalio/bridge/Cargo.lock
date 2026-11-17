@@ -2765,6 +2765,7 @@ dependencies = [
  "temporalio-client",
  "temporalio-common",
  "temporalio-macros",
+ "temporalio-streams",
  "thiserror",
  "tokio",
  "tokio-stream",

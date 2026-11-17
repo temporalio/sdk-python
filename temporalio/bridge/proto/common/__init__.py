@@ -1,6 +1,7 @@
 from .common_pb2 import (
     ExternalStorageMetrics,
     NamespacedWorkflowExecution,
+    StreamReadStop,
     VersioningIntent,
     WorkerDeploymentVersion,
 )
@@ -8,6 +9,7 @@ from .common_pb2 import (
 __all__ = [
     "ExternalStorageMetrics",
     "NamespacedWorkflowExecution",
+    "StreamReadStop",
     "VersioningIntent",
     "WorkerDeploymentVersion",
 ]

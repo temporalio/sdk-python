@@ -20,6 +20,7 @@ import temporalio.api.workflowservice.v1
 import temporalio.client._stream_store
 import temporalio.common
 import temporalio.converter._payload_converter
+import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.nexus.system._support
 import temporalio.workflow
@@ -33,7 +34,7 @@ from temporalio.client import (
 )
 from temporalio.client._stream_store import _STREAM_OPERATIONS, _request_ref
 from temporalio.converter import DataConverter, StorageDriverActivityInfo
-from temporalio.exceptions import StreamConfigError, StreamError
+from temporalio.exceptions import ApplicationError, StreamConfigError, StreamError
 from temporalio.nexus.system.stream_service import (
     ClientProducer,
     DescribeStreamRequest,
@@ -662,3 +663,32 @@ def test_stream_error_carries_its_reason():
     assert StreamError("x").reason == (
         StreamErrorReason.STREAM_ERROR_REASON_UNSPECIFIED
     )
+
+
+def test_stream_error_from_application_error():
+    from_failure = temporalio.exceptions._stream_error_from_failure
+    rebuilt = from_failure(
+        ApplicationError(
+            "the Stream exists",
+            temporalio.api.stream.v1.StreamErrorDetails(
+                reason=StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS
+            ),
+            type="StreamError",
+        )
+    )
+    assert isinstance(rebuilt, StreamError)
+    assert rebuilt.reason == StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS
+    assert rebuilt.message == "the Stream exists"
+    unknown = from_failure(
+        ApplicationError(
+            "x",
+            temporalio.api.stream.v1.StreamErrorDetails(
+                reason=StreamErrorReason.ValueType(999)
+            ),
+            type="StreamError",
+        )
+    )
+    assert unknown is not None
+    assert unknown.reason == StreamErrorReason.STREAM_ERROR_REASON_UNSPECIFIED
+    assert from_failure(ApplicationError("x", type="RuntimeError")) is None
+    assert from_failure(RuntimeError("x")) is None
