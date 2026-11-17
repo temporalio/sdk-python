@@ -29,12 +29,10 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True)
 class StreamStoreCallOptions:
-    """Options of the Activity that calls a Stream Store for Workflow code.
+    """Options of the Local Activity that calls a Stream Store for Workflow code.
 
     Workflow code can't do I/O, so the default
-    :py:meth:`StreamStore.call_from_workflow` calls its Store from an Activity. A close
-    runs it as a regular Activity, and every other operation runs it as a Local
-    Activity. Both get these options.
+    :py:meth:`StreamStore.call_from_workflow` calls its Store from a Local Activity.
 
     A :py:class:`StreamConfig` holds them in
     :py:attr:`StreamConfig.workflow_call_options`, and every Store of that config
@@ -139,9 +137,8 @@ class StreamStore(ABC):
         """The Activities that a Worker registers for this Store when it runs Workflows.
 
         The default is one Activity, named for this Store, that
-        :py:meth:`call_from_workflow` runs as a Local Activity, or as a regular Activity
-        for a close. A Store that overrides one of the two methods overrides the other to
-        match.
+        :py:meth:`call_from_workflow` runs as a Local Activity. A Store that overrides
+        one of the two methods overrides the other to match.
         """
         return [_store_call_activity(self)]
 
@@ -154,11 +151,13 @@ class StreamStore(ABC):
         """Answer one Stream operation for Workflow code.
 
         It runs in Workflow code, so it does no I/O itself. The default runs the
-        Activity of :py:meth:`worker_activities` with the timeouts and the retry policy
-        of ``options``. A close runs it as a regular Activity on the Workflow's Task
-        Queue, after the Workflow Task completes. Every other operation runs it as a
-        Local Activity. A replay takes the result from History and calls no method of
-        this Store.
+        Activity of :py:meth:`worker_activities` as a Local Activity for each operation.
+        It takes the timeouts and the retry policy of ``options``. A replay takes the
+        result from History and calls no method of this Store.
+
+        A Local Activity reaches the Store before its Workflow Task completes. If that
+        task fails after a close, the Stream stays closed. The retry of the task then
+        can't append to it.
 
         Args:
             operation: The Nexus operation name, ``CreateStream``, ``AppendRecords``,
@@ -172,29 +171,14 @@ class StreamStore(ABC):
         stream_operation = _STREAM_OPERATIONS[operation]
         # Workflow code runs no payload codec, so the Activity encodes the bodies of an
         # append before the Store gets them.
-        if operation == "CloseStream":
-            # A Local Activity reaches the Store before its Workflow Task completes. If
-            # that task then failed, the Stream would stay closed and the retry of the
-            # task could not append. The server schedules a regular Activity only when
-            # the task completes.
-            response = await temporalio.workflow.execute_activity(
-                _store_call_activity_name(self.name),
-                args=[operation, request.SerializeToString()],
-                result_type=bytes,
-                task_queue=temporalio.workflow.info().task_queue,
-                schedule_to_close_timeout=options.schedule_to_close_timeout,
-                start_to_close_timeout=options.start_to_close_timeout,
-                retry_policy=options.retry_policy,
-            )
-        else:
-            response = await temporalio.workflow.execute_local_activity(
-                _store_call_activity_name(self.name),
-                args=[operation, request.SerializeToString()],
-                result_type=bytes,
-                schedule_to_close_timeout=options.schedule_to_close_timeout,
-                start_to_close_timeout=options.start_to_close_timeout,
-                retry_policy=options.retry_policy,
-            )
+        response = await temporalio.workflow.execute_local_activity(
+            _store_call_activity_name(self.name),
+            args=[operation, request.SerializeToString()],
+            result_type=bytes,
+            schedule_to_close_timeout=options.schedule_to_close_timeout,
+            start_to_close_timeout=options.start_to_close_timeout,
+            retry_policy=options.retry_policy,
+        )
         return stream_operation.response_type.FromString(response)
 
 
@@ -436,9 +420,10 @@ class StreamConfig:
     one Store when there is no selector. With more than one Store and no selector,
     such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
-    A Worker with Workflows and this config polls for Activity Tasks, since a Workflow's
-    close runs the Store's Activity as a regular Activity. With ``no_remote_activities``
-    on that Worker, another Worker of the Task Queue must run the close.
+    Workflow code calls a Store from a Local Activity, also for a close. So it needs
+    no Worker that polls for Activity Tasks. A Local Activity reaches the Store before
+    its Workflow Task completes. If that task fails after a close, the Stream stays
+    closed. The retry of the task then can't append to it.
 
     .. warning::
         This API is experimental and subject to change.
@@ -462,8 +447,8 @@ class StreamConfig:
     Store, such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
     For a call of Workflow code, the selector runs in Workflow code, also on a
-    replay. So it must give the same Store for the same context. The Activity of the
-    chosen Store is in History, and another answer on a replay is a
+    replay. So it must give the same Store for the same context. The Local Activity
+    of the chosen Store is in History, and another answer on a replay is a
     non-determinism error. A Stream that code builds from an id only goes through the
     selector on each call, so the selector must also give the same Store for the same
     id.
@@ -475,8 +460,7 @@ class StreamConfig:
     """Options of a Store's call for Workflow code, for every Store of this config.
 
     :py:meth:`StreamStore.call_from_workflow` gets them. The default runs the Store's
-    Activity with their timeouts and retry policy, as a Local Activity, or as a regular
-    Activity for a close.
+    Local Activity with their timeouts and retry policy.
     """
 
     _store_map: dict[str, StreamStore] = dataclasses.field(

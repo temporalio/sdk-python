@@ -62,11 +62,7 @@ from temporalio.worker import (
     ExecuteActivityInput,
     Interceptor,
     Replayer,
-    StartActivityInput,
     Worker,
-    WorkflowInboundInterceptor,
-    WorkflowInterceptorClassInput,
-    WorkflowOutboundInterceptor,
 )
 from tests.helpers import assert_task_fail_eventually, new_worker
 from tests.helpers.streams import DictStreamStore, RecordingStreamStore
@@ -373,67 +369,48 @@ class AsyncWithCloseWorkflow:
 
 
 _fail_close_task = True
-_started_activities: list[str] = []
 
 
 @workflow.defn(sandboxed=False)
 class CloseThenFailTaskOnceWorkflow:
     @workflow.run
-    async def run(self, stream_id: str) -> None:
-        stream = await create_stream(
-            id=stream_id,
-            body_type=str,
-            id_conflict_policy=StreamIdConflictPolicy.StreamIdConflictPolicyUseExisting,
-        )
-        await stream.append("a")
-        close = asyncio.create_task(stream.close())
-        # A few turns of the loop let the close schedule its Activity in this task.
-        for _ in range(10):
-            await asyncio.sleep(0)
+    async def run(self, stream_id: str) -> str:
+        # The test creates the Stream, so the retry of the task starts with the append.
+        stream = get_stream(StreamRef(id=stream_id), body_type=str)
+        try:
+            await stream.append("a")
+        except StreamError as err:
+            return f"{StreamErrorReason.Name(err.reason)}: {err.message}"
+        await stream.close()
         global _fail_close_task
         if _fail_close_task:
             _fail_close_task = False
             raise RuntimeError("Failed the Workflow Task once")
-        await close
-
-
-class StartedActivityInterceptor(Interceptor):
-    def workflow_interceptor_class(
-        self, input: WorkflowInterceptorClassInput
-    ) -> type[WorkflowInboundInterceptor]:
-        return _StartedActivityInbound
-
-
-class _StartedActivityInbound(WorkflowInboundInterceptor):
-    def init(self, outbound: WorkflowOutboundInterceptor) -> None:
-        super().init(_StartedActivityOutbound(outbound))
-
-
-class _StartedActivityOutbound(WorkflowOutboundInterceptor):
-    def start_activity(self, input: StartActivityInput) -> workflow.ActivityHandle[Any]:
-        _started_activities.append(str(input.activity))
-        return super().start_activity(input)
+        return "closed"
 
 
 class RecordingInterceptor(Interceptor):
     def __init__(self) -> None:
         self.activity_types: list[str] = []
+        self.is_local: list[bool] = []
 
     def intercept_activity(
         self, next: ActivityInboundInterceptor
     ) -> ActivityInboundInterceptor:
-        return _RecordingActivityInbound(next, self.activity_types)
+        return _RecordingActivityInbound(next, self)
 
 
 class _RecordingActivityInbound(ActivityInboundInterceptor):
     def __init__(
-        self, next: ActivityInboundInterceptor, activity_types: list[str]
+        self, next: ActivityInboundInterceptor, recording: RecordingInterceptor
     ) -> None:
         super().__init__(next)
-        self._activity_types = activity_types
+        self._recording = recording
 
     async def execute_activity(self, input: ExecuteActivityInput) -> Any:
-        self._activity_types.append(activity.info().activity_type)
+        info = activity.info()
+        self._recording.activity_types.append(info.activity_type)
+        self._recording.is_local.append(info.is_local)
         return await super().execute_activity(input)
 
 
@@ -1088,7 +1065,7 @@ async def _describe_status(client: Client, stream_id: str) -> StreamStatus | Non
     return (await stream.describe()).status
 
 
-async def test_workflow_close_runs_in_activity_after_its_task(client: Client):
+async def test_workflow_close_runs_as_local_activity_in_its_task(client: Client):
     store = CloseRequestStore()
     stream_client = _with_store(client, store)
     stream_id = f"stream-{uuid.uuid4()}"
@@ -1111,22 +1088,27 @@ async def test_workflow_close_runs_in_activity_after_its_task(client: Client):
     assert close.producer.WhichOneof("kind") == "workflow"
     assert close.producer.workflow.run_id == handle.result_run_id
     events = (await handle.fetch_history()).events
-    scheduled = [
-        event.activity_task_scheduled_event_attributes
+    assert not [
+        event
         for event in events
         if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED
     ]
-    assert [attributes.activity_type.name for attributes in scheduled] == [
-        "__temporal_stream_store_call:memory"
-    ]
-    assert scheduled[0].task_queue.name == worker.task_queue
     markers = [
-        event.marker_recorded_event_attributes.marker_name
+        event.marker_recorded_event_attributes
         for event in events
         if event.event_type == EventType.EVENT_TYPE_MARKER_RECORDED
     ]
-    # One marker for the create and one for the append, and none for the close.
-    assert markers == ["core_local_activity", "core_local_activity"]
+    # One marker each for the create, the append and the close.
+    assert [marker.marker_name for marker in markers] == ["core_local_activity"] * 3
+    # The Workflow's first task runs all three calls and completes the Workflow.
+    [task_completed] = [
+        event.event_id
+        for event in events
+        if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+    ]
+    assert [marker.workflow_task_completed_event_id for marker in markers] == [
+        task_completed
+    ] * 3
 
 
 async def test_workflow_async_with_closes_the_stream(client: Client):
@@ -1147,11 +1129,17 @@ async def test_workflow_async_with_closes_the_stream(client: Client):
     assert [record.body for record in records] == ["a"]
 
 
-async def test_worker_with_workflows_only_runs_the_close(client: Client):
+@pytest.mark.parametrize("no_remote_activities", [False, True])
+async def test_worker_with_workflows_only_runs_the_close(
+    client: Client, no_remote_activities: bool
+):
     stream_client = _with_store(client, MemoryStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with Worker(
-        stream_client, task_queue=str(uuid.uuid4()), workflows=[CloseWorkflow]
+        stream_client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[CloseWorkflow],
+        no_remote_activities=no_remote_activities,
     ) as worker:
         await stream_client.execute_workflow(
             CloseWorkflow.run,
@@ -1164,29 +1152,35 @@ async def test_worker_with_workflows_only_runs_the_close(client: Client):
     )
 
 
-async def test_failed_workflow_task_leaves_the_stream_open(client: Client):
+async def test_failed_workflow_task_after_close_leaves_the_stream_closed(
+    client: Client,
+):
     global _fail_close_task
     _fail_close_task = True
-    _started_activities.clear()
     stream_client = _with_store(client, MemoryStreamStore())
-    stream_id = f"stream-{uuid.uuid4()}"
-    async with new_worker(
-        stream_client,
-        CloseThenFailTaskOnceWorkflow,
-        interceptors=[StartedActivityInterceptor()],
-    ) as worker:
-        await stream_client.execute_workflow(
+    stream = await stream_client.create_stream(
+        id=f"stream-{uuid.uuid4()}", body_type=str
+    )
+    async with new_worker(stream_client, CloseThenFailTaskOnceWorkflow) as worker:
+        handle = await stream_client.start_workflow(
             CloseThenFailTaskOnceWorkflow.run,
-            stream_id,
+            stream.ref.id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-    # The failed task started the close too, but the server never scheduled it.
-    assert _started_activities == ["__temporal_stream_store_call:memory"] * 2
-    records = await _read_all(stream_client, stream_id)
-    # The retried task appends again to the open Stream, and then closes it.
-    assert [record.body for record in records] == ["a", "a"]
-    assert await _describe_status(stream_client, stream_id) == (
+        result = await handle.result()
+    # The close of the failed task reached the Store, so the retry can't append.
+    assert result == "STREAM_ERROR_REASON_CLOSED: the Stream is closed"
+    events = (await handle.fetch_history()).events
+    failed_tasks = [
+        event
+        for event in events
+        if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED
+    ]
+    assert len(failed_tasks) == 1
+    records = await _read_all(stream_client, stream.ref.id)
+    assert [record.body for record in records] == ["a"]
+    assert await _describe_status(stream_client, stream.ref.id) == (
         StreamStatus.StreamStatusClosed
     )
 
@@ -1203,5 +1197,6 @@ async def test_activity_interceptors_see_the_close_activity(client: Client):
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-    # The create and the append run as Local Activities, and the close as an Activity.
+    # The create, the append and the close each run as a Local Activity.
     assert interceptor.activity_types == ["__temporal_stream_store_call:memory"] * 3
+    assert interceptor.is_local == [True] * 3
