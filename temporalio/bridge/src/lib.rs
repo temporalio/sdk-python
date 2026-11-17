@@ -117,14 +117,14 @@ fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, 
 
 #[cfg(feature = "streams")]
 #[pyfunction]
-#[pyo3(signature = (runtime_ref, store_name, retention=None, last_write_ttl=None))]
+#[pyo3(signature = (runtime_ref, store_name, retention=None, producer_idle_ttl=None))]
 fn new_memory_stream_runtime(
     runtime_ref: &runtime::RuntimeRef,
     store_name: String,
     retention: Option<std::time::Duration>,
-    last_write_ttl: Option<std::time::Duration>,
+    producer_idle_ttl: Option<std::time::Duration>,
 ) -> PyResult<streams::StreamRuntimeRef> {
-    streams::new_memory_stream_runtime(runtime_ref, store_name, retention, last_write_ttl)
+    streams::new_memory_stream_runtime(runtime_ref, store_name, retention, producer_idle_ttl)
 }
 
 #[cfg(feature = "streams-redis")]
@@ -136,7 +136,7 @@ fn new_memory_stream_runtime(
     cluster,
     key_prefix,
     retention,
-    last_write_ttl,
+    producer_idle_ttl,
     response_timeout,
     store_name,
     wait_replicas,
@@ -149,7 +149,7 @@ fn new_redis_stream_runtime(
     cluster: bool,
     key_prefix: Option<String>,
     retention: Option<std::time::Duration>,
-    last_write_ttl: Option<std::time::Duration>,
+    producer_idle_ttl: Option<std::time::Duration>,
     response_timeout: Option<std::time::Duration>,
     store_name: String,
     wait_replicas: i32,
@@ -162,7 +162,7 @@ fn new_redis_stream_runtime(
             cluster,
             key_prefix,
             retention,
-            last_write_ttl,
+            producer_idle_ttl,
             response_timeout,
             store_name,
             wait_replicas,

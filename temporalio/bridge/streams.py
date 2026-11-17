@@ -25,7 +25,7 @@ class StreamRuntime:
         *,
         name: str,
         retention: timedelta | None,
-        last_write_ttl: timedelta | None,
+        producer_idle_ttl: timedelta | None,
     ) -> StreamRuntime:
         """Build the runtime on a new memory Store.
 
@@ -40,7 +40,7 @@ class StreamRuntime:
             raise temporalio.exceptions.StreamConfigError(
                 "This build of temporalio has no Stream runtime"
             )
-        return StreamRuntime(new(runtime._ref, name, retention, last_write_ttl))
+        return StreamRuntime(new(runtime._ref, name, retention, producer_idle_ttl))
 
     @staticmethod
     def new_redis(
@@ -50,7 +50,7 @@ class StreamRuntime:
         cluster: bool,
         key_prefix: str | None,
         retention: timedelta | None,
-        last_write_ttl: timedelta | None,
+        producer_idle_ttl: timedelta | None,
         response_timeout: timedelta | None,
         name: str,
         wait_replicas: int,
@@ -77,7 +77,7 @@ class StreamRuntime:
                 cluster=cluster,
                 key_prefix=key_prefix,
                 retention=retention,
-                last_write_ttl=last_write_ttl,
+                producer_idle_ttl=producer_idle_ttl,
                 response_timeout=response_timeout,
                 store_name=name,
                 wait_replicas=wait_replicas,

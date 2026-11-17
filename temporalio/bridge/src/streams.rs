@@ -50,7 +50,7 @@ pub fn new_memory_stream_runtime(
     runtime_ref: &runtime::RuntimeRef,
     store_name: String,
     retention: Option<std::time::Duration>,
-    last_write_ttl: Option<std::time::Duration>,
+    producer_idle_ttl: Option<std::time::Duration>,
 ) -> PyResult<StreamRuntimeRef> {
     let runtime = runtime_ref.runtime.clone();
     runtime.assert_same_process("create a Stream runtime")?;
@@ -61,7 +61,7 @@ pub fn new_memory_stream_runtime(
         store_name,
         temporalio_streams::MemoryStreamOptions {
             retention,
-            last_write_ttl,
+            producer_idle_ttl,
         },
         meter,
     );
@@ -75,7 +75,7 @@ pub struct RedisStreamOptions {
     pub cluster: bool,
     pub key_prefix: Option<String>,
     pub retention: Option<std::time::Duration>,
-    pub last_write_ttl: Option<std::time::Duration>,
+    pub producer_idle_ttl: Option<std::time::Duration>,
     pub response_timeout: Option<std::time::Duration>,
     pub store_name: String,
     pub wait_replicas: i32,
@@ -100,7 +100,7 @@ pub fn new_redis_stream_runtime(
         cluster: options.cluster,
         key_prefix: options.key_prefix.unwrap_or_default(),
         retention: proto_duration("retention", options.retention)?,
-        last_write_ttl: proto_duration("last_write_ttl", options.last_write_ttl)?,
+        producer_idle_ttl: proto_duration("producer_idle_ttl", options.producer_idle_ttl)?,
         response_timeout: proto_duration("response_timeout", options.response_timeout)?,
         store_name: options.store_name,
         wait_replicas: options.wait_replicas,

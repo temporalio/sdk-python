@@ -47,7 +47,7 @@ class RedisStreamStore(temporalio.client._stream_store._BridgeStreamStore):
         cluster: bool = False,
         key_prefix: str | None = None,
         retention: timedelta | None = None,
-        last_write_ttl: timedelta | None = None,
+        producer_idle_ttl: timedelta | None = None,
         response_timeout: timedelta | None = None,
         wait_replicas: int = 0,
         wait_timeout: timedelta | None = None,
@@ -67,8 +67,9 @@ class RedisStreamStore(temporalio.client._stream_store._BridgeStreamStore):
                 A Stream id is unique in one Redis and key prefix.
             retention: The default Retention of a new Stream, which is how long the
                 Stream stays readable after its close. ``None`` takes 7 days.
-            last_write_ttl: How long an open Stream stays after its last write.
-                ``None`` keeps an open Stream and every Record until its close.
+            producer_idle_ttl: How long an open Stream stays after the last write of any
+                Producer. ``None`` keeps an open Stream and every Record until its
+                close.
             response_timeout: The longest time that one Redis call can take. ``None``
                 takes 5 seconds.
             wait_replicas: How many replicas must have each write before it answers,
@@ -82,7 +83,7 @@ class RedisStreamStore(temporalio.client._stream_store._BridgeStreamStore):
         """
         temporalio.client._stream_store._check_not_negative(
             retention=retention,
-            last_write_ttl=last_write_ttl,
+            producer_idle_ttl=producer_idle_ttl,
             response_timeout=response_timeout,
             wait_timeout=wait_timeout,
         )
@@ -91,7 +92,7 @@ class RedisStreamStore(temporalio.client._stream_store._BridgeStreamStore):
         self._cluster = cluster
         self._key_prefix = key_prefix
         self._retention = retention
-        self._last_write_ttl = last_write_ttl
+        self._producer_idle_ttl = producer_idle_ttl
         self._response_timeout = response_timeout
         self._wait_replicas = wait_replicas
         self._wait_timeout = wait_timeout
@@ -105,7 +106,7 @@ class RedisStreamStore(temporalio.client._stream_store._BridgeStreamStore):
             cluster=self._cluster,
             key_prefix=self._key_prefix,
             retention=self._retention,
-            last_write_ttl=self._last_write_ttl,
+            producer_idle_ttl=self._producer_idle_ttl,
             response_timeout=self._response_timeout,
             name=self._name,
             wait_replicas=self._wait_replicas,
