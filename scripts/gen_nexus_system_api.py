@@ -89,7 +89,7 @@ def generate_package(
 ) -> None:
     args = [*command, "python", str(wit_input_dir / wit_name), str(wit_deps_dir)]
     if native_api:
-        args.append("--native-api")
+        args.extend(["--targets", "workflow"])
     subprocess.check_call(
         [
             *args,

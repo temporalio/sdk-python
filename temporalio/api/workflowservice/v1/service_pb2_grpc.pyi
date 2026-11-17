@@ -1298,6 +1298,10 @@ class WorkflowServiceStub:
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse,
     ]
+    """PollWorkflowExecutionTimeSkipping waits for a fast-forward outcome for a workflow execution.
+
+    Experimental. Might change in the future.
+    """
 
 class WorkflowServiceAsyncStub:
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -2572,6 +2576,10 @@ class WorkflowServiceAsyncStub:
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingRequest,
         temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse,
     ]
+    """PollWorkflowExecutionTimeSkipping waits for a fast-forward outcome for a workflow execution.
+
+    Experimental. Might change in the future.
+    """
 
 class WorkflowServiceServicer(metaclass=abc.ABCMeta):
     """WorkflowService API defines how Temporal SDKs and other clients interact with the Temporal server
@@ -4706,7 +4714,11 @@ class WorkflowServiceServicer(metaclass=abc.ABCMeta):
         collections.abc.Awaitable[
             temporalio.api.workflowservice.v1.request_response_pb2.PollWorkflowExecutionTimeSkippingResponse
         ],
-    ]: ...
+    ]:
+        """PollWorkflowExecutionTimeSkipping waits for a fast-forward outcome for a workflow execution.
+
+        Experimental. Might change in the future.
+        """
 
 def add_WorkflowServiceServicer_to_server(
     servicer: WorkflowServiceServicer,

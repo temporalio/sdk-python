@@ -81,16 +81,14 @@ global___TaskQueueMetadata = TaskQueueMetadata
 
 @typing.final
 class PollerPoolInfo(google.protobuf.message.Message):
-    """Worker-reported state about the poller pool issuing a poll, used by the server to spread
-    poller scaling suggestions across a fleet.
-    """
+    """Worker-reported state about the poller pool issuing a poll."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     TARGET_POLLERS_FIELD_NUMBER: builtins.int
     target_pollers: builtins.int
-    """Number of concurrent poll requests this worker is currently targeting for this task
-    queue and task type. 0 if unknown, such as a poller pool of fixed size.
+    """Number of pollers this worker is targeting for this task queue and task type.
+    0 if unknown, such as a poller pool of fixed size.
     """
     def __init__(
         self,
@@ -1046,6 +1044,30 @@ class RateLimit(google.protobuf.message.Message):
 global___RateLimit = RateLimit
 
 @typing.final
+class ConcurrencyLimit(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONCURRENT_TASKS_FIELD_NUMBER: builtins.int
+    concurrent_tasks: builtins.int
+    """Maximum number of concurrent tasks that may be running at a time across the scope of the
+    limit. e.g. in TaskQueueConfig, the scope is the whole task queue.
+
+    Note that in situations like network partitions, the server's idea of what is running on
+    workers may be out of date, and this limit could be exceeded from the point of view of
+    workers.
+    """
+    def __init__(
+        self,
+        *,
+        concurrent_tasks: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["concurrent_tasks", b"concurrent_tasks"]
+    ) -> None: ...
+
+global___ConcurrencyLimit = ConcurrencyLimit
+
+@typing.final
 class ConfigMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1118,6 +1140,37 @@ class RateLimitConfig(google.protobuf.message.Message):
 global___RateLimitConfig = RateLimitConfig
 
 @typing.final
+class ConcurrencyLimitConfig(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    CONCURRENCY_LIMIT_FIELD_NUMBER: builtins.int
+    METADATA_FIELD_NUMBER: builtins.int
+    @property
+    def concurrency_limit(self) -> global___ConcurrencyLimit: ...
+    @property
+    def metadata(self) -> global___ConfigMetadata: ...
+    def __init__(
+        self,
+        *,
+        concurrency_limit: global___ConcurrencyLimit | None = ...,
+        metadata: global___ConfigMetadata | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "concurrency_limit", b"concurrency_limit", "metadata", b"metadata"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "concurrency_limit", b"concurrency_limit", "metadata", b"metadata"
+        ],
+    ) -> None: ...
+
+global___ConcurrencyLimitConfig = ConcurrencyLimitConfig
+
+@typing.final
 class TaskQueueConfig(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1142,9 +1195,10 @@ class TaskQueueConfig(google.protobuf.message.Message):
     QUEUE_RATE_LIMIT_FIELD_NUMBER: builtins.int
     FAIRNESS_KEYS_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
     FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
+    QUEUE_CONCURRENCY_LIMIT_FIELD_NUMBER: builtins.int
     @property
     def queue_rate_limit(self) -> global___RateLimitConfig:
-        """Unless modified, this is the system-defined rate limit."""
+        """Rate limit for the whole queue."""
 
     @property
     def fairness_keys_rate_limit_default(self) -> global___RateLimitConfig:
@@ -1156,6 +1210,10 @@ class TaskQueueConfig(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.float]:
         """If set, overrides the fairness weights for the corresponding fairness keys."""
 
+    @property
+    def queue_concurrency_limit(self) -> global___ConcurrencyLimitConfig:
+        """Concurrency limit for the whole queue."""
+
     def __init__(
         self,
         *,
@@ -1163,12 +1221,15 @@ class TaskQueueConfig(google.protobuf.message.Message):
         fairness_keys_rate_limit_default: global___RateLimitConfig | None = ...,
         fairness_weight_overrides: collections.abc.Mapping[builtins.str, builtins.float]
         | None = ...,
+        queue_concurrency_limit: global___ConcurrencyLimitConfig | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "fairness_keys_rate_limit_default",
             b"fairness_keys_rate_limit_default",
+            "queue_concurrency_limit",
+            b"queue_concurrency_limit",
             "queue_rate_limit",
             b"queue_rate_limit",
         ],
@@ -1180,6 +1241,8 @@ class TaskQueueConfig(google.protobuf.message.Message):
             b"fairness_keys_rate_limit_default",
             "fairness_weight_overrides",
             b"fairness_weight_overrides",
+            "queue_concurrency_limit",
+            b"queue_concurrency_limit",
             "queue_rate_limit",
             b"queue_rate_limit",
         ],

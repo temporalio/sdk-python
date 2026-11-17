@@ -36,6 +36,7 @@ class Region(google.protobuf.message.Message):
         CLOUD_PROVIDER_UNSPECIFIED: Region._CloudProvider.ValueType  # 0
         CLOUD_PROVIDER_AWS: Region._CloudProvider.ValueType  # 1
         CLOUD_PROVIDER_GCP: Region._CloudProvider.ValueType  # 2
+        CLOUD_PROVIDER_AZURE: Region._CloudProvider.ValueType  # 3
 
     class CloudProvider(_CloudProvider, metaclass=_CloudProviderEnumTypeWrapper):
         """The cloud provider that's hosting the region."""
@@ -43,6 +44,7 @@ class Region(google.protobuf.message.Message):
     CLOUD_PROVIDER_UNSPECIFIED: Region.CloudProvider.ValueType  # 0
     CLOUD_PROVIDER_AWS: Region.CloudProvider.ValueType  # 1
     CLOUD_PROVIDER_GCP: Region.CloudProvider.ValueType  # 2
+    CLOUD_PROVIDER_AZURE: Region.CloudProvider.ValueType  # 3
 
     ID_FIELD_NUMBER: builtins.int
     CLOUD_PROVIDER_DEPRECATED_FIELD_NUMBER: builtins.int

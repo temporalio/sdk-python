@@ -2366,16 +2366,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         return handle
 
-    async def _intercept_system_nexus_operation(
-        self, input: StartNexusOperationInput[Any, OutputT]
-    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        return await self._outbound.start_system_nexus_operation(input)
-
-    async def _schedule_system_nexus_operation(
-        self, input: StartNexusOperationInput[Any, OutputT]
-    ) -> _NexusOperationHandle[OutputT]:
-        return await self._outbound_start_nexus_operation(input)
-
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
 
@@ -3425,15 +3415,10 @@ class _WorkflowOutboundImpl(
     ) -> _NexusOperationHandle[OutputT]:
         return await self._instance._outbound_start_nexus_operation(input)
 
-    async def _intercept_system_nexus_operation(
-        self, input: StartNexusOperationInput[InputT, OutputT]
-    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        return await self._instance._intercept_system_nexus_operation(input)
-
-    async def start_system_nexus_operation(
+    async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
-        return await self._instance._schedule_system_nexus_operation(input)
+        return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput

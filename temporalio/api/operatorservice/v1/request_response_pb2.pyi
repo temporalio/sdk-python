@@ -11,8 +11,10 @@ import google.protobuf.descriptor
 import google.protobuf.duration_pb2
 import google.protobuf.internal.containers
 import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.enums.v1.common_pb2
+import temporalio.api.enums.v1.namespace_pb2
 import temporalio.api.nexus.v1.message_pb2
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
@@ -304,6 +306,174 @@ class DeleteNamespaceResponse(google.protobuf.message.Message):
     ) -> None: ...
 
 global___DeleteNamespaceResponse = DeleteNamespaceResponse
+
+@typing.final
+class SoftDeleteNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Only one of namespace or namespace_id must be specified to identify namespace."""
+    namespace_id: builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        namespace_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "namespace", b"namespace", "namespace_id", b"namespace_id"
+        ],
+    ) -> None: ...
+
+global___SoftDeleteNamespaceRequest = SoftDeleteNamespaceRequest
+
+@typing.final
+class SoftDeleteNamespaceResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___SoftDeleteNamespaceResponse = SoftDeleteNamespaceResponse
+
+@typing.final
+class RestoreNamespaceRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Only one of namespace or namespace_id must be specified to identify namespace."""
+    namespace_id: builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        namespace_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "namespace", b"namespace", "namespace_id", b"namespace_id"
+        ],
+    ) -> None: ...
+
+global___RestoreNamespaceRequest = RestoreNamespaceRequest
+
+@typing.final
+class RestoreNamespaceResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    def __init__(
+        self,
+    ) -> None: ...
+
+global___RestoreNamespaceResponse = RestoreNamespaceResponse
+
+@typing.final
+class DescribeNamespaceRestoreRequest(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Only one of namespace or namespace_id must be specified to identify namespace."""
+    namespace_id: builtins.str
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        namespace_id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "namespace", b"namespace", "namespace_id", b"namespace_id"
+        ],
+    ) -> None: ...
+
+global___DescribeNamespaceRestoreRequest = DescribeNamespaceRestoreRequest
+
+@typing.final
+class DescribeNamespaceRestoreResponse(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    STATE_FIELD_NUMBER: builtins.int
+    HOST_CLUSTER_FIELD_NUMBER: builtins.int
+    START_TIME_FIELD_NUMBER: builtins.int
+    CLOSE_TIME_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    TOTAL_EXECUTION_COUNT_FIELD_NUMBER: builtins.int
+    PROCESSED_EXECUTION_COUNT_FIELD_NUMBER: builtins.int
+    ESTIMATED_COMPLETION_TIME_FIELD_NUMBER: builtins.int
+    state: temporalio.api.enums.v1.namespace_pb2.NamespaceRestoreState.ValueType
+    host_cluster: builtins.str
+    """Cluster that runs the restore job."""
+    run_id: builtins.str
+    """Run ID of the restore job."""
+    total_execution_count: builtins.int
+    """Estimated when the refresh starts."""
+    processed_execution_count: builtins.int
+    """Executions processed on every cluster."""
+    @property
+    def start_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    @property
+    def close_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """Unset while the restore is running."""
+
+    @property
+    def estimated_completion_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
+    def __init__(
+        self,
+        *,
+        state: temporalio.api.enums.v1.namespace_pb2.NamespaceRestoreState.ValueType = ...,
+        host_cluster: builtins.str = ...,
+        start_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        close_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        run_id: builtins.str = ...,
+        total_execution_count: builtins.int = ...,
+        processed_execution_count: builtins.int = ...,
+        estimated_completion_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "close_time",
+            b"close_time",
+            "estimated_completion_time",
+            b"estimated_completion_time",
+            "start_time",
+            b"start_time",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "close_time",
+            b"close_time",
+            "estimated_completion_time",
+            b"estimated_completion_time",
+            "host_cluster",
+            b"host_cluster",
+            "processed_execution_count",
+            b"processed_execution_count",
+            "run_id",
+            b"run_id",
+            "start_time",
+            b"start_time",
+            "state",
+            b"state",
+            "total_execution_count",
+            b"total_execution_count",
+        ],
+    ) -> None: ...
+
+global___DescribeNamespaceRestoreResponse = DescribeNamespaceRestoreResponse
 
 @typing.final
 class AddOrUpdateRemoteClusterRequest(google.protobuf.message.Message):

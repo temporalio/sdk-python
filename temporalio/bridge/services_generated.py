@@ -2342,6 +2342,24 @@ class OperatorService:
             timeout=timeout,
         )
 
+    async def describe_namespace_restore(
+        self,
+        req: temporalio.api.operatorservice.v1.DescribeNamespaceRestoreRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.operatorservice.v1.DescribeNamespaceRestoreResponse:
+        """Invokes the OperatorService.describe_namespace_restore rpc method."""
+        return await self._client._rpc_call(
+            rpc="describe_namespace_restore",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.operatorservice.v1.DescribeNamespaceRestoreResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_nexus_endpoint(
         self,
         req: temporalio.api.operatorservice.v1.GetNexusEndpointRequest,
@@ -2445,6 +2463,42 @@ class OperatorService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.operatorservice.v1.RemoveSearchAttributesResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def restore_namespace(
+        self,
+        req: temporalio.api.operatorservice.v1.RestoreNamespaceRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.operatorservice.v1.RestoreNamespaceResponse:
+        """Invokes the OperatorService.restore_namespace rpc method."""
+        return await self._client._rpc_call(
+            rpc="restore_namespace",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.operatorservice.v1.RestoreNamespaceResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def soft_delete_namespace(
+        self,
+        req: temporalio.api.operatorservice.v1.SoftDeleteNamespaceRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.operatorservice.v1.SoftDeleteNamespaceResponse:
+        """Invokes the OperatorService.soft_delete_namespace rpc method."""
+        return await self._client._rpc_call(
+            rpc="soft_delete_namespace",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.operatorservice.v1.SoftDeleteNamespaceResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2567,6 +2621,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_caller_rate_limit(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateCallerRateLimitRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateCallerRateLimitResponse:
+        """Invokes the CloudService.create_caller_rate_limit rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_caller_rate_limit",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateCallerRateLimitResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateConnectivityRuleRequest,
@@ -2657,6 +2729,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def create_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.CreateProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.CreateProjectResponse:
+        """Invokes the CloudService.create_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="create_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.CreateProjectResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def create_service_account(
         self,
         req: temporalio.api.cloud.cloudservice.v1.CreateServiceAccountRequest,
@@ -2742,6 +2832,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.DeleteApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_caller_rate_limit(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteCallerRateLimitRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteCallerRateLimitResponse:
+        """Invokes the CloudService.delete_caller_rate_limit rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_caller_rate_limit",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteCallerRateLimitResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -2850,6 +2958,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.DeleteNexusEndpointResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def delete_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.DeleteProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.DeleteProjectResponse:
+        """Invokes the CloudService.delete_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="delete_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.DeleteProjectResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3071,6 +3197,42 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_caller_rate_limit(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitResponse:
+        """Invokes the CloudService.get_caller_rate_limit rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_caller_rate_limit",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_caller_rate_limits(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitsResponse:
+        """Invokes the CloudService.get_caller_rate_limits rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_caller_rate_limits",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetCallerRateLimitsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_connectivity_rule(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetConnectivityRuleRequest,
@@ -3287,6 +3449,60 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetProjectResponse:
+        """Invokes the CloudService.get_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetProjectResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_project_scoped_service_accounts(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetProjectScopedServiceAccountsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetProjectScopedServiceAccountsResponse:
+        """Invokes the CloudService.get_project_scoped_service_accounts rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_project_scoped_service_accounts",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetProjectScopedServiceAccountsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_projects(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetProjectsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetProjectsResponse:
+        """Invokes the CloudService.get_projects rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_projects",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetProjectsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_region(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetRegionRequest,
@@ -3354,6 +3570,26 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetServiceAccountNamespaceAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def get_service_account_project_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetServiceAccountProjectAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> (
+        temporalio.api.cloud.cloudservice.v1.GetServiceAccountProjectAssignmentsResponse
+    ):
+        """Invokes the CloudService.get_service_account_project_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_service_account_project_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetServiceAccountProjectAssignmentsResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3467,6 +3703,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_user_group_project_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserGroupProjectAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserGroupProjectAssignmentsResponse:
+        """Invokes the CloudService.get_user_group_project_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_group_project_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserGroupProjectAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_user_groups(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUserGroupsRequest,
@@ -3503,6 +3757,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def get_user_project_assignments(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.GetUserProjectAssignmentsRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.GetUserProjectAssignmentsResponse:
+        """Invokes the CloudService.get_user_project_assignments rpc method."""
+        return await self._client._rpc_call(
+            rpc="get_user_project_assignments",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.GetUserProjectAssignmentsResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def get_users(
         self,
         req: temporalio.api.cloud.cloudservice.v1.GetUsersRequest,
@@ -3516,6 +3788,42 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.GetUsersResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def move_namespace_to_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.MoveNamespaceToProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.MoveNamespaceToProjectResponse:
+        """Invokes the CloudService.move_namespace_to_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="move_namespace_to_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.MoveNamespaceToProjectResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def move_nexus_endpoint_to_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.MoveNexusEndpointToProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.MoveNexusEndpointToProjectResponse:
+        """Invokes the CloudService.move_nexus_endpoint_to_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="move_nexus_endpoint_to_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.MoveNexusEndpointToProjectResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3575,6 +3883,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def set_service_account_project_access(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.SetServiceAccountProjectAccessRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.SetServiceAccountProjectAccessResponse:
+        """Invokes the CloudService.set_service_account_project_access rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_service_account_project_access",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.SetServiceAccountProjectAccessResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def set_user_group_namespace_access(
         self,
         req: temporalio.api.cloud.cloudservice.v1.SetUserGroupNamespaceAccessRequest,
@@ -3593,6 +3919,24 @@ class CloudService:
             timeout=timeout,
         )
 
+    async def set_user_group_project_access(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.SetUserGroupProjectAccessRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.SetUserGroupProjectAccessResponse:
+        """Invokes the CloudService.set_user_group_project_access rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_user_group_project_access",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.SetUserGroupProjectAccessResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
     async def set_user_namespace_access(
         self,
         req: temporalio.api.cloud.cloudservice.v1.SetUserNamespaceAccessRequest,
@@ -3606,6 +3950,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.SetUserNamespaceAccessResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def set_user_project_access(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.SetUserProjectAccessRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.SetUserProjectAccessResponse:
+        """Invokes the CloudService.set_user_project_access rpc method."""
+        return await self._client._rpc_call(
+            rpc="set_user_project_access",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.SetUserProjectAccessResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3660,6 +4022,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateApiKeyResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_caller_rate_limit(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateCallerRateLimitRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateCallerRateLimitResponse:
+        """Invokes the CloudService.update_caller_rate_limit rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_caller_rate_limit",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateCallerRateLimitResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
@@ -3750,6 +4130,24 @@ class CloudService:
             req=req,
             service=self._service,
             resp_type=temporalio.api.cloud.cloudservice.v1.UpdateNexusEndpointResponse,
+            retry=retry,
+            metadata=metadata,
+            timeout=timeout,
+        )
+
+    async def update_project(
+        self,
+        req: temporalio.api.cloud.cloudservice.v1.UpdateProjectRequest,
+        retry: bool = False,
+        metadata: Mapping[str, str | bytes] = {},
+        timeout: timedelta | None = None,
+    ) -> temporalio.api.cloud.cloudservice.v1.UpdateProjectResponse:
+        """Invokes the CloudService.update_project rpc method."""
+        return await self._client._rpc_call(
+            rpc="update_project",
+            req=req,
+            service=self._service,
+            resp_type=temporalio.api.cloud.cloudservice.v1.UpdateProjectResponse,
             retry=retry,
             metadata=metadata,
             timeout=timeout,
