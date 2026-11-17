@@ -355,7 +355,7 @@ fn convert_metric_event(
                 )
                 .expect("Unable to create buffered metric"),
             ));
-            populate_into.set(Arc::new(buffered_ref)).unwrap();
+            populate_into.set(buffered_ref).unwrap();
             None
         }
         // Create the attributes and put it on the lazy ref

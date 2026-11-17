@@ -1503,6 +1503,7 @@ class TimeSkippingConfig(google.protobuf.message.Message):
     but a parent's fast_forward won't affect its child's execution. A flag is provided to disable propagation of the
     "enabled" flag to child workflows; regardless of that flag, a child workflow inherits the virtual time from the
     parent execution as its start time.
+    Experimental. Might change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1564,6 +1565,10 @@ global___TimeSkippingConfig = TimeSkippingConfig
 
 @typing.final
 class FastForwardConfig(google.protobuf.message.Message):
+    """Controls a time-skipping fast-forward for an execution.
+    Experimental. Might change in the future.
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     ID_FIELD_NUMBER: builtins.int
@@ -1605,6 +1610,7 @@ global___FastForwardConfig = FastForwardConfig
 class TimeSkippingStatePropagation(google.protobuf.message.Message):
     """The time-skipping state that needs to be propagated from one execution to another, or through a chain of runs
     within the same execution.
+    Experimental. Might change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1656,7 +1662,9 @@ global___TimeSkippingStatePropagation = TimeSkippingStatePropagation
 
 @typing.final
 class TimeSkippingInfo(google.protobuf.message.Message):
-    """Describes the current time-skipping state of a workflow execution."""
+    """Describes the current time-skipping state of a workflow execution.
+    Experimental. Might change in the future.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1723,7 +1731,9 @@ global___TimeSkippingInfo = TimeSkippingInfo
 
 @typing.final
 class TimeSkippingFastForwardInfo(google.protobuf.message.Message):
-    """TimeSkippingFastForwardInfo describes the current time-skipping fast-forward on an execution."""
+    """TimeSkippingFastForwardInfo describes the current time-skipping fast-forward on an execution.
+    Experimental. Might change in the future.
+    """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

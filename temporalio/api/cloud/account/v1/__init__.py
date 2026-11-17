@@ -3,6 +3,7 @@ from .message_pb2 import (
     AccountSpec,
     AuditLogSink,
     AuditLogSinkSpec,
+    AuthenticationSettings,
     Metrics,
     MetricsSpec,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "AccountSpec",
     "AuditLogSink",
     "AuditLogSinkSpec",
+    "AuthenticationSettings",
     "Metrics",
     "MetricsSpec",
 ]

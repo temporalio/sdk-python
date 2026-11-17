@@ -42,6 +42,21 @@ class OperatorServiceStub(object):
             request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.FromString,
         )
+        self.SoftDeleteNamespace = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/SoftDeleteNamespace",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceResponse.FromString,
+        )
+        self.RestoreNamespace = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/RestoreNamespace",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceResponse.FromString,
+        )
+        self.DescribeNamespaceRestore = channel.unary_unary(
+            "/temporal.api.operatorservice.v1.OperatorService/DescribeNamespaceRestore",
+            request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreResponse.FromString,
+        )
         self.AddOrUpdateRemoteCluster = channel.unary_unary(
             "/temporal.api.operatorservice.v1.OperatorService/AddOrUpdateRemoteCluster",
             request_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.AddOrUpdateRemoteClusterRequest.SerializeToString,
@@ -119,6 +134,31 @@ class OperatorServiceServicer(object):
 
     def DeleteNamespace(self, request, context):
         """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SoftDeleteNamespace(self, request, context):
+        """SoftDeleteNamespace moves a namespace to NAMESPACE_STATE_SOFT_DELETED on every cluster in its
+        replication config. Executions stop making progress, but no data is removed. A running restore
+        is marked failed. Idempotent.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def RestoreNamespace(self, request, context):
+        """RestoreNamespace moves a soft-deleted namespace back to NAMESPACE_STATE_REGISTERED on every
+        cluster in its replication config, then starts a job that refreshes every execution so they
+        resume. Returns UNAVAILABLE until every cluster has the new state; retry until it succeeds.
+        Idempotent.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DescribeNamespaceRestore(self, request, context):
+        """DescribeNamespaceRestore reports the state and progress of the namespace's most recent restore."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -205,6 +245,21 @@ def add_OperatorServiceServicer_to_server(servicer, server):
             servicer.DeleteNamespace,
             request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.FromString,
             response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.SerializeToString,
+        ),
+        "SoftDeleteNamespace": grpc.unary_unary_rpc_method_handler(
+            servicer.SoftDeleteNamespace,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceResponse.SerializeToString,
+        ),
+        "RestoreNamespace": grpc.unary_unary_rpc_method_handler(
+            servicer.RestoreNamespace,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceResponse.SerializeToString,
+        ),
+        "DescribeNamespaceRestore": grpc.unary_unary_rpc_method_handler(
+            servicer.DescribeNamespaceRestore,
+            request_deserializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreRequest.FromString,
+            response_serializer=temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreResponse.SerializeToString,
         ),
         "AddOrUpdateRemoteCluster": grpc.unary_unary_rpc_method_handler(
             servicer.AddOrUpdateRemoteCluster,
@@ -368,6 +423,93 @@ class OperatorService(object):
             "/temporal.api.operatorservice.v1.OperatorService/DeleteNamespace",
             temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceRequest.SerializeToString,
             temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DeleteNamespaceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SoftDeleteNamespace(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/SoftDeleteNamespace",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.SoftDeleteNamespaceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def RestoreNamespace(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/RestoreNamespace",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.RestoreNamespaceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DescribeNamespaceRestore(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.operatorservice.v1.OperatorService/DescribeNamespaceRestore",
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreRequest.SerializeToString,
+            temporal_dot_api_dot_operatorservice_dot_v1_dot_request__response__pb2.DescribeNamespaceRestoreResponse.FromString,
             options,
             channel_credentials,
             insecure,

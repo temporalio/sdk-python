@@ -320,7 +320,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """Initial time-skipping configuration for this workflow execution, recorded at start time.
+        """Experimental.
+        Initial time-skipping configuration for this workflow execution, recorded at start time.
         This may have been set explicitly via the start workflow request, or propagated from a
         parent/previous execution.
 
@@ -332,7 +333,8 @@ class WorkflowExecutionStartedEventAttributes(google.protobuf.message.Message):
     def time_skipping_state_propagation(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
-        """The time-skipping state propagated from a previous run of this workflow. This can be nil
+        """Experimental.
+        The time-skipping state propagated from a previous run of this workflow. This can be nil
         if no time skipping has occurred or there is no previous run.
         """
 
@@ -2792,13 +2794,16 @@ class StartChildWorkflowExecutionInitiatedEventAttributes(
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """The propagated time-skipping configuration for the child workflow."""
+        """Experimental.
+        The propagated time-skipping configuration for the child workflow.
+        """
 
     @property
     def time_skipping_state_propagation(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
-        """The time-skipping state propagated from the parent workflow. This can be nil if no time skipping
+        """Experimental.
+        The time-skipping state propagated from the parent workflow. This can be nil if no time skipping
         has occurred or there is no previous run.
         """
 
@@ -3501,7 +3506,8 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     identity: builtins.str
     """Optional. The identity of the client who initiated the request that created this event."""
     time_skipping_config_updated: builtins.bool
-    """Indicates the time skipping config was updated by the recent call to update
+    """Experimental.
+    Indicates the time skipping config was updated by the recent call to update
     workflow execution options.
     """
     @property
@@ -3530,7 +3536,9 @@ class WorkflowExecutionOptionsUpdatedEventAttributes(google.protobuf.message.Mes
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """TimeSkippingConfig override upserted in this event. Represents the full config."""
+        """Experimental.
+        TimeSkippingConfig override upserted in this event. Represents the full config.
+        """
 
     @property
     def workflow_update_options(
@@ -3971,6 +3979,7 @@ class WorkflowExecutionTimeSkippingTransitionedEventAttributes(
     """Attributes for an event indicating that time skipping state changed for a workflow execution:
     either time was advanced, or time skipping was stopped automatically due to the fast_forward completing.
     The worker_may_ignore field in HistoryEvent should always be set true for this event.
+    Experimental. Might change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -4888,7 +4897,9 @@ class HistoryEvent(google.protobuf.message.Message):
     @property
     def workflow_execution_time_skipping_transitioned_event_attributes(
         self,
-    ) -> global___WorkflowExecutionTimeSkippingTransitionedEventAttributes: ...
+    ) -> global___WorkflowExecutionTimeSkippingTransitionedEventAttributes:
+        """Experimental."""
+
     def __init__(
         self,
         *,

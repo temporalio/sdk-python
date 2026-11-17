@@ -38,8 +38,8 @@ class WorkerPollerInfo(google.protobuf.message.Message):
     is_autoscaling: builtins.bool
     """Set true if the number of concurrent pollers is auto-scaled"""
     target_pollers: builtins.int
-    """Number of concurrent poll requests this poller pool is currently targeting, which may
-    differ from current_pollers. 0 if unknown, such as a poller pool of fixed size.
+    """Number of pollers this poller pool is currently targeting, which may differ from current_pollers.
+    0 if unknown, such as a poller pool of fixed size.
     """
     @property
     def last_successful_poll_time(self) -> google.protobuf.timestamp_pb2.Timestamp: ...
