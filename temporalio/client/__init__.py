@@ -189,7 +189,6 @@ from ._stream_store import (
     StreamConfig,
     StreamSelectContext,
     StreamStore,
-    StreamStoreCallOptions,
 )
 from ._worker_versioning import (
     BuildIdOp,
@@ -359,7 +358,6 @@ __all__ = [
     "StreamConfig",
     "StreamSelectContext",
     "StreamStore",
-    "StreamStoreCallOptions",
     "Callback",
     "_ClientImpl",
     "_apply_headers",

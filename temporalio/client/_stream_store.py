@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -13,52 +13,14 @@ import temporalio.activity
 import temporalio.api.streamservice.v1
 import temporalio.bridge._visitor
 import temporalio.bridge.runtime
-import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system.stream_service
 import temporalio.runtime
-import temporalio.workflow
-from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
+from temporalio.converter import StorageDriverActivityInfo
 from temporalio.exceptions import StreamConfigError
 
 if TYPE_CHECKING:
     import temporalio.bridge.streams
-
-
-@dataclasses.dataclass(frozen=True)
-class StreamStoreCallOptions:
-    """Options of the Local Activity that calls a Stream Store for Workflow code.
-
-    Workflow code can't do I/O, so the default
-    :py:meth:`StreamStore.call_from_workflow` calls its Store from a Local Activity.
-
-    A :py:class:`StreamConfig` holds them in
-    :py:attr:`StreamConfig.workflow_call_options`, and every Store of that config
-    gets the same options.
-
-    .. warning::
-        This API is experimental and subject to change.
-    """
-
-    start_to_close_timeout: timedelta | None = timedelta(seconds=60)
-    """Most time for one attempt."""
-
-    schedule_to_close_timeout: timedelta | None = None
-    """Most time for all attempts."""
-
-    retry_policy: temporalio.common.RetryPolicy = dataclasses.field(
-        default_factory=lambda: temporalio.common.RetryPolicy(maximum_attempts=1)
-    )
-    """Retries of a failed call. The default is one attempt. In one Workflow Task, each
-    attempt of an append with the Workflow's Producer sends the same epoch and
-    sequence, so the Store writes the batch once."""
-
-    def __post_init__(self) -> None:
-        """Check that a timeout is set."""
-        if not self.start_to_close_timeout and not self.schedule_to_close_timeout:
-            raise ValueError(
-                "start_to_close_timeout or schedule_to_close_timeout must be set"
-            )
 
 
 class StreamStore(ABC):
@@ -130,54 +92,6 @@ class StreamStore(ABC):
     ) -> temporalio.api.streamservice.v1.DescribeStreamResponse:
         """Give the status and the newest offset of a Stream."""
         ...
-
-    def worker_activities(self) -> Sequence[Callable[..., Any]]:
-        """The Activities that a Worker registers for this Store when it runs Workflows.
-
-        The default is one Activity, named for this Store, that
-        :py:meth:`call_from_workflow` runs as a Local Activity. A Store that overrides
-        one of the two methods overrides the other to match.
-        """
-        return [_store_call_activity(self)]
-
-    async def call_from_workflow(
-        self,
-        operation: str,
-        request: google.protobuf.message.Message,
-        options: StreamStoreCallOptions,
-    ) -> google.protobuf.message.Message:
-        """Answer one Stream operation for Workflow code.
-
-        It runs in Workflow code, so it does no I/O itself. The default runs the
-        Activity of :py:meth:`worker_activities` as a Local Activity for each operation.
-        It takes the timeouts and the retry policy of ``options``. A replay takes the
-        result from History and calls no method of this Store.
-
-        A Local Activity reaches the Store before its Workflow Task completes. If that
-        task fails after a close, the Stream stays closed. The retry of the task then
-        can't append to it.
-
-        Args:
-            operation: The Nexus operation name, ``CreateStream``, ``AppendRecords``,
-                ``CloseStream`` or ``DescribeStream`` in this release.
-            request: The request message of ``temporalio.api.streamservice.v1``.
-            options: The :py:attr:`StreamConfig.workflow_call_options` of the config.
-
-        Returns:
-            The response message of the operation.
-        """
-        stream_operation = _STREAM_OPERATIONS[operation]
-        # Workflow code runs no payload codec, so the Activity encodes the bodies of an
-        # append before the Store gets them.
-        response = await temporalio.workflow.execute_local_activity(
-            _store_call_activity_name(self.name),
-            args=[operation, request.SerializeToString()],
-            result_type=bytes,
-            schedule_to_close_timeout=options.schedule_to_close_timeout,
-            start_to_close_timeout=options.start_to_close_timeout,
-            retry_policy=options.retry_policy,
-        )
-        return stream_operation.response_type.FromString(response)
 
 
 class _BridgeStreamStore(StreamStore):  # pyright: ignore[reportUnusedClass]
@@ -268,9 +182,6 @@ class _StreamOperation:
 
     response_type: type[google.protobuf.message.Message]
 
-    workflow_refusal: str | None = None
-    """Why Workflow code can't start it in this release, or ``None`` when it can."""
-
     async def call(
         self, store: StreamStore, request: google.protobuf.message.Message
     ) -> google.protobuf.message.Message:
@@ -308,10 +219,6 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
         "read_records",
         temporalio.api.streamservice.v1.ReadRecordsRequest,
         temporalio.api.streamservice.v1.ReadRecordsResponse,
-        workflow_refusal=(
-            "Workflow code can't read a Stream on a Store in this release. "
-            "Call an Activity that reads it through its client."
-        ),
     ),
     "CloseStream": _StreamOperation(
         "close_stream",
@@ -326,69 +233,6 @@ _STREAM_OPERATIONS: dict[str, _StreamOperation] = {
 }
 """The operations of the Stream service, by their Nexus operation name."""
 
-_STORE_CALL_ACTIVITY = "__temporal_stream_store_call"
-
-
-def _store_call_activity_name(store_name: str) -> str:
-    # The name carries the Store's name, so two Stores on one Worker don't clash.
-    return f"{_STORE_CALL_ACTIVITY}:{store_name}"
-
-
-def _store_call_activity(
-    store: StreamStore,
-) -> Callable[[str, bytes], Awaitable[bytes]]:
-    @temporalio.activity.defn(name=_store_call_activity_name(store.name))
-    async def call(operation: str, request: bytes) -> bytes:
-        message = _STREAM_OPERATIONS[operation].request_type.FromString(request)
-        if isinstance(
-            message,
-            (
-                temporalio.api.streamservice.v1.AppendRecordsRequest,
-                temporalio.api.streamservice.v1.CloseStreamRequest,
-            ),
-        ):
-            _set_workflow_task_epoch_and_sequence(message)
-        response = await _call_stream_store(
-            store, temporalio.activity.client().data_converter, operation, message
-        )
-        return response.SerializeToString()
-
-    return call
-
-
-def _set_workflow_task_epoch_and_sequence(
-    request: temporalio.api.streamservice.v1.AppendRecordsRequest
-    | temporalio.api.streamservice.v1.CloseStreamRequest,
-) -> None:
-    # Every append and the close of a Workflow run write as one Producer, the Workflow. Its
-    # epoch is the Workflow Task that dispatched this Local Activity, so the Store fences a
-    # late write of a failed task, whichever call made it. A Producer that Workflow code
-    # gave of another kind reaches the Store as it is.
-    info = temporalio.activity.info()
-    if request.producer.WhichOneof("kind") != "workflow" or not info.is_local:
-        return
-    task = info.workflow_task
-    if task is None:
-        raise RuntimeError(
-            "A Stream write of Workflow code needs the Workflow Task of its Local "
-            "Activity, and the Worker's Core gave none"
-        )
-    epoch = request.producer.workflow.epoch
-    epoch.Clear()
-    epoch.started_event_id = task.started_event_id
-    epoch.attempt = task.attempt
-    if task.started_time is not None:
-        epoch.started_time.FromDatetime(task.started_time)
-    if (
-        isinstance(request, temporalio.api.streamservice.v1.AppendRecordsRequest)
-        and not request.sequence
-    ):
-        # The activity id of a Local Activity is its sequence number in the run. The
-        # Workflow's calls on one Stream run one at a time, so these numbers go up in the
-        # order of the appends. Each retry of this Local Activity sends the same number,
-        # so the Store writes the batch once and gives back its first offsets.
-        request.sequence = int(info.activity_id)
-
 
 @dataclasses.dataclass(frozen=True)
 class StreamSelectContext:
@@ -401,12 +245,8 @@ class StreamSelectContext:
     id: str
     """The id of the Stream."""
 
-    target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None = None
-    """The Workflow or Activity that makes the call, or ``None`` for a plain client.
-
-    A call in an Activity has that Activity here. A Workflow's call runs the selector
-    in Workflow code, and has that Workflow here.
-    """
+    target: StorageDriverActivityInfo | None = None
+    """The Activity that makes the call, or ``None`` for a plain client."""
 
 
 @dataclasses.dataclass(frozen=True)
@@ -419,28 +259,16 @@ class StreamConfig:
     operation. It holds Stores and a selector, as
     :py:class:`temporalio.converter.ExternalStorage` holds drivers and a selector.
 
-    On a Worker whose client has no config, a Stream call of Workflow code raises
-    :py:class:`temporalio.exceptions.ApplicationError` with the ``type``
-    ``StreamConfigError``, and an uncaught one fails the Workflow. Workflow code can
-    catch this error. A Workflow that catches it must not go on to make the same call
-    on a Worker that has a config, since the History then has no record of the first
-    call.
-
     A ref carries the name of its Store, so a call on a known Stream goes to the
     Store of that name. A create can name its Store with ``store=``. A call whose ref
     names no Store goes to the Store that :py:attr:`store_selector` returns, or to the
     one Store when there is no selector. With more than one Store and no selector,
     such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
-    An append or a close of Workflow code writes as the Workflow, with the Workflow Task
-    that runs it as its epoch. So the Store fences a late write of a failed Workflow
-    Task. The appends and the close of one Workflow on one Stream run one at a time, in
-    the order of the calls.
-
-    Workflow code calls a Store from a Local Activity, also for a close. So it needs
-    no Worker that polls for Activity Tasks. A Local Activity reaches the Store before
-    its Workflow Task completes. If that task fails after a close, the Stream stays
-    closed. The retry of the task then can't append to it.
+    An Activity reaches the Stores of its Worker's client through
+    :py:func:`temporalio.activity.client`. Workflow code can't call a Stream in this
+    version. A Stream call of Workflow code raises ``RuntimeError``, which fails the
+    Workflow Task.
 
     .. warning::
         This API is experimental and subject to change.
@@ -451,8 +279,7 @@ class StreamConfig:
 
     A ref carries the :py:attr:`StreamStore.name` of its Store, and a call looks
     the Store up by that name. With more than one Store and no
-    :py:attr:`store_selector`, each call must name its Store. A Worker serves every
-    Store of its client.
+    :py:attr:`store_selector`, each call must name its Store.
     """
 
     store_selector: Callable[[StreamSelectContext], StreamStore] | None = None
@@ -463,21 +290,8 @@ class StreamConfig:
     such a call goes to that Store. When it is ``None`` and there is more than one
     Store, such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
-    For a call of Workflow code, the selector runs in Workflow code, also on a
-    replay. So it must give the same Store for the same context. The Local Activity
-    of the chosen Store is in History, and another answer on a replay is a
-    non-determinism error. A Stream that code builds from an id only goes through the
-    selector on each call, so the selector must also give the same Store for the same
-    id.
-    """
-
-    workflow_call_options: StreamStoreCallOptions = dataclasses.field(
-        default_factory=StreamStoreCallOptions
-    )
-    """Options of a Store's call for Workflow code, for every Store of this config.
-
-    :py:meth:`StreamStore.call_from_workflow` gets them. The default runs the Store's
-    Local Activity with their timeouts and retry policy.
+    A Stream that code builds from an id only goes through the selector on each
+    call, so the selector must give the same Store for the same id.
     """
 
     _store_map: dict[str, StreamStore] = dataclasses.field(
@@ -535,7 +349,7 @@ class StreamConfig:
     def _store_for(
         self,
         ref: temporalio.nexus.system.stream_service.StreamRef[Any],
-        target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None,
+        target: StorageDriverActivityInfo | None,
     ) -> StreamStore:
         if ref.store:
             return self._get_store_by_name(ref.store)
@@ -595,6 +409,15 @@ def _stream_service() -> nexusrpc.ServiceDefinition:
 
 
 _STREAM_SERVICE = _stream_service()
+
+
+def _workflow_stream_call_error() -> RuntimeError:  # pyright: ignore[reportUnusedFunction]
+    # Not an `ApplicationError`, so it fails the Workflow Task and not the Workflow. A
+    # Worker with code that has no Stream call can then finish the Workflow.
+    return RuntimeError(
+        "Workflow code can't call a Stream in this version. Call it from an Activity "
+        "through activity.client()."
+    )
 
 
 async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]

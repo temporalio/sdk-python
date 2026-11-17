@@ -9,17 +9,11 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 from types import TracebackType
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from typing_extensions import Self
 
 import temporalio.nexus.system.stream_service.client
-import temporalio.workflow
-
-if TYPE_CHECKING:
-    # The Workflow Stream class is in a private module of the generated code. Only its type
-    # is needed, since the appender calls the same `append` on both Streams.
-    import temporalio.nexus.system.stream_service.workflow._resources.stream
 
 BodyT = TypeVar("BodyT")
 
@@ -34,24 +28,16 @@ class BufferedAppender(Generic[BodyT]):
     """Batches the appends of one Stream.
 
     Use it in code that appends often, such as an Activity that streams model tokens.
-    :py:meth:`append` returns at once and does no I/O. One write is in flight at a time.
+    :py:meth:`append` returns immediately and does no I/O. One write is in flight at a time.
     Records appended during a write wait for the next batch, and they keep their order. A batch
     holds at most 1,000 Records.
 
-    It takes a client Stream or a Workflow Stream. When a write starts depends on where
-    :py:meth:`append` runs, not on the type of the Stream:
-
-    * In a client or an Activity, the appender writes the buffered Records at most
-      ``max_delay`` after the first of them, or at once when they fill a batch.
-    * In Workflow code, a timer would go into History, so the appender uses none. The first
-      write starts when the calling code next yields, so the appends of one activation go as
-      one write. Each write is the Workflow ``append`` of the Stream, so it is one Local
-      Activity and one marker in History. A replay takes the results from History and writes
-      nothing.
+    It takes a client Stream, in a client or an Activity. It writes the buffered Records at
+    most ``max_delay`` after the first of them, or immediately when they fill a batch.
 
     Use it in ``async with``, which writes the remaining Records at the end of the block, or
     await :py:meth:`flush`. Without ``async with`` or a :py:meth:`flush`, the Records still in
-    the buffer are lost. The end of an Activity attempt or of a Workflow doesn't write them.
+    the buffer are lost. The end of an Activity attempt doesn't write them.
 
     ``await flush()`` is the backpressure point. A caller that appends faster than the Store
     accepts Records must await it from time to time, so the buffer doesn't grow without bound.
@@ -68,33 +54,27 @@ class BufferedAppender(Generic[BodyT]):
 
     def __init__(
         self,
-        stream: temporalio.nexus.system.stream_service.client.Stream[BodyT]
-        | temporalio.nexus.system.stream_service.workflow._resources.stream.Stream[
-            BodyT
-        ],
+        stream: temporalio.nexus.system.stream_service.client.Stream[BodyT],
         *,
         max_delay: timedelta | None = None,
     ) -> None:
         """Create an appender. It starts no write until the first append.
 
         Args:
-            stream: The Stream to append to, a client Stream or a Workflow Stream.
+            stream: The client Stream to append to.
             max_delay: The longest time that a Record waits in the buffer before its batch
-                starts to write, in a client or an Activity. It must not be negative.
-                ``None`` means 100 milliseconds. Workflow code must leave it ``None``.
+                starts to write. It must not be negative. ``None`` means 100 milliseconds.
 
         Raises:
-            ValueError: ``max_delay`` is negative, or it is set in Workflow code.
+            ValueError: ``max_delay`` is negative.
         """
         if max_delay is not None and max_delay < timedelta():
             raise ValueError("max_delay must not be negative")
         self._stream = stream
         self._max_delay = max_delay
-        self._check_delay()
         self._buffer: list[BodyT] = []
         # When the oldest buffered Record arrived, so its batch starts at most max_delay later.
         self._first_at = 0.0
-        # The timer of a client or an Activity, or the start at the next yield of Workflow code.
         self._timer: asyncio.Handle | None = None
         self._writing: asyncio.Task[None] | None = None
         self._appended = 0
@@ -105,7 +85,7 @@ class BufferedAppender(Generic[BodyT]):
         self._unwritten = 0
 
     def append(self, *records: BodyT) -> None:
-        """Add one Record for each value to the buffer, and return at once.
+        """Add one Record for each value to the buffer, and return immediately.
 
         A list is one value.
 
@@ -117,7 +97,6 @@ class BufferedAppender(Generic[BodyT]):
         self._raise_error()
         if not records:
             raise TypeError("append takes one or more values")
-        self._check_delay()
         loop = asyncio.get_running_loop()
         if not self._buffer:
             self._first_at = loop.time()
@@ -171,22 +150,10 @@ class BufferedAppender(Generic[BodyT]):
         if self._error is not None:
             raise self._error
 
-    def _check_delay(self) -> None:
-        if self._max_delay is not None and temporalio.workflow.in_workflow():
-            raise ValueError(
-                "BufferedAppender takes no max_delay in Workflow code, since a delay "
-                "would put a timer into History. Leave max_delay as None."
-            )
-
     def _schedule(self) -> None:
         if self._writing is not None or not self._buffer:
             return
-        if temporalio.workflow.in_workflow():
-            # A timer of the Workflow event loop is durable. A start at the next yield
-            # takes every Record of this activation into one write, and adds no event.
-            if self._timer is None:
-                self._timer = asyncio.get_running_loop().call_soon(self._start)
-        elif len(self._buffer) >= _MAX_BATCH_RECORDS:
+        if len(self._buffer) >= _MAX_BATCH_RECORDS:
             self._start()
         elif self._timer is None:
             max_delay = self._max_delay or _DEFAULT_MAX_DELAY

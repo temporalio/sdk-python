@@ -212,8 +212,8 @@ _STREAM_RETRYABLE_REASONS: frozenset[int] = frozenset(
 class StreamError(ApplicationError):
     """A failed Stream call. ``reason`` tells the cases apart.
 
-    One class covers every failed call in client, Activity and Workflow code, so match
-    on ``reason`` and not on the type. The reason is a ``StreamErrorReason``, such as
+    One class covers every failed call in client and Activity code, so match on
+    ``reason`` and not on the type. The reason is a ``StreamErrorReason``, such as
     ``STREAM_ERROR_REASON_NOT_FOUND`` (nobody created the Stream),
     ``STREAM_ERROR_REASON_CLOSED`` (the Stream is closed), or
     ``STREAM_ERROR_REASON_ALREADY_EXISTS`` (a strict create of a Stream that exists).
@@ -266,23 +266,6 @@ def _stream_error_from_call(  # pyright: ignore[reportUnusedFunction]
     return _stream_error_from_reason(proto.reason, message)
 
 
-def _stream_error_from_failure(  # pyright: ignore[reportUnusedFunction]
-    err: BaseException,
-) -> StreamError | None:
-    # A Local Activity or a Nexus operation hands back a plain application error, so the
-    # error is rebuilt from its type and details.
-    if isinstance(err, StreamError):
-        return err
-    if not isinstance(err, ApplicationError) or err.type != "StreamError":
-        return None
-    reason: int = _STREAM_ERROR_REASON_UNSPECIFIED
-    for detail in err.details:
-        if isinstance(detail, temporalio.api.stream.v1.StreamErrorDetails):
-            reason = detail.reason
-            break
-    return _stream_error_from_reason(reason, err.message)
-
-
 class StreamConfigError(RuntimeError):
     """A Stream call can't find its Store, because of how the Stores are set up.
 
@@ -291,24 +274,13 @@ class StreamConfigError(RuntimeError):
 
     * A Stream call is made on a client with no Stream config. This release has no
       Streams on the server, so every Stream call needs a Store.
-    * A Workflow's Stream call has a ref that names no Store, on a Worker whose
-      client has more than one Store and no selector. This fails the Workflow Task.
     * A :py:class:`temporalio.client.StreamConfig` has no Store, or has two Stores
       with one name.
     * A call names no Store on a config with more than one Store and no selector.
     * A ref names a Store that the config of the client doesn't have.
     * The selector returns a Store that isn't one of the config's Stores.
     * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.
-    * A Workflow's Stream call has a ref that names a Store that the config of the
-      Worker's client doesn't have. This fails the Workflow Task.
     * This build of temporalio has no Stream runtime, or no Redis Stream Store.
-
-    A Workflow's Stream call on a Worker whose client has no Stream config doesn't
-    raise this class. Workflow code gets an :py:class:`ApplicationError` with the
-    ``type`` ``StreamConfigError`` and ``non_retryable`` set, so an uncaught one fails
-    the Workflow. Workflow code can catch this error. A Workflow that catches it must
-    not go on to make the same call on a Worker that has a config, since the History
-    then has no record of the first call.
 
     .. warning::
         This API is experimental and subject to change.

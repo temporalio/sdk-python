@@ -59,7 +59,10 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
-from temporalio.client._stream_store import _STREAM_SERVICE
+from temporalio.client._stream_store import (
+    _STREAM_SERVICE,
+    _workflow_stream_call_error,
+)
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.nexus.system.stream_service.workflow._system_nexus_interceptor import (
     _start_system_nexus_operation as _start_stream_system_nexus_operation,
@@ -95,7 +98,6 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
-from ._stream_store import _no_stream_config_error, _WorkflowStreamStore
 
 logger = logging.getLogger(__name__)
 
@@ -193,10 +195,6 @@ class WorkflowInstanceDetails:
         temporalio.converter.NexusSerializationContext | None
     ) = None
     """Serialization context of the Nexus operation handler that started the workflow, if any."""
-    stream_store: _WorkflowStreamStore | None = None
-    """The Worker's Stream Stores as Workflow code reaches them, or ``None`` when the
-    Worker's client has none. This release has no Streams on the server, so with ``None``
-    a Stream call fails the Workflow."""
 
 
 class WorkflowInstance(ABC):
@@ -313,10 +311,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # the Nexus caller, which decodes them with the handler's Nexus context. A retried or cron run
         # reads the previous run's result and failure with the same context.
         self._nexus_serialization_context = det.nexus_serialization_context
-        self._stream_store = det.stream_store
-        # The last append or close of each Stream, by Store name and Stream id, so the
-        # next one of the same Stream starts after it.
-        self._stream_write_tails: dict[tuple[str, str], asyncio.Task[Any]] = {}
         if self._nexus_serialization_context:
             self._result_payload_converter = self._payload_converter_with_context(
                 self._nexus_serialization_context
@@ -2318,7 +2312,25 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             )
 
         if temporalio.nexus.system.is_system_endpoint(input.endpoint):
-            payload_converter, failure_converter = self._system_nexus_converters(input)
+            serialization_context = temporalio.nexus.system._get_serialization_context(
+                input.service,
+                input.operation_name,
+                input.input,
+            )
+            user_payload_converter = self._context_free_payload_converter
+            user_failure_converter = self._context_free_failure_converter
+            if serialization_context is not None:
+                user_payload_converter = self._payload_converter_with_context(
+                    serialization_context
+                )
+                user_failure_converter = self._failure_converter_with_context(
+                    serialization_context
+                )
+            payload_converter = temporalio.nexus.system._get_payload_converter(
+                user_payload_converter,
+                user_failure_converter,
+            )
+            failure_converter = user_failure_converter
         else:
             serialization_context = temporalio.converter.NexusSerializationContext(
                 endpoint=input.endpoint,
@@ -2357,40 +2369,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        # This release has no Streams on the server, so a Worker answers a Stream call with
-        # a Store of its client. Every other system Nexus operation goes to the server.
+        # The server has no Streams, and Workflow code reaches no Store. So a Stream call
+        # stops here, after the interceptors saw it.
         if input.service == _STREAM_SERVICE.name:
-            store = self._stream_store
-            if store is None:
-                raise _no_stream_config_error()
-            return store.start_operation(self, input)
+            raise _workflow_stream_call_error()
         return await self._outbound_start_nexus_operation(input)
-
-    def _system_nexus_converters(
-        self, input: StartNexusOperationInput[Any, Any]
-    ) -> tuple[
-        temporalio.nexus.system._SystemNexusPayloadConverter,
-        temporalio.converter.FailureConverter,
-    ]:
-        serialization_context = temporalio.nexus.system._get_serialization_context(
-            input.service,
-            input.operation_name,
-            input.input,
-        )
-        user_payload_converter = self._context_free_payload_converter
-        user_failure_converter = self._context_free_failure_converter
-        if serialization_context is not None:
-            user_payload_converter = self._payload_converter_with_context(
-                serialization_context
-            )
-            user_failure_converter = self._failure_converter_with_context(
-                serialization_context
-            )
-        payload_converter = temporalio.nexus.system._get_payload_converter(
-            user_payload_converter,
-            user_failure_converter,
-        )
-        return payload_converter, user_failure_converter
 
     #### Miscellaneous helpers ####
     # These are in alphabetical order.

@@ -19,13 +19,11 @@ from temporalio.nexus.system.stream_service import (
     Producer,
     ProducerKindClient,
     ProducerKindLocalActivity,
-    ProducerKindWorkflow,
     ProducerKindWorkflowActivity,
     StreamRef,
     StreamStatus,
 )
 from temporalio.nexus.system.stream_service.client import Stream
-from temporalio.nexus.system.stream_service.workflow import create_stream
 from tests.helpers import new_worker
 
 _REDIS_URL = os.environ.get("STREAMS_REDIS_URL")
@@ -65,24 +63,12 @@ async def append_values(ref: StreamRef[str], values: list[str]) -> None:
 @workflow.defn
 class AppendWorkflow:
     @workflow.run
-    async def run(self, stream_id: str) -> StreamRef[str]:
-        stream = await create_stream(id=stream_id, body_type=str)
+    async def run(self, ref: StreamRef[str]) -> None:
         await workflow.execute_local_activity(
             append_values,
-            args=[stream.ref, ["a", "b"]],
+            args=[ref, ["a", "b"]],
             start_to_close_timeout=timedelta(seconds=10),
         )
-        return stream.ref
-
-
-@workflow.defn
-class AppendAndCloseWorkflow:
-    @workflow.run
-    async def run(self, stream_id: str) -> StreamRef[str]:
-        stream = await create_stream(id=stream_id, body_type=str)
-        await stream.append("a", "b")
-        await stream.close()
-        return stream.ref
 
 
 @activity.defn
@@ -126,22 +112,20 @@ async def test_client_creates_appends_reads_and_closes(client: Client):
     assert page.records == []
 
 
-async def test_workflow_local_activity_appends_with_local_activity_producer(
-    client: Client,
-):
+async def test_local_activity_appends_with_local_activity_producer(client: Client):
     stream_client = _with_store(client, _store())
+    stream = await _create_stream(stream_client)
     async with new_worker(
         stream_client, AppendWorkflow, activities=[append_values]
     ) as worker:
         handle = await stream_client.start_workflow(
             AppendWorkflow.run,
-            f"stream-{uuid.uuid4()}",
+            stream.ref,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-        ref = await handle.result()
+        await handle.result()
 
-    stream = stream_client.get_stream(ref, body_type=str)
     records = [record async for record in stream.iter_read_items()]
     assert [record.body for record in records] == ["a", "b"]
     run_id = handle.result_run_id
@@ -149,34 +133,6 @@ async def test_workflow_local_activity_appends_with_local_activity_producer(
         assert record.producer is not None
         assert isinstance(record.producer.kind, ProducerKindLocalActivity)
         assert record.producer.kind.value.run_id == run_id
-
-
-async def test_workflow_appends_and_closes(client: Client):
-    stream_client = _with_store(client, _store())
-    async with new_worker(stream_client, AppendAndCloseWorkflow) as worker:
-        handle = await stream_client.start_workflow(
-            AppendAndCloseWorkflow.run,
-            f"stream-{uuid.uuid4()}",
-            id=f"workflow-{uuid.uuid4()}",
-            task_queue=worker.task_queue,
-        )
-        ref = await handle.result()
-
-    stream = stream_client.get_stream(ref, body_type=str)
-    records = [record async for record in stream.iter_read_items()]
-    assert [record.body for record in records] == ["a", "b"]
-    run_id = handle.result_run_id
-    for record in records:
-        # A Workflow writes as itself, with its Workflow Task as the epoch.
-        assert record.producer is not None
-        assert record.producer.id == f"wf:{run_id}"
-        assert isinstance(record.producer.kind, ProducerKindWorkflow)
-        assert record.producer.kind.value.run_id == run_id
-        assert record.producer.kind.value.epoch is not None
-    described = await stream.describe()
-    assert described.status == StreamStatus.StreamStatusClosed
-    err = await _stream_error(stream.append("c"))
-    assert err.reason == StreamErrorReason.STREAM_ERROR_REASON_CLOSED
 
 
 async def test_activity_appends_with_activity_producer(client: Client):

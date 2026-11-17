@@ -1,6 +1,7 @@
 """The Redis Stream Store.
 
-A client takes it in ``stream_config``, and its Workers use the same Store::
+A client takes it in ``stream_config``. The Activities of a Worker on that client reach
+the same Store through ``activity.client()``::
 
     from temporalio.client import Client, StreamConfig
     from temporalio.contrib.redis.streams import RedisStreamStore
