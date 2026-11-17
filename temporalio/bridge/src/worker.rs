@@ -72,7 +72,10 @@ pub struct WorkerConfig {
     /// The most bytes of one read's Records that wait for Workflow code. `None` keeps Core's
     /// default.
     stream_read_ahead_bytes: Option<usize>,
-    /// The least time between two batches of one read. `None` keeps Core's default.
+    /// The most Records of one read in one activation. `None` keeps Core's default.
+    stream_read_page_records: Option<usize>,
+    /// The least time between two batches of one read. `None` keeps Core's default of no gap.
+    stream_read_min_gap: Option<Duration>,
     /// Whether a replay that lost the Records of a read fails the Workflow, for every type or
     /// for the types listed.
     stream_replay_as_workflow_fail: bool,
@@ -741,6 +744,14 @@ fn convert_worker_config(
     let stream_runtimes = temporalio_sdk_core::StreamRuntimes::default();
     let stream_runtimes = match conf.stream_read_ahead_bytes {
         Some(bytes) => stream_runtimes.with_read_ahead_bytes(bytes),
+        None => stream_runtimes,
+    };
+    let stream_runtimes = match conf.stream_read_page_records {
+        Some(records) => stream_runtimes.with_read_page_records(records),
+        None => stream_runtimes,
+    };
+    let stream_runtimes = match conf.stream_read_min_gap {
+        Some(gap) => stream_runtimes.with_read_min_gap(gap),
         None => stream_runtimes,
     };
     let mut workflow_failure_errors = HashSet::new();

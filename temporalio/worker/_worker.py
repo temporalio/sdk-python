@@ -36,6 +36,8 @@ from ._nexus import _NexusWorker
 from ._plugin import Plugin
 from ._stream_store import (
     _bridge_read_ahead_bytes,
+    _bridge_read_min_gap,
+    _bridge_read_page_records,
     _bridge_stream_runtimes,
     _WorkflowStreamStore,
 )
@@ -741,6 +743,8 @@ class Worker:
                     stream_config if self._workflow_worker is not None else None
                 ),
                 stream_read_ahead_bytes=_bridge_read_ahead_bytes(stream_config),
+                stream_read_page_records=_bridge_read_page_records(stream_config),
+                stream_read_min_gap=_bridge_read_min_gap(stream_config),
             ),
         )
 

@@ -2450,6 +2450,111 @@ async def test_store_page_over_256_records_comes_in_pages_of_at_most_256(
     )
 
 
+# The page cap and the least gap of a read, two settings of the Worker.
+
+
+def _client_with(client: Client, **settings: Any) -> Client:
+    config = client.config()
+    config["stream_config"] = StreamConfig(stores=[MemoryStreamStore()], **settings)
+    return Client(**config)
+
+
+def _page_counts(history: WorkflowHistory) -> list[int]:
+    return [
+        count
+        for task in _read_entries(history)
+        for entry in task
+        for count in entry.page_counts
+    ]
+
+
+@pytest.mark.parametrize("max_cached_workflows", [1000, 0])
+async def test_page_cap_of_10_gives_pages_of_at_most_10(
+    client: Client, max_cached_workflows: int
+):
+    stream_client = _client_with(client, workflow_read_page_records=10)
+    bodies = [f"record-{index}" for index in range(35)]
+    ref = await _filled_stream(stream_client, bodies)
+    handle, got = await _run(
+        stream_client,
+        ReadItemsWorkflow,
+        ref,
+        None,
+        max_cached_workflows=max_cached_workflows,
+    )
+    assert got == bodies
+    history = await handle.fetch_history()
+    counts = _page_counts(history)
+    assert sum(counts) == 35
+    assert max(counts) == 10
+    config = stream_client.config()["stream_config"]
+    await Replayer(workflows=[ReadItemsWorkflow], stream_config=config).replay_workflow(
+        history
+    )
+
+
+def test_page_cap_out_of_bounds_raises():
+    for records in (0, 1001):
+        with pytest.raises(ValueError, match="workflow_read_page_records"):
+            StreamConfig(
+                stores=[MemoryStreamStore()], workflow_read_page_records=records
+            )
+
+
+def test_min_gap_out_of_bounds_raises():
+    for gap in (timedelta(seconds=2), timedelta(milliseconds=-1)):
+        with pytest.raises(ValueError, match="workflow_read_min_gap"):
+            StreamConfig(stores=[MemoryStreamStore()], workflow_read_min_gap=gap)
+
+
+@activity.defn
+async def append_five_20ms_apart(stream_id: str) -> None:
+    stream = activity.client().get_stream(StreamRef(id=stream_id), body_type=str)
+    for index in range(5):
+        await stream.append(f"record-{index}")
+        await asyncio.sleep(0.02)
+    await stream.close()
+
+
+@workflow.defn
+class GappedReadWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> ReadResult:
+        writer = workflow.start_activity(
+            append_five_20ms_apart,
+            stream_id,
+            start_to_close_timeout=timedelta(seconds=30),
+        )
+        stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
+        result = ReadResult([], [], [], [], [])
+        async for page in stream.iter_read(wait=timedelta(seconds=10)):
+            result.bodies.extend(record.body for record in page.records)
+            result.page_sizes.append(len(page.records))
+            result.dones.append(page.done)
+        await writer
+        return result
+
+
+async def test_min_gap_of_200ms_joins_records_that_come_20ms_apart(client: Client):
+    stream_client = _client_with(
+        client, workflow_read_min_gap=timedelta(milliseconds=200)
+    )
+    ref = await _filled_stream(stream_client, [], close=False)
+    handle, result = await _run(
+        stream_client,
+        GappedReadWorkflow,
+        ref.id,
+        activities=[append_five_20ms_apart],
+    )
+    assert result.bodies == [f"record-{index}" for index in range(5)]
+    assert len(result.page_sizes) < 5
+    assert result.dones[-1] is True
+    config = stream_client.config()["stream_config"]
+    await Replayer(
+        workflows=[GappedReadWorkflow], stream_config=config
+    ).replay_workflow(await handle.fetch_history())
+
+
 # A replay that lost the Records of a read.
 
 

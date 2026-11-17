@@ -595,6 +595,23 @@ class StreamConfig:
     for a Worker with little memory, since each open read can hold this much.
     """
 
+    workflow_read_page_records: int | None = None
+    """The most Records of one read that Workflow code gets in one activation.
+
+    Core keeps the Records over it and gives them in the next activation, with no wait.
+    ``None`` takes Core's default of 256. The value must be 1 to 1000. A replay gives
+    each page as History has it, whatever this value is.
+    """
+
+    workflow_read_min_gap: timedelta | None = None
+    """The least time between two batches of one read of Workflow code.
+
+    A read gives its first batch immediately. The Records that come in the gap after a
+    batch come together in the next batch. This trades latency for fewer activations of
+    Workflow code, since a Record can wait up to one gap. ``None`` and zero mean no gap,
+    the default. The value must be zero to 1 s. A replay ignores it.
+    """
+
     _store_map: dict[str, StreamStore] = dataclasses.field(
         init=False, repr=False, compare=False
     )
@@ -604,14 +621,30 @@ class StreamConfig:
         """Check the Stores and build the name-keyed map of them.
 
         Raises :py:class:`temporalio.exceptions.StreamConfigError` if there is no
-        Store, or if two Stores share a name, and ``ValueError`` if
-        :py:attr:`workflow_read_ahead_bytes` is below 1.
+        Store, or if two Stores share a name. Raises ``ValueError`` if
+        :py:attr:`workflow_read_ahead_bytes` is below 1, if
+        :py:attr:`workflow_read_page_records` is not 1 to 1000, or if
+        :py:attr:`workflow_read_min_gap` is not zero to 1 s.
         """
         if (
             self.workflow_read_ahead_bytes is not None
             and self.workflow_read_ahead_bytes < 1
         ):
             raise ValueError("workflow_read_ahead_bytes must be at least 1")
+        if self.workflow_read_page_records is not None and not (
+            1 <= self.workflow_read_page_records <= 1000
+        ):
+            raise ValueError(
+                "workflow_read_page_records must be 1 to 1000, "
+                f"got {self.workflow_read_page_records}"
+            )
+        if self.workflow_read_min_gap is not None and not (
+            timedelta(0) <= self.workflow_read_min_gap <= timedelta(seconds=1)
+        ):
+            raise ValueError(
+                "workflow_read_min_gap must be zero to 1 second, "
+                f"got {self.workflow_read_min_gap}"
+            )
         if not self.stores:
             raise StreamConfigError("StreamConfig.stores must have at least one Store")
         store_map: dict[str, StreamStore] = {}

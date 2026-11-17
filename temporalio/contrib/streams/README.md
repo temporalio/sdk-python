@@ -115,6 +115,12 @@ waits until the code takes them. `workflow_read_ahead_bytes` of `StreamConfig` c
 bound, for large Records or a Worker with little memory. A read gives Workflow code its Records
 as soon as no activation of the Workflow is pending. A page that Workflow code gets in one
 activation has at most 256 Records, and the rest come in the next activation with no wait.
+`workflow_read_page_records` changes that cap, from 1 to 1000.
+
+`workflow_read_min_gap` of `StreamConfig` sets the least time between two batches of one read.
+It has no gap by default, and it must be at most 1 s. A read gives its first batch immediately.
+The Records that come in the gap come together in the next batch. This trades latency for fewer
+activations of Workflow code. A replay ignores both settings.
 
 An append and a close of Workflow code always write as the Workflow, with the Workflow Task as
 their epoch. A `producer=` of another kind raises `StreamError` with the reason

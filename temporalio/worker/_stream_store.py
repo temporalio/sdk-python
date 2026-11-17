@@ -396,6 +396,16 @@ def _bridge_read_ahead_bytes(config: StreamConfig | None) -> int | None:  # pyri
     return config.workflow_read_ahead_bytes if config is not None else None
 
 
+def _bridge_read_page_records(config: StreamConfig | None) -> int | None:  # pyright: ignore[reportUnusedFunction]
+    """Give Core the page cap of a read in the config, or ``None`` for Core's default."""
+    return config.workflow_read_page_records if config is not None else None
+
+
+def _bridge_read_min_gap(config: StreamConfig | None) -> timedelta | None:  # pyright: ignore[reportUnusedFunction]
+    """Give Core the least gap between two batches of a read, or ``None`` for no gap."""
+    return config.workflow_read_min_gap if config is not None else None
+
+
 def _bridge_stream_runtimes(config: StreamConfig | None) -> list[tuple[str, Any]]:  # pyright: ignore[reportUnusedFunction]
     """Give Core the bridge's object of each Store's Stream runtime, by Store name."""
     if config is None:

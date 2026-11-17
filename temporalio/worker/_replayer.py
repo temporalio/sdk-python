@@ -24,6 +24,8 @@ from ..common import HeaderCodecBehavior
 from ._interceptor import Interceptor
 from ._stream_store import (
     _bridge_read_ahead_bytes,
+    _bridge_read_min_gap,
+    _bridge_read_page_records,
     _bridge_stream_runtimes,
     _WorkflowStreamStore,
 )
@@ -390,6 +392,12 @@ class Replayer:
                         self._config.get("stream_config")
                     ),
                     stream_read_ahead_bytes=_bridge_read_ahead_bytes(
+                        self._config.get("stream_config")
+                    ),
+                    stream_read_page_records=_bridge_read_page_records(
+                        self._config.get("stream_config")
+                    ),
+                    stream_read_min_gap=_bridge_read_min_gap(
                         self._config.get("stream_config")
                     ),
                 ),
