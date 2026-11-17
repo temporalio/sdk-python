@@ -34,13 +34,13 @@ def current_producer() -> Producer:
 
 
 def as_producer(value: object) -> Producer:
-    """Give a :py:class:`Producer` for a Producer or for its proto message.
+    """Give a Producer for a Producer or for its proto message.
 
     A Producer that went through a data converter with no type hint, such as one in
     ``activity.info().heartbeat_details``, comes back as the proto message
-    ``temporalio.api.stream.v1.Producer``. This function turns it back into a
-    :py:class:`Producer` that ``append`` and ``close`` take in ``producer=``. A
-    :py:class:`Producer` comes back as it is.
+    ``temporalio.api.stream.v1.Producer``. This function turns it back into the
+    :py:class:`temporalio.nexus.system.stream_service.Producer` that ``append`` and
+    ``close`` take in ``producer=``. Such a Producer comes back as it is.
 
     Raises:
         TypeError: The value is neither a Producer nor its proto message.
