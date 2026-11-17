@@ -22,6 +22,7 @@ from temporalio.nexus.system.stream_service import (
     ProducerKindWorkflowActivity,
     StreamRecord,
     StreamRef,
+    StreamStatus,
     WorkflowProducer,
 )
 from temporalio.nexus.system.stream_service.client import Stream
@@ -126,6 +127,7 @@ class CurrentProducerWorkflow:
         stream = await create_stream(id=stream_id, body_type=str)
         producer = current_producer()
         await stream.append("a", producer=producer)
+        await stream.close(producer=producer)
         return producer
 
 
@@ -147,11 +149,17 @@ async def test_current_producer_in_workflow_code_is_the_workflow_producer(
     assert producer == Producer(
         id=f"wf:{run_id}", kind=ProducerKindWorkflow(WorkflowProducer(run_id=run_id))
     )
-    # On a Store, the append writes as the Local Activity that runs it.
+    # On a Store, the append writes as the Workflow, with its Workflow Task as the epoch.
+    # The close passes the Store's check of that epoch too.
     stream = stream_client.get_stream(StreamRef(id=stream_id), body_type=str)
     [record] = await _records(stream)
     assert record.producer is not None
-    assert isinstance(record.producer.kind, ProducerKindLocalActivity)
+    assert record.producer.id == producer.id
+    assert isinstance(record.producer.kind, ProducerKindWorkflow)
+    assert record.producer.kind.value.epoch is not None
+    assert record.producer.kind.value.epoch.attempt == 1
+    described = await stream.describe()
+    assert described.status == StreamStatus.StreamStatusClosed
 
 
 @pytest.mark.parametrize("kind", ["workflow", *_ACTIVITY_INFOS, "client"])

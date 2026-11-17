@@ -19,6 +19,7 @@ from temporalio.nexus.system.stream_service import (
     Producer,
     ProducerKindClient,
     ProducerKindLocalActivity,
+    ProducerKindWorkflow,
     ProducerKindWorkflowActivity,
     StreamRef,
     StreamStatus,
@@ -166,9 +167,12 @@ async def test_workflow_appends_and_closes(client: Client):
     assert [record.body for record in records] == ["a", "b"]
     run_id = handle.result_run_id
     for record in records:
+        # A Workflow writes as itself, with its Workflow Task as the epoch.
         assert record.producer is not None
-        assert isinstance(record.producer.kind, ProducerKindLocalActivity)
+        assert record.producer.id == f"wf:{run_id}"
+        assert isinstance(record.producer.kind, ProducerKindWorkflow)
         assert record.producer.kind.value.run_id == run_id
+        assert record.producer.kind.value.epoch is not None
     described = await stream.describe()
     assert described.status == StreamStatus.StreamStatusClosed
     err = await _stream_error(stream.append("c"))

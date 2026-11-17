@@ -36,6 +36,11 @@ def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyri
     )
 
 
+# The writes of a Workflow to one Stream, which run one at a time in the order of the
+# calls. A create and a describe need no order.
+_ORDERED_OPERATIONS = frozenset({"AppendRecords", "CloseStream"})
+
+
 def _workflow_target() -> StorageDriverWorkflowInfo:
     # External storage builds the same value for a Workflow.
     info = temporalio.workflow.info()
@@ -74,12 +79,24 @@ class _WorkflowStreamStore:
             )
         payload_converter, _ = instance._system_nexus_converters(input)
         request = payload_converter._to_transfer_value(input.input)
+        ref = _request_ref(input.input)
         # The choice runs in Workflow code, so a ref of a Store that the config doesn't
         # have raises `StreamConfigError` here, with no I/O, and fails the Workflow Task.
-        store = self.config._store_for(_request_ref(input.input), _workflow_target())
+        store = self.config._store_for(ref, _workflow_target())
         options = self.config.workflow_call_options
+        tails = instance._stream_write_tails
+        tail_key = (store.name, ref.id)
+        previous = (
+            tails.get(tail_key) if input.operation_name in _ORDERED_OPERATIONS else None
+        )
 
         async def result() -> OutputT:
+            if previous is not None and not previous.done():
+                # The Workflow's appends carry sequences that go up in the order of the
+                # calls, and the Store refuses one below the last. So a write starts its
+                # Local Activity only after the one before it ended, also when that one
+                # failed.
+                await temporalio.workflow.wait([previous])
             try:
                 response = await store.call_from_workflow(
                     input.operation_name, request, options
@@ -111,9 +128,18 @@ class _WorkflowStreamStore:
                 stream_operation.check_response(store, response), input.output_type
             )
 
-        return _StreamStoreOperationHandle(
-            instance.create_task(result(), name=f"stream store: {input.operation_name}")
+        task = instance.create_task(
+            result(), name=f"stream store: {input.operation_name}"
         )
+        if input.operation_name in _ORDERED_OPERATIONS:
+            tails[tail_key] = task
+
+            def forget(done: asyncio.Task[Any]) -> None:
+                if tails.get(tail_key) is done:
+                    del tails[tail_key]
+
+            task.add_done_callback(forget)
+        return _StreamStoreOperationHandle(task)
 
 
 class _StreamStoreOperationHandle(temporalio.workflow.NexusOperationHandle[OutputT]):

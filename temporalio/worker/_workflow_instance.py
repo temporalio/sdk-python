@@ -314,6 +314,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # reads the previous run's result and failure with the same context.
         self._nexus_serialization_context = det.nexus_serialization_context
         self._stream_store = det.stream_store
+        # The last append or close of each Stream, by Store name and Stream id, so the
+        # next one of the same Stream starts after it.
+        self._stream_write_tails: dict[tuple[str, str], asyncio.Task[Any]] = {}
         if self._nexus_serialization_context:
             self._result_payload_converter = self._payload_converter_with_context(
                 self._nexus_serialization_context

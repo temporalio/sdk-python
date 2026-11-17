@@ -15,8 +15,6 @@ import temporalio.bridge._visitor
 import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
-import temporalio.converter._payload_converter
-import temporalio.nexus.system._support
 import temporalio.nexus.system.stream_service
 import temporalio.runtime
 import temporalio.workflow
@@ -52,8 +50,8 @@ class StreamStoreCallOptions:
         default_factory=lambda: temporalio.common.RetryPolicy(maximum_attempts=1)
     )
     """Retries of a failed call. The default is one attempt. In one Workflow Task, each
-    attempt of a Workflow's append without an explicit ``producer`` sends the same
-    Producer, epoch and sequence, so the Store writes the batch once."""
+    attempt of an append with the Workflow's Producer sends the same epoch and
+    sequence, so the Store writes the batch once."""
 
     def __post_init__(self) -> None:
         """Check that a timeout is set."""
@@ -342,8 +340,14 @@ def _store_call_activity(
     @temporalio.activity.defn(name=_store_call_activity_name(store.name))
     async def call(operation: str, request: bytes) -> bytes:
         message = _STREAM_OPERATIONS[operation].request_type.FromString(request)
-        if isinstance(message, temporalio.api.streamservice.v1.AppendRecordsRequest):
-            _with_local_activity_producer(message)
+        if isinstance(
+            message,
+            (
+                temporalio.api.streamservice.v1.AppendRecordsRequest,
+                temporalio.api.streamservice.v1.CloseStreamRequest,
+            ),
+        ):
+            _set_workflow_task_epoch_and_sequence(message)
         response = await _call_stream_store(
             store, temporalio.activity.client().data_converter, operation, message
         )
@@ -352,30 +356,38 @@ def _store_call_activity(
     return call
 
 
-def _with_local_activity_producer(
-    request: temporalio.api.streamservice.v1.AppendRecordsRequest,
+def _set_workflow_task_epoch_and_sequence(
+    request: temporalio.api.streamservice.v1.AppendRecordsRequest
+    | temporalio.api.streamservice.v1.CloseStreamRequest,
 ) -> None:
-    # On a Store, a Workflow appends as the Local Activity that runs the append, so the
-    # Store can fence the write of a failed Workflow Task. A Producer that Workflow code
+    # Every append and the close of a Workflow run write as one Producer, the Workflow. Its
+    # epoch is the Workflow Task that dispatched this Local Activity, so the Store fences a
+    # late write of a failed task, whichever call made it. A Producer that Workflow code
     # gave of another kind reaches the Store as it is.
-    if (
-        request.producer.WhichOneof("kind") != "workflow"
-        or not temporalio.activity.info().is_local
-    ):
+    info = temporalio.activity.info()
+    if request.producer.WhichOneof("kind") != "workflow" or not info.is_local:
         return
-    converter = temporalio.converter._payload_converter._get_transfer_type_converter(
-        temporalio.nexus.system.stream_service.Producer
-    )
-    if converter is None:
-        raise TypeError("The generated Producer has no proto transfer type")
-    request.producer.CopyFrom(
-        converter.to_transfer_type(temporalio.nexus.system._support.default_producer())
-    )
-    # Each retry of this Local Activity in one Workflow Task sends the same Producer, epoch
-    # and sequence, so the Store writes the batch once and gives back its first offsets.
-    request.producer.local_activity.epoch.attempt = 1
-    if not request.sequence:
-        request.sequence = 1
+    task = info.workflow_task
+    if task is None:
+        raise RuntimeError(
+            "A Stream write of Workflow code needs the Workflow Task of its Local "
+            "Activity, and the Worker's Core gave none"
+        )
+    epoch = request.producer.workflow.epoch
+    epoch.Clear()
+    epoch.started_event_id = task.started_event_id
+    epoch.attempt = task.attempt
+    if task.started_time is not None:
+        epoch.started_time.FromDatetime(task.started_time)
+    if (
+        isinstance(request, temporalio.api.streamservice.v1.AppendRecordsRequest)
+        and not request.sequence
+    ):
+        # The activity id of a Local Activity is its sequence number in the run. The
+        # Workflow's calls on one Stream run one at a time, so these numbers go up in the
+        # order of the appends. Each retry of this Local Activity sends the same number,
+        # so the Store writes the batch once and gives back its first offsets.
+        request.sequence = int(info.activity_id)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -419,6 +431,11 @@ class StreamConfig:
     names no Store goes to the Store that :py:attr:`store_selector` returns, or to the
     one Store when there is no selector. With more than one Store and no selector,
     such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
+
+    An append or a close of Workflow code writes as the Workflow, with the Workflow Task
+    that runs it as its epoch. So the Store fences a late write of a failed Workflow
+    Task. The appends and the close of one Workflow on one Stream run one at a time, in
+    the order of the calls.
 
     Workflow code calls a Store from a Local Activity, also for a close. So it needs
     no Worker that polls for Activity Tasks. A Local Activity reaches the Store before

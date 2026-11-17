@@ -17,8 +17,8 @@ def current_producer() -> Producer:
     code it is the Workflow's Producer. In any other code it is the client Producer of
     this process. It does no I/O.
 
-    On a Store, an append of Workflow code writes as the Local Activity that runs it.
-    That holds also when the code passes this Producer in ``producer=``.
+    On a Store, an append or a close of Workflow code writes as this Producer, with the
+    Workflow Task that runs it as its epoch.
 
     An Activity can keep the result and pass it to a later ``append`` or ``close`` with
     ``producer=``. That call then writes as this Producer with its epoch, also in a

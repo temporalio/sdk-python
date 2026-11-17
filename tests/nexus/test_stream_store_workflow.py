@@ -45,6 +45,7 @@ from temporalio.nexus.system.stream_service import (
     Producer,
     ProducerKindClient,
     ProducerKindLocalActivity,
+    ProducerKindWorkflow,
     ReadRecordsRequest,
     StreamIdConflictPolicy,
     StreamRecord,
@@ -455,6 +456,17 @@ async def _read_all(client: Client, stream_id: str) -> list[StreamRecord[str]]:
     return [record async for record in stream.iter_read_items()]
 
 
+def _epoch(producer: Producer) -> tuple[int, int, int]:
+    # The Workflow Task, then the attempt of the Local Activity, which a Workflow lacks.
+    if isinstance(producer.kind, ProducerKindWorkflow):
+        task = producer.kind.value.epoch
+        assert task is not None
+        return (task.started_event_id, task.attempt, 0)
+    assert isinstance(producer.kind, ProducerKindLocalActivity)
+    local = producer.kind.value.epoch
+    return (local.task.started_event_id, local.task.attempt, local.attempt)
+
+
 def _producers(records: list[StreamRecord[str]]) -> list[Producer]:
     producers = [record.producer for record in records]
     assert all(producer is not None for producer in producers)
@@ -506,6 +518,15 @@ async def test_workflow_stream_uses_store(client: Client, append_workflow: type[
     assert run_id
     first, second = _producers(records)
     assert first == second
+    if append_workflow is AppendWorkflow:
+        # The Workflow writes as itself, with its first Workflow Task as the epoch.
+        assert first.id == f"wf:{run_id}"
+        assert isinstance(first.kind, ProducerKindWorkflow)
+        assert first.kind.value.run_id == run_id
+        assert first.kind.value.epoch is not None
+        assert first.kind.value.epoch.started_event_id > 0
+        assert first.kind.value.epoch.attempt == 1
+        return
     # The create is the run's first Local Activity, so the append is its second.
     assert first.id == f"la:{run_id}:2"
     assert isinstance(first.kind, ProducerKindLocalActivity)
@@ -690,11 +711,12 @@ async def test_client_append_after_workflow_append_keeps_offset_order(
     assert len(set(offsets)) == len(offsets)
     assert offsets[-1] == appended.last_offset
     kinds = [type(producer.kind) for producer in _producers(records)]
-    assert kinds == [
-        ProducerKindLocalActivity,
-        ProducerKindLocalActivity,
-        ProducerKindClient,
-    ]
+    workflow_kind = (
+        ProducerKindWorkflow
+        if append_workflow is AppendWorkflow
+        else ProducerKindLocalActivity
+    )
+    assert kinds == [workflow_kind, workflow_kind, ProducerKindClient]
 
 
 async def test_workflow_stream_store_call_options_retry(client: Client):
@@ -768,13 +790,10 @@ async def test_workflow_task_retry_appends_with_higher_epoch(
     assert [record.body for record in records] == [*_BODIES, *_BODIES]
     producers = _producers(records)
     assert len({producer.id for producer in producers}) == 1
+    if not in_local_activity:
+        assert producers[0].id.startswith("wf:")
 
-    def epoch(producer: Producer) -> tuple[int, int, int]:
-        assert isinstance(producer.kind, ProducerKindLocalActivity)
-        local = producer.kind.value.epoch
-        return (local.task.started_event_id, local.task.attempt, local.attempt)
-
-    first, second, third, fourth = (epoch(producer) for producer in producers)
+    first, second, third, fourth = (_epoch(producer) for producer in producers)
     assert first == second
     assert third == fourth
     assert third > first
@@ -1028,8 +1047,9 @@ async def test_workflow_append_retry_in_one_task_writes_once(client: Client):
         )
     first, second = store.appends
     assert first.producer == second.producer
-    assert first.producer.local_activity.epoch.attempt == 1
-    assert first.sequence == second.sequence == 1
+    assert first.producer.workflow.epoch.attempt == 1
+    # The append is the run's second Local Activity, after the create.
+    assert first.sequence == second.sequence == 2
     records = await _read_all(stream_client, stream_id)
     assert [record.body for record in records] == _BODIES
     assert store.first_response is not None
@@ -1083,10 +1103,12 @@ async def test_workflow_close_runs_as_local_activity_in_its_task(client: Client)
     with pytest.raises(StreamError) as err:
         await stream_client.get_stream(ref, body_type=str).append("b")
     assert err.value.reason == StreamErrorReason.STREAM_ERROR_REASON_CLOSED
-    # The close keeps the Workflow Producer of the request.
+    # The close writes as the Workflow, with its Workflow Task as the epoch.
     [close] = store.closes
-    assert close.producer.WhichOneof("kind") == "workflow"
+    assert close.producer.id == f"wf:{handle.result_run_id}"
     assert close.producer.workflow.run_id == handle.result_run_id
+    assert close.producer.workflow.epoch.started_event_id > 0
+    assert close.producer.workflow.epoch.attempt == 1
     events = (await handle.fetch_history()).events
     assert not [
         event
@@ -1200,3 +1222,121 @@ async def test_activity_interceptors_see_the_close_activity(client: Client):
     # The create, the append and the close each run as a Local Activity.
     assert interceptor.activity_types == ["__temporal_stream_store_call:memory"] * 3
     assert interceptor.is_local == [True] * 3
+
+
+class SlowFirstAppendStore(LostAnswerStore):
+    """Keeps each append request, and holds the first append for a while."""
+
+    def __init__(self) -> None:
+        super().__init__(lose_first_answer=False)
+        self._held = False
+
+    async def before_call(self, operation: str, request: Message) -> None:
+        # Without the order of the Workflow's writes, a later call would reach the Store
+        # first while this one waits.
+        if operation == "AppendRecords" and not self._held:
+            self._held = True
+            await asyncio.sleep(0.5)
+
+
+@workflow.defn
+class TwoAppendsWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str, sleep_between: bool) -> None:
+        stream = await create_stream(id=stream_id, body_type=str)
+        await stream.append("a")
+        if sleep_between:
+            # A timer ends the Workflow Task, so the next append runs in a later one.
+            await workflow.sleep(timedelta(milliseconds=10))
+        await stream.append("b")
+
+
+@workflow.defn
+class GatheredAppendsWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> None:
+        stream = await create_stream(id=stream_id, body_type=str)
+        await asyncio.gather(stream.append("a"), stream.append("b"), stream.append("c"))
+
+
+@workflow.defn
+class GatheredAppendAndCloseWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> None:
+        stream = await create_stream(id=stream_id, body_type=str)
+        await asyncio.gather(stream.append("a"), stream.close())
+
+
+async def _run_two_appends(
+    client: Client, store: StreamStore, sleep_between: bool
+) -> tuple[str, list[StreamRecord[str]]]:
+    stream_client = _with_store(client, store)
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, TwoAppendsWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            TwoAppendsWorkflow.run,
+            args=[stream_id, sleep_between],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await handle.result()
+    assert handle.result_run_id
+    return handle.result_run_id, await _read_all(stream_client, stream_id)
+
+
+async def test_workflow_appends_in_one_task_write_as_one_producer(client: Client):
+    store = LostAnswerStore(lose_first_answer=False)
+    run_id, records = await _run_two_appends(client, store, sleep_between=False)
+    assert [record.body for record in records] == ["a", "b"]
+    first, second = _producers(records)
+    assert first == second
+    assert first.id == f"wf:{run_id}"
+    first_request, second_request = store.appends
+    assert first_request.producer == second_request.producer
+    assert 0 < first_request.sequence < second_request.sequence
+
+
+async def test_workflow_append_in_a_later_task_has_a_higher_epoch(client: Client):
+    run_id, records = await _run_two_appends(
+        client, MemoryStreamStore(), sleep_between=True
+    )
+    first, second = _producers(records)
+    assert first.id == second.id == f"wf:{run_id}"
+    assert _epoch(second) > _epoch(first)
+
+
+async def test_workflow_appends_started_together_write_in_call_order(client: Client):
+    store = SlowFirstAppendStore()
+    stream_client = _with_store(client, store)
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, GatheredAppendsWorkflow) as worker:
+        await stream_client.execute_workflow(
+            GatheredAppendsWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    records = await _read_all(stream_client, stream_id)
+    assert [record.body for record in records] == ["a", "b", "c"]
+    assert [request.sequence for request in store.appends] == sorted(
+        request.sequence for request in store.appends
+    )
+
+
+async def test_workflow_close_started_with_an_append_comes_after_it(client: Client):
+    store = SlowFirstAppendStore()
+    stream_client = _with_store(client, store)
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, GatheredAppendAndCloseWorkflow) as worker:
+        await stream_client.execute_workflow(
+            GatheredAppendAndCloseWorkflow.run,
+            stream_id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert store.operations == ["CreateStream", "AppendRecords", "CloseStream"]
+    records = await _read_all(stream_client, stream_id)
+    assert [record.body for record in records] == ["a"]
+    assert await _describe_status(stream_client, stream_id) == (
+        StreamStatus.StreamStatusClosed
+    )
