@@ -218,10 +218,9 @@ class StreamError(ApplicationError):
     ``STREAM_ERROR_REASON_CLOSED`` (the Stream is closed), or
     ``STREAM_ERROR_REASON_ALREADY_EXISTS`` (a strict create of a Stream that exists).
     A Store outage, ``STREAM_ERROR_REASON_STORAGE_UNAVAILABLE``, is the one retryable
-    reason. On a Store with a Rust runtime, Core tries a read, an append or a close of
-    Workflow code again while the Store is unavailable. It waits from 100 ms up to 2 s
-    between tries, and Workflow code gets this reason only after 30 s. Every other
-    reason raises on the first try.
+    reason. Core tries a read, an append or a close of Workflow code again while the
+    Store is unavailable. It waits from 100 ms up to 2 s between tries, and Workflow
+    code gets this reason only after 30 s. Every other reason raises on the first try.
 
     .. warning::
         This API is experimental and subject to change.
@@ -308,11 +307,12 @@ class StreamConfigError(RuntimeError):
 
     A Workflow's Stream call on a Worker whose client has no Stream config doesn't
     raise this class. Neither does a read, an append or a close of Workflow code on a
-    Store written in Python, which has no Rust runtime for Core to call. Workflow code
-    gets an :py:class:`ApplicationError` with the ``type`` ``StreamConfigError`` and
-    ``non_retryable`` set, so an uncaught one fails the Workflow. Workflow code can
-    catch this error. A Workflow that catches it must not go on to make the same call on
-    a Worker that has a config, since the History then has no record of the first call.
+    Store written in Python, in a build of temporalio with no Stream runtime for Core to
+    call it. Workflow code gets an :py:class:`ApplicationError` with the ``type``
+    ``StreamConfigError`` and ``non_retryable`` set, so an uncaught one fails the
+    Workflow. Workflow code can catch this error. A Workflow that catches it must not go
+    on to make the same call on a Worker that has a config, since the History then has
+    no record of the first call.
 
     .. warning::
         This API is experimental and subject to change.

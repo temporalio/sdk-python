@@ -38,7 +38,7 @@ from ._stream_store import (
     _bridge_read_ahead_bytes,
     _bridge_read_min_gap,
     _bridge_read_page_records,
-    _bridge_stream_runtimes,
+    _core_stream_runtimes,
     _WorkflowStreamStore,
 )
 from ._tuning import WorkerTuner
@@ -654,6 +654,13 @@ class Worker:
             driver.type() for driver in self._storage_drivers
         }
 
+        # Only Workflow code makes Direct calls, so a Worker with no Workflows builds no
+        # runtime, as it builds no Store Activity.
+        self._core_stream_runtimes = _core_stream_runtimes(
+            stream_config if self._workflow_worker is not None else None,
+            self._runtime,
+        )
+
         # Create bridge worker last. We have empirically observed that if it is
         # created before an error is raised from the activity worker
         # constructor, a deadlock/hang will occur presumably while trying to
@@ -737,11 +744,7 @@ class Worker:
                 disable_payload_error_limit=config.get(
                     "disable_payload_error_limit", False
                 ),
-                # Only Workflow code makes Direct calls, so a Worker with no Workflows
-                # builds no runtime, as it builds no Store Activity.
-                stream_runtimes=_bridge_stream_runtimes(
-                    stream_config if self._workflow_worker is not None else None
-                ),
+                stream_runtimes=self._core_stream_runtimes.runtimes,
                 stream_read_ahead_bytes=_bridge_read_ahead_bytes(stream_config),
                 stream_read_page_records=_bridge_read_page_records(stream_config),
                 stream_read_min_gap=_bridge_read_min_gap(stream_config),
@@ -867,6 +870,8 @@ class Worker:
         if self._started:
             raise RuntimeError("Already started")
         self._started = True
+        # Core calls a Store written in Python on the loop that runs the Worker.
+        self._core_stream_runtimes.bind(asyncio.get_running_loop())
 
         # Eagerly validate which will do a namespace check in Core.
         try:

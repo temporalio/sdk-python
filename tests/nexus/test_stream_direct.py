@@ -16,6 +16,12 @@ import pytest
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.api.enums.v1 import EventType, StreamErrorReason
+from temporalio.api.streamservice.v1 import (
+    AppendRecordsRequest,
+    AppendRecordsResponse,
+    ReadRecordsRequest,
+    ReadRecordsResponse,
+)
 from temporalio.bridge.proto.external_data import (
     StreamCloseEntry,
     StreamMarkerData,
@@ -58,7 +64,7 @@ from temporalio.worker import (
     WorkflowOutboundInterceptor,
 )
 from tests.helpers import assert_eventually, assert_task_fail_eventually, new_worker
-from tests.helpers.streams import DictStreamStore
+from tests.helpers.streams import DictStreamStore, RecordingStreamStore
 from tests.test_converter import SimpleCodec
 
 # A Record body that a test can look for in the bytes of History.
@@ -1533,57 +1539,195 @@ async def test_continue_as_new_with_an_open_read(client: Client):
 
 
 @workflow.defn
-class PythonStoreAppendWorkflow:
+class PythonStoreAppendCloseWorkflow:
     @workflow.run
     async def run(self, ref: StreamRef[str]) -> None:
-        await workflow.get_stream(ref, body_type=str).append("a")
+        stream = workflow.get_stream(ref, body_type=str)
+        await stream.append("a", "b")
+        await stream.close()
+
+
+@pytest.mark.parametrize("max_cached_workflows", [1000, 0])
+async def test_python_store_takes_a_workflow_append_and_close(
+    client: Client, max_cached_workflows: int
+):
+    store = DictStreamStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, [], close=False)
+    assert ref.store == "dict"
+    handle, _ = await _run(
+        stream_client,
+        PythonStoreAppendCloseWorkflow,
+        ref,
+        max_cached_workflows=max_cached_workflows,
+    )
+    assert [record.body for record in await _read_all(stream_client, ref)] == [
+        "a",
+        "b",
+    ]
+    assert await _status(stream_client, ref) == StreamStatus.StreamStatusClosed
+    # The Store gets the Workflow's Producer with the Workflow Task as its epoch.
+    producer = store.streams[ref.id].records[0].producer
+    assert producer.WhichOneof("kind") == "workflow"
+    assert producer.workflow.run_id == handle.result_run_id
+    assert producer.workflow.epoch.started_event_id > 0
+    # Core made the calls, with no Local Activity.
+    history = await handle.fetch_history()
+    assert "core_local_activity" not in _markers(history)
+    assert "core_stream" in _markers(history)
+
+
+@pytest.mark.parametrize("max_cached_workflows", [1000, 0])
+async def test_python_store_gives_a_workflow_the_records_of_a_running_activity(
+    client: Client, max_cached_workflows: int
+):
+    store = DictStreamStore()
+    stream_client = _stream_client(client, store)
+    chunks = await _filled_stream(stream_client, [], close=False)
+    seen = await _filled_stream(stream_client, [], close=False)
+    _, text = await _run(
+        stream_client,
+        LiveModelWorkflow,
+        ModelCall(chunks.id, seen.id),
+        activities=[stream_model_output],
+        max_cached_workflows=max_cached_workflows,
+    )
+    assert text == "Hello, world"
+    assert store.waiting == 0
+
+
+@pytest.mark.parametrize("max_cached_workflows", [1000, 0])
+async def test_python_store_read_with_wait_on_a_quiet_stream_gives_an_empty_page(
+    client: Client, max_cached_workflows: int
+):
+    store = DictStreamStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, [], close=False)
+    handle, result = await _run(
+        stream_client,
+        ReadOnePageWorkflow,
+        ref,
+        1000,
+        max_cached_workflows=max_cached_workflows,
+    )
+    assert result == [[], False, None]
+    events = (await handle.fetch_history()).events
+    elapsed = events[-1].event_time.ToDatetime() - events[0].event_time.ToDatetime()
+    assert elapsed >= timedelta(seconds=1)
+    assert store.waiting == 0
+
+
+async def test_python_store_read_replays_from_the_store(client: Client):
+    store = DictStreamStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, ["a", "b", "c"])
+    handle, result = await _run(
+        stream_client, ReadPagesWorkflow, ReadArgs(ref.id, store="dict")
+    )
+    assert result.bodies == ["a", "b", "c"]
+    # History holds no Record, so the replay reads them from the Python Store again.
+    recording = RecordingStreamStore(store)
+    await Replayer(
+        workflows=[ReadPagesWorkflow],
+        stream_config=StreamConfig(stores=[recording]),
+    ).replay_workflow(await handle.fetch_history())
+    assert "ReadRecords" in recording.operations
+
+
+class ClosedOnAppendStore(DictStreamStore):
+    async def append_records(
+        self, request: AppendRecordsRequest
+    ) -> AppendRecordsResponse:
+        raise StreamError(
+            "The Store closed the Stream",
+            reason=StreamErrorReason.STREAM_ERROR_REASON_CLOSED,
+        )
+
+
+class BrokenReadStore(DictStreamStore):
+    async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
+        raise RuntimeError("the read broke")
 
 
 @workflow.defn
-class PythonStoreCloseWorkflow:
+class PythonStoreErrorWorkflow:
     @workflow.run
-    async def run(self, ref: StreamRef[str]) -> None:
-        await workflow.get_stream(ref, body_type=str).close()
+    async def run(self, ref: StreamRef[str], call: str) -> list[Any]:
+        stream = workflow.get_stream(ref, body_type=str)
+        try:
+            if call == "append":
+                await stream.append("a")
+            else:
+                await stream.read()
+        except StreamError as err:
+            return [StreamErrorReason.Name(err.reason), err.message]
+        return ["no error"]
 
 
-async def _python_store_failure(
-    client: Client, workflow_type: type[Any], ref: StreamRef[str]
-) -> ApplicationError:
-    with pytest.raises(WorkflowFailureError) as err:
-        await _run(client, workflow_type, ref)
-    cause = err.value.cause
-    assert isinstance(cause, ApplicationError)
-    assert cause.type == "StreamConfigError"
-    assert cause.non_retryable
-    return cause
-
-
-async def test_python_store_refuses_an_append(client: Client):
-    stream_client = _stream_client(client, DictStreamStore())
+async def test_python_store_error_reaches_workflow_code_with_its_reason(
+    client: Client,
+):
+    stream_client = _stream_client(client, ClosedOnAppendStore())
     ref = await _filled_stream(stream_client, [], close=False)
-    cause = await _python_store_failure(stream_client, PythonStoreAppendWorkflow, ref)
-    assert cause.message == (
-        "The Stream Store 'dict' has no Direct append, since it is written in Python. "
-        "Append to the Stream in an Activity, or use a Store that runs on the bridge, "
-        "such as the Redis Store or MemoryStreamStore."
-    )
-    assert await _read_all(stream_client, ref) == []
+    _, result = await _run(stream_client, PythonStoreErrorWorkflow, ref, "append")
+    assert result == ["STREAM_ERROR_REASON_CLOSED", "The Store closed the Stream"]
 
 
-async def test_python_store_refuses_a_read(client: Client):
-    stream_client = _stream_client(client, DictStreamStore())
-    ref = await _filled_stream(stream_client, ["a"])
-    with pytest.raises(WorkflowFailureError) as err:
-        await _run(stream_client, ReadPagesWorkflow, ReadArgs(ref.id, store="dict"))
-    cause = err.value.cause
-    assert isinstance(cause, ApplicationError)
-    assert cause.type == "StreamConfigError"
-    assert cause.non_retryable
-    assert cause.message == (
-        "The Stream Store 'dict' has no Direct read, since it is written in Python. "
-        "Read the Stream in an Activity, or use a Store that runs on the bridge, such "
-        "as the Redis Store or MemoryStreamStore."
-    )
+async def test_python_store_exception_is_a_stream_failure_and_the_worker_goes_on(
+    client: Client,
+):
+    stream_client = _stream_client(client, BrokenReadStore())
+    ref = await _filled_stream(stream_client, [], close=False)
+    async with new_worker(
+        stream_client, PythonStoreErrorWorkflow, PythonStoreAppendCloseWorkflow
+    ) as worker:
+        # Core tries a Store that fails again for 30 s, as for an unavailable Store.
+        result = await stream_client.execute_workflow(
+            PythonStoreErrorWorkflow.run,
+            args=[ref, "read"],
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == [
+            "STREAM_ERROR_REASON_STORAGE_UNAVAILABLE",
+            "The Stream Store 'dict' raised RuntimeError: the read broke",
+        ]
+        # The same Worker serves the next Workflow.
+        await stream_client.execute_workflow(
+            PythonStoreAppendCloseWorkflow.run,
+            ref,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert await _status(stream_client, ref) == StreamStatus.StreamStatusClosed
+
+
+async def test_python_store_read_that_a_cancel_stops_leaves_no_task(client: Client):
+    store = DictStreamStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, ["a"], close=False)
+    async with new_worker(stream_client, CancelDuringReadWorkflow) as worker:
+        handle = await stream_client.start_workflow(
+            CancelDuringReadWorkflow.run,
+            ref.id,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def read_waits() -> None:
+            assert store.waiting == 1
+
+        await assert_eventually(read_waits)
+        await handle.cancel()
+        assert await asyncio.wait_for(handle.result(), timeout=30) == [
+            ["a"],
+            "cancelled",
+        ]
+
+        async def no_read_waits() -> None:
+            assert store.waiting == 0
+
+        await assert_eventually(no_read_waits)
 
 
 # A payload codec.
@@ -2222,18 +2366,6 @@ async def test_cancel_while_the_close_waits(client: Client):
     # intent.
     assert result == "cancelled"
     assert await _status(stream_client, ref) == StreamStatus.StreamStatusClosed
-
-
-async def test_python_store_refuses_a_close(client: Client):
-    stream_client = _stream_client(client, DictStreamStore())
-    ref = await _filled_stream(stream_client, [], close=False)
-    cause = await _python_store_failure(stream_client, PythonStoreCloseWorkflow, ref)
-    assert cause.message == (
-        "The Stream Store 'dict' has no Direct close, since it is written in Python. "
-        "Close the Stream in an Activity, or use a Store that runs on the bridge, "
-        "such as the Redis Store or MemoryStreamStore."
-    )
-    assert await _status(stream_client, ref) == StreamStatus.StreamStatusOpen
 
 
 # The metrics of the Direct calls.

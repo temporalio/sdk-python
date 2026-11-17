@@ -604,7 +604,7 @@ async def test_workflow_create_without_stream_config_fails_the_workflow(
     )
 
 
-async def test_workflow_read_through_a_nexus_client_needs_a_runtime(
+async def test_workflow_read_through_a_nexus_client_goes_through_core(
     client: Client,
 ):
     async def read_with(store: StreamStore) -> str:
@@ -617,13 +617,10 @@ async def test_workflow_read_through_a_nexus_client_needs_a_runtime(
                 task_queue=worker.task_queue,
             )
 
-    # Core reads a Store with a Rust runtime, as for `read`. Nobody created the Stream.
+    # Core reads the Store, as for `read`, also one written in Python. Nobody created
+    # the Stream.
     assert await read_with(MemoryStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
-    assert await read_with(DictStreamStore()) == (
-        "The Stream Store 'dict' has no Direct read, since it is written in Python. "
-        "Read the Stream in an Activity, or use a Store that runs on the bridge, such "
-        "as the Redis Store or MemoryStreamStore."
-    )
+    assert await read_with(DictStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
 
 
 def test_workflow_stream_has_the_calls_of_a_client_stream():

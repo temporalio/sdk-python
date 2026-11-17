@@ -147,18 +147,42 @@ class StreamStore(ABC):
     Store of a package, such as ``RedisStreamStore`` of ``temporalio-streams-redis``, or
     :py:class:`temporalio.testing.MemoryStreamStore` in tests.
 
-    The SDK's Stores run on the bridge, in Rust, and this class isn't meant to be
-    subclassed in Python. A Store that is written in Python works for a client and an
-    Activity, for example as a double in a test. Core can't call it, so Workflow code has
-    no Direct call on it. A read, an append and a close of Workflow code then fail the
-    Workflow. A create and a describe still run in the Store's Local Activity.
+    The SDK's Stores run on the bridge, in Rust. A Store can also be written in Python,
+    by a subclass that implements :py:attr:`name` and the five operations. Each
+    operation takes and gives a message of ``temporalio.api.streamservice.v1``. The
+    bodies of the Records arrive as payloads that the SDK already encoded with the data
+    converter and the payload codec, so a Store keeps payloads and not the user's types.
+    A failed call raises :py:class:`temporalio.exceptions.StreamError` with a reason.
 
-    Such a Store implements :py:attr:`name` and the five operations. Each operation
-    takes and gives a message of
-    ``temporalio.api.streamservice.v1``. The bodies of the Records arrive as payloads
-    that the SDK already encoded with the data converter and the payload codec, so a
-    Store keeps payloads and not the user's types. A failed call raises
-    :py:class:`temporalio.exceptions.StreamError` with a reason.
+    Such a Store works for client, Activity and Workflow code. Core makes a read, an
+    append and a close of Workflow code, as it does on a Store in Rust. It calls the
+    Store's method as a task on the Worker's event loop, never on a Workflow thread, and
+    records the result in History. A create and a describe of Workflow code run in the
+    Store's Local Activity. For Workflow code, a Store must do these things.
+
+    * Each method is ``async`` and never blocks the event loop, since the calls of every
+      Workflow on the Worker run there.
+    * :py:meth:`read_records` waits up to the request's ``wait`` when it has no Record
+      after ``from_offset``, and gives an empty page after the wait. An append or a
+      close wakes it. Core cancels the task of a read that it stops, for example when
+      Workflow code is cancelled or the Worker shuts down, so the wait must end on a
+      cancel.
+    * Each Record has an offset of 1 to 1024 bytes. Offsets of one Stream compare in
+      order as bytes. A page that gives the last Record of a closed Stream is ``done``.
+    * :py:meth:`append_records` gives the offsets of the first and the last Record. A
+      Workflow appends as a Producer of kind Workflow, with its Workflow Task as the
+      epoch. The Store refuses a batch of a lower epoch of that Producer with the reason
+      ``STREAM_ERROR_REASON_FENCED``. It writes a batch that comes again with the same
+      Producer, epoch and ``sequence`` once, since Core sends it again after an outage.
+    * :py:meth:`close_stream` of a closed Stream succeeds, since Core may send a close
+      again.
+    * A replay of a read under :py:attr:`StreamReplaySource.STORE` reads the Records
+      again, so the Store keeps them with the same offsets.
+    * An outage raises :py:class:`temporalio.exceptions.StreamError` with the reason
+      ``STREAM_ERROR_REASON_STORAGE_UNAVAILABLE``. Core then tries a call of Workflow
+      code again for up to 30 s. Every other reason reaches Workflow code on the first
+      try. Any other exception, or a ``StreamError`` with no reason, counts as an outage,
+      and the Worker logs it. Its message tells the type of the exception.
 
     .. warning::
         This API is experimental and subject to change.
@@ -494,8 +518,7 @@ class StreamConfig:
     Activity. So Workflow code needs no Worker that polls for Activity Tasks.
 
     Workflow code reads with the same ``read``, ``iter_read`` and ``iter_read_items`` as
-    a client. On a Store with a Rust runtime, Core reads the Store inside the Workflow
-    Task. A page that Workflow code gets in one activation has at most 256 Records, and
+    a client. Core reads the Store inside the Workflow Task. A page that Workflow code gets in one activation has at most 256 Records, and
     the rest come in the next activation with no wait. A loop that asks for its next page in the same
     activation keeps one read open in Core. A read that no code waits on closes before
     the activation completes, so it never holds a Workflow Task open.
@@ -528,10 +551,9 @@ class StreamConfig:
       as long as the Workflow can replay.
     * A replay on a Worker with no cache reads the Store again on every Workflow Task.
 
-    On a Store written in Python, a read, an append and a close of Workflow code fail
-    the Workflow with a non-retryable
-    :py:class:`temporalio.exceptions.ApplicationError`. Code in a Query handler or an
-    Update validator can't read.
+    Core calls a Store written in Python on the Worker's event loop, with the same rules.
+    :py:class:`StreamStore` says what such a Store must do for Workflow code. Code in a
+    Query handler or an Update validator can't read.
 
     .. warning::
         This API is experimental and subject to change.
@@ -691,8 +713,8 @@ class StreamConfig:
     ) -> list[tuple[str, temporalio.bridge.streams.StreamRuntime]]:
         """Give the Stream runtime of each Store that runs on the bridge, by Store name.
 
-        Core reads and appends a Stream of Workflow code through these runtimes. A Store
-        that a user wrote in Python has none.
+        Core reads and appends a Stream of Workflow code through these runtimes. The
+        Worker builds the runtime of a Store written in Python itself.
         """
         return [
             (store.name, store._get_stream_runtime())

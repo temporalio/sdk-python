@@ -46,10 +46,10 @@ replacement of the first attempt's Records.
 ## Reads and appends in Workflow code
 
 The helpers run on the Streams API, so they follow how Workflow code reads, appends and
-closes. On a Store with a Rust runtime, such as the Redis Store or `MemoryStreamStore`, Core
-reads, appends and closes a Stream itself, with no Activity. Workflow code reads with the same
-`read`, `iter_read` and `iter_read_items` as a client. It gets the same pages, but each page has
-at most 256 Records.
+closes. On every Store, such as the Redis Store, `MemoryStreamStore` or a Store written in
+Python, Core reads, appends and closes a Stream itself, with no Activity. Workflow code reads
+with the same `read`, `iter_read` and `iter_read_items` as a client. It gets the same pages, but
+each page has at most 256 Records.
 
 Here the Workflow reads the events of a model's answer while the model Activity still runs,
 and starts each tool as its call arrives.
@@ -152,8 +152,24 @@ after the server took that task. A graceful shutdown of the Worker waits for suc
 at most 10 s. Only a Worker that dies there, or a Store that doesn't answer in that time, loses
 the close, and the Stream stays open.
 
-A Store isn't meant to be written in Python, since such a Store has no Rust runtime. On one,
-a read, an append and a close of Workflow code fail the Workflow.
+A Store can be written in Python, as a subclass of `StreamStore`, and it works for Workflow
+code too. Core makes a read, an append and a close of Workflow code on it with the same marker
+and rules as on a Store in Rust. It calls the Store's method as a task on the Worker's event
+loop, never on a Workflow thread. For Workflow code, such a Store must do these things.
+
+- Each method is `async` and never blocks the event loop.
+- `read_records` waits up to the request's `wait` when it has no Record after `from_offset`, and
+  an append or a close wakes it. The wait must end on a cancel, since Core cancels the task of a
+  read that it stops.
+- Each Record has an offset of 1 to 1024 bytes, and offsets compare in order as bytes. A page
+  that gives the last Record of a closed Stream is `done`.
+- `append_records` refuses a lower epoch of a Producer with `STREAM_ERROR_REASON_FENCED`, and
+  writes a batch that comes again with the same Producer, epoch and `sequence` once.
+- `close_stream` of a closed Stream succeeds.
+- The Store keeps the Records with their offsets for as long as a replay reads them.
+- An outage raises `StreamError` with `STREAM_ERROR_REASON_STORAGE_UNAVAILABLE`, and Core tries
+  the call again for up to 30 s. Any other exception counts as an outage too, and its type is in
+  the message that Workflow code gets.
 
 ## Metrics
 

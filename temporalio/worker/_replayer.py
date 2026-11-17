@@ -26,7 +26,7 @@ from ._stream_store import (
     _bridge_read_ahead_bytes,
     _bridge_read_min_gap,
     _bridge_read_page_records,
-    _bridge_stream_runtimes,
+    _core_stream_runtimes,
     _WorkflowStreamStore,
 )
 from ._worker import load_default_build_id
@@ -323,6 +323,12 @@ class Replayer:
                 else set()
             )
 
+            # A replay reads a Store written in Python on this loop.
+            core_stream_runtimes = _core_stream_runtimes(
+                self._config.get("stream_config"), runtime
+            )
+            core_stream_runtimes.bind(asyncio.get_running_loop())
+
             # Create bridge worker
             bridge_worker, pusher = temporalio.bridge.worker.Worker.for_replay(
                 runtime._core_runtime,
@@ -388,9 +394,7 @@ class Replayer:
                         (plugin.name(), plugin.version()) for plugin in self.plugins
                     ],
                     storage_drivers=storage_driver_types,
-                    stream_runtimes=_bridge_stream_runtimes(
-                        self._config.get("stream_config")
-                    ),
+                    stream_runtimes=core_stream_runtimes.runtimes,
                     stream_read_ahead_bytes=_bridge_read_ahead_bytes(
                         self._config.get("stream_config")
                     ),
