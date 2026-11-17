@@ -36,6 +36,9 @@ from temporalio.worker.workflow_sandbox import (
 from temporalio.workflow import SandboxImportNotificationPolicy
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
+from tests.worker.workflow_sandbox.testmodules.from_import_workflow import (
+    FromImportPassthroughWorkflow,
+)
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 
 global_state = ["global orig"]
@@ -715,6 +718,18 @@ async def test_workflow_sandbox_import_suppress_warnings(client: Client):
                 task_queue=worker.task_queue,
             )
             assert len(recorder) == 0, "Expected no warnings to be issued"
+
+
+async def test_workflow_sandbox_passthrough_from_import_of_sibling_module(
+    client: Client,
+):
+    async with new_worker(client, FromImportPassthroughWorkflow) as worker:
+        module_id = await client.execute_workflow(
+            FromImportPassthroughWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert module_id == id(stateful_module)
 
 
 def _assert_expected_warnings(
