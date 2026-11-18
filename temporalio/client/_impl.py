@@ -11,6 +11,7 @@ from collections.abc import (
     Mapping,
 )
 from datetime import timedelta
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -146,6 +147,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
+    @cached_property
     def _targetless_data_converter(self) -> temporalio.converter.DataConverter:
         return self._client.data_converter._with_store_context(
             StorageDriverStoreContext(namespace=self._client.namespace)
@@ -1359,7 +1361,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 initial_patch=initial_patch,
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
-                memo=await self._targetless_data_converter()._encode_memo(input.memo)
+                memo=await self._targetless_data_converter._encode_memo(input.memo)
                 if input.memo
                 else None,
             )
@@ -1818,5 +1820,5 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             dest,
             self._client.config(active_config=True)["header_codec_behavior"]
             == HeaderCodecBehavior.CODEC,
-            self._targetless_data_converter(),
+            self._targetless_data_converter,
         )
