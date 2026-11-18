@@ -77,6 +77,8 @@ class WorkflowActivation(google.protobuf.message.Message):
     (which must be stable based on lang implementation or convention), rather than the order jobs are
     processed.
 
+    Workflow tasks with no activation jobs are handled internally by Core, without activating lang.
+
     ## Evictions
 
     Evictions appear as an activations that contains only a `remove_from_cache` job. Such activations

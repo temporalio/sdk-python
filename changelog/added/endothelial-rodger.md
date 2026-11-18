@@ -1,0 +1,1 @@
+Core: SDK bridges can opt in at build time to preserving workflow task boundaries during replay, for new workflows only. The mode is recorded on the first successful task completion and defaults to off. Core handles tasks with no activation jobs internally, without polling workflow routines; see [Disabling chunking](../../arch_docs/workflow_task_chunking.md#disabling-chunking).

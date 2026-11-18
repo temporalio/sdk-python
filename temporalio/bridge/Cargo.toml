@@ -68,6 +68,7 @@ temporalio-common = { version = "1.2.0", path = "./sdk-core/crates/common", feat
 # default-features disabled (drops the pinned `tls-ring`); re-add the non-TLS
 # defaults the bridge relied on (`envconfig`, `prometheus`) plus `ephemeral-server`.
 temporalio-sdk-core = { version = "0.11.0", path = "./sdk-core/crates/sdk-core", default-features = false, features = [
+    "disable_workflow_task_chunking",
     "ephemeral-server",
     "envconfig",
     "prometheus",

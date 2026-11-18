@@ -355,7 +355,7 @@ fn convert_metric_event(
                 )
                 .expect("Unable to create buffered metric"),
             ));
-            populate_into.set(Arc::new(buffered_ref)).unwrap();
+            populate_into.set(buffered_ref).unwrap();
             None
         }
         // Create the attributes and put it on the lazy ref
@@ -402,7 +402,7 @@ fn convert_metric_event(
             attributes,
             update,
         } => Some(BufferedMetricUpdate {
-            metric: instrument.get().clone().0.clone_ref(py),
+            metric: instrument.get().0.clone_ref(py),
             value: match update {
                 metrics::core::MetricUpdateVal::Duration(v) if durations_as_seconds => {
                     BufferedMetricUpdateValue::F64(v.as_secs_f64())
