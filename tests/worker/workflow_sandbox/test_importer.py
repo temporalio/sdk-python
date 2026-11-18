@@ -281,6 +281,48 @@ def test_workflow_sandbox_importer_passthough_context_manager():
     assert id(outside) == id(inside)
 
 
+def test_workflow_sandbox_importer_passthrough_from_import():
+    import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
+
+    # The package is already loaded in the sandbox, like the package of a
+    # workflow module, so it has no attribute for the submodule yet
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox.testmodules as package
+
+        assert not hasattr(package, "stateful_module")
+        with workflow.unsafe.imports_passed_through():
+            from tests.worker.workflow_sandbox.testmodules import (
+                stateful_module as inside,
+            )
+    assert id(inside) == id(outside)
+
+
+def test_workflow_sandbox_importer_passthrough_relative_from_import():
+    import tests.worker.workflow_sandbox.test_restrictions as outside
+
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox as package
+
+        assert not hasattr(package, "test_restrictions")
+        with workflow.unsafe.imports_passed_through():
+            from . import test_restrictions as inside
+    assert id(inside) == id(outside)
+
+
+def test_workflow_sandbox_importer_passthrough_star_import():
+    import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
+
+    importer = Importer(restrictions, RestrictionContext())
+    package_name = "tests.worker.workflow_sandbox.testmodules"
+    with importer.applied():
+        importer.import_func(package_name)
+        setattr(sys.modules[package_name], "__all__", ["stateful_module"])
+        with workflow.unsafe.imports_passed_through():
+            importer.import_func(package_name, fromlist=("*",))
+        inside = sys.modules[f"{package_name}.stateful_module"]
+    assert id(inside) == id(outside)
+
+
 def test_workflow_sandbox_importer_passthrough_all_modules():
     import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
 
