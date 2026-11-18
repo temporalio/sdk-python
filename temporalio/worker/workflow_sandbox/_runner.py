@@ -234,7 +234,10 @@ class _Instance(WorkflowInstance):
                 __temporal_command_info=command_info,
             )
             return self.globals_and_locals.pop(
-                "__temporal_context", StorageDriverStoreContext(target=None)
+                "__temporal_context",
+                StorageDriverStoreContext(
+                    namespace=self.instance_details.info.namespace
+                ),
             )  # type: ignore
         finally:
             self.importer.restriction_context.is_runtime = False

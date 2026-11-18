@@ -387,6 +387,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             data_converter = self._data_converter._with_contexts(
                 workflow_context,
                 StorageDriverStoreContext(
+                    namespace=self._namespace,
                     target=StorageDriverWorkflowInfo(
                         id=workflow_id,
                         run_id=act.run_id,

@@ -148,11 +148,14 @@ class GCSStorageDriver(StorageDriver):
         Python value may serialize differently across payload converter versions
         (e.g. proto binary). The returned list is the same length as
         ``payloads``.
+
+        Without a target, object names are scoped to the context's namespace. An
+        empty or missing namespace uses ``"null"``.
         """
         context_segments = ""
         target = context.target
-        namespace = _percent_encode(target.namespace) if target is not None else None
-        namespace_segment = f"/ns/{namespace or 'null'}" if target is not None else ""
+        namespace = target.namespace if target is not None else context.namespace
+        namespace_segment = f"/ns/{_percent_encode(namespace) or 'null'}"
         if isinstance(target, StorageDriverWorkflowInfo):
             wf_type = _percent_encode(target.type) or "null"
             wf_id = _percent_encode(target.id) or "null"

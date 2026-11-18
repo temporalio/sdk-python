@@ -64,10 +64,11 @@ namespace, available workflow or activity identifiers, and a SHA-256 hash:
 ```text
 v0/ns/{namespace}/wt/{workflow-type}/wi/{workflow-id}/ri/{run-id}/d/sha256/{hex-digest}
 v0/ns/{namespace}/at/{activity-type}/ai/{activity-id}/ri/{run-id}/d/sha256/{hex-digest}
-v0/d/sha256/{hex-digest}
+v0/ns/{namespace}/d/sha256/{hex-digest}
 ```
 
-The last form is used when no target is available. Empty or missing fields use
+The last form is used when no target is available, with the namespace of the
+client or worker performing the operation. Empty or missing fields use
 `null`, including an empty namespace on a workflow or activity target. Names
 preserve Unicode and escape characters that interfere with
 [GCS tools](https://cloud.google.com/storage/docs/objects#naming), including `/`
