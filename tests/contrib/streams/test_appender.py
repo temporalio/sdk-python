@@ -92,6 +92,17 @@ async def test_a_large_buffer_goes_as_batches_of_at_most_1000(client: Client):
     assert await _bodies(stream) == values
 
 
+async def test_max_batch_records_cuts_the_batches(client: Client):
+    store = RecordingStore()
+    stream = await _create_stream(client, store)
+    appender = BufferedAppender(stream, max_delay=_NEVER, max_batch_records=2)
+    values = ["a", "b", "c", "d", "e"]
+    appender.append(*values)
+    await appender.flush()
+    assert store.batches == [2, 2, 1]
+    assert await _bodies(stream) == values
+
+
 async def test_the_timer_alone_writes_the_batch(client: Client):
     store = RecordingStore()
     stream = await _create_stream(client, store)
@@ -157,3 +168,17 @@ async def test_append_without_a_value_fails(client: Client):
         appender.append()
     with pytest.raises(ValueError, match="max_delay must not be negative"):
         BufferedAppender(stream, max_delay=timedelta(seconds=-1))
+
+
+async def test_max_batch_records_must_be_from_1_to_1000(client: Client):
+    stream = _with_store(client, DictStreamStore()).get_stream(
+        StreamRef(id=f"stream-{uuid.uuid4()}"), body_type=str
+    )
+    for value in (0, 1001):
+        with pytest.raises(ValueError) as err:
+            BufferedAppender(stream, max_batch_records=value)
+        assert (
+            str(err.value) == f"max_batch_records must be from 1 to 1000, not {value}"
+        )
+    for value in (1, 1000):
+        BufferedAppender(stream, max_batch_records=value)

@@ -30,7 +30,7 @@ class BufferedAppender(Generic[BodyT]):
     Use it in code that appends often, such as an Activity that streams model tokens.
     :py:meth:`append` returns immediately and does no I/O. One write is in flight at a time.
     Records appended during a write wait for the next batch, and they keep their order. A batch
-    holds at most 1,000 Records.
+    holds at most ``max_batch_records`` Records.
 
     It takes a client Stream, in a client or an Activity. It writes the buffered Records at
     most ``max_delay`` after the first of them, or immediately when they fill a batch.
@@ -57,6 +57,7 @@ class BufferedAppender(Generic[BodyT]):
         stream: temporalio.nexus.system.stream_service.client.Stream[BodyT],
         *,
         max_delay: timedelta | None = None,
+        max_batch_records: int | None = None,
     ) -> None:
         """Create an appender. It starts no write until the first append.
 
@@ -64,14 +65,27 @@ class BufferedAppender(Generic[BodyT]):
             stream: The client Stream to append to.
             max_delay: The longest time that a Record waits in the buffer before its batch
                 starts to write. It must not be negative. ``None`` means 100 milliseconds.
+            max_batch_records: The most Records of one batch, from 1 to 1,000. Set it to the
+                ``max_batch_records`` of the Store's
+                :py:attr:`temporalio.client.StreamStore.limits` when the Store allows less.
+                ``None`` means 1,000.
 
         Raises:
-            ValueError: ``max_delay`` is negative.
+            ValueError: ``max_delay`` is negative, or ``max_batch_records`` is below 1 or
+                above 1,000.
         """
         if max_delay is not None and max_delay < timedelta():
             raise ValueError("max_delay must not be negative")
+        if max_batch_records is None:
+            max_batch_records = _MAX_BATCH_RECORDS
+        elif not 1 <= max_batch_records <= _MAX_BATCH_RECORDS:
+            raise ValueError(
+                f"max_batch_records must be from 1 to {_MAX_BATCH_RECORDS}, "
+                f"not {max_batch_records}"
+            )
         self._stream = stream
         self._max_delay = max_delay
+        self._max_batch_records = max_batch_records
         self._buffer: list[BodyT] = []
         # When the oldest buffered Record arrived, so its batch starts at most max_delay later.
         self._first_at = 0.0
@@ -153,7 +167,7 @@ class BufferedAppender(Generic[BodyT]):
     def _schedule(self) -> None:
         if self._writing is not None or not self._buffer:
             return
-        if len(self._buffer) >= _MAX_BATCH_RECORDS:
+        if len(self._buffer) >= self._max_batch_records:
             self._start()
         elif self._timer is None:
             max_delay = self._max_delay or _DEFAULT_MAX_DELAY
@@ -167,8 +181,8 @@ class BufferedAppender(Generic[BodyT]):
             self._timer = None
         if self._writing is not None or not self._buffer:
             return
-        batch = self._buffer[:_MAX_BATCH_RECORDS]
-        del self._buffer[:_MAX_BATCH_RECORDS]
+        batch = self._buffer[: self._max_batch_records]
+        del self._buffer[: self._max_batch_records]
         self._writing = asyncio.get_running_loop().create_task(self._write(batch))
 
     async def _write(self, batch: list[BodyT]) -> None:

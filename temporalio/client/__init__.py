@@ -186,6 +186,7 @@ from ._schedule import (
     ScheduleUpdateInput,
 )
 from ._stream_store import (
+    StreamBatchLimits,
     StreamConfig,
     StreamSelectContext,
     StreamStore,
@@ -355,6 +356,7 @@ __all__ = [
     "TaskReachabilityType",
     "CloudOperationsClient",
     "Plugin",
+    "StreamBatchLimits",
     "StreamConfig",
     "StreamSelectContext",
     "StreamStore",

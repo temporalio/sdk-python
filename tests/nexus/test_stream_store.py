@@ -26,6 +26,7 @@ import temporalio.workflow
 from temporalio.api.enums.v1 import StreamErrorReason
 from temporalio.client import (
     Client,
+    StreamBatchLimits,
     StreamConfig,
     StreamSelectContext,
     StreamStore,
@@ -478,6 +479,33 @@ def test_stream_config_takes_several_stores_with_no_selector():
     assert stream_config._store_for(StreamRef(id="stream", store="b"), None) is second
     with pytest.raises(StreamConfigError, match="more than one Store"):
         stream_config._store_for(StreamRef(id="stream"), None)
+
+
+_BATCH_LIMIT_DEFAULTS = {
+    "max_record_bytes": 1536 * 1024,
+    "max_batch_bytes": 4 * 1024 * 1024,
+    "max_batch_records": 1000,
+}
+
+
+def test_stream_batch_limits_default_to_the_largest_batch():
+    assert dataclasses.asdict(StreamBatchLimits()) == _BATCH_LIMIT_DEFAULTS
+
+
+@pytest.mark.parametrize("field,default", _BATCH_LIMIT_DEFAULTS.items())
+def test_stream_batch_limits_take_a_value_from_1_to_the_default(
+    field: str, default: int
+):
+    for value in (1, default):
+        assert getattr(StreamBatchLimits(**{field: value}), field) == value
+    for value in (0, default + 1):
+        with pytest.raises(ValueError) as err:
+            StreamBatchLimits(**{field: value})
+        assert str(err.value) == f"{field} must be from 1 to {default}, not {value}"
+
+
+def test_stream_store_without_its_own_limits_gives_the_default():
+    assert DictStreamStore().limits == StreamBatchLimits()
 
 
 async def test_client_create_with_store_on_several_stores_needs_no_selector(

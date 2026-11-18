@@ -16,6 +16,47 @@ import temporalio.nexus.system.stream_service
 from temporalio.converter import StorageDriverActivityInfo
 from temporalio.exceptions import StreamConfigError
 
+_MAX_RECORD_BYTES = 1536 * 1024
+_MAX_BATCH_BYTES = 4 * 1024 * 1024
+_MAX_BATCH_RECORDS = 1000
+
+
+@dataclasses.dataclass(frozen=True)
+class StreamBatchLimits:
+    """The limits of one batch of Records on a Stream Store.
+
+    The defaults are the largest batch that any Store may take. A Store can allow less, and
+    never more.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    max_record_bytes: int = _MAX_RECORD_BYTES
+    """The most bytes of one stored Record, from 1 to 1,572,864. The stored form of a Record
+    has its Producer and its body."""
+
+    max_batch_bytes: int = _MAX_BATCH_BYTES
+    """The most bytes of the stored Records of one batch, from 1 to 4,194,304."""
+
+    max_batch_records: int = _MAX_BATCH_RECORDS
+    """The most Records of one batch, from 1 to 1,000."""
+
+    def __post_init__(self) -> None:
+        """Check that each limit is from 1 to the default of its field.
+
+        Raises:
+            ValueError: A limit is below 1 or above its default.
+        """
+        for name, most in (
+            ("max_record_bytes", _MAX_RECORD_BYTES),
+            ("max_batch_bytes", _MAX_BATCH_BYTES),
+            ("max_batch_records", _MAX_BATCH_RECORDS),
+        ):
+            value = getattr(self, name)
+            if not 1 <= value <= most:
+                raise ValueError(f"{name} must be from 1 to {most}, not {value}")
+
 
 class StreamStore(ABC):
     """A Store that answers the Stream operations of a client.
@@ -41,6 +82,15 @@ class StreamStore(ABC):
     def name(self) -> str:
         """Name of the Store, which the refs of its Streams carry."""
         ...
+
+    @property
+    def limits(self) -> StreamBatchLimits:
+        """The limits of one batch on this Store.
+
+        The default is the largest batch that any Store may take. A Store that allows less
+        overrides this property, and refuses a larger batch itself.
+        """
+        return StreamBatchLimits()
 
     @abstractmethod
     async def create_stream(
