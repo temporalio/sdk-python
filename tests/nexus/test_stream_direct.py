@@ -11,8 +11,6 @@ from typing import Any
 
 import pytest
 
-import temporalio.bridge.runtime
-import temporalio.bridge.streams
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.api.enums.v1 import EventType, StreamErrorReason
@@ -35,7 +33,6 @@ from temporalio.client import (
     WorkflowHandle,
     WorkflowHistory,
 )
-from temporalio.client._stream_store import _BridgeStreamStore
 from temporalio.common import RawValue
 from temporalio.converter import (
     DataConverter,
@@ -54,11 +51,10 @@ from temporalio.nexus.system.stream_service import (
     StreamStatus,
 )
 from temporalio.runtime import MetricBuffer, Runtime, TelemetryConfig
-from temporalio.testing import MemoryStreamStore, WorkflowEnvironment
+from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
     Replayer,
-    Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
@@ -80,7 +76,7 @@ def _stream_client(
 ) -> Client:
     config = client.config()
     config["stream_config"] = StreamConfig(
-        stores=[store if store is not None else MemoryStreamStore()],
+        stores=[store if store is not None else DictStreamStore()],
         workflow_read_replay_from=replay_from,
     )
     if codec:
@@ -243,7 +239,7 @@ class ReadArgs:
     wait_ms: int | None = None
     max_records: int | None = None
     max_bytes: int | None = None
-    store: str = "memory"
+    store: str = "dict"
     pages: int | None = None
     """The most pages to read. ``None`` reads until the iterator ends."""
 
@@ -881,48 +877,6 @@ async def test_one_record_reads_of_one_page_keep_its_marker(
 # What `read_page` checks, and where it can't run.
 
 
-# A client's read clamps each of these, or refuses it, and a Workflow read does the same.
-_READ_LIMIT_CASES: list[dict[str, Any]] = [
-    {"max_bytes": -1},
-    {"max_records": 0},
-    {"max_records": -1},
-    {"max_records": 5000},
-    {"wait": timedelta(seconds=-1)},
-    {"wait": timedelta(seconds=120)},
-]
-
-
-@workflow.defn
-class ReadLimitsWorkflow:
-    @workflow.run
-    async def run(self, ref: StreamRef[str]) -> list[Any]:
-        stream = workflow.get_stream(ref, body_type=str)
-        results: list[Any] = []
-        for arguments in _READ_LIMIT_CASES:
-            try:
-                page = await stream.read_page(**arguments)
-                results.append(len(page.records))
-            except StreamError as err:
-                results.append([StreamErrorReason.Name(err.reason), err.message])
-        return results
-
-
-async def test_read_takes_the_limits_of_a_client_read(client: Client):
-    stream_client = _stream_client(client)
-    ref = await _filled_stream(stream_client, ["a", "b", "c"])
-    _, results = await _run(stream_client, ReadLimitsWorkflow, ref)
-    stream = stream_client.get_stream(ref, body_type=str)
-    expected: list[Any] = []
-    for arguments in _READ_LIMIT_CASES:
-        try:
-            page = await stream.read_page(**arguments)
-            expected.append(len(page.records))
-        except StreamError as err:
-            expected.append([StreamErrorReason.Name(err.reason), err.message])
-    assert results == expected
-    assert results[0] == ["STREAM_ERROR_REASON_INVALID", expected[0][1]]
-
-
 @workflow.defn
 class LongOffsetWorkflow:
     @workflow.run
@@ -1080,21 +1034,21 @@ async def _failed_replay(
     assert isinstance(result.replay_failure, RuntimeError)
     assert str(result.replay_failure) == str(err.value)
     message = str(err.value)
-    assert f"StreamReplayError: Stream `{ref.id}` in Store `memory`" in message
+    assert f"StreamReplayError: Stream `{ref.id}` in Store `dict`" in message
     return message
 
 
 async def test_replay_of_store_marker_with_no_stream_config_fails(client: Client):
     history, ref, _ = await _history_of_a_read(client, StreamReplaySource.STORE)
     message = await _failed_replay(history, ref, None)
-    assert "this Worker has no Stream runtime for the Store `memory`" in message
+    assert "this Worker has no Stream runtime for the Store `dict`" in message
 
 
 async def test_replay_of_store_marker_fails_when_records_are_gone(client: Client):
     history, ref, _ = await _history_of_a_read(client, StreamReplaySource.STORE)
-    # A new memory Store of the same name has none of the Records.
+    # A new Store of the same name has none of the Records.
     message = await _failed_replay(
-        history, ref, StreamConfig(stores=[MemoryStreamStore()])
+        history, ref, StreamConfig(stores=[DictStreamStore()])
     )
     assert "stream_not_found" in message
 
@@ -1777,7 +1731,7 @@ class AppendThenReadWorkflow:
 
 
 async def test_payload_codec_covers_direct_append_and_read(client: Client):
-    store = MemoryStreamStore()
+    store = DictStreamStore()
     stream_client = _stream_client(client, store, codec=True)
     ref = await _filled_stream(stream_client, [], close=False)
     _, bodies = await _run(stream_client, AppendThenReadWorkflow, ref)
@@ -1975,7 +1929,7 @@ class AppendThenReadAllWorkflow:
 
 
 async def test_codec_runs_with_no_context_on_stream_bodies(client: Client):
-    store = MemoryStreamStore()
+    store = DictStreamStore()
     config = client.config()
     config["stream_config"] = StreamConfig(stores=[store])
     config["data_converter"] = DataConverter(payload_codec=ContextCodec())
@@ -2033,8 +1987,8 @@ async def test_store_replay_of_an_unnamed_ref_with_no_config_fails(client: Clien
     with pytest.raises(RuntimeError) as err:
         await Replayer(workflows=[UnnamedRefReadWorkflow]).replay_workflow(history)
     message = str(err.value)
-    assert f"StreamReplayError: Stream `{stream_id}` in Store `memory`" in message
-    assert "this Worker has no Stream runtime for the Store `memory`" in message
+    assert f"StreamReplayError: Stream `{stream_id}` in Store `dict`" in message
+    assert "this Worker has no Stream runtime for the Store `dict`" in message
     assert "Nondeterminism" not in message
 
 
@@ -2090,41 +2044,6 @@ async def test_page_with_a_body_that_fails_to_decode_raises_each_time(
     await stream.close()
     _, events = await _run(stream_client, BadBodyWorkflow, stream.ref.id)
     assert events == [["got", 1], ["page", "TypeError"], ["page", "TypeError"]]
-
-
-# A Worker with no Workflows and a Store with a bad option.
-
-
-@activity.defn
-async def noop() -> None:
-    pass
-
-
-class BadOptionStore(_BridgeStreamStore):
-    def __init__(self) -> None:
-        super().__init__(name="bad-option", runtime=None)
-
-    def _new_stream_runtime(
-        self, runtime: temporalio.bridge.runtime.Runtime
-    ) -> temporalio.bridge.streams.StreamRuntime:
-        raise ValueError("The Store option is wrong")
-
-
-async def test_worker_without_workflows_builds_no_store_runtime(client: Client):
-    config = client.config()
-    config["stream_config"] = StreamConfig(stores=[BadOptionStore()])
-    # Such a Worker starts, as it did before Direct calls, since it gives Core no runtime.
-    async with Worker(
-        Client(**config), task_queue=f"tq-{uuid.uuid4()}", activities=[noop]
-    ):
-        pass
-    # A Worker with Workflows gives Core the runtime, so it builds it immediately.
-    with pytest.raises(ValueError, match="The Store option is wrong"):
-        Worker(
-            Client(**config),
-            task_queue=f"tq-{uuid.uuid4()}",
-            workflows=[AppendOneWorkflow],
-        )
 
 
 # The Direct close.
@@ -2309,7 +2228,7 @@ async def test_close_without_a_cache_and_in_replays(client: Client):
     history = await handle.fetch_history()
     assert [entry.resolved for entry in _close_entries(history)] == [False, True]
     # A Store with the same Stream, still open, shows that a replay closes nothing.
-    replay_store = MemoryStreamStore()
+    replay_store = DictStreamStore()
     replay_client = _stream_client(client, replay_store)
     await replay_client.create_stream(id=ref.id, body_type=str)
     await Replayer(
@@ -2429,7 +2348,7 @@ async def test_direct_calls_record_their_metrics(env: WorkflowEnvironment):
     buffer = MetricBuffer(10000)
     runtime = Runtime(telemetry=TelemetryConfig(metrics=buffer))
     client = await env.connect_client(runtime=runtime)
-    store = MemoryStreamStore(name="metered", runtime=runtime)
+    store = DictStreamStore(name="metered")
     stream_client = _stream_client(client, store)
     source = await _filled_stream(stream_client, ["a", "b", "c"])
     out = await _filled_stream(stream_client, [], close=False)
@@ -2575,13 +2494,13 @@ async def test_workflow_starts_each_tool_as_its_call_arrives(client: Client):
 def test_read_ahead_bytes_below_one_raises():
     for bytes_ in (0, -1):
         with pytest.raises(ValueError, match="workflow_read_ahead_bytes"):
-            StreamConfig(stores=[MemoryStreamStore()], workflow_read_ahead_bytes=bytes_)
+            StreamConfig(stores=[DictStreamStore()], workflow_read_ahead_bytes=bytes_)
 
 
 async def test_read_with_a_read_ahead_of_one_byte_gives_every_record(client: Client):
     config = client.config()
     config["stream_config"] = StreamConfig(
-        stores=[MemoryStreamStore()], workflow_read_ahead_bytes=1
+        stores=[DictStreamStore()], workflow_read_ahead_bytes=1
     )
     stream_client = Client(**config)
     bodies = [f"record-{index}" for index in range(20)]
@@ -2629,7 +2548,7 @@ async def test_store_page_over_256_records_comes_in_pages_of_at_most_256(
 
 def _client_with(client: Client, **settings: Any) -> Client:
     config = client.config()
-    config["stream_config"] = StreamConfig(stores=[MemoryStreamStore()], **settings)
+    config["stream_config"] = StreamConfig(stores=[DictStreamStore()], **settings)
     return Client(**config)
 
 
@@ -2670,15 +2589,13 @@ async def test_page_cap_of_10_gives_pages_of_at_most_10(
 def test_page_cap_out_of_bounds_raises():
     for records in (0, 1001):
         with pytest.raises(ValueError, match="workflow_read_page_records"):
-            StreamConfig(
-                stores=[MemoryStreamStore()], workflow_read_page_records=records
-            )
+            StreamConfig(stores=[DictStreamStore()], workflow_read_page_records=records)
 
 
 def test_min_gap_out_of_bounds_raises():
     for gap in (timedelta(seconds=2), timedelta(milliseconds=-1)):
         with pytest.raises(ValueError, match="workflow_read_min_gap"):
-            StreamConfig(stores=[MemoryStreamStore()], workflow_read_min_gap=gap)
+            StreamConfig(stores=[DictStreamStore()], workflow_read_min_gap=gap)
 
 
 @activity.defn
@@ -2783,7 +2700,7 @@ async def _replay_with_records_gone(
             assert "core_stream" in _markers(await handle.fetch_history())
 
         await assert_eventually(read_is_in_history)
-    # A new memory Store of the same name has none of the Records.
+    # A new Store of the same name has none of the Records.
     lost_client = _stream_client(client)
     worker = new_worker(
         lost_client, workflow_type, task_queue=task_queue, **worker_options

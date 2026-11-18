@@ -8,13 +8,19 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 
 from google.protobuf.message import Message
+from google.protobuf.timestamp_pb2 import Timestamp
 
 from temporalio.api.enums.v1 import (
     StreamErrorReason,
     StreamIdConflictPolicy,
     StreamStatus,
 )
-from temporalio.api.stream.v1 import StreamRecord, StreamRef
+from temporalio.api.stream.v1 import (
+    Producer,
+    StreamRecord,
+    StreamRef,
+    WorkflowTaskEpoch,
+)
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -86,10 +92,19 @@ class RecordingStreamStore(StreamStore):
 
 
 @dataclasses.dataclass
+class _LastBatch:
+    epoch: tuple[int, ...]
+    sequence: int
+    response: AppendRecordsResponse
+
+
+@dataclasses.dataclass
 class _DictStream:
     request_id: str
     records: list[StreamRecord] = dataclasses.field(default_factory=list)
     closed: bool = False
+    # The id of a Producer is unique in one Stream.
+    last_batches: dict[str, _LastBatch] = dataclasses.field(default_factory=dict)
     changed: asyncio.Event = dataclasses.field(default_factory=asyncio.Event)
 
     def wake(self) -> None:
@@ -102,12 +117,39 @@ def _offset(index: int) -> bytes:
     return index.to_bytes(8, "big")
 
 
-class DictStreamStore(StreamStore):
-    """A Store written from scratch, with no bridge, that keeps its Streams in a dict.
+def _epoch(producer: Producer) -> tuple[int, ...]:
+    """Give a key that orders the epochs of one Producer, as ``Producer`` documents it."""
+    kind = producer.WhichOneof("kind")
+    task = WorkflowTaskEpoch()
+    scheduled = Timestamp()
+    attempt = 0
+    if kind == "workflow":
+        task = producer.workflow.epoch
+    elif kind == "local_activity":
+        task = producer.local_activity.epoch.task
+        attempt = producer.local_activity.epoch.attempt
+    elif kind in ("workflow_activity", "standalone_activity"):
+        scheduled = getattr(producer, kind).epoch.attempt_scheduled_time
+        attempt = getattr(producer, kind).epoch.attempt
+    return (
+        task.started_event_id,
+        task.attempt,
+        task.started_time.seconds,
+        task.started_time.nanos,
+        scheduled.seconds,
+        scheduled.nanos,
+        attempt,
+    )
 
-    It has enough of each operation for the tests, and no dedupe and no Retention. A
-    read with a ``wait`` waits for an append or a close, as Core needs for Workflow
-    code. :py:attr:`waiting` counts the reads that wait, so a test sees one that stays.
+
+class DictStreamStore(StreamStore):
+    """A Store that keeps its Streams in a dict, for the tests.
+
+    It has no Retention and no expiry, and it checks no request. It resends the answer
+    of a batch that comes again with the same Producer, epoch and sequence, and it
+    fences a Producer whose epoch is lower than its newest one. A read with a ``wait``
+    waits for an append or a close, as Core needs for Workflow code.
+    :py:attr:`waiting` counts the reads that wait, so a test sees one that stays.
     """
 
     def __init__(self, name: str = "dict") -> None:
@@ -150,10 +192,21 @@ class DictStreamStore(StreamStore):
         self, request: AppendRecordsRequest
     ) -> AppendRecordsResponse:
         stream = self._stream(request.ref)
+        epoch = _epoch(request.producer)
+        last = stream.last_batches.get(request.producer.id)
+        previous = last if last is not None and last.epoch == epoch else None
+        sequence = request.sequence or (previous.sequence + 1 if previous else 1)
+        if previous is not None and sequence == previous.sequence:
+            return previous.response
         if stream.closed:
             raise StreamError(
                 f"The Stream '{request.ref.id}' is closed",
                 reason=StreamErrorReason.STREAM_ERROR_REASON_CLOSED,
+            )
+        if last is not None and epoch < last.epoch:
+            raise StreamError(
+                "The epoch is lower than the newest one of the Producer",
+                reason=StreamErrorReason.STREAM_ERROR_REASON_FENCED,
             )
         first = len(stream.records) + 1
         for record in request.records:
@@ -164,11 +217,13 @@ class DictStreamStore(StreamStore):
                     offset=_offset(len(stream.records) + 1),
                 )
             )
-        if request.records:
-            stream.wake()
-        return AppendRecordsResponse(
+        response = AppendRecordsResponse(
             first_offset=_offset(first), last_offset=_offset(len(stream.records))
         )
+        stream.last_batches[request.producer.id] = _LastBatch(epoch, sequence, response)
+        if request.records:
+            stream.wake()
+        return response
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
         stream = self._stream(request.ref)

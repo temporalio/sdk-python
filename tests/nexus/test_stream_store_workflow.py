@@ -56,7 +56,6 @@ from temporalio.nexus.system.stream_service.workflow import create_stream, get_s
 from temporalio.nexus.system.stream_service.workflow._resources.stream import (
     Stream as WorkflowStream,
 )
-from temporalio.testing import MemoryStreamStore
 from temporalio.worker import (
     ActivityInboundInterceptor,
     ExecuteActivityInput,
@@ -230,7 +229,7 @@ class CreateAndDescribeWorkflow:
 
 class CountingStore(RecordingStreamStore):
     def __init__(self, name: str) -> None:
-        super().__init__(MemoryStreamStore(name=name))
+        super().__init__(DictStreamStore(name=name))
 
 
 @activity.defn
@@ -289,7 +288,7 @@ class UserLocalActivityAppendWorkflow:
 
 class FlakyDescribeStore(RecordingStreamStore):
     def __init__(self, *, failures: int = 0, delay: timedelta = timedelta()) -> None:
-        super().__init__(MemoryStreamStore())
+        super().__init__(DictStreamStore())
         self._failures = failures
         self._delay = delay
         self.describes = 0
@@ -472,7 +471,7 @@ async def _describe_result(
 
 @_APPEND_WORKFLOWS
 async def test_workflow_stream_uses_store(client: Client, append_workflow: type[Any]):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     handle, ref = await _run_append_workflow(stream_client, append_workflow)
 
     stream = stream_client.get_stream(ref, body_type=str)
@@ -516,7 +515,7 @@ async def test_workflow_stream_uses_a_store_written_from_scratch(client: Client)
 async def test_workflow_stream_store_uses_payload_codec(
     client: Client, append_workflow: type[Any]
 ):
-    store = MemoryStreamStore()
+    store = DictStreamStore()
     config = client.config()
     config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
     config["stream_config"] = StreamConfig(stores=[store])
@@ -537,7 +536,7 @@ async def test_workflow_stream_store_uses_payload_codec(
 async def test_workflow_stream_history_has_no_bodies(
     client: Client, append_workflow: type[Any]
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     handle, _ = await _run_append_workflow(stream_client, append_workflow)
     events = (await handle.fetch_history()).events
     markers = [
@@ -560,11 +559,11 @@ async def test_workflow_stream_history_has_no_bodies(
 async def test_workflow_stream_replay_does_not_call_store(
     client: Client, append_workflow: type[Any]
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     handle, ref = await _run_append_workflow(stream_client, append_workflow)
-    # A replay of an append that Core made needs a Store that runs on the bridge, as the
-    # first run had. A new memory Store shows any call, since it has no Stream.
-    replay_store = MemoryStreamStore()
+    # A replay of an append that Core made needs a Store, as the first run had. A new
+    # Store shows any call, since it has no Stream.
+    replay_store = DictStreamStore()
     await Replayer(
         workflows=[append_workflow],
         stream_config=StreamConfig(stores=[replay_store]),
@@ -607,20 +606,16 @@ async def test_workflow_create_without_stream_config_fails_the_workflow(
 async def test_workflow_read_through_a_nexus_client_goes_through_core(
     client: Client,
 ):
-    async def read_with(store: StreamStore) -> str:
-        stream_client = _with_store(client, store)
-        async with new_worker(stream_client, NexusClientReadWorkflow) as worker:
-            return await stream_client.execute_workflow(
-                NexusClientReadWorkflow.run,
-                "ReadRecords",
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-
-    # Core reads the Store, as for `read_page`, also one written in Python. Nobody created
-    # the Stream.
-    assert await read_with(MemoryStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
-    assert await read_with(DictStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
+    stream_client = _with_store(client, DictStreamStore())
+    async with new_worker(stream_client, NexusClientReadWorkflow) as worker:
+        result = await stream_client.execute_workflow(
+            NexusClientReadWorkflow.run,
+            "ReadRecords",
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    # Core reads the Store, as for `read_page`. Nobody created the Stream.
+    assert result == "STREAM_ERROR_REASON_NOT_FOUND"
 
 
 def test_workflow_stream_has_the_calls_of_a_client_stream():
@@ -646,7 +641,7 @@ async def test_workflow_stream_store_error_reaches_workflow_code(client: Client)
 
 
 async def test_workflow_describe_of_unknown_stream_raises_stream_error(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     async with new_worker(stream_client, DescribeStreamWorkflow) as worker:
         reason = await stream_client.execute_workflow(
             DescribeStreamWorkflow.run,
@@ -658,7 +653,7 @@ async def test_workflow_describe_of_unknown_stream_raises_stream_error(client: C
 
 
 async def test_strict_create_in_each_run_of_a_chain_succeeds(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(
         stream_client, CreateThenContinueAsNewWorkflow, activities=[append_values]
@@ -687,7 +682,7 @@ async def test_strict_create_in_each_run_of_a_chain_succeeds(client: Client):
 async def test_client_append_after_workflow_append_keeps_offset_order(
     client: Client, append_workflow: type[Any]
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     _, ref = await _run_append_workflow(stream_client, append_workflow)
     stream = stream_client.get_stream(ref, body_type=str)
     appended = await stream.append("from-client")
@@ -725,7 +720,7 @@ async def test_workflow_stream_store_call_options_timeout(client: Client):
 
 
 async def test_worker_keeps_its_stream_stores(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     async with new_worker(stream_client, AppendWorkflow) as worker:
         with pytest.raises(ValueError, match="Stream Stores"):
             worker.client = client
@@ -734,7 +729,7 @@ async def test_worker_keeps_its_stream_stores(client: Client):
 
 async def test_activity_interceptors_see_stream_store_activity(client: Client):
     interceptor = RecordingInterceptor()
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     async with new_worker(
         stream_client,
         CreateAndActivityWorkflow,
@@ -749,7 +744,7 @@ async def test_activity_interceptors_see_stream_store_activity(client: Client):
         )
     # The create runs as the SDK's Local Activity, before the Workflow's own Activity.
     assert interceptor.activity_types == [
-        "__temporal_stream_store_call:memory",
+        "__temporal_stream_store_call:dict",
         "user_activity",
     ]
 
@@ -760,7 +755,7 @@ async def test_workflow_task_retry_appends_with_higher_epoch(
 ):
     global _fail_next_task
     _fail_next_task = True
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(
         stream_client, AppendThenFailTaskOnceWorkflow, activities=[append_values]
@@ -787,7 +782,7 @@ async def test_workflow_task_retry_appends_with_higher_epoch(
 
 
 async def test_user_local_activity_append_has_local_activity_producer(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
@@ -813,7 +808,7 @@ async def test_user_local_activity_append_has_local_activity_producer(client: Cl
 
 
 async def test_workflow_ref_of_another_store_fails_the_task(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     async with new_worker(stream_client, DescribeOtherStoreWorkflow) as worker:
         handle = await stream_client.start_workflow(
             DescribeOtherStoreWorkflow.run,
@@ -981,7 +976,7 @@ async def test_workflow_call_goes_through_the_store_own_activity(client: Client)
 
 
 async def test_workflow_append_returns_offsets_of_records_in_order(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, AppendOffsetsWorkflow) as worker:
         appended = await stream_client.execute_workflow(
@@ -998,7 +993,7 @@ async def test_workflow_append_returns_offsets_of_records_in_order(client: Clien
 
 
 async def test_workflow_append_to_closed_stream_raises_stream_error(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
@@ -1014,7 +1009,7 @@ async def test_workflow_append_to_closed_stream_raises_stream_error(client: Clie
 
 
 async def test_workflow_append_with_a_producer_of_another_kind_fails(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, ExplicitProducerWorkflow) as worker:
         result = await stream_client.execute_workflow(
@@ -1038,7 +1033,7 @@ async def _describe_status(client: Client, stream_id: str) -> StreamStatus | Non
 
 
 async def test_workflow_async_with_closes_the_stream(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, AsyncWithCloseWorkflow) as worker:
         status = await stream_client.execute_workflow(
@@ -1059,7 +1054,7 @@ async def test_workflow_async_with_closes_the_stream(client: Client):
 async def test_worker_with_workflows_only_runs_the_close(
     client: Client, no_remote_activities: bool
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with Worker(
         stream_client,
@@ -1083,7 +1078,7 @@ async def test_failed_workflow_task_after_direct_close_leaves_the_stream_open(
 ):
     global _fail_close_intent_task
     _fail_close_intent_task = True
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
@@ -1150,7 +1145,7 @@ async def _run_two_appends(
 
 async def test_workflow_appends_in_one_task_write_as_one_producer(client: Client):
     run_id, records = await _run_two_appends(
-        client, MemoryStreamStore(), sleep_between=False
+        client, DictStreamStore(), sleep_between=False
     )
     assert [record.body for record in records] == ["a", "b"]
     first, second = _producers(records)
@@ -1160,7 +1155,7 @@ async def test_workflow_appends_in_one_task_write_as_one_producer(client: Client
 
 async def test_workflow_append_in_a_later_task_has_a_higher_epoch(client: Client):
     run_id, records = await _run_two_appends(
-        client, MemoryStreamStore(), sleep_between=True
+        client, DictStreamStore(), sleep_between=True
     )
     first, second = _producers(records)
     assert first.id == second.id == f"wf:{run_id}"
@@ -1168,7 +1163,7 @@ async def test_workflow_append_in_a_later_task_has_a_higher_epoch(client: Client
 
 
 async def test_workflow_appends_started_together_write_in_call_order(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, GatheredAppendsWorkflow) as worker:
         await stream_client.execute_workflow(
@@ -1183,7 +1178,7 @@ async def test_workflow_appends_started_together_write_in_call_order(client: Cli
 
 
 async def test_workflow_close_started_with_an_append_comes_after_it(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, GatheredAppendAndCloseWorkflow) as worker:
         await stream_client.execute_workflow(

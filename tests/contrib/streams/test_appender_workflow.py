@@ -16,9 +16,9 @@ from temporalio.contrib.streams import BufferedAppender
 from temporalio.exceptions import StreamError
 from temporalio.nexus.system.stream_service import StreamRef
 from temporalio.nexus.system.stream_service.workflow import create_stream, get_stream
-from temporalio.testing import MemoryStreamStore
 from temporalio.worker import Replayer
 from tests.helpers import new_worker
+from tests.helpers.streams import DictStreamStore
 from tests.nexus.test_stream_store import _with_store
 
 _BURST = [f"record-{index}" for index in range(40)]
@@ -156,7 +156,7 @@ async def _bodies(client: Client, stream_id: str) -> list[str]:
 
 
 async def test_appends_of_one_activation_are_one_append(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     handle, last_offset = await _run(stream_client, BurstWorkflow, stream_id)
 
@@ -174,7 +174,7 @@ async def test_appends_of_one_activation_are_one_append(client: Client):
 
 
 async def test_appends_during_a_workflow_append_join_the_next_one(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     handle, _ = await _run(stream_client, InFlightWorkflow, stream_id)
 
@@ -186,7 +186,7 @@ async def test_appends_during_a_workflow_append_join_the_next_one(client: Client
 
 async def test_a_failed_workflow_append_stops_the_appender(client: Client):
     handle, result = await _run(
-        _with_store(client, MemoryStreamStore()),
+        _with_store(client, DictStreamStore()),
         FailedAppendWorkflow,
         f"stream-{uuid.uuid4()}",
     )
@@ -197,13 +197,13 @@ async def test_a_failed_workflow_append_stops_the_appender(client: Client):
 
 
 async def test_replay_of_workflow_appender_writes_nothing(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     handle, _ = await _run(stream_client, InFlightWorkflow, stream_id)
 
-    # A replay of an append that Core made needs a Store that runs on the bridge, as the
-    # first run had. A new memory Store shows any write, since it has no Stream.
-    replay_store = MemoryStreamStore()
+    # A replay of an append that Core made needs a Store, as the first run had. A new
+    # Store shows any write, since it has no Stream.
+    replay_store = DictStreamStore()
     await Replayer(
         workflows=[InFlightWorkflow],
         stream_config=_with_store(client, replay_store).config()["stream_config"],
@@ -220,7 +220,7 @@ async def test_replay_of_workflow_appender_writes_nothing(client: Client):
 
 async def test_workflow_appender_refuses_a_max_delay(client: Client):
     _, message = await _run(
-        _with_store(client, MemoryStreamStore()),
+        _with_store(client, DictStreamStore()),
         MaxDelayWorkflow,
         f"stream-{uuid.uuid4()}",
     )

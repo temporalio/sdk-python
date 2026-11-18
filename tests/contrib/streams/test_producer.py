@@ -27,8 +27,9 @@ from temporalio.nexus.system.stream_service import (
 )
 from temporalio.nexus.system.stream_service.client import Stream
 from temporalio.nexus.system.stream_service.workflow import create_stream
-from temporalio.testing import ActivityEnvironment, MemoryStreamStore
+from temporalio.testing import ActivityEnvironment
 from tests.helpers import new_worker
+from tests.helpers.streams import DictStreamStore
 from tests.nexus.test_stream_store import _create_stream, _with_store
 
 _SCHEDULED = datetime(2026, 11, 12, 10, 0, 0, 123456, tzinfo=timezone.utc)
@@ -94,7 +95,7 @@ async def _records(stream: Stream[str]) -> list[StreamRecord[str]]:
 
 
 async def test_current_producer_in_other_code_is_the_client_producer(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     await stream.append("a")
     [record] = await _records(stream)
     producer = current_producer()
@@ -106,7 +107,7 @@ async def test_current_producer_in_other_code_is_the_client_producer(client: Cli
 async def test_current_producer_in_an_activity_is_its_attempt_producer(
     client: Client, kind: str
 ):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
 
     async def append_and_give_producer() -> Producer:
         await stream.append("a")
@@ -134,7 +135,7 @@ class CurrentProducerWorkflow:
 async def test_current_producer_in_workflow_code_is_the_workflow_producer(
     client: Client,
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     async with new_worker(stream_client, CurrentProducerWorkflow) as worker:
         handle = await stream_client.start_workflow(
@@ -214,7 +215,7 @@ class AppendOncePerAttemptWorkflow:
 async def test_activity_retry_appends_as_its_stored_producer(
     client: Client, keep_producer: bool
 ):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
