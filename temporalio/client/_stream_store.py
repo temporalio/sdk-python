@@ -147,15 +147,16 @@ class StreamStore(ABC):
     Store of a package, such as ``RedisStreamStore`` of ``temporalio-streams-redis``, or
     :py:class:`temporalio.testing.MemoryStreamStore` in tests.
 
-    The SDK's Stores run on the bridge, in Rust. A Store can also be written in Python,
-    by a subclass that implements :py:attr:`name` and the five operations. Each
-    operation takes and gives a message of ``temporalio.api.streamservice.v1``. The
-    bodies of the Records arrive as payloads that the SDK already encoded with the data
-    converter and the payload codec, so a Store keeps payloads and not the user's types.
-    A failed call raises :py:class:`temporalio.exceptions.StreamError` with a reason.
+    The memory Store runs on the bridge, in Rust. Every other Store is a subclass,
+    written in Python, that implements :py:attr:`name` and the five operations. It can
+    call its own native code, as the Redis Store does. Each operation takes and gives a
+    message of ``temporalio.api.streamservice.v1``. The bodies of the Records arrive as
+    payloads that the SDK already encoded with the data converter and the payload codec,
+    so a Store keeps payloads and not the user's types. A failed call raises
+    :py:class:`temporalio.exceptions.StreamError` with a reason.
 
     Such a Store works for client, Activity and Workflow code. Core makes a read, an
-    append and a close of Workflow code, as it does on a Store in Rust. It calls the
+    append and a close of Workflow code, as it does on the memory Store. It calls the
     Store's method as a task on the Worker's event loop, never on a Workflow thread, and
     records the result in History. A create and a describe of Workflow code run in the
     Store's Local Activity. For Workflow code, a Store must do these things.

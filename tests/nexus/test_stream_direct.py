@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, Self
+from typing import Any
 
 import pytest
 
+import temporalio.bridge.runtime
+import temporalio.bridge.streams
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.api.enums.v1 import EventType, StreamErrorReason
@@ -31,11 +31,11 @@ from temporalio.client import (
     Client,
     StreamConfig,
     StreamReplaySource,
-    WorkflowExecutionStatus,
     WorkflowFailureError,
     WorkflowHandle,
     WorkflowHistory,
 )
+from temporalio.client._stream_store import _BridgeStreamStore
 from temporalio.common import RawValue
 from temporalio.converter import (
     DataConverter,
@@ -2100,18 +2100,26 @@ async def noop() -> None:
     pass
 
 
-async def test_worker_without_workflows_builds_no_store_runtime(client: Client):
-    from temporalio.contrib.redis.streams import RedisStreamStore
+class BadOptionStore(_BridgeStreamStore):
+    def __init__(self) -> None:
+        super().__init__(name="bad-option", runtime=None)
 
+    def _new_stream_runtime(
+        self, runtime: temporalio.bridge.runtime.Runtime
+    ) -> temporalio.bridge.streams.StreamRuntime:
+        raise ValueError("The Store option is wrong")
+
+
+async def test_worker_without_workflows_builds_no_store_runtime(client: Client):
     config = client.config()
-    config["stream_config"] = StreamConfig(stores=[RedisStreamStore("not a url")])
+    config["stream_config"] = StreamConfig(stores=[BadOptionStore()])
     # Such a Worker starts, as it did before Direct calls, since it gives Core no runtime.
     async with Worker(
         Client(**config), task_queue=f"tq-{uuid.uuid4()}", activities=[noop]
     ):
         pass
-    # A Worker with Workflows gives Core the runtime, so it builds it at once.
-    with pytest.raises(ValueError, match="The Redis URL is wrong"):
+    # A Worker with Workflows gives Core the runtime, so it builds it immediately.
+    with pytest.raises(ValueError, match="The Store option is wrong"):
         Worker(
             Client(**config),
             task_queue=f"tq-{uuid.uuid4()}",
@@ -2861,262 +2869,3 @@ async def test_workflow_interceptor_sees_each_page_read(client: Client):
         bytes.fromhex(result.offsets[1]),
         bytes.fromhex(result.offsets[3]),
     ]
-
-
-# A Store outage that Core tries again, made with a proxy in front of Redis.
-
-_REDIS_URL = os.environ.get("STREAMS_REDIS_URL")
-
-_needs_redis = pytest.mark.skipif(
-    not _REDIS_URL, reason="STREAMS_REDIS_URL is not set to a Redis server"
-)
-
-
-async def _copy(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
-    try:
-        while data := await reader.read(65536):
-            writer.write(data)
-            await writer.drain()
-    except ConnectionError:
-        pass
-
-
-class _StoreOutage:
-    """A TCP proxy in front of Redis that a test takes down and brings up.
-
-    Down, it drops each open connection and each new one, so each call of the Store
-    fails with `StorageUnavailable`. Redis itself keeps running, so the tests that
-    share it in other processes see no outage. `refused` counts the connections that
-    it dropped while down.
-    """
-
-    def __init__(self, url: str) -> None:
-        self._parts = urllib.parse.urlsplit(url)
-        self._server: asyncio.Server | None = None
-        self._writers: set[asyncio.StreamWriter] = set()
-        self._down = False
-        self.url = ""
-        self.refused = 0
-
-    async def __aenter__(self) -> Self:
-        self._server = await asyncio.start_server(self._serve, "127.0.0.1", 0)
-        port = self._server.sockets[0].getsockname()[1]
-        credentials, at, _ = self._parts.netloc.rpartition("@")
-        netloc = f"{credentials}{at}127.0.0.1:{port}"
-        self.url = urllib.parse.urlunsplit(self._parts._replace(netloc=netloc))
-        return self
-
-    async def __aexit__(self, *_: object) -> None:
-        self.take_down()
-        if self._server:
-            self._server.close()
-
-    def take_down(self) -> None:
-        self._down = True
-        for writer in list(self._writers):
-            writer.close()
-
-    def bring_up(self) -> None:
-        self._down = False
-
-    async def _serve(
-        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
-    ) -> None:
-        if self._down:
-            self.refused += 1
-            writer.close()
-            return
-        try:
-            redis_reader, redis_writer = await asyncio.open_connection(
-                self._parts.hostname or "127.0.0.1", self._parts.port or 6379
-            )
-        except OSError:
-            writer.close()
-            return
-        self._writers.update((writer, redis_writer))
-        copies = [
-            asyncio.create_task(_copy(reader, redis_writer)),
-            asyncio.create_task(_copy(redis_reader, writer)),
-        ]
-        try:
-            await asyncio.wait(copies, return_when=asyncio.FIRST_COMPLETED)
-        finally:
-            for each in (writer, redis_writer):
-                self._writers.discard(each)
-                each.close()
-            await asyncio.gather(*copies)
-
-
-def _redis_client(client: Client, url: str) -> Client:
-    from temporalio.contrib.redis.streams import RedisStreamStore
-
-    # A short response timeout keeps a call that the outage cuts from waiting long.
-    store = RedisStreamStore(
-        url,
-        key_prefix=f"test-{uuid.uuid4()}",
-        response_timeout=timedelta(seconds=1),
-    )
-    return _stream_client(client, store)
-
-
-async def _store_answers(stream: Any) -> None:
-    # A client call has no retry, so the test waits until the Store answers again.
-    try:
-        await stream.describe()
-    except StreamError as err:
-        raise AssertionError(f"The Store doesn't answer: {err}") from err
-
-
-@_needs_redis
-async def test_append_during_a_short_outage_appends_once(client: Client):
-    assert _REDIS_URL
-    async with _StoreOutage(_REDIS_URL) as outage:
-        stream_client = _redis_client(client, outage.url)
-        ref = await _filled_stream(stream_client, [], close=False)
-        stream = stream_client.get_stream(ref, body_type=str)
-        async with new_worker(
-            stream_client, AppendWorkflow, max_cached_workflows=0
-        ) as worker:
-            outage.take_down()
-            handle: WorkflowHandle[Any, Any] = await stream_client.start_workflow(
-                AppendWorkflow.run,
-                ref,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-            # The client gets the error that Core keeps from Workflow code.
-            with pytest.raises(StreamError) as err:
-                await stream.describe()
-            assert (
-                err.value.reason
-                == StreamErrorReason.STREAM_ERROR_REASON_STORAGE_UNAVAILABLE
-            )
-
-            async def task_started() -> None:
-                events = (await handle.fetch_history()).events
-                assert any(
-                    event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
-                    for event in events
-                )
-
-            await assert_eventually(task_started)
-            refused = outage.refused
-            await asyncio.sleep(1)
-            # The task waits for the append, which Core tries again.
-            assert outage.refused > refused
-            assert _completed_tasks(await handle.fetch_history()) == 0
-            outage.bring_up()
-            offsets = await asyncio.wait_for(handle.result(), timeout=30)
-        records = await _read_all(stream_client, ref)
-    assert [record.body for record in records] == ["a", "b"]
-    assert offsets == [record.offset.hex() for record in records]
-
-
-@workflow.defn
-class ReadAcrossAnOutageWorkflow:
-    def __init__(self) -> None:
-        self._bodies: list[str] = []
-
-    @workflow.run
-    async def run(self, ref: StreamRef[str]) -> list[str]:
-        stream = workflow.get_stream(ref, body_type=str)
-        async for record in stream.read(wait=timedelta(seconds=10)):
-            self._bodies.append(record.body)
-        return self._bodies
-
-    @workflow.query
-    def bodies(self) -> list[str]:
-        return self._bodies
-
-
-@_needs_redis
-async def test_read_across_a_short_outage_gives_each_record_once(client: Client):
-    assert _REDIS_URL
-    async with _StoreOutage(_REDIS_URL) as outage:
-        stream_client = _redis_client(client, outage.url)
-        ref = await _filled_stream(stream_client, ["a", "b", "c"], close=False)
-        stream = stream_client.get_stream(ref, body_type=str)
-        async with new_worker(stream_client, ReadAcrossAnOutageWorkflow) as worker:
-            handle = await stream_client.start_workflow(
-                ReadAcrossAnOutageWorkflow.run,
-                ref,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=worker.task_queue,
-            )
-
-            async def read_three() -> None:
-                bodies = await handle.query(ReadAcrossAnOutageWorkflow.bodies)
-                assert bodies == ["a", "b", "c"]
-
-            await assert_eventually(read_three)
-            # The outage cuts the read that waits for the next Record.
-            outage.take_down()
-            await asyncio.sleep(1.5)
-            # Only the Worker's read asks the Store in the outage.
-            assert outage.refused > 0
-            outage.bring_up()
-            await assert_eventually(lambda: _store_answers(stream))
-            await stream.append("d", "e")
-            await stream.close()
-            result = await asyncio.wait_for(handle.result(), timeout=30)
-    assert result == ["a", "b", "c", "d", "e"]
-
-
-@_needs_redis
-@pytest.mark.parametrize("opt_in", ["worker", "defn"])
-async def test_replay_with_its_store_down_fails_only_the_task(
-    client: Client, opt_in: str
-):
-    assert _REDIS_URL
-    workflow_type: type[Any] = (
-        ReadThenWaitFailsWorkflow if opt_in == "defn" else ReadThenWaitWorkflow
-    )
-    worker_options: dict[str, Any] = (
-        {"workflow_failure_exception_types": [StreamReplayError]}
-        if opt_in == "worker"
-        else {}
-    )
-    async with _StoreOutage(_REDIS_URL) as outage:
-        stream_client = _redis_client(client, outage.url)
-        ref = await _filled_stream(stream_client, ["a", "b"])
-        task_queue = f"tq-{uuid.uuid4()}"
-        # No cache, so the next Worker replays the History and reads the Store.
-        async with new_worker(
-            stream_client, workflow_type, task_queue=task_queue, max_cached_workflows=0
-        ):
-            handle: WorkflowHandle[Any, Any] = await stream_client.start_workflow(
-                workflow_type.run,
-                ref.id,
-                id=f"workflow-{uuid.uuid4()}",
-                task_queue=task_queue,
-            )
-
-            async def read_is_in_history() -> None:
-                assert "core_stream" in _markers(await handle.fetch_history())
-
-            await assert_eventually(read_is_in_history)
-        outage.take_down()
-        async with new_worker(
-            stream_client, workflow_type, task_queue=task_queue, **worker_options
-        ):
-            await handle.signal("proceed")
-
-            async def task_failed() -> None:
-                messages = [
-                    event.workflow_task_failed_event_attributes.failure.message
-                    for event in (await handle.fetch_history()).events
-                    if event.event_type == EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED
-                ]
-                assert messages
-                assert messages[0].startswith(
-                    f"StreamReplayUnavailable: Stream `{ref.id}` in Store `redis`"
-                ), messages[0]
-
-            # Core tries the Store for 5 s before it fails the task.
-            await assert_eventually(task_failed, timeout=timedelta(seconds=30))
-            # The opt-in doesn't fail the Workflow, since the Records may still be there.
-            description = await handle.describe()
-            assert description.status == WorkflowExecutionStatus.RUNNING
-            outage.bring_up()
-            result = await asyncio.wait_for(handle.result(), timeout=60)
-    assert result == ["a", "b"]
