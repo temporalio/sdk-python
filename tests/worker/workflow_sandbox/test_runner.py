@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import importlib.util
 import inspect
 import os
 import sys
@@ -13,6 +14,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -615,6 +617,32 @@ async def test_workflow_sandbox_import_workflow_without_warning():
     assert (
         f"Module {stateful_module.__package__} was not intentionally passed through to the sandbox."
         in actual_warnings
+    )
+
+
+@pytest.mark.parametrize(
+    "main_restrictions",
+    [
+        SandboxRestrictions.default,
+        SandboxRestrictions.default.with_passthrough_all_modules(),
+        SandboxRestrictions.default.with_passthrough_modules("__temporal_main__"),
+    ],
+    ids=["default", "all_modules", "main_module"],
+)
+async def test_workflow_sandbox_validates_workflow_in_main_module(
+    main_restrictions: SandboxRestrictions, monkeypatch: pytest.MonkeyPatch
+):
+    # Load the file as __main__, like running it as a script
+    spec = importlib.util.spec_from_file_location(
+        "__main__", Path(__file__).parent / "testmodules" / "main_module_workflow.py"
+    )
+    assert spec and spec.loader
+    main_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(main_module)
+    monkeypatch.setitem(sys.modules, "__main__", main_module)
+
+    SandboxedWorkflowRunner(main_restrictions).prepare_workflow(
+        workflow._Definition.must_from_class(main_module.MainModuleWorkflow)
     )
 
 

@@ -244,9 +244,9 @@ class Importer:
                         f"Module {full_name} was imported after initial workflow load."
                     )
 
-            # If the module is __temporal_main__ and not already in sys.modules,
-            # we load it from whatever file __main__ was originally in
-            if full_name == "__temporal_main__":
+            # If the module is __temporal_main__ and was not passed through, we
+            # load it from whatever file __main__ was originally in
+            if full_name == "__temporal_main__" and not passthrough_mod:
                 orig_mod = _thread_local_sys_modules.orig["__main__"]
                 new_spec = importlib.util.spec_from_file_location(
                     full_name, orig_mod.__file__
@@ -372,9 +372,12 @@ class Importer:
             _trace("Passing module %s through from host", name)
             global _trace_depth
             _trace_depth += 1
-            # Use our import outside of the sandbox
+            # Use our import outside of the sandbox. The host has no module
+            # named __temporal_main__, its counterpart is __main__.
             try:
-                return importlib.import_module(name)
+                return importlib.import_module(
+                    "__main__" if name == "__temporal_main__" else name
+                )
             finally:
                 _trace_depth -= 1
 
