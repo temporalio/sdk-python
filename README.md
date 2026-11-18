@@ -2049,6 +2049,18 @@ like Temporal. See [this gevent issue](https://github.com/gevent/gevent/issues/9
 users are encouraged to not use gevent in asyncio applications (including Temporal). But if you must, there is
 [a sample](https://github.com/temporalio/samples-python/tree/main/gevent_async) showing how it is possible.
 
+#### Deadlock Interruption and Logging Lock Leaks (Python ≤ 3.12)
+
+On Python ≤ 3.12, asynchronously interrupting a thread while it acquires a `logging.Handler` lock can leave the lock
+permanently held. If a workflow thread is interrupted by deadlock detection (`attempt_deadlock_interruption()`) or a
+synchronous activity thread is cancelled while logging, subsequent log attempts on the worker's event-loop thread can
+block indefinitely, freezing the worker.
+
+Python 3.13 resolves this specific handler lock leak by updating `logging.Handler.handle()` to use a context manager.
+On Python ≤ 3.12, synchronous activities can avoid cancellation exceptions by setting `no_thread_cancel_exception=True`
+on `@activity.defn`. For workflows, deadlock interruption cannot currently be disabled separately without disabling
+deadlock detection entirely (via `debug_mode=True` or `TEMPORAL_DEBUG=1`).
+
 # Development
 
 The Python SDK supports Python 3.11 through 3.15. It is built using
