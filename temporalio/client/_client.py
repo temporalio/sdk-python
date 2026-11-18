@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import (
     Awaitable,
     Callable,
@@ -25,6 +26,7 @@ import temporalio.activity
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.converter
+import temporalio.converter._extstore
 import temporalio.runtime
 import temporalio.service
 import temporalio.workflow
@@ -299,6 +301,20 @@ class Client:
 
     def _init_from_config(self, config: ClientConfig):
         self._config = config
+        # The driver operation limit is state of this client, so it rides on a
+        # private copy of the converter rather than the config or the public
+        # data_converter. Clients built from this config get their own.
+        converter = config["data_converter"]
+        self._data_converter = (
+            dataclasses.replace(
+                converter,
+                _driver_operation_semaphore=temporalio.converter._extstore.new_driver_operation_semaphore(
+                    converter.external_storage
+                ),
+            )
+            if converter.external_storage is not None
+            else converter
+        )
 
         # Iterate over interceptors in reverse building the impl
         self._impl: OutboundInterceptor = _ClientImpl(self)

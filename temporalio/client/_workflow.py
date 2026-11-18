@@ -131,7 +131,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             temporalio.converter.WorkflowSerializationContext(
                 namespace=self._client.namespace, workflow_id=self._id
             )
@@ -146,7 +146,7 @@ class WorkflowHandle(Generic[SelfType, ReturnType]):
         context = getattr(events, "_propagated_nexus_serialization_context", None)
         if context is None:
             return self._data_converter
-        return self._client.data_converter.with_context(context)
+        return self._client._data_converter.with_context(context)
 
     @property
     def id(self) -> str:
@@ -1619,7 +1619,7 @@ class WorkflowExecutionAsyncIterator:
 
         self._current_page = [
             WorkflowExecution._from_raw_info(
-                v, self._client.namespace, self._client.data_converter
+                v, self._client.namespace, self._client._data_converter
             )
             for v in resp.executions
         ]
@@ -1884,7 +1884,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
 
     @functools.cached_property
     def _data_converter(self) -> temporalio.converter.DataConverter:
-        return self._client.data_converter.with_context(
+        return self._client._data_converter.with_context(
             WorkflowSerializationContext(
                 namespace=self._client.namespace,
                 workflow_id=self.workflow_id,
@@ -1948,7 +1948,7 @@ class WorkflowUpdateHandle(Generic[LocalReturnType]):
         # Convert outcome to failure or value
         assert self._known_outcome
         data_converter = (
-            self._client.data_converter.with_context(self._known_outcome_nexus_context)
+            self._client._data_converter.with_context(self._known_outcome_nexus_context)
             if self._known_outcome_nexus_context
             else self._data_converter
         )

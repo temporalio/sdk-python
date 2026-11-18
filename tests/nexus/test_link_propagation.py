@@ -168,7 +168,7 @@ def _make_client_impl(workflow_service: Any) -> _ClientImpl:
     client.namespace = NAMESPACE
     client.identity = "test-identity"
     client.workflow_service = workflow_service
-    client.data_converter = temporalio.converter.DataConverter.default
+    client._data_converter = temporalio.converter.DataConverter.default
     return _ClientImpl(client)
 
 
