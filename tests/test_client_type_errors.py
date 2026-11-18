@@ -6,6 +6,8 @@ It doesn't contain any test functions.
 from dataclasses import dataclass
 from unittest.mock import Mock
 
+import temporalio.api.common.v1
+import temporalio.client
 from temporalio import workflow
 from temporalio.client import (
     Client,
@@ -77,6 +79,40 @@ class TestWorkflow2(TestWorkflow):
     @workflow.run
     async def run(self, _: WorkflowInput) -> WorkflowOutput:
         return WorkflowOutput()
+
+
+@workflow.defn
+class NoParamWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        pass
+
+
+@workflow.defn
+class MultiParamWorkflow:
+    @workflow.run
+    async def run(self, value: int, label: str) -> None:
+        pass
+
+
+def _schedule_action_code_for_type_checking_test():  # type:ignore[reportUnusedFunction]
+    headers = {"custom-header": temporalio.api.common.v1.Payload(data=b"value")}
+    temporalio.client.ScheduleActionStartWorkflow(
+        NoParamWorkflow.run, id="wid", task_queue="tq", headers=headers
+    )
+    temporalio.client.ScheduleActionStartWorkflow(
+        TestWorkflow.run, WorkflowInput(), id="wid", task_queue="tq", headers=headers
+    )
+    temporalio.client.ScheduleActionStartWorkflow(
+        MultiParamWorkflow.run,
+        args=[1, "value"],
+        id="wid",
+        task_queue="tq",
+        headers=headers,
+    )
+    temporalio.client.ScheduleActionStartWorkflow(
+        "workflow-name", args=["value"], id="wid", task_queue="tq", headers=headers
+    )
 
 
 async def _start_and_execute_workflow_code_for_type_checking_test():  # type:ignore[reportUnusedFunction]
