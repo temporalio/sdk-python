@@ -2586,6 +2586,7 @@ dependencies = [
  "async-trait",
  "aws-lc-rs",
  "futures",
+ "parking_lot",
  "prost",
  "pyo3",
  "pyo3-async-runtimes",

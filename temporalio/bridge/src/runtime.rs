@@ -1,4 +1,5 @@
 use futures::channel::mpsc::Receiver;
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::exceptions::{PyAssertionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::pythonize;
@@ -7,7 +8,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard, Weak};
+use std::sync::{Arc, Weak};
 use std::time::{Duration, UNIX_EPOCH};
 use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
@@ -32,7 +33,6 @@ pub struct RuntimeRef {
 
 #[derive(Clone)]
 pub(crate) struct Runtime {
-    pub(crate) pid: u32,
     pub(crate) core: Arc<CoreRuntimeHandle>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
@@ -41,14 +41,55 @@ pub(crate) struct Runtime {
 // Python can finish an awaited RPC before the blocking Rust task which delivered
 // its result has returned. Join native threads before interpreter finalization,
 // while those tasks can still attach to Python and release their thread states.
-static RUNTIMES: Mutex<RuntimeRegistry> = Mutex::new(RuntimeRegistry {
-    shutting_down: false,
-    runtimes: Vec::new(),
-});
+static RUNTIMES: RuntimeRegistry = RuntimeRegistry::new();
 
 struct RuntimeRegistry {
+    state: Mutex<RuntimeRegistryState>,
+}
+
+struct RuntimeRegistryState {
     shutting_down: bool,
     runtimes: Vec<Weak<CoreRuntimeHandle>>,
+}
+
+impl RuntimeRegistry {
+    const fn new() -> Self {
+        Self {
+            state: Mutex::new(RuntimeRegistryState {
+                shutting_down: false,
+                runtimes: Vec::new(),
+            }),
+        }
+    }
+
+    fn check_running(&self) -> PyResult<()> {
+        self.state.lock().check_running()
+    }
+
+    fn register(&self, runtime: &Arc<CoreRuntimeHandle>) -> PyResult<()> {
+        let mut state = self.state.lock();
+        state.check_running()?;
+        state.runtimes.retain(|runtime| runtime.strong_count() > 0);
+        state.runtimes.push(Arc::downgrade(runtime));
+        Ok(())
+    }
+
+    fn begin_shutdown(&self) -> Vec<Weak<CoreRuntimeHandle>> {
+        let mut state = self.state.lock();
+        state.shutting_down = true;
+        std::mem::take(&mut state.runtimes)
+    }
+}
+
+impl RuntimeRegistryState {
+    fn check_running(&self) -> PyResult<()> {
+        if self.shutting_down {
+            return Err(PyRuntimeError::new_err(
+                "Temporal runtimes are shutting down",
+            ));
+        }
+        Ok(())
+    }
 }
 
 pub(crate) struct CoreRuntimeHandle {
@@ -56,36 +97,23 @@ pub(crate) struct CoreRuntimeHandle {
     core: RwLock<Option<CoreRuntime>>,
 }
 
-pub(crate) struct CoreRuntimeGuard<'a>(RwLockReadGuard<'a, Option<CoreRuntime>>);
-
-impl std::ops::Deref for CoreRuntimeGuard<'_> {
-    type Target = CoreRuntime;
-
-    fn deref(&self) -> &CoreRuntime {
-        self.0.as_ref().expect("Core runtime used after drop")
-    }
-}
-
 impl CoreRuntimeHandle {
-    pub(crate) fn read(&self) -> PyResult<CoreRuntimeGuard<'_>> {
-        let core = self.core.read().unwrap();
-        if core.is_none() {
-            return Err(PyRuntimeError::new_err("Temporal runtime has shut down"));
-        }
-        Ok(CoreRuntimeGuard(core))
+    pub(crate) fn read(&self) -> PyResult<MappedRwLockReadGuard<'_, CoreRuntime>> {
+        RwLockReadGuard::try_map(self.core.read(), Option::as_ref)
+            .map_err(|_| PyRuntimeError::new_err("Temporal runtime has shut down"))
     }
 
     fn shutdown(&self) {
         // Do not hold the lock while joining threads: their remaining callbacks
         // may try to use this runtime and must be able to observe its shutdown.
-        let core = self.core.write().unwrap().take();
+        let core = self.core.write().take();
         drop(core);
     }
 }
 
 impl Drop for CoreRuntimeHandle {
     fn drop(&mut self) {
-        let mut core = self.core.get_mut().unwrap().take();
+        let mut core = self.core.get_mut().take();
         if core.is_some() && self.pid == std::process::id() {
             let _ = Python::try_attach(|py| py.detach(|| drop(core.take())));
         }
@@ -97,15 +125,12 @@ impl Drop for CoreRuntimeHandle {
 
 #[pyfunction]
 pub(crate) fn shutdown_runtimes(py: Python) {
-    let runtimes = {
-        let mut registry = RUNTIMES.lock().unwrap();
-        registry.shutting_down = true;
-        std::mem::take(&mut registry.runtimes)
-            .into_iter()
-            .filter_map(|runtime| runtime.upgrade())
-            .filter(|runtime| runtime.pid == std::process::id())
-            .collect::<Vec<_>>()
-    };
+    let runtimes = RUNTIMES
+        .begin_shutdown()
+        .into_iter()
+        .filter_map(|runtime| runtime.upgrade())
+        .filter(|runtime| runtime.pid == std::process::id())
+        .collect::<Vec<_>>();
     // Tokio joins blocking tasks even after their Python futures completed or
     // were cancelled. They must be able to acquire the GIL until the join ends.
     py.detach(|| {
@@ -176,11 +201,7 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
-    if RUNTIMES.lock().unwrap().shutting_down {
-        return Err(PyRuntimeError::new_err(
-            "Temporal runtimes are shutting down",
-        ));
-    }
+    RUNTIMES.check_running()?;
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
@@ -282,21 +303,9 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         pid: std::process::id(),
         core: RwLock::new(Some(core)),
     });
-    {
-        let mut registry = RUNTIMES.lock().unwrap();
-        if registry.shutting_down {
-            return Err(PyRuntimeError::new_err(
-                "Temporal runtimes are shutting down",
-            ));
-        }
-        registry
-            .runtimes
-            .retain(|runtime| runtime.strong_count() > 0);
-        registry.runtimes.push(Arc::downgrade(&core));
-    }
+    RUNTIMES.register(&core)?;
     Ok(RuntimeRef {
         runtime: Runtime {
-            pid: std::process::id(),
             core,
             metrics_call_buffer,
             log_forwarder_handle,
@@ -325,10 +334,10 @@ impl Runtime {
 
     pub(crate) fn assert_same_process(&self, action: &'static str) -> PyResult<()> {
         let current_pid = std::process::id();
-        if self.pid != current_pid {
+        let runtime_pid = self.core.pid;
+        if runtime_pid != current_pid {
             Err(PyAssertionError::new_err(format!(
-                "Cannot {} across forks (original runtime PID is {}, current is {})",
-                action, self.pid, current_pid,
+                "Cannot {action} across forks (original runtime PID is {runtime_pid}, current is {current_pid})",
             )))
         } else {
             Ok(())
