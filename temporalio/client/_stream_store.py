@@ -5,7 +5,7 @@ import enum
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import google.protobuf.message
 import nexusrpc
@@ -13,17 +13,12 @@ import nexusrpc
 import temporalio.activity
 import temporalio.api.streamservice.v1
 import temporalio.bridge._visitor
-import temporalio.bridge.runtime
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system.stream_service
-import temporalio.runtime
 import temporalio.workflow
 from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
 from temporalio.exceptions import StreamConfigError
-
-if TYPE_CHECKING:
-    import temporalio.bridge.streams
 
 _MAX_RECORD_BYTES = 1536 * 1024
 _MAX_BATCH_BYTES = 4 * 1024 * 1024
@@ -145,21 +140,20 @@ class StreamStore(ABC):
     A client with a Store sends each Stream operation to it. This release has no
     Streams on the server, so a client needs a Store for any Stream operation. Use a
     Store of a package, such as ``RedisStreamStore`` of ``temporalio-streams-redis``, or
-    :py:class:`temporalio.testing.MemoryStreamStore` in tests.
+    ``MemoryStreamStore`` of ``temporalio-streams-memory`` in tests.
 
-    The memory Store runs on the bridge, in Rust. Every other Store is a subclass,
-    written in Python, that implements :py:attr:`name` and the five operations. It can
-    call its own native code, as the Redis Store does. Each operation takes and gives a
-    message of ``temporalio.api.streamservice.v1``. The bodies of the Records arrive as
-    payloads that the SDK already encoded with the data converter and the payload codec,
-    so a Store keeps payloads and not the user's types. A failed call raises
-    :py:class:`temporalio.exceptions.StreamError` with a reason.
+    A Store is a subclass, written in Python, that implements :py:attr:`name` and the
+    five operations. It can call its own native code, as the Redis Store does. Each
+    operation takes and gives a message of ``temporalio.api.streamservice.v1``. The
+    bodies of the Records arrive as payloads that the SDK already encoded with the data
+    converter and the payload codec, so a Store keeps payloads and not the user's types.
+    A failed call raises :py:class:`temporalio.exceptions.StreamError` with a reason.
 
     Such a Store works for client, Activity and Workflow code. Core makes a read, an
-    append and a close of Workflow code, as it does on the memory Store. It calls the
-    Store's method as a task on the Worker's event loop, never on a Workflow thread, and
-    records the result in History. A create and a describe of Workflow code run in the
-    Store's Local Activity. For Workflow code, a Store must do these things.
+    append and a close of Workflow code. It calls the Store's method as a task on the
+    Worker's event loop, never on a Workflow thread, and records the result in History.
+    A create and a describe of Workflow code run in the Store's Local Activity. For
+    Workflow code, a Store must do these things.
 
     * Each method is ``async`` and never blocks the event loop, since the calls of every
       Workflow on the Worker run there.
@@ -294,92 +288,6 @@ class StreamStore(ABC):
             retry_policy=options.retry_policy,
         )
         return stream_operation.response_type.FromString(response)
-
-
-class _BridgeStreamStore(StreamStore):  # pyright: ignore[reportUnusedClass]
-    """A Store that runs on the Stream runtime of the bridge.
-
-    It builds the runtime at its first call, or when a Worker with Workflows gives it to
-    Core, so the Store can be built before the Runtime and its Tokio threads exist.
-    """
-
-    def __init__(
-        self,
-        *,
-        name: str,
-        runtime: temporalio.runtime.Runtime | None,
-    ) -> None:
-        self._name = name
-        self._runtime = runtime
-        self._stream_runtime: temporalio.bridge.streams.StreamRuntime | None = None
-
-    @property
-    def name(self) -> str:
-        """Name of the Store."""
-        return self._name
-
-    @abstractmethod
-    def _new_stream_runtime(
-        self, runtime: temporalio.bridge.runtime.Runtime
-    ) -> temporalio.bridge.streams.StreamRuntime: ...
-
-    async def create_stream(
-        self, request: temporalio.api.streamservice.v1.CreateStreamRequest
-    ) -> temporalio.api.streamservice.v1.CreateStreamResponse:
-        """See base class."""
-        return await self._call_bridge("CreateStream", request)
-
-    async def append_records(
-        self, request: temporalio.api.streamservice.v1.AppendRecordsRequest
-    ) -> temporalio.api.streamservice.v1.AppendRecordsResponse:
-        """See base class."""
-        return await self._call_bridge("AppendRecords", request)
-
-    async def read_records(
-        self, request: temporalio.api.streamservice.v1.ReadRecordsRequest
-    ) -> temporalio.api.streamservice.v1.ReadRecordsResponse:
-        """See base class."""
-        return await self._call_bridge("ReadRecords", request)
-
-    async def close_stream(
-        self, request: temporalio.api.streamservice.v1.CloseStreamRequest
-    ) -> temporalio.api.streamservice.v1.CloseStreamResponse:
-        """See base class."""
-        return await self._call_bridge("CloseStream", request)
-
-    async def describe_stream(
-        self, request: temporalio.api.streamservice.v1.DescribeStreamRequest
-    ) -> temporalio.api.streamservice.v1.DescribeStreamResponse:
-        """See base class."""
-        return await self._call_bridge("DescribeStream", request)
-
-    def _get_stream_runtime(self) -> temporalio.bridge.streams.StreamRuntime:
-        """Give the Stream runtime of the bridge, and build it at the first use.
-
-        Raises:
-            temporalio.exceptions.StreamConfigError: This build of temporalio has no
-                Stream runtime, or not this Store.
-        """
-        if self._stream_runtime is None:
-            runtime = self._runtime or temporalio.runtime.Runtime.default()
-            self._stream_runtime = self._new_stream_runtime(runtime._core_runtime)
-        return self._stream_runtime
-
-    async def _call_bridge(
-        self, operation: str, request: google.protobuf.message.Message
-    ) -> Any:
-        """Answer one Stream operation with the Stream runtime of the bridge.
-
-        Raises:
-            temporalio.exceptions.StreamError: The call failed.
-            temporalio.exceptions.StreamConfigError: This build of temporalio has no
-                Stream runtime.
-        """
-        # The bridge takes and gives the messages in their wire form.
-        response = await self._get_stream_runtime().call(
-            operation, request.SerializeToString()
-        )
-        return _STREAM_OPERATIONS[operation].response_type.FromString(response)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -711,20 +619,6 @@ class StreamConfig:
             )
         return store
 
-    def _bridge_stream_runtimes(
-        self,
-    ) -> list[tuple[str, temporalio.bridge.streams.StreamRuntime]]:
-        """Give the Stream runtime of each Store that runs on the bridge, by Store name.
-
-        Core reads and appends a Stream of Workflow code through these runtimes. The
-        Worker builds the runtime of a Store written in Python itself.
-        """
-        return [
-            (store.name, store._get_stream_runtime())
-            for store in self.stores
-            if isinstance(store, _BridgeStreamStore)
-        ]
-
     def _store_for(
         self,
         ref: temporalio.nexus.system.stream_service.StreamRef[Any],
@@ -770,12 +664,6 @@ def _refuse_store_plugins(  # pyright: ignore[reportUnusedFunction]
                 f"The Stream Store '{plugin.name}' is in plugins. Give it in "
                 "stream_config=StreamConfig(stores=[...]) instead."
             )
-
-
-def _check_not_negative(**durations: timedelta | None) -> None:  # pyright: ignore[reportUnusedFunction]
-    for label, value in durations.items():
-        if value is not None and value < timedelta():
-            raise ValueError(f"{label} must not be negative")
 
 
 def _stream_service() -> nexusrpc.ServiceDefinition:

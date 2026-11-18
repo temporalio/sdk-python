@@ -65,9 +65,8 @@ pub struct WorkerConfig {
     plugins: Vec<(String, String)>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
-    /// The Stream runtime of each Store that has one, by Store name. Core reads and appends a
-    /// Stream of Workflow code through them.
-    #[cfg(feature = "streams")]
+    /// The Stream runtime of each Store, by Store name. Core reads and appends a Stream of
+    /// Workflow code through them.
     stream_runtimes: Vec<(String, Py<crate::streams::StreamRuntimeRef>)>,
     /// The most bytes of one read's Records that wait for Workflow code. `None` keeps Core's
     /// default.
@@ -733,15 +732,11 @@ fn convert_worker_config(
 ) -> PyResult<temporalio_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
     let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
-    // A build with no Stream runtime has no Store that Core can call, so Core gets none.
-    #[cfg(feature = "streams")]
     let stream_runtimes = temporalio_sdk_core::StreamRuntimes::new(
         conf.stream_runtimes
             .into_iter()
             .map(|(store, runtime)| (store, runtime.get().streams.clone())),
     );
-    #[cfg(not(feature = "streams"))]
-    let stream_runtimes = temporalio_sdk_core::StreamRuntimes::default();
     let stream_runtimes = match conf.stream_read_ahead_bytes {
         Some(bytes) => stream_runtimes.with_read_ahead_bytes(bytes),
         None => stream_runtimes,

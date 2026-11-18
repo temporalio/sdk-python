@@ -72,6 +72,8 @@ temporalio-sdk-core = { version = "0.11.0", path = "./sdk-core/crates/sdk-core",
     "envconfig",
     "prometheus",
 ] }
+# The Stream runtime, from the submodule.
+temporalio-streams = { path = "./sdk-core/crates/streams" }
 tokio = "1.26"
 # Matches the sdk-core client crate's rustls stack; used to build the custom
 # server certificate verifier for ClientTlsConfig.verification_server_name.

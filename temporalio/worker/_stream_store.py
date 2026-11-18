@@ -26,7 +26,6 @@ from temporalio.client._stream_store import (
     StreamConfig,
     StreamReplaySource,
     StreamStore,
-    _BridgeStreamStore,
     _request_ref,
 )
 from temporalio.converter import StorageDriverWorkflowInfo
@@ -51,33 +50,9 @@ def _no_stream_config_error() -> temporalio.exceptions.ApplicationError:  # pyri
     )
 
 
-# The Direct calls of Workflow code, by Nexus operation name. Each has the word of an
-# error message and the call that an Activity makes in its place.
-_DIRECT_CALLS = {
-    "ReadRecords": ("read", "Read the Stream"),
-    "AppendRecords": ("append", "Append to the Stream"),
-    "CloseStream": ("close", "Close the Stream"),
-}
-
-
-# Core calls a Store written in Python through the Stream runtime of the bridge, which a
-# build of temporalio may leave out.
-_CORE_CALLS_PYTHON_STORES = temporalio.bridge.streams.StreamRuntime.has_runtime()
-
-
-def _no_direct_call_error(
-    store: StreamStore, operation: str
-) -> temporalio.exceptions.ApplicationError:
-    # Core makes a Workflow's read, append and close itself, and a build with no Stream
-    # runtime gives Core no way to call the Store. Each retry of the task would fail the
-    # same way for good, so the Workflow fails instead, as for a Worker with no config.
-    call, advice = _DIRECT_CALLS[operation]
-    return temporalio.exceptions.ApplicationError(
-        f"The Stream Store '{store.name}' has no Direct {call}, since this build of "
-        f"temporalio has no Stream runtime. {advice} in an Activity.",
-        type="StreamConfigError",
-        non_retryable=True,
-    )
+# The word of an error message for each write that Core makes for Workflow code, by Nexus
+# operation name.
+_DIRECT_WRITES = {"AppendRecords": "append", "CloseStream": "close"}
 
 
 def _not_a_workflow_producer_error(
@@ -85,7 +60,7 @@ def _not_a_workflow_producer_error(
 ) -> temporalio.exceptions.StreamError:
     # Core sets the Workflow Task as the epoch of the Producer, which only a Producer of
     # kind Workflow has.
-    call, _ = _DIRECT_CALLS[operation]
+    call = _DIRECT_WRITES[operation]
     return temporalio.exceptions.StreamError(
         f"A Stream {call} of Workflow code writes as a Producer of kind Workflow. "
         "Leave out producer=, or give a Producer of kind Workflow.",
@@ -525,33 +500,21 @@ def _core_stream_runtimes(  # pyright: ignore[reportUnusedFunction]
 ) -> _CoreStreamRuntimes:
     """Give Core a Stream runtime for each Store of the config.
 
-    A Store on the bridge has its own runtime. A Store written in Python gets one on
-    ``runtime`` that calls it on the event loop that :py:meth:`_CoreStreamRuntimes.bind`
-    gives.
+    Each runtime is on ``runtime`` and calls its Store on the event loop that
+    :py:meth:`_CoreStreamRuntimes.bind` gives.
     """
     if config is None:
         return _CoreStreamRuntimes(runtimes=[], callers=[])
-    runtimes = [
-        (name, stream_runtime._ref)
-        for name, stream_runtime in config._bridge_stream_runtimes()
-    ]
+    runtimes: list[tuple[str, Any]] = []
     callers: list[_CoreStoreCaller] = []
-    if _CORE_CALLS_PYTHON_STORES:
-        for store in config.stores:
-            if isinstance(store, _BridgeStreamStore):
-                continue
-            caller = _CoreStoreCaller(store)
-            stream_runtime = temporalio.bridge.streams.StreamRuntime.new_python(
-                runtime._core_runtime, name=store.name, caller=caller
-            )
-            runtimes.append((store.name, stream_runtime._ref))
-            callers.append(caller)
+    for store in config.stores:
+        caller = _CoreStoreCaller(store)
+        stream_runtime = temporalio.bridge.streams.StreamRuntime.new_python(
+            runtime._core_runtime, caller=caller
+        )
+        runtimes.append((store.name, stream_runtime._ref))
+        callers.append(caller)
     return _CoreStreamRuntimes(runtimes=runtimes, callers=callers)
-
-
-def _core_calls(store: StreamStore) -> bool:
-    """Whether Core can call ``store`` for a read, an append and a close."""
-    return isinstance(store, _BridgeStreamStore) or _CORE_CALLS_PYTHON_STORES
 
 
 def _workflow_target() -> StorageDriverWorkflowInfo:
@@ -593,8 +556,6 @@ class _WorkflowStreamStore:
         options = self.config.workflow_call_options
         if isinstance(request, temporalio.api.streamservice.v1.ReadRecordsRequest):
             instance._assert_not_read_only("start stream read")
-            if not _core_calls(store):
-                raise _no_direct_call_error(store, input.operation_name)
             return _start_direct_read(
                 instance,
                 input,
@@ -611,8 +572,6 @@ class _WorkflowStreamStore:
                 temporalio.api.streamservice.v1.CloseStreamRequest,
             ),
         ):
-            if not _core_calls(store):
-                raise _no_direct_call_error(store, input.operation_name)
             return _start_direct_call(instance, input, request, store.name)
 
         # A create and a describe run in the Store's Local Activity.

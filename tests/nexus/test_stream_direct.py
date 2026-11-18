@@ -2380,6 +2380,10 @@ async def test_direct_calls_record_their_metrics(env: WorkflowEnvironment):
     assert values("temporal_stream_append_failed") == []
     assert values("temporal_stream_close_failed") == []
     for update in updates:
+        # The Stream runtime counts the reads that wait on the Store, with the default
+        # attributes of the meter and no more.
+        if update.metric.name == "temporal_stream_blocking_reads_waiting":
+            continue
         assert update.attributes["stream_store"] == "metered"
         assert update.attributes["workflow_type"] == "ReadAppendCloseWorkflow"
         assert update.attributes["task_queue"] == worker.task_queue

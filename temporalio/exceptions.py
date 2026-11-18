@@ -260,14 +260,6 @@ def _stream_error_from_reason(reason: int, message: str) -> StreamError:
     )
 
 
-def _stream_error_from_call(  # pyright: ignore[reportUnusedFunction]
-    message: str, details: bytes
-) -> StreamError:
-    # A Store on the bridge fails with the encoded details, as a gRPC status has them.
-    proto = temporalio.api.stream.v1.StreamErrorDetails.FromString(details)
-    return _stream_error_from_reason(proto.reason, message)
-
-
 def _stream_error_from_failure(  # pyright: ignore[reportUnusedFunction]
     err: BaseException,
 ) -> StreamError | None:
@@ -303,14 +295,11 @@ class StreamConfigError(RuntimeError):
     * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.
     * A Workflow's Stream call has a ref that names a Store that the config of the
       Worker's client doesn't have. This fails the Workflow Task.
-    * This build of temporalio has no Stream runtime.
 
     A Workflow's Stream call on a Worker whose client has no Stream config doesn't
-    raise this class. Neither does a read, an append or a close of Workflow code on a
-    Store written in Python, in a build of temporalio with no Stream runtime for Core to
-    call it. Workflow code gets an :py:class:`ApplicationError` with the ``type``
-    ``StreamConfigError`` and ``non_retryable`` set, so an uncaught one fails the
-    Workflow. Workflow code can catch this error. A Workflow that catches it must not go
+    raise this class. Workflow code gets an :py:class:`ApplicationError` with the
+    ``type`` ``StreamConfigError`` and ``non_retryable`` set, so an uncaught one fails
+    the Workflow. Workflow code can catch this error. A Workflow that catches it must not go
     on to make the same call on a Worker that has a config, since the History then has
     no record of the first call.
 
