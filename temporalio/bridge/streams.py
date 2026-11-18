@@ -5,7 +5,6 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import timedelta
 from typing import Any
 
@@ -42,51 +41,8 @@ class StreamRuntime:
             )
         return StreamRuntime(new(runtime._ref, name, retention, producer_idle_ttl))
 
-    @staticmethod
-    def new_redis(
-        runtime: temporalio.bridge.runtime.Runtime,
-        *,
-        urls: Sequence[str],
-        cluster: bool,
-        key_prefix: str | None,
-        retention: timedelta | None,
-        producer_idle_ttl: timedelta | None,
-        response_timeout: timedelta | None,
-        name: str,
-        wait_replicas: int,
-        wait_timeout: timedelta | None,
-    ) -> StreamRuntime:
-        """Build the runtime on Redis. It connects at its first call.
-
-        Raises:
-            temporalio.exceptions.StreamConfigError: The bridge build has no Redis
-                Stream Store.
-            ValueError: An option is bad.
-        """
-        new = getattr(
-            temporalio.bridge.temporal_sdk_bridge, "new_redis_stream_runtime", None
-        )
-        if new is None:
-            raise temporalio.exceptions.StreamConfigError(
-                "This build of temporalio has no Redis Stream Store"
-            )
-        return StreamRuntime(
-            new(
-                runtime._ref,
-                list(urls),
-                cluster=cluster,
-                key_prefix=key_prefix,
-                retention=retention,
-                producer_idle_ttl=producer_idle_ttl,
-                response_timeout=response_timeout,
-                store_name=name,
-                wait_replicas=wait_replicas,
-                wait_timeout=wait_timeout,
-            )
-        )
-
     def __init__(self, ref: Any) -> None:
-        """Wrap the bridge's runtime object. Use ``new_memory`` or ``new_redis`` instead."""
+        """Wrap the bridge's runtime object. Use ``new_memory`` instead."""
         self._ref = ref
 
     async def call(self, operation: str, request: bytes) -> bytes:

@@ -27,8 +27,8 @@ class StreamStore(ABC):
     """A Store that answers the Stream operations of a client.
 
     A client with a Store sends each Stream operation to it. This release has no
-    Streams on the server, so a client needs a Store for any Stream operation. Use
-    :py:class:`temporalio.contrib.redis.streams.RedisStreamStore`, or
+    Streams on the server, so a client needs a Store for any Stream operation. Use a
+    Store of a package, such as ``RedisStreamStore`` of ``temporalio-streams-redis``, or
     :py:class:`temporalio.testing.MemoryStreamStore` in tests.
 
     To keep Streams in another system, write a Store that implements :py:attr:`name`
@@ -159,7 +159,7 @@ class _BridgeStreamStore(StreamStore):  # pyright: ignore[reportUnusedClass]
         Raises:
             temporalio.exceptions.StreamError: The call failed.
             temporalio.exceptions.StreamConfigError: This build of temporalio has no
-                Stream runtime, or not this Store.
+                Stream runtime.
         """
         if self._stream_runtime is None:
             runtime = self._runtime or temporalio.runtime.Runtime.default()

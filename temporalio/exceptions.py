@@ -280,7 +280,7 @@ class StreamConfigError(RuntimeError):
     * A ref names a Store that the config of the client doesn't have.
     * The selector returns a Store that isn't one of the config's Stores.
     * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.
-    * This build of temporalio has no Stream runtime, or no Redis Stream Store.
+    * This build of temporalio has no Stream runtime.
 
     .. warning::
         This API is experimental and subject to change.

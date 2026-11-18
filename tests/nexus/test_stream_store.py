@@ -413,7 +413,6 @@ def test_each_stream_module_can_be_the_first_import():
         "temporalio.workflow",
         "temporalio.client",
         "temporalio.worker",
-        "temporalio.contrib.redis.streams",
     ]
     failures: dict[str, str] = {}
     for module in modules:

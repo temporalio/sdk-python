@@ -55,8 +55,6 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     {
         m.add_class::<streams::StreamRuntimeRef>()?;
         m.add_function(wrap_pyfunction!(new_memory_stream_runtime, m)?)?;
-        #[cfg(feature = "streams-redis")]
-        m.add_function(wrap_pyfunction!(new_redis_stream_runtime, m)?)?;
     }
 
     // Testing stuff
@@ -125,50 +123,6 @@ fn new_memory_stream_runtime(
     producer_idle_ttl: Option<std::time::Duration>,
 ) -> PyResult<streams::StreamRuntimeRef> {
     streams::new_memory_stream_runtime(runtime_ref, store_name, retention, producer_idle_ttl)
-}
-
-#[cfg(feature = "streams-redis")]
-#[pyfunction]
-#[pyo3(signature = (
-    runtime_ref,
-    urls,
-    *,
-    cluster,
-    key_prefix,
-    retention,
-    producer_idle_ttl,
-    response_timeout,
-    store_name,
-    wait_replicas,
-    wait_timeout,
-))]
-#[allow(clippy::too_many_arguments)]
-fn new_redis_stream_runtime(
-    runtime_ref: &runtime::RuntimeRef,
-    urls: Vec<String>,
-    cluster: bool,
-    key_prefix: Option<String>,
-    retention: Option<std::time::Duration>,
-    producer_idle_ttl: Option<std::time::Duration>,
-    response_timeout: Option<std::time::Duration>,
-    store_name: String,
-    wait_replicas: i32,
-    wait_timeout: Option<std::time::Duration>,
-) -> PyResult<streams::StreamRuntimeRef> {
-    streams::new_redis_stream_runtime(
-        runtime_ref,
-        streams::RedisStreamOptions {
-            urls,
-            cluster,
-            key_prefix,
-            retention,
-            producer_idle_ttl,
-            response_timeout,
-            store_name,
-            wait_replicas,
-            wait_timeout,
-        },
-    )
 }
 
 #[pyfunction]
