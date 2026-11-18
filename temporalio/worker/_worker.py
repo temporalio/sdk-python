@@ -140,6 +140,7 @@ class Worker:
         on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
         use_worker_versioning: bool = False,
         disable_safe_workflow_eviction: bool = False,
+        disable_workflow_deadlock_interruption: bool = False,
         deployment_config: WorkerDeploymentConfig | None = None,
         patch_activation_callback: Callable[[PatchActivationInput], bool] | None = None,
         workflow_task_poller_behavior: PollerBehavior | None = None,
@@ -317,6 +318,16 @@ class Worker:
                 throw ``GeneratorExit`` in coroutines causing them to wake up
                 in different threads and run ``finally`` and other code in the
                 wrong workflow environment.
+            disable_workflow_deadlock_interruption: If true, when a workflow
+                activation exceeds the deadlock timeout, the worker still fails
+                the workflow task with a deadlock error but does not raise an
+                exception inside the activation thread to interrupt it.
+                Eviction then waits for the activation to finish on its own.
+                Interrupting a thread asynchronously can leave locks held by
+                Python internals (such as the import lock) or by libraries
+                permanently acquired, freezing the worker. Consider enabling
+                this if workflow tasks may exceed the deadlock timeout due to
+                CPU contention rather than true deadlocks.
             deployment_config: Deployment config for the worker. Exclusive with ``build_id`` and
                 ``use_worker_versioning``.
                 WARNING: This is an experimental feature and may change in the future.
@@ -388,6 +399,7 @@ class Worker:
             on_fatal_error=on_fatal_error,
             use_worker_versioning=use_worker_versioning,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
+            disable_workflow_deadlock_interruption=disable_workflow_deadlock_interruption,
             deployment_config=deployment_config,
             patch_activation_callback=patch_activation_callback,
             workflow_task_poller_behavior=workflow_task_poller_behavior,
@@ -573,6 +585,9 @@ class Worker:
                 metric_meter=self._runtime.metric_meter,
                 on_eviction_hook=None,
                 disable_safe_eviction=config["disable_safe_workflow_eviction"],  # type: ignore[reportTypedDictNotRequiredAccess]
+                disable_deadlock_interruption=config.get(
+                    "disable_workflow_deadlock_interruption", False
+                ),
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
                 encode_headers=client_config["header_codec_behavior"]
@@ -1055,6 +1070,7 @@ class WorkerConfig(TypedDict, total=False):
     on_fatal_error: Callable[[BaseException], Awaitable[None]] | None
     use_worker_versioning: bool
     disable_safe_workflow_eviction: bool
+    disable_workflow_deadlock_interruption: bool
     deployment_config: WorkerDeploymentConfig | None
     patch_activation_callback: Callable[[PatchActivationInput], bool] | None
     workflow_task_poller_behavior: PollerBehavior | None

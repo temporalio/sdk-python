@@ -277,6 +277,7 @@ class Replayer:
                 disable_safe_eviction=self._config.get(
                     "disable_safe_workflow_eviction", False
                 ),
+                disable_deadlock_interruption=False,
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
                 encode_headers=self._config.get(

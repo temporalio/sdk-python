@@ -1,0 +1,1 @@
+Add the `disable_workflow_deadlock_interruption` worker option, which reports deadlocked workflow tasks without asynchronously interrupting the activation thread, avoiding worker freezes caused by leaked locks such as the import lock.
