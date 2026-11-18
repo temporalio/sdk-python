@@ -3429,6 +3429,11 @@ class _WorkflowOutboundImpl(
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         return await self._instance._schedule_system_nexus_operation(input)
 
+    async def _schedule_system_nexus_operation(
+        self, input: StartNexusOperationInput[InputT, OutputT]
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        return await self._instance._schedule_system_nexus_operation(input)
+
     def start_local_activity(
         self, input: StartLocalActivityInput
     ) -> temporalio.workflow.ActivityHandle[Any]:

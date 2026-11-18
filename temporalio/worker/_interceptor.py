@@ -535,7 +535,11 @@ class WorkflowOutboundInterceptor(
     async def start_system_nexus_operation(
         self, input: StartNexusOperationInput[InputT, OutputT]
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        """Intercept a Temporal System Nexus operation started by a workflow."""
+        """Intercept a Temporal System Nexus operation started by a workflow.
+
+        A Stream operation does not reach this method. Its operation-specific method, such as
+        ``start_append_records``, intercepts it.
+        """
         return await self.next.start_system_nexus_operation(input)
 
 
