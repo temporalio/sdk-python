@@ -510,7 +510,7 @@ def _core_stream_runtimes(  # pyright: ignore[reportUnusedFunction]
     for store in config.stores:
         caller = _CoreStoreCaller(store)
         stream_runtime = temporalio.bridge.streams.StreamRuntime.new_python(
-            runtime._core_runtime, caller=caller
+            runtime._core_runtime, caller=caller, limits=store.limits
         )
         runtimes.append((store.name, stream_runtime._ref))
         callers.append(caller)

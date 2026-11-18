@@ -9,6 +9,7 @@ from typing import Any
 
 import temporalio.bridge.runtime
 import temporalio.bridge.temporal_sdk_bridge
+import temporalio.client
 
 
 class StreamRuntime:
@@ -19,14 +20,20 @@ class StreamRuntime:
         runtime: temporalio.bridge.runtime.Runtime,
         *,
         caller: Any,
+        limits: temporalio.client.StreamBatchLimits,
     ) -> StreamRuntime:
         """Build the runtime on a Store written in Python, which Core calls for Workflow code.
 
-        ``caller`` runs each call of the Store on the Worker's event loop.
+        ``caller`` runs each call of the Store on the Worker's event loop. Core refuses a
+        batch over ``limits`` before the Store sees it.
         """
         return StreamRuntime(
             temporalio.bridge.temporal_sdk_bridge.new_python_stream_runtime(
-                runtime._ref, caller
+                runtime._ref,
+                caller,
+                limits.max_record_bytes,
+                limits.max_batch_bytes,
+                limits.max_batch_records,
             )
         )
 

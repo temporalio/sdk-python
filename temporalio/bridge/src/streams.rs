@@ -1,6 +1,8 @@
 //! The adapter that lets Core call a Stream Store written in Python for Workflow code.
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
+use temporalio_streams::record::BatchLimits;
 
 use crate::runtime;
 
@@ -12,15 +14,24 @@ pub struct StreamRuntimeRef {
 
 /// Builds the runtime on a Store written in Python. Core calls the Store through it for Workflow
 /// code, and the runtime checks each request and answer. `caller` runs each call of the Store on
-/// the Worker's event loop, never on a Workflow thread.
+/// the Worker's event loop, never on a Workflow thread. The three numbers are the batch limits of
+/// the Store, and the runtime refuses a batch over them before the Store sees it.
 pub fn new_python_stream_runtime(
     runtime_ref: &runtime::RuntimeRef,
     caller: Py<PyAny>,
+    max_record_bytes: usize,
+    max_batch_bytes: usize,
+    max_batch_records: usize,
 ) -> PyResult<StreamRuntimeRef> {
     let runtime = &runtime_ref.runtime;
     runtime.assert_same_process("create a Stream runtime")?;
+    let limits = BatchLimits::default()
+        .with_max_record_bytes(max_record_bytes)
+        .and_then(|limits| limits.with_max_batch_bytes(max_batch_bytes))
+        .and_then(|limits| limits.with_max_batch_records(max_batch_records))
+        .map_err(|err| PyValueError::new_err(err.message))?;
     let meter = runtime.core.telemetry().get_temporal_metric_meter();
-    let store = std::sync::Arc::new(python_store::PythonStore { caller });
+    let store = std::sync::Arc::new(python_store::PythonStore { caller, limits });
     let streams = temporalio_streams::StreamRuntime::new(store, meter);
     Ok(StreamRuntimeRef { streams })
 }
@@ -38,6 +49,7 @@ mod python_store {
             CreateStreamRequest, CreateStreamResponse, DescribeStreamRequest,
             DescribeStreamResponse, ReadRecordsRequest, ReadRecordsResponse,
         },
+        record::BatchLimits,
         Reason, StreamError, StreamResult, StreamStore,
     };
 
@@ -52,6 +64,8 @@ mod python_store {
     pub(crate) struct PythonStore {
         /// The Python object that starts a call on the event loop and gives a canceller.
         pub(crate) caller: Py<PyAny>,
+        /// The batch limits of the Store, which the runtime reads once.
+        pub(crate) limits: BatchLimits,
     }
 
     /// What Python calls with the answer of one call.
@@ -178,6 +192,10 @@ mod python_store {
             request: DescribeStreamRequest,
         ) -> StreamResult<DescribeStreamResponse> {
             self.call("DescribeStream", request).await
+        }
+
+        fn limits(&self) -> BatchLimits {
+            self.limits
         }
     }
 }

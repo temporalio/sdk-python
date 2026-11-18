@@ -27,6 +27,7 @@ from temporalio.bridge.proto.external_data import (
 )
 from temporalio.client import (
     Client,
+    StreamBatchLimits,
     StreamConfig,
     StreamReplaySource,
     WorkflowFailureError,
@@ -1657,6 +1658,55 @@ async def test_python_store_outage_is_tried_again(client: Client):
         "a",
         "b",
     ]
+
+
+class CountingAppendStore(DictStreamStore):
+    """A Store that allows at most 2 Records in a batch and keeps the size of each append."""
+
+    def __init__(self) -> None:
+        super().__init__(limits=StreamBatchLimits(max_batch_records=2))
+        self.batches: list[int] = []
+
+    async def append_records(
+        self, request: AppendRecordsRequest
+    ) -> AppendRecordsResponse:
+        self.batches.append(len(request.records))
+        return await super().append_records(request)
+
+
+@workflow.defn
+class BatchOverTheLimitWorkflow:
+    @workflow.run
+    async def run(self, ref: StreamRef[str]) -> str:
+        stream = workflow.get_stream(ref, body_type=str)
+        try:
+            await stream.append("a", "b", "c")
+            reason = "appended"
+        except StreamError as err:
+            reason = StreamErrorReason.Name(err.reason)
+        await stream.append("d", "e")
+        return reason
+
+
+async def test_a_workflow_batch_over_the_limits_of_its_store_is_refused(
+    client: Client,
+):
+    store = CountingAppendStore()
+    stream_client = _stream_client(client, store)
+    ref = await _filled_stream(stream_client, [], close=False)
+    handle, reason = await _run(stream_client, BatchOverTheLimitWorkflow, ref)
+    assert reason == "STREAM_ERROR_REASON_TOO_LARGE"
+    # Core refused the batch of 3 before the Store saw it, and the batch of 2 went through.
+    assert store.batches == [2]
+    assert [record.body for record in await _read_all(stream_client, ref)] == [
+        "d",
+        "e",
+    ]
+    await Replayer(
+        workflows=[BatchOverTheLimitWorkflow],
+        stream_config=stream_client.config()["stream_config"],
+    ).replay_workflow(await handle.fetch_history())
+    assert store.batches == [2]
 
 
 async def test_python_store_exception_is_a_stream_failure_and_the_worker_goes_on(

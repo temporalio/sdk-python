@@ -33,7 +33,7 @@ from temporalio.api.streamservice.v1 import (
     ReadRecordsRequest,
     ReadRecordsResponse,
 )
-from temporalio.client import StreamStore
+from temporalio.client import StreamBatchLimits, StreamStore
 from temporalio.exceptions import StreamError
 
 _RequestT = TypeVar("_RequestT", bound=Message)
@@ -152,14 +152,21 @@ class DictStreamStore(StreamStore):
     :py:attr:`waiting` counts the reads that wait, so a test sees one that stays.
     """
 
-    def __init__(self, name: str = "dict") -> None:
+    def __init__(
+        self, name: str = "dict", *, limits: StreamBatchLimits | None = None
+    ) -> None:
         self._name = name
+        self._limits = limits if limits is not None else StreamBatchLimits()
         self.streams: dict[str, _DictStream] = {}
         self.waiting = 0
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def limits(self) -> StreamBatchLimits:
+        return self._limits
 
     def _stream(self, ref: StreamRef) -> _DictStream:
         stream = self.streams.get(ref.id)

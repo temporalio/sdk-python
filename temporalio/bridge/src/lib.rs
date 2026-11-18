@@ -113,8 +113,17 @@ fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, 
 fn new_python_stream_runtime(
     runtime_ref: &runtime::RuntimeRef,
     caller: Py<PyAny>,
+    max_record_bytes: usize,
+    max_batch_bytes: usize,
+    max_batch_records: usize,
 ) -> PyResult<streams::StreamRuntimeRef> {
-    streams::new_python_stream_runtime(runtime_ref, caller)
+    streams::new_python_stream_runtime(
+        runtime_ref,
+        caller,
+        max_record_bytes,
+        max_batch_bytes,
+        max_batch_records,
+    )
 }
 
 #[pyfunction]

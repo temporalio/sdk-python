@@ -196,7 +196,8 @@ class StreamStore(ABC):
         """The limits of one batch on this Store.
 
         The default is the largest batch that any Store may take. A Store that allows less
-        overrides this property, and refuses a larger batch itself.
+        overrides this property, and refuses a larger batch itself. Core refuses a larger
+        batch of Workflow code before the Store sees it.
         """
         return StreamBatchLimits()
 
