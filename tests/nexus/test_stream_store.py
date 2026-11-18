@@ -51,11 +51,7 @@ from temporalio.nexus.system.stream_service.client import (
     Stream,
     StreamServiceClientExtension,
 )
-from temporalio.testing import (
-    ActivityEnvironment,
-    MemoryStreamStore,
-    WorkflowEnvironment,
-)
+from temporalio.testing import ActivityEnvironment, WorkflowEnvironment
 from tests import DEV_SERVER_DOWNLOAD_VERSION
 from tests.helpers.streams import DictStreamStore
 from tests.test_converter import SimpleCodec
@@ -73,9 +69,9 @@ def _with_config(client: Client, stream_config: StreamConfig) -> Client:
 
 def _two_stores(
     selector: Callable[[StreamSelectContext], StreamStore],
-) -> tuple[MemoryStreamStore, MemoryStreamStore, StreamConfig]:
-    first = MemoryStreamStore(name="first")
-    second = MemoryStreamStore(name="second")
+) -> tuple[DictStreamStore, DictStreamStore, StreamConfig]:
+    first = DictStreamStore(name="first")
+    second = DictStreamStore(name="second")
     return first, second, StreamConfig(stores=[first, second], store_selector=selector)
 
 
@@ -94,7 +90,7 @@ async def _only_producer(stream: Stream[str]) -> Producer:
 async def _append_in_activity(
     client: Client, info: temporalio.activity.Info
 ) -> Producer:
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     env = ActivityEnvironment()
     env.info = info
     await env.run(stream.append, "a")
@@ -114,13 +110,13 @@ async def _stream_error(call: Awaitable[object]) -> StreamError:
 
 
 async def test_client_stream_uses_store(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
 
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
     assert stream.created
-    assert stream.ref.store == "memory"
+    assert stream.ref.store == "dict"
     appended = await stream.append("a", "b")
     assert appended.first_offset is not None
     assert appended.last_offset is not None
@@ -200,7 +196,7 @@ def test_stream_operations_match_the_stream_service():
 
 
 async def test_client_strict_create_of_existing_stream_fails(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream_id = f"stream-{uuid.uuid4()}"
     await stream_client.create_stream(id=stream_id, body_type=str)
     err = await _stream_error(stream_client.create_stream(id=stream_id, body_type=str))
@@ -216,7 +212,7 @@ async def test_client_strict_create_of_existing_stream_fails(client: Client):
 
 
 async def test_client_read_or_describe_of_unknown_stream_fails(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = stream_client.get_stream(
         StreamRef(id=f"stream-{uuid.uuid4()}"), body_type=str
     )
@@ -226,7 +222,7 @@ async def test_client_read_or_describe_of_unknown_stream_fails(client: Client):
 
 
 async def test_client_append_after_close_fails(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     await stream.append("a")
     await stream.close()
     err = await _stream_error(stream.append("b"))
@@ -235,7 +231,7 @@ async def test_client_append_after_close_fails(client: Client):
 
 
 async def test_client_stream_store_uses_payload_codec(client: Client):
-    store = MemoryStreamStore()
+    store = DictStreamStore()
     config = client.config()
     config["data_converter"] = DataConverter(payload_codec=SimpleCodec())
     config["stream_config"] = StreamConfig(stores=[store])
@@ -255,7 +251,7 @@ async def test_client_stream_store_uses_payload_codec(client: Client):
 
 
 async def test_client_append_has_client_producer(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     await stream.append("a")
     producer = await _only_producer(stream)
     assert producer.id.startswith("client:")
@@ -348,7 +344,7 @@ async def test_local_activity_append_without_workflow_task_fails(client: Client)
 
 
 async def test_explicit_producer_is_sent(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     with mock.patch.object(
         temporalio.nexus.system._support, "default_producer"
     ) as default_producer:
@@ -362,7 +358,7 @@ async def test_explicit_producer_is_sent(client: Client):
 
 
 async def test_client_append_with_sequence_writes_once(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     producer = Producer(id="mine", kind=ProducerKindClient(ClientProducer()))
     first = await stream.append("a", "b", producer=producer, sequence=5)
     second = await stream.append("a", "b", producer=producer, sequence=5)
@@ -469,14 +465,14 @@ async def test_client_without_stream_store_raises_and_sends_nothing(client: Clie
 def test_stream_config_refuses_a_bad_set_of_stores():
     with pytest.raises(StreamConfigError, match="at least one Store"):
         StreamConfig(stores=[])
-    same_name = [MemoryStreamStore(name="a"), MemoryStreamStore(name="a")]
+    same_name = [DictStreamStore(name="a"), DictStreamStore(name="a")]
     with pytest.raises(StreamConfigError, match="more than one Store named 'a'"):
         StreamConfig(stores=same_name, store_selector=lambda _: same_name[0])
     assert not issubclass(StreamConfigError, StreamError)
 
 
 def test_stream_config_takes_several_stores_with_no_selector():
-    first, second = MemoryStreamStore(name="a"), MemoryStreamStore(name="b")
+    first, second = DictStreamStore(name="a"), DictStreamStore(name="b")
     stream_config = StreamConfig(stores=[first, second])
     assert stream_config.store_selector is None
     assert stream_config._store_for(StreamRef(id="stream", store="b"), None) is second
@@ -487,8 +483,8 @@ def test_stream_config_takes_several_stores_with_no_selector():
 async def test_client_create_with_store_on_several_stores_needs_no_selector(
     client: Client,
 ):
-    first = MemoryStreamStore(name="first")
-    second = MemoryStreamStore(name="second")
+    first = DictStreamStore(name="first")
+    second = DictStreamStore(name="second")
     stream_client = _with_config(client, StreamConfig(stores=[first, second]))
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", store="second", body_type=str
@@ -506,7 +502,7 @@ async def test_client_create_with_store_on_several_stores_needs_no_selector(
 
 async def test_client_create_without_store_on_several_stores_fails(client: Client):
     stream_config = StreamConfig(
-        stores=[MemoryStreamStore(name="first"), MemoryStreamStore(name="second")]
+        stores=[DictStreamStore(name="first"), DictStreamStore(name="second")]
     )
     stream_client = _with_config(client, stream_config)
     with pytest.raises(StreamConfigError) as err:
@@ -520,7 +516,7 @@ async def test_client_create_without_store_on_several_stores_fails(client: Clien
 
 def test_client_refuses_a_store_in_plugins(client: Client):
     config = client.config()
-    config["plugins"] = [MemoryStreamStore()]  # type: ignore[list-item]
+    config["plugins"] = [DictStreamStore()]  # type: ignore[list-item]
     with pytest.raises(StreamConfigError, match="plugins"):
         Client(**config)
 
@@ -586,14 +582,14 @@ async def test_selector_gets_the_activity_that_makes_the_call(client: Client):
 
 
 async def test_selector_that_returns_another_store_fails(client: Client):
-    _, _, stream_config = _two_stores(lambda _: MemoryStreamStore(name="first"))
+    _, _, stream_config = _two_stores(lambda _: DictStreamStore(name="first"))
     stream_client = _with_config(client, stream_config)
     with pytest.raises(StreamConfigError, match="isn't one of"):
         await stream_client.create_stream(id=f"stream-{uuid.uuid4()}", body_type=str)
 
 
 async def test_ref_of_a_store_that_the_client_lacks_fails(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore(name="first"))
+    stream_client = _with_store(client, DictStreamStore(name="first"))
     stream = stream_client.get_stream(
         StreamRef(id=f"stream-{uuid.uuid4()}", store="other"), body_type=str
     )
@@ -608,7 +604,7 @@ def test_request_without_a_stream_ref_fails():
 
 
 async def test_start_local_gives_its_client_the_stream_config():
-    stream_config = StreamConfig(stores=[MemoryStreamStore()])
+    stream_config = StreamConfig(stores=[DictStreamStore()])
     async with await WorkflowEnvironment.start_local(
         stream_config=stream_config,
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
@@ -617,7 +613,7 @@ async def test_start_local_gives_its_client_the_stream_config():
         stream = await env.client.create_stream(
             id=f"stream-{uuid.uuid4()}", body_type=str
         )
-        assert stream.ref.store == "memory"
+        assert stream.ref.store == "dict"
 
 
 def test_stream_error_carries_its_reason():

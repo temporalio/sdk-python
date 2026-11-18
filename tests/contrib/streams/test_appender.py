@@ -13,8 +13,7 @@ from temporalio.client import Client
 from temporalio.contrib.streams import BufferedAppender
 from temporalio.nexus.system.stream_service import StreamRef
 from temporalio.nexus.system.stream_service.client import Stream
-from temporalio.testing import MemoryStreamStore
-from tests.helpers.streams import RecordingStreamStore
+from tests.helpers.streams import DictStreamStore, RecordingStreamStore
 from tests.nexus.test_stream_store import _create_stream, _stream_error, _with_store
 
 # Long enough that only a flush, a full batch or the end of `async with` starts a write.
@@ -23,7 +22,7 @@ _NEVER = timedelta(hours=1)
 
 class RecordingStore(RecordingStreamStore):
     def __init__(self) -> None:
-        super().__init__(MemoryStreamStore())
+        super().__init__(DictStreamStore())
         self.batches: list[int] = []
         self.append_started = asyncio.Event()
         self.release: asyncio.Event | None = None
@@ -53,7 +52,7 @@ async def test_appends_inside_one_delay_go_as_one_batch(client: Client):
 
 
 async def test_flush_returns_the_last_offset(client: Client):
-    stream = await _create_stream(client, MemoryStreamStore())
+    stream = await _create_stream(client, DictStreamStore())
     appender = BufferedAppender(stream)
     assert await appender.flush() is None
     appender.append("a", "b")
@@ -150,7 +149,7 @@ async def test_async_with_keeps_the_error_of_its_block(client: Client):
 
 
 async def test_append_without_a_value_fails(client: Client):
-    stream = _with_store(client, MemoryStreamStore()).get_stream(
+    stream = _with_store(client, DictStreamStore()).get_stream(
         StreamRef(id=f"stream-{uuid.uuid4()}"), body_type=str
     )
     appender = BufferedAppender(stream)

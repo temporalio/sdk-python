@@ -17,9 +17,8 @@ from temporalio.nexus.system.stream_service import (
     StreamService,
 )
 from temporalio.nexus.system.stream_service.workflow import create_stream, get_stream
-from temporalio.testing import MemoryStreamStore
 from tests.helpers import assert_task_fail_eventually, new_worker
-from tests.helpers.streams import RecordingStreamStore
+from tests.helpers.streams import DictStreamStore, RecordingStreamStore
 from tests.nexus.test_stream_store import _with_store
 
 _BODIES = ["first-record-body", "second-record-body"]
@@ -55,7 +54,7 @@ class StreamCallWorkflow:
 async def test_workflow_stream_call_fails_the_workflow_task(
     client: Client, operation: str
 ):
-    store = RecordingStreamStore(MemoryStreamStore())
+    store = RecordingStreamStore(DictStreamStore())
     stream_client = _with_store(client, store)
     async with new_worker(stream_client, StreamCallWorkflow) as worker:
         handle = await stream_client.start_workflow(
@@ -140,7 +139,7 @@ async def test_local_activity_append_after_a_failed_workflow_task_has_a_higher_e
 ):
     global _fail_next_task
     _fail_next_task = True
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
@@ -168,7 +167,7 @@ async def test_local_activity_append_after_a_failed_workflow_task_has_a_higher_e
 
 
 async def test_user_local_activity_append_has_local_activity_producer(client: Client):
-    stream_client = _with_store(client, MemoryStreamStore())
+    stream_client = _with_store(client, DictStreamStore())
     stream = await stream_client.create_stream(
         id=f"stream-{uuid.uuid4()}", body_type=str
     )
