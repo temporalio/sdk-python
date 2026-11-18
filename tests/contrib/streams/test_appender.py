@@ -37,7 +37,7 @@ class RecordingStore(RecordingStreamStore):
 
 
 async def _bodies(stream: Stream[str]) -> list[str]:
-    return [record.body async for record in stream.iter_read_items()]
+    return [record.body async for record in stream.read()]
 
 
 async def test_appends_inside_one_delay_go_as_one_batch(client: Client):
@@ -98,7 +98,7 @@ async def test_the_timer_alone_writes_the_batch(client: Client):
     stream = await _create_stream(client, store)
     appender = BufferedAppender(stream, max_delay=timedelta(milliseconds=10))
     appender.append("a", "b")
-    page = await stream.read(wait=timedelta(seconds=10))
+    page = await stream.read_page(wait=timedelta(seconds=10))
     assert [record.body for record in page.records] == ["a", "b"]
     assert store.batches == [2]
 

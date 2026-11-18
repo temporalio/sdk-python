@@ -86,7 +86,7 @@ async def _create_stream(client: Client, store: StreamStore) -> Stream[str]:
 
 
 async def _only_producer(stream: Stream[str]) -> Producer:
-    [record] = [record async for record in stream.iter_read_items()]
+    [record] = [record async for record in stream.read()]
     assert record.producer is not None
     return record.producer
 
@@ -125,14 +125,14 @@ async def test_client_stream_uses_store(client: Client):
     assert appended.first_offset is not None
     assert appended.last_offset is not None
     assert appended.first_offset < appended.last_offset
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [(record.body, record.offset) for record in records] == [
         ("a", appended.first_offset),
         ("b", appended.last_offset),
     ]
 
     other = stream_client.get_stream(stream.ref, body_type=str)
-    assert [record.body async for record in other.iter_read_items()] == ["a", "b"]
+    assert [record.body async for record in other.read()] == ["a", "b"]
 
     described = await stream.describe()
     assert described.status == StreamStatus.StreamStatusOpen
@@ -142,10 +142,10 @@ async def test_client_stream_uses_store(client: Client):
     described = await stream.describe()
     assert described.status == StreamStatus.StreamStatusClosed
     assert described.last_offset == appended.last_offset
-    page = await stream.read(from_offset=records[-1].offset)
+    page = await stream.read_page(from_offset=records[-1].offset)
     assert page.done
     assert page.records == []
-    pages = [page async for page in stream.iter_read()]
+    pages = [page async for page in stream.read_pages()]
     assert pages[-1].done
     assert [record.body for page in pages for record in page.records] == ["a", "b"]
 
@@ -162,7 +162,7 @@ async def test_client_stream_uses_a_store_written_from_scratch(client: Client):
     assert stream.created
     assert stream.ref.store == "dict"
     appended = await stream.append("a", "b")
-    assert [record.body async for record in stream.iter_read_items()] == ["a", "b"]
+    assert [record.body async for record in stream.read()] == ["a", "b"]
     # The Store gets payloads that the client already encoded with the codec.
     stored = store.streams[stream_id].records
     assert [record.body.metadata["simple-codec"] for record in stored] == [
@@ -220,7 +220,7 @@ async def test_client_read_or_describe_of_unknown_stream_fails(client: Client):
     stream = stream_client.get_stream(
         StreamRef(id=f"stream-{uuid.uuid4()}"), body_type=str
     )
-    for call in (stream.read(), stream.describe()):
+    for call in (stream.read_page(), stream.describe()):
         err = await _stream_error(call)
         assert err.reason == StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND
 
@@ -249,9 +249,9 @@ async def test_client_stream_store_uses_payload_codec(client: Client):
     raw = _with_store(client, store).get_stream(
         StreamRef(id=stream.ref.id), body_type=temporalio.common.RawValue
     )
-    stored = [record.body.payload async for record in raw.iter_read_items()]
+    stored = [record.body.payload async for record in raw.read()]
     assert [body.metadata["simple-codec"] for body in stored] == [b"true", b"true"]
-    assert [record.body async for record in stream.iter_read_items()] == ["a", "b"]
+    assert [record.body async for record in stream.read()] == ["a", "b"]
 
 
 async def test_client_append_has_client_producer(client: Client):
@@ -367,7 +367,7 @@ async def test_client_append_with_sequence_writes_once(client: Client):
     first = await stream.append("a", "b", producer=producer, sequence=5)
     second = await stream.append("a", "b", producer=producer, sequence=5)
     assert second == first
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [record.body for record in records] == ["a", "b"]
     assert [record.offset for record in records] == [
         first.first_offset,
@@ -497,7 +497,7 @@ async def test_client_create_with_store_on_several_stores_needs_no_selector(
     assert stream.ref.store == "second"
     await stream.append("a")
     in_second = _with_store(client, second).get_stream(stream.ref, body_type=str)
-    assert [record.body async for record in in_second.iter_read_items()] == ["a"]
+    assert [record.body async for record in in_second.read()] == ["a"]
     in_first = _with_store(client, first).get_stream(
         StreamRef(id=stream.ref.id), body_type=str
     )
@@ -544,7 +544,7 @@ async def test_selector_picks_the_store_of_a_new_stream(client: Client):
     # A call through a ref that names its Store doesn't ask the selector.
     assert len(contexts) == 1
     in_second = _with_store(client, second).get_stream(stream.ref, body_type=str)
-    assert [record.body async for record in in_second.iter_read_items()] == ["a"]
+    assert [record.body async for record in in_second.read()] == ["a"]
     in_first = _with_store(client, first).get_stream(
         StreamRef(id=stream_id), body_type=str
     )

@@ -119,7 +119,7 @@ class UserLocalActivityAppendWorkflow:
 
 async def _read_all(client: Client, stream_id: str) -> list[StreamRecord[str]]:
     stream = client.get_stream(StreamRef(id=stream_id), body_type=str)
-    return [record async for record in stream.iter_read_items()]
+    return [record async for record in stream.read()]
 
 
 def _local_activity_epoch(producer: Producer) -> tuple[int, int, int]:

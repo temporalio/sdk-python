@@ -88,7 +88,7 @@ def _producer_of_each_kind() -> dict[str, Producer]:
 
 
 async def _records(stream: Stream[str]) -> list[StreamRecord[str]]:
-    return [record async for record in stream.iter_read_items()]
+    return [record async for record in stream.read()]
 
 
 async def test_current_producer_in_other_code_is_the_client_producer(client: Client):

@@ -97,7 +97,7 @@ async def test_client_creates_appends_reads_and_closes(client: Client):
     appended = await stream.append("a", "b")
     assert appended.first_offset is not None
     assert appended.last_offset is not None
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [(record.body, record.offset) for record in records] == [
         ("a", appended.first_offset),
         ("b", appended.last_offset),
@@ -107,7 +107,7 @@ async def test_client_creates_appends_reads_and_closes(client: Client):
     described = await stream.describe()
     assert described.status == StreamStatus.StreamStatusClosed
     assert described.last_offset == appended.last_offset
-    page = await stream.read(from_offset=appended.last_offset)
+    page = await stream.read_page(from_offset=appended.last_offset)
     assert page.done
     assert page.records == []
 
@@ -126,7 +126,7 @@ async def test_local_activity_appends_with_local_activity_producer(client: Clien
         )
         await handle.result()
 
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [record.body for record in records] == ["a", "b"]
     run_id = handle.result_run_id
     for record in records:
@@ -149,7 +149,7 @@ async def test_activity_appends_with_activity_producer(client: Client):
         )
         await handle.result()
 
-    [record] = [record async for record in stream.iter_read_items()]
+    [record] = [record async for record in stream.read()]
     assert record.body == "from-activity"
     assert record.producer is not None
     assert isinstance(record.producer.kind, ProducerKindWorkflowActivity)
@@ -162,7 +162,7 @@ async def test_client_append_with_sequence_writes_once(client: Client):
     first = await stream.append("a", "b", producer=producer, sequence=5)
     second = await stream.append("a", "b", producer=producer, sequence=5)
     assert second == first
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [record.body for record in records] == ["a", "b"]
     assert [record.offset for record in records] == [
         first.first_offset,
@@ -199,7 +199,7 @@ async def test_read_with_wait_gets_a_later_record(client: Client):
         await stream.append("late")
 
     append = asyncio.create_task(append_later())
-    page = await stream.read(wait=timedelta(seconds=10))
+    page = await stream.read_page(wait=timedelta(seconds=10))
     await append
     assert [record.body for record in page.records] == ["late"]
 
