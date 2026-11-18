@@ -99,6 +99,12 @@ def _take_nexus_previous_run_outcome(
     return outcome
 
 
+async def _wait_until_done(future: asyncio.Future, timeout: float | None) -> bool:
+    """Wait for completion without cancelling the future or retrieving its result."""
+    done, _ = await asyncio.wait((future,), timeout=timeout)
+    return bool(done)
+
+
 class _WorkflowWorker:  # type:ignore[reportUnusedClass]
     def __init__(
         self,
@@ -445,35 +451,41 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     asyncio.get_running_loop(), workflow, act
                 )
             else:
-                # Run activation in separate thread so we can check if it's
-                # deadlocked
-                activate_task = asyncio.get_running_loop().run_in_executor(
-                    self._workflow_task_executor,
-                    workflow.activate,
-                    act,
+                # Submit the activation job to the executor to create a future.
+                activation_job = self._workflow_task_executor.submit(
+                    workflow.activate, act
                 )
 
-                # Run activation task with deadlock timeout
+                # Wrap the future in a asyncio.Future so the current loop can await it
+                activation_future = asyncio.wrap_future(activation_job)
                 try:
-                    completion = await asyncio.wait_for(
-                        activate_task, self._deadlock_timeout_seconds
+                    completed = await _wait_until_done(
+                        activation_future, self._deadlock_timeout_seconds
                     )
-                except asyncio.TimeoutError:
-                    # Need to create the deadlock exception up here so it
-                    # captures the trace now instead of later after we may have
-                    # interrupted it
+                except asyncio.CancelledError:
+                    # If wait is cancelled, manually forward to future
+                    activation_future.cancel()
+                    raise
+
+                if not completed:
+                    # Cancel only work the executor hasn't started. If it has
+                    # started, keep its wrapper awaitable for safe eviction.
+
+                    # Cancel the activation job future, False indicates it cannot be canceled
+                    cancelled_before_start = activation_job.cancel()
                     deadlock_exc = _DeadlockError.from_deadlocked_workflow(
-                        workflow.instance, self._deadlock_timeout_seconds
+                        None if cancelled_before_start else workflow.instance,
+                        self._deadlock_timeout_seconds,
                     )
-                    # When we deadlock, we will raise an exception to fail
-                    # the task. But before we do that, we want to try to
-                    # interrupt the thread and put this activation task on
-                    # the workflow so that the successive eviction can wait
-                    # on it before trying to evict.
-                    workflow.attempt_deadlock_interruption()
-                    # Set the task and raise
-                    workflow.deadlocked_activation_task = activate_task
-                    raise deadlock_exc from None
+                    # if we weren't able to cancel the activation job, it is either running
+                    # or finished. attempt_deadlock_interruption accounts for both scenarios
+                    if not cancelled_before_start:
+                        workflow.deadlocked_activation_task = activation_future
+                        workflow.attempt_deadlock_interruption()
+                    raise deadlock_exc
+
+                # If all went well the activation job's result is threaded to the task's result
+                completion = activation_future.result()
 
         except Exception as err:
             if isinstance(err, _DeadlockError):
@@ -610,12 +622,10 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             # eviction complete successfully because this is the only way we can
             # confirm the event loop was torn down gracefully and therefore no
             # GC'ing of the tasks occurs (which can cause them to wake up in
-            # different threads). We will wait deadlock timeout amount (2s if
-            # enabled) before making it clear to users that eviction is being
-            # swallowed. Any error or timeout of eviction causes us to retry
-            # forever because something in users code is preventing eviction.
+            # different threads). Log if teardown times out, but keep waiting
+            # for the same call. Retry only if the call fails.
             seen_fail = False
-            handle_eviction_task: asyncio.Future | None = None
+            eviction_future: asyncio.Future | None = None
             while True:
                 try:
                     if self._debug_mode:
@@ -623,22 +633,24 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                             asyncio.get_running_loop(), workflow, act
                         )
                     else:
-                        # We only create the eviction task if we haven't already or
-                        # it is done. This is because if it already is running and
-                        # timed out, it's still running (and holding on to a
-                        # thread). But if did complete running but failed with
-                        # another error, we want to re-create the task.
-                        if not handle_eviction_task or handle_eviction_task.done():
-                            handle_eviction_task = (
+                        if eviction_future is None:
+                            eviction_future = (
                                 asyncio.get_running_loop().run_in_executor(
                                     self._workflow_task_executor,
                                     workflow.activate,
                                     act,
                                 )
                             )
-                        await asyncio.wait_for(
-                            handle_eviction_task, self._deadlock_timeout_seconds
-                        )
+                        # Keep the call on timeout: it may still be running, or
+                        # it may finish while we sleep before checking again.
+                        if not await _wait_until_done(
+                            eviction_future, self._deadlock_timeout_seconds
+                        ):
+                            raise asyncio.TimeoutError
+                        try:
+                            eviction_future.result()
+                        finally:
+                            eviction_future = None
                     # Break if it succeeds
                     break
                 except BaseException as err:
@@ -650,8 +662,9 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                         # exception
                         if isinstance(err, asyncio.TimeoutError):
                             logger.error(
-                                "Timed out running eviction job for run ID %s, continually "
-                                + "retrying eviction. This is usually caused by inadvertently "
+                                "Timed out running eviction job for run ID %s. "
+                                + "Waiting for the eviction call to finish before retrying. "
+                                + "This is usually caused by inadvertently "
                                 + "catching 'BaseException's like asyncio.CancelledError or "
                                 + "_WorkflowBeingEvictedError and still continuing work. "
                                 + "Since eviction could not be processed, this worker "
@@ -875,9 +888,11 @@ class _DeadlockError(Exception):
             self._new_tb = None
 
     @classmethod
-    def from_deadlocked_workflow(cls, workflow: WorkflowInstance, timeout: int | None):
+    def from_deadlocked_workflow(
+        cls, workflow: WorkflowInstance | None, timeout: int | None
+    ):
         msg = f"[TMPRL1101] Potential deadlock detected: workflow didn't yield within {timeout} second(s)."
-        tid = workflow.get_thread_id()
+        tid = workflow.get_thread_id() if workflow is not None else None
         if not tid:
             return cls(msg)
 

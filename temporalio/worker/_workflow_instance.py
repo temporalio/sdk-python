@@ -587,6 +587,11 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 self._versioning_behavior.value
             )
 
+        if self._deleting:
+            # An interrupt while a finished task schedules its done callbacks
+            # can prevent its removal. It has no coroutine left to tear down.
+            self._tasks.difference_update([t for t in self._tasks if t.done()])
+
         # If we're deleting, there better be no more tasks. It is important for
         # the integrity of the system that we check this. If there are tasks
         # remaining, they and any associated coroutines will get garbage
@@ -2847,7 +2852,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # Add to and remove from our own non-weak set instead of relying on
         # Python's weak set which can collect these too early
         self._tasks.add(task)
-        task.add_done_callback(self._tasks.remove)
+        task.add_done_callback(self._tasks.discard)
         # When the workflow is GC'd (for whatever reason, e.g. eviction or
         # worker shutdown), still-open tasks get a message logged to the
         # exception handler about still pending. We disable this if the
