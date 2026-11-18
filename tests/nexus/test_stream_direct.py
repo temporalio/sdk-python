@@ -45,6 +45,7 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.exceptions import ApplicationError, StreamError, StreamReplayError
+from temporalio.nexus.system import stream_service
 from temporalio.nexus.system.stream_service import (
     Producer,
     ProducerKindWorkflow,
@@ -57,7 +58,6 @@ from temporalio.testing import MemoryStreamStore, WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
     Replayer,
-    StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
@@ -131,7 +131,7 @@ async def _filled_stream(
 
 async def _read_all(client: Client, ref: StreamRef[str]) -> list[StreamRecord[str]]:
     stream = client.get_stream(ref, body_type=str)
-    return [record async for record in stream.iter_read_items()]
+    return [record async for record in stream.read()]
 
 
 async def _run(
@@ -158,7 +158,7 @@ async def _run(
         return handle, await handle.result()
 
 
-# A generator over `iter_read_items` that reads the Stream of an Activity that still runs.
+# A generator over `read` that reads the Stream of an Activity that still runs.
 
 
 @dataclass
@@ -176,7 +176,7 @@ async def stream_model_output(call: ModelCall) -> None:
     # The Activity writes the rest only after the Workflow says that it has the first
     # chunks. So the test passes only if Workflow code gets chunks while the Activity runs.
     told = False
-    async for _ in seen.iter_read_items(wait=timedelta(seconds=30)):
+    async for _ in seen.read(wait=timedelta(seconds=30)):
         told = True
         break
     if not told:
@@ -191,7 +191,7 @@ async def model_chunks(chunks_id: str) -> AsyncGenerator[str, None]:
     """Yield each chunk of the model's Stream, as the model stub of a library does."""
     stream = workflow.get_stream(StreamRef(id=chunks_id), body_type=str)
     # The wait is far longer than a pause of the model, so no page comes back empty.
-    async for record in stream.iter_read_items(wait=timedelta(seconds=30)):
+    async for record in stream.read(wait=timedelta(seconds=30)):
         yield record.body
 
 
@@ -212,7 +212,7 @@ class LiveModelWorkflow:
         return text
 
 
-async def test_generator_over_iter_read_items_reads_a_running_activity(
+async def test_generator_over_read_reads_a_running_activity(
     client: Client,
 ):
     stream_client = _stream_client(client)
@@ -273,7 +273,7 @@ class ReadPagesWorkflow:
         ref = StreamRef[str](id=args.stream_id, store=args.store)
         stream = workflow.get_stream(ref, body_type=str)
         result = ReadResult([], [], [], [], [])
-        async for page in stream.iter_read(
+        async for page in stream.read_pages(
             from_offset=(
                 bytes.fromhex(args.from_offset)
                 if args.from_offset is not None
@@ -347,7 +347,7 @@ class ReadOnePageWorkflow:
     @workflow.run
     async def run(self, ref: StreamRef[str], wait_ms: int | None) -> list[Any]:
         stream = workflow.get_stream(ref, body_type=str)
-        page = await stream.read(wait=_ms(wait_ms))
+        page = await stream.read_page(wait=_ms(wait_ms))
         return [[record.body for record in page.records], page.done, page.last_offset]
 
 
@@ -385,7 +385,7 @@ async def test_read_with_no_wait_on_an_empty_stream_gives_an_empty_page(
 
 
 @pytest.mark.parametrize("max_cached_workflows", [1000, 0])
-async def test_iter_read_items_with_no_wait_gives_what_is_there_and_ends(
+async def test_read_with_no_wait_gives_what_is_there_and_ends(
     client: Client, max_cached_workflows: int
 ):
     stream_client = _stream_client(client)
@@ -409,9 +409,7 @@ class ReadItemsWorkflow:
     @workflow.run
     async def run(self, ref: StreamRef[str], wait_ms: int | None) -> list[str]:
         stream = workflow.get_stream(ref, body_type=str)
-        return [
-            record.body async for record in stream.iter_read_items(wait=_ms(wait_ms))
-        ]
+        return [record.body async for record in stream.read(wait=_ms(wait_ms))]
 
 
 async def test_page_that_takes_the_last_record_with_a_cap_is_done(client: Client):
@@ -461,15 +459,12 @@ class QuietGapWorkflow:
             start_to_close_timeout=timedelta(seconds=30),
         )
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        got = [
-            record.body
-            async for record in stream.iter_read_items(wait=timedelta(seconds=10))
-        ]
+        got = [record.body async for record in stream.read(wait=timedelta(seconds=10))]
         await writer
         return got
 
 
-async def test_iter_read_items_with_a_wait_reads_across_a_quiet_gap(client: Client):
+async def test_read_with_a_wait_reads_across_a_quiet_gap(client: Client):
     stream_client = _stream_client(client)
     ref = await _filled_stream(stream_client, [], close=False)
     handle, result = await _run(
@@ -524,7 +519,7 @@ class LoopWithNoAwaitWorkflow:
         )
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         got = []
-        async for record in stream.iter_read_items(wait=timedelta(seconds=10)):
+        async for record in stream.read(wait=timedelta(seconds=10)):
             got.append(record.body)
         await writer
         return got
@@ -561,7 +556,7 @@ class LoopWithAppendWorkflow:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         out = workflow.get_stream(StreamRef(id=out_id), body_type=str)
         got = []
-        async for record in stream.iter_read_items(wait=timedelta(seconds=10)):
+        async for record in stream.read(wait=timedelta(seconds=10)):
             got.append(record.body)
             await out.append(record.body)
         await writer
@@ -655,7 +650,7 @@ class CounterTasksWorkflow:
         wakes = _Wakes()
         seen: list[int] = []
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        async for item in stream.iter_read_items(wait=timedelta(seconds=30)):
+        async for item in stream.read(wait=timedelta(seconds=30)):
             asyncio.create_task(self.count(wakes))
             seen.append(self.i)
             if self.i == 2:
@@ -666,7 +661,7 @@ class CounterTasksWorkflow:
 
 
 async def _read_calls(count: int) -> None:
-    """Wait until Workflow code has made this many `read` calls."""
+    """Wait until Workflow code has made this many `read_page` calls."""
 
     async def check() -> None:
         assert [name for name, _ in _intercepted].count("ReadRecords") >= count
@@ -790,7 +785,7 @@ class ActivityForEachRecordWorkflow:
     async def run(self, stream_id: str) -> list[str]:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         got = []
-        async for item in stream.iter_read_items():
+        async for item in stream.read():
             got.append(
                 await workflow.execute_activity(
                     tag, item.body, start_to_close_timeout=timedelta(seconds=10)
@@ -807,7 +802,7 @@ class OneRecordPerReadWorkflow:
         got = []
         offset = None
         while True:
-            page = await stream.read(from_offset=offset, max_records=1)
+            page = await stream.read_page(from_offset=offset, max_records=1)
             for record in page.records:
                 got.append(
                     await workflow.execute_activity(
@@ -883,7 +878,7 @@ async def test_one_record_reads_of_one_page_keep_its_marker(
     )
 
 
-# What `read` checks, and where it can't run.
+# What `read_page` checks, and where it can't run.
 
 
 # A client's read clamps each of these, or refuses it, and a Workflow read does the same.
@@ -905,7 +900,7 @@ class ReadLimitsWorkflow:
         results: list[Any] = []
         for arguments in _READ_LIMIT_CASES:
             try:
-                page = await stream.read(**arguments)
+                page = await stream.read_page(**arguments)
                 results.append(len(page.records))
             except StreamError as err:
                 results.append([StreamErrorReason.Name(err.reason), err.message])
@@ -920,7 +915,7 @@ async def test_read_takes_the_limits_of_a_client_read(client: Client):
     expected: list[Any] = []
     for arguments in _READ_LIMIT_CASES:
         try:
-            page = await stream.read(**arguments)
+            page = await stream.read_page(**arguments)
             expected.append(len(page.records))
         except StreamError as err:
             expected.append([StreamErrorReason.Name(err.reason), err.message])
@@ -935,11 +930,11 @@ class LongOffsetWorkflow:
         stream = workflow.get_stream(ref, body_type=str)
         got: list[str] = []
         try:
-            await stream.read(from_offset=b"o" * 2000)
+            await stream.read_page(from_offset=b"o" * 2000)
             got.append("page")
         except StreamError as err:
             got.append(StreamErrorReason.Name(err.reason))
-        got.extend([record.body async for record in stream.iter_read_items()])
+        got.extend([record.body async for record in stream.read()])
         return got
 
 
@@ -967,7 +962,7 @@ class QueryReadWorkflow:
     @workflow.query
     def start_read(self) -> str:
         assert self.ref is not None
-        step = workflow.get_stream(self.ref, body_type=str).read()
+        step = workflow.get_stream(self.ref, body_type=str).read_page()
         try:
             step.send(None)
         except Exception as err:
@@ -1003,7 +998,7 @@ class LoopReadWorkflow:
         stream = workflow.get_stream(ref, body_type=str)
         got: list[str] = []
         # The first loop leaves with `break`, and its next request resumes there.
-        items = stream.iter_read_items(max_records=4)
+        items = stream.read(max_records=4)
         async for record in items:
             got.append(record.body)
             if len(got) == 3:
@@ -1012,7 +1007,7 @@ class LoopReadWorkflow:
         last = items.next_request.from_offset
         # The last reads go on from there to the end, two Records at a time.
         while True:
-            page = await stream.read(from_offset=last, max_records=2)
+            page = await stream.read_page(from_offset=last, max_records=2)
             got.extend(record.body for record in page.records)
             last = page.last_offset
             if page.done:
@@ -1144,7 +1139,7 @@ class TwoReadsWorkflow:
         last = None
         while True:
             self.reads += 1
-            page = await stream.read(from_offset=last, max_records=2)
+            page = await stream.read_page(from_offset=last, max_records=2)
             for record in page.records:
                 tagged = await workflow.execute_local_activity(
                     tag, record.body, start_to_close_timeout=timedelta(seconds=10)
@@ -1297,7 +1292,7 @@ class FailOnceInReadWorkflow:
         stream = workflow.get_stream(ref, body_type=str)
         out = workflow.get_stream(out_ref, body_type=str)
         got: list[str] = []
-        async for record in stream.iter_read_items():
+        async for record in stream.read():
             got.append(record.body)
             if record.body == "record-2":
                 await out.append("seen record-2")
@@ -1345,7 +1340,7 @@ class SignalStopsReadWorkflow:
         got: list[str] = []
 
         async def read_all() -> None:
-            async for record in stream.iter_read_items(wait=timedelta(seconds=60)):
+            async for record in stream.read(wait=timedelta(seconds=60)):
                 got.append(record.body)
 
         reader = asyncio.create_task(read_all())
@@ -1400,7 +1395,7 @@ class BreakThenReadAgainWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[Any]:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        first = stream.iter_read_items(wait=timedelta(seconds=30))
+        first = stream.read(wait=timedelta(seconds=30))
         got_first: list[str] = []
         async for record in first:
             got_first.append(record.body)
@@ -1408,7 +1403,7 @@ class BreakThenReadAgainWorkflow:
                 break
         assert first.next_request is not None
         # The second loop resumes after the last Record that the first one gave.
-        second = stream.iter_read(
+        second = stream.read_pages(
             from_offset=first.next_request.from_offset, wait=timedelta(seconds=30)
         )
         writer = workflow.start_activity(
@@ -1441,10 +1436,10 @@ class CompleteWithOpenReadsWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> str:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        first = await stream.read(wait=timedelta(seconds=60))
+        first = await stream.read_page(wait=timedelta(seconds=60))
         # A second read waits in its own task while the Workflow returns.
         waiting = asyncio.create_task(
-            stream.read(from_offset=first.last_offset, wait=timedelta(seconds=60))
+            stream.read_page(from_offset=first.last_offset, wait=timedelta(seconds=60))
         )
         await asyncio.sleep(0)
         assert not waiting.done()
@@ -1475,7 +1470,7 @@ class CancelDuringReadWorkflow:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         got: list[str] = []
         try:
-            async for record in stream.iter_read_items(wait=timedelta(seconds=60)):
+            async for record in stream.read(wait=timedelta(seconds=60)):
                 got.append(record.body)
         except asyncio.CancelledError:
             return [got, "cancelled"]
@@ -1507,10 +1502,10 @@ class ContinueWithOpenReadWorkflow:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         if from_offset is None:
             # The Core read of this page is still open when the run continues.
-            first = await stream.read(max_records=1, wait=timedelta(seconds=60))
+            first = await stream.read_page(max_records=1, wait=timedelta(seconds=60))
             assert first.last_offset is not None
             workflow.continue_as_new(args=[stream_id, first.last_offset.hex()])
-        items = stream.iter_read_items(from_offset=bytes.fromhex(from_offset))
+        items = stream.read(from_offset=bytes.fromhex(from_offset))
         return [record.body async for record in items]
 
 
@@ -1658,7 +1653,7 @@ class PythonStoreErrorWorkflow:
             if call == "append":
                 await stream.append("a")
             else:
-                await stream.read()
+                await stream.read_page()
         except StreamError as err:
             return [StreamErrorReason.Name(err.reason), err.message, err.non_retryable]
         return ["no error"]
@@ -1778,7 +1773,7 @@ class AppendThenReadWorkflow:
     async def run(self, ref: StreamRef[str]) -> list[str]:
         stream = workflow.get_stream(ref, body_type=str)
         await stream.append("a", "b")
-        return [record.body async for record in stream.iter_read_items()]
+        return [record.body async for record in stream.read()]
 
 
 async def test_payload_codec_covers_direct_append_and_read(client: Client):
@@ -1791,7 +1786,7 @@ async def test_payload_codec_covers_direct_append_and_read(client: Client):
     raw = _stream_client(client, store).get_stream(
         StreamRef(id=ref.id), body_type=RawValue
     )
-    stored = [record.body.payload async for record in raw.iter_read_items()]
+    stored = [record.body.payload async for record in raw.read()]
     assert [body.metadata["simple-codec"] for body in stored] == [b"true", b"true"]
 
 
@@ -1848,7 +1843,7 @@ class MeasureWorkflow:
         )
         stream = workflow.get_stream(StreamRef(id=burst.stream_id), body_type=str)
         count = 0
-        async for _ in stream.iter_read_items(wait=timedelta(seconds=30)):
+        async for _ in stream.read(wait=timedelta(seconds=30)):
             count += 1
         await writer
         return count
@@ -1888,7 +1883,7 @@ class TwoLoopsWorkflow:
         stream = workflow.get_stream(ref, body_type=str)
 
         async def drain() -> list[str]:
-            return [record.body async for record in stream.iter_read_items()]
+            return [record.body async for record in stream.read()]
 
         # Both loops ask for the first page before either gets it, so each one takes a
         # read of its own.
@@ -1913,7 +1908,7 @@ class FailedReadsWorkflow:
 
         async def read() -> str:
             try:
-                await stream.read(wait=timedelta(seconds=10))
+                await stream.read_page(wait=timedelta(seconds=10))
             except StreamError as err:
                 return StreamErrorReason.Name(err.reason)
             return "page"
@@ -1976,7 +1971,7 @@ class AppendThenReadAllWorkflow:
     async def run(self, ref: StreamRef[str]) -> list[str]:
         stream = workflow.get_stream(ref, body_type=str)
         await stream.append("from-workflow")
-        return [record.body async for record in stream.iter_read_items()]
+        return [record.body async for record in stream.read()]
 
 
 async def test_codec_runs_with_no_context_on_stream_bodies(client: Client):
@@ -1996,7 +1991,7 @@ async def test_codec_runs_with_no_context_on_stream_bodies(client: Client):
     raw_config = client.config()
     raw_config["stream_config"] = StreamConfig(stores=[store])
     raw = Client(**raw_config).get_stream(StreamRef(id=ref.id), body_type=RawValue)
-    stored = [record.body.payload async for record in raw.iter_read_items()]
+    stored = [record.body.payload async for record in raw.read()]
     assert [body.metadata["ctx"] for body in stored] == [b"", b""]
 
 
@@ -2015,7 +2010,7 @@ class UnnamedRefReadWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[str]:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        return [record.body async for record in stream.iter_read_items()]
+        return [record.body async for record in stream.read()]
 
 
 async def _unnamed_read_history(
@@ -2074,12 +2069,12 @@ class BadBodyWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[Any]:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=Point)
-        first = await stream.read(max_records=1)
+        first = await stream.read_page(max_records=1)
         events: list[Any] = [["got", first.records[0].body.x]]
         # The page of the bad body raises, and a read from the same offset gets it again.
         for _ in range(2):
             try:
-                await stream.read(from_offset=first.last_offset, max_records=1)
+                await stream.read_page(from_offset=first.last_offset, max_records=1)
                 events.append(["page", "decoded"])
             except Exception as err:
                 events.append(["page", type(err).__name__])
@@ -2416,7 +2411,7 @@ class ReadAppendCloseWorkflow:
     async def run(self, source_id: str, out_id: str) -> list[str]:
         source = workflow.get_stream(StreamRef(id=source_id), body_type=str)
         out = workflow.get_stream(StreamRef(id=out_id), body_type=str)
-        got = [record.body async for record in source.iter_read_items()]
+        got = [record.body async for record in source.read()]
         await out.append(*got)
         await out.close()
         return got
@@ -2513,7 +2508,7 @@ class ToolCallsWorkflow:
         events = workflow.get_stream(StreamRef(id=events_id), body_type=ModelEvent)
         status = workflow.get_stream(StreamRef(id=status_id), body_type=str)
         tools = []
-        async for record in events.iter_read_items(wait=timedelta(seconds=10)):
+        async for record in events.read(wait=timedelta(seconds=10)):
             event = record.body
             if event.kind == "tool_call":
                 assert event.tool_call is not None
@@ -2698,7 +2693,7 @@ class GappedReadWorkflow:
         )
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
         result = ReadResult([], [], [], [], [])
-        async for page in stream.iter_read(wait=timedelta(seconds=10)):
+        async for page in stream.read_pages(wait=timedelta(seconds=10)):
             result.bodies.extend(record.body for record in page.records)
             result.page_sizes.append(len(page.records))
             result.dones.append(page.done)
@@ -2735,7 +2730,7 @@ class _ReadThenWait:
 
     async def read_then_wait(self, stream_id: str) -> list[str]:
         stream = workflow.get_stream(StreamRef(id=stream_id), body_type=str)
-        got = [record.body async for record in stream.iter_read_items()]
+        got = [record.body async for record in stream.read()]
         await workflow.wait_condition(lambda: self.go)
         return got
 
@@ -2836,11 +2831,13 @@ class _StreamCallInbound(WorkflowInboundInterceptor):
 
 
 class _StreamCallOutbound(WorkflowOutboundInterceptor):
-    async def start_system_nexus_operation(
-        self, input: StartNexusOperationInput[Any, Any]
-    ) -> workflow.NexusOperationHandle[Any]:
-        _intercepted.append((input.operation_name, input.input))
-        return await super().start_system_nexus_operation(input)
+    async def start_read_records(
+        self,
+        request: stream_service.ReadRecordsRequest[Any],
+        output_type: type[stream_service.ReadRecordsResponse[Any]] | None = None,
+    ) -> workflow.NexusOperationHandle[stream_service.ReadRecordsResponse[Any]]:
+        _intercepted.append(("ReadRecords", request))
+        return await super().start_read_records(request, output_type)
 
 
 async def test_workflow_interceptor_sees_each_page_read(client: Client):
@@ -3023,7 +3020,7 @@ class ReadAcrossAnOutageWorkflow:
     @workflow.run
     async def run(self, ref: StreamRef[str]) -> list[str]:
         stream = workflow.get_stream(ref, body_type=str)
-        async for record in stream.iter_read_items(wait=timedelta(seconds=10)):
+        async for record in stream.read(wait=timedelta(seconds=10)):
             self._bodies.append(record.body)
         return self._bodies
 

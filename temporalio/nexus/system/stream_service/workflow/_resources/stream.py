@@ -13,6 +13,7 @@ import temporalio.nexus.system
 import temporalio.nexus.system._support as _support
 import temporalio.workflow
 
+from ..._poll import PollIterator
 from ...models import (
     AppendRecord,
     AppendRecordsRequest,
@@ -27,7 +28,6 @@ from ...models import (
     StreamRecord,
     StreamRef,
 )
-from .._poll import PollIterator
 
 BodyT = typing.TypeVar("BodyT")
 
@@ -92,7 +92,7 @@ class Stream(typing.Generic[BodyT]):
         handle = await _close_stream(request)
         await handle
 
-    async def read(
+    async def read_page(
         self,
         from_offset: bytes | None = None,
         max_records: int | None = None,
@@ -110,14 +110,14 @@ class Stream(typing.Generic[BodyT]):
         handle = await _read_records(request, self.body_type)
         return await handle
 
-    async def iter_read(
+    async def read_pages(
         self,
         from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
-        """Yield each response of ``read`` until the poll helper stops.
+        """Yield each response of ``read_page`` until the poll helper stops.
 
         Read one page of Records. The poll iterator reads them all.
 
@@ -146,14 +146,14 @@ class Stream(typing.Generic[BodyT]):
                 return
             request = next_request
 
-    def iter_read_items(
+    def read(
         self,
         from_offset: bytes | None = None,
         max_records: int | None = None,
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> PollIterator[ReadRecordsRequest[BodyT], StreamRecord[BodyT]]:
-        """Yield each item of ``iter_read``, page by page.
+        """Yield each item of ``read_pages``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is
         ``None`` after the last page.
@@ -178,7 +178,7 @@ class Stream(typing.Generic[BodyT]):
         )
         return PollIterator(
             request,
-            self.iter_read(
+            self.read_pages(
                 from_offset=from_offset,
                 max_records=max_records,
                 wait=wait,

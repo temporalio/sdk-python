@@ -133,7 +133,7 @@ async def _batches(
 ) -> list[int]:
     """Give the number of Records of each append, from its offsets in the marker."""
     stream = client.get_stream(StreamRef(id=stream_id), body_type=str)
-    offsets = [record.offset async for record in stream.iter_read_items()]
+    offsets = [record.offset async for record in stream.read()]
     return [
         sum(
             1 for offset in offsets if entry.first_offset <= offset <= entry.last_offset
@@ -152,7 +152,7 @@ def _marker_names(events: list[HistoryEvent]) -> list[str]:
 
 async def _bodies(client: Client, stream_id: str) -> list[str]:
     stream = client.get_stream(StreamRef(id=stream_id), body_type=str)
-    return [record.body async for record in stream.iter_read_items()]
+    return [record.body async for record in stream.read()]
 
 
 async def test_appends_of_one_activation_are_one_append(client: Client):

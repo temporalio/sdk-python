@@ -48,7 +48,7 @@ replacement of the first attempt's Records.
 The helpers run on the Streams API, so they follow how Workflow code reads, appends and
 closes. On every Store, such as the Redis Store, `MemoryStreamStore` or a Store written in
 Python, Core reads, appends and closes a Stream itself, with no Activity. Workflow code reads
-with the same `read`, `iter_read` and `iter_read_items` as a client. It gets the same pages, but
+with the same `read`, `read_pages` and `read_page` as a client. It gets the same pages, but
 each page has at most 256 Records.
 
 Here the Workflow reads the events of a model's answer while the model Activity still runs,
@@ -58,7 +58,7 @@ and starts each tool as its call arrives.
 events = workflow.get_stream(events_ref, body_type=ModelEvent)
 status = workflow.get_stream(status_ref, body_type=str)
 tools = []
-async for record in events.iter_read_items(wait=timedelta(seconds=10)):
+async for record in events.read(wait=timedelta(seconds=10)):
     event = record.body
     if event.kind == "tool_call":
         # The tool starts now, before the model ends its answer.
@@ -74,12 +74,12 @@ results = await asyncio.gather(*tools)
 The loop ends after the page that is `done`, when the Stream is closed and the read gave its
 last Record. With no `wait`, a call gives what is in the Stream, and the loop ends at the first
 empty page. With a `wait`, a call on a quiet Stream gives an empty page after the wait, and
-the loop asks again. So a loop on a Stream that can be quiet for long uses `iter_read` and
+the loop asks again. So a loop on a Stream that can be quiet for long uses `read_pages` and
 leaves after an empty page. A later loop from the `last_offset` of that page goes on there.
 
 ```python
 last = None
-async for page in tokens.iter_read(from_offset=last, wait=timedelta(seconds=30)):
+async for page in tokens.read_pages(from_offset=last, wait=timedelta(seconds=30)):
     for record in page.records:
         await shown.append(record.body.text)
     last = page.last_offset

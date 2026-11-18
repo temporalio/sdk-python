@@ -237,7 +237,7 @@ _MAX_READ_WAIT = timedelta(seconds=60)
 
 @dataclasses.dataclass(frozen=True)
 class _ReadKey:
-    """What a ``read`` call of Workflow code must match to take an open read."""
+    """What a ``read_page`` call of Workflow code must match to take an open read."""
 
     store: str
     stream_id: str
@@ -247,9 +247,9 @@ class _ReadKey:
 
 
 class _DirectRead:  # pyright: ignore[reportUnusedClass]
-    """One Core read of a Stream, which serves the ``read`` calls of Workflow code.
+    """One Core read of a Stream, which serves the ``read_page`` calls of Workflow code.
 
-    Core gives its Records in batches. Each ``read`` call takes one page of them, and the
+    Core gives its Records in batches. Each ``read_page`` call takes one page of them, and the
     read then waits for the next call under the offset of that page.
     """
 
@@ -355,7 +355,7 @@ def _start_direct_read(
     *,
     records_in_history: bool,
 ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-    """Answer one ``read`` call of Workflow code from a Core read of the Stream."""
+    """Answer one ``read_page`` call of Workflow code from a Core read of the Stream."""
     instance._assert_not_read_only("start stream read")
     payload_converter, _ = instance._system_nexus_converters(input)
     max_records, wait, max_bytes = _read_limits(request)

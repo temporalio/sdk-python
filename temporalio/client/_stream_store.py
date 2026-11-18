@@ -519,7 +519,7 @@ class StreamConfig:
     closes nothing. A create and a describe of Workflow code run in the Store's Local
     Activity. So Workflow code needs no Worker that polls for Activity Tasks.
 
-    Workflow code reads with the same ``read``, ``iter_read`` and ``iter_read_items`` as
+    Workflow code reads with the same ``read``, ``read_pages`` and ``read_page`` as
     a client. Core reads the Store inside the Workflow Task. A page that Workflow code gets in one activation has at most 256 Records, and
     the rest come in the next activation with no wait. A loop that asks for its next page in the same
     activation keeps one read open in Core. A read that no code waits on closes before
@@ -527,7 +527,7 @@ class StreamConfig:
 
     .. code-block:: python
 
-        async for record in events.iter_read_items(wait=timedelta(seconds=10)):
+        async for record in events.read(wait=timedelta(seconds=10)):
             if record.body.kind == "tool_call":
                 tools.append(
                     workflow.start_activity(
@@ -540,7 +540,7 @@ class StreamConfig:
     The loop ends after the page that is ``done``, when the Stream is closed and the
     read gave its last Record. With a ``wait``, a quiet Stream gives empty pages, and
     the loop goes on. So a loop on a Stream that can be quiet for long uses
-    ``iter_read`` and leaves after an empty page. A read has these costs.
+    ``read_pages`` and leaves after an empty page. A read has these costs.
 
     * A call keeps its Workflow Task open while it waits for its page. A Signal, an
       Update, a cancel or an Activity result reaches the Workflow at the next Workflow

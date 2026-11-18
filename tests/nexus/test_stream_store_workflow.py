@@ -150,7 +150,7 @@ class ExplicitProducerWorkflow:
 class NexusClientReadWorkflow:
     @workflow.run
     async def run(self, operation: str) -> str:
-        # Workflow code can also start the operation of `read` through a Nexus client.
+        # Workflow code can also start the operation of `read_page` through a Nexus client.
         requests: dict[str, Any] = {
             "ReadRecords": ReadRecordsRequest(ref=StreamRef[str](id="stream")),
         }
@@ -476,7 +476,7 @@ async def test_workflow_stream_uses_store(client: Client, append_workflow: type[
     handle, ref = await _run_append_workflow(stream_client, append_workflow)
 
     stream = stream_client.get_stream(ref, body_type=str)
-    records = [record async for record in stream.iter_read_items()]
+    records = [record async for record in stream.read()]
     assert [record.body for record in records] == _BODIES
     run_id = handle.result_run_id
     assert run_id
@@ -509,7 +509,7 @@ async def test_workflow_stream_uses_a_store_written_from_scratch(client: Client)
 
     stream = stream_client.get_stream(ref, body_type=str)
     await stream.append("a")
-    assert [record.body async for record in stream.iter_read_items()] == ["a"]
+    assert [record.body async for record in stream.read()] == ["a"]
 
 
 @_APPEND_WORKFLOWS
@@ -527,10 +527,10 @@ async def test_workflow_stream_store_uses_payload_codec(
     raw = _with_store(client, store).get_stream(
         StreamRef(id=ref.id), body_type=temporalio.common.RawValue
     )
-    stored = [record.body.payload async for record in raw.iter_read_items()]
+    stored = [record.body.payload async for record in raw.read()]
     assert [body.metadata["simple-codec"] for body in stored] == [b"true", b"true"]
     stream = stream_client.get_stream(ref, body_type=str)
-    assert [record.body async for record in stream.iter_read_items()] == _BODIES
+    assert [record.body async for record in stream.read()] == _BODIES
 
 
 @_APPEND_WORKFLOWS
@@ -617,7 +617,7 @@ async def test_workflow_read_through_a_nexus_client_goes_through_core(
                 task_queue=worker.task_queue,
             )
 
-    # Core reads the Store, as for `read`, also one written in Python. Nobody created
+    # Core reads the Store, as for `read_page`, also one written in Python. Nobody created
     # the Stream.
     assert await read_with(MemoryStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
     assert await read_with(DictStreamStore()) == "STREAM_ERROR_REASON_NOT_FOUND"
@@ -629,8 +629,8 @@ def test_workflow_stream_has_the_calls_of_a_client_stream():
         "close",
         "describe",
         "read",
-        "iter_read",
-        "iter_read_items",
+        "read_pages",
+        "read_page",
         "__aenter__",
         "__aexit__",
     ):
