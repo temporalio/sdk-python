@@ -249,23 +249,6 @@ class StreamError(ApplicationError):
         return self._reason
 
 
-def _stream_error_from_reason(reason: int, message: str) -> StreamError:
-    if reason not in temporalio.api.enums.v1.StreamErrorReason.values():
-        # A reason that this SDK doesn't know gives the unspecified reason.
-        reason = _STREAM_ERROR_REASON_UNSPECIFIED
-    return StreamError(
-        message, reason=temporalio.api.enums.v1.StreamErrorReason.ValueType(reason)
-    )
-
-
-def _stream_error_from_call(  # pyright: ignore[reportUnusedFunction]
-    message: str, details: bytes
-) -> StreamError:
-    # A Store on the bridge fails with the encoded details, as a gRPC status has them.
-    proto = temporalio.api.stream.v1.StreamErrorDetails.FromString(details)
-    return _stream_error_from_reason(proto.reason, message)
-
-
 class StreamConfigError(RuntimeError):
     """A Stream call can't find its Store, because of how the Stores are set up.
 
@@ -280,7 +263,6 @@ class StreamConfigError(RuntimeError):
     * A ref names a Store that the config of the client doesn't have.
     * The selector returns a Store that isn't one of the config's Stores.
     * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.
-    * This build of temporalio has no Stream runtime.
 
     .. warning::
         This API is experimental and subject to change.
