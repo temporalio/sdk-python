@@ -1,7 +1,7 @@
 """Helpers that sit on top of the Streams API.
 
-:py:class:`BufferedAppender` batches the appends of one Stream. It takes a client Stream or a
-Workflow Stream. :py:func:`current_producer` gives the Producer that an append of the
+:py:class:`BufferedAppender` batches the appends of one Stream. It is for client and Activity
+code. :py:func:`current_producer` gives the Producer that an append of the
 calling code sends by default, and :py:func:`as_producer` gives back a Producer that code
 stored.
 

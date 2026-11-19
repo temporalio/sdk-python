@@ -2,15 +2,13 @@
 
 > This package is experimental. Its API can change in a later release.
 
-`temporalio.contrib.streams` holds helpers that sit on top of the Streams API of the SDK. A
-helper takes a client `Stream` or a Workflow `Stream`.
+`temporalio.contrib.streams` holds helpers that sit on top of the Streams API of the SDK.
 
 ## `BufferedAppender`
 
 `BufferedAppender` batches the appends of one Stream. `append` returns immediately, and the
-appender writes the buffered Records as one batch. In a client or an Activity a batch waits
-at most `max_delay`. In Workflow code a batch starts when the code next yields, so it adds no
-timer to History.
+appender writes the buffered Records as one batch. A batch waits at most `max_delay`. The
+appender is for client and Activity code. Workflow code passes its Records to one `append` call.
 
 ```python
 from temporalio.contrib.streams import BufferedAppender
@@ -45,10 +43,10 @@ replacement of the first attempt's Records.
 
 ## Reads and appends in Workflow code
 
-The helpers run on the Streams API, so they follow how Workflow code reads, appends and
-closes. On every Store, such as the Redis Store, Core reads, appends and closes a Stream
-itself, with no Activity. Workflow code reads with the same `read`, `read_pages` and
-`read_page` as a client. It gets the same pages, but each page has at most 256 Records.
+This section says how Workflow code reads, appends and closes a Stream. On every Store, such
+as the Redis Store, Core reads, appends and closes a Stream itself, with no Activity. Workflow
+code reads with the same `read`, `read_pages` and `read_page` as a client. It gets the same
+pages, but each page has at most 256 Records.
 
 Here the Workflow reads the events of a model's answer while the model Activity still runs,
 and starts each tool as its call arrives.
