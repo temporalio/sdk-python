@@ -46,6 +46,7 @@ async-trait = "0.1"
 # aws-lc-fips-sys instead of aws-lc-sys. Ported from sdk-ruby PR #466.
 aws-lc-rs = { version = "1", features = ["fips"], optional = true }
 futures = "0.3"
+parking_lot = "0.12"
 prost = "0.14"
 pyo3 = { version = "0.29", features = [
     "extension-module",

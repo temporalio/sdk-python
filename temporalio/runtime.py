@@ -64,9 +64,13 @@ class Runtime:
     :py:meth:`set_default`. Every time a new runtime is created, a new internal
     thread pool is created.
 
-    Runtimes do not work across forks. Advanced users should consider using
-    :py:meth:`prevent_default` and :py:meth:`set_default` to ensure each
-    fork creates it's own runtime.
+    .. warning::
+        Create a separate runtime in each process after forking. Creating a
+        runtime before forking can retain inherited native memory and file
+        descriptors in the child until it exits, even after the inherited
+        runtime is garbage collected. Use :py:meth:`prevent_default` and
+        :py:meth:`set_default` to control when each process creates its default
+        runtime.
 
     """
 

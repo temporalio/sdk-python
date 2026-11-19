@@ -1,4 +1,5 @@
 use futures::channel::mpsc::Receiver;
+use parking_lot::{MappedRwLockReadGuard, Mutex, RwLock, RwLockReadGuard};
 use pyo3::exceptions::{PyAssertionError, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pythonize::pythonize;
@@ -7,7 +8,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::{Duration, UNIX_EPOCH};
 use temporalio_common::telemetry::metrics::core::MetricCallBufferer;
 use temporalio_common::telemetry::metrics::CoreMeter;
@@ -32,29 +33,111 @@ pub struct RuntimeRef {
 
 #[derive(Clone)]
 pub(crate) struct Runtime {
-    pub(crate) pid: u32,
     pub(crate) core: Arc<CoreRuntimeHandle>,
     metrics_call_buffer: Option<Arc<MetricsCallBuffer<BufferedMetricRef>>>,
     log_forwarder_handle: Option<Arc<JoinHandle<()>>>,
 }
 
-/// Owns the Core runtime so the last runtime clone can shut it down with the GIL released.
-/// Shutting down waits for running Tokio tasks, and the log forwarder may be one of them,
-/// waiting for the GIL.
-pub(crate) struct CoreRuntimeHandle(Option<CoreRuntime>);
+// Python can finish an awaited RPC before the blocking Rust task which delivered
+// its result has returned. Join native threads before interpreter finalization,
+// while those tasks can still attach to Python and release their thread states.
+static RUNTIMES: RuntimeRegistry = RuntimeRegistry::new();
 
-impl std::ops::Deref for CoreRuntimeHandle {
-    type Target = CoreRuntime;
+struct RuntimeRegistry {
+    state: Mutex<RuntimeRegistryState>,
+}
 
-    fn deref(&self) -> &CoreRuntime {
-        self.0.as_ref().expect("Core runtime used after drop")
+struct RuntimeRegistryState {
+    shutting_down: bool,
+    runtimes: Vec<Weak<CoreRuntimeHandle>>,
+}
+
+impl RuntimeRegistry {
+    const fn new() -> Self {
+        Self {
+            state: Mutex::new(RuntimeRegistryState {
+                shutting_down: false,
+                runtimes: Vec::new(),
+            }),
+        }
+    }
+
+    fn check_running(&self) -> PyResult<()> {
+        self.state.lock().check_running()
+    }
+
+    fn register(&self, runtime: &Arc<CoreRuntimeHandle>) -> PyResult<()> {
+        let mut state = self.state.lock();
+        state.check_running()?;
+        state.runtimes.retain(|runtime| runtime.strong_count() > 0);
+        state.runtimes.push(Arc::downgrade(runtime));
+        Ok(())
+    }
+
+    fn begin_shutdown(&self) -> Vec<Weak<CoreRuntimeHandle>> {
+        let mut state = self.state.lock();
+        state.shutting_down = true;
+        std::mem::take(&mut state.runtimes)
+    }
+}
+
+impl RuntimeRegistryState {
+    fn check_running(&self) -> PyResult<()> {
+        if self.shutting_down {
+            return Err(PyRuntimeError::new_err(
+                "Temporal runtimes are shutting down",
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) struct CoreRuntimeHandle {
+    pid: u32,
+    core: RwLock<Option<CoreRuntime>>,
+}
+
+impl CoreRuntimeHandle {
+    pub(crate) fn read(&self) -> PyResult<MappedRwLockReadGuard<'_, CoreRuntime>> {
+        RwLockReadGuard::try_map(self.core.read(), Option::as_ref)
+            .map_err(|_| PyRuntimeError::new_err("Temporal runtime has shut down"))
+    }
+
+    fn shutdown(&self) {
+        // Do not hold the lock while joining threads: their remaining callbacks
+        // may try to use this runtime and must be able to observe its shutdown.
+        let core = self.core.write().take();
+        drop(core);
     }
 }
 
 impl Drop for CoreRuntimeHandle {
     fn drop(&mut self) {
-        let _ = Python::try_attach(|py| py.detach(|| drop(self.0.take())));
+        let mut core = self.core.get_mut().take();
+        if core.is_some() && self.pid == std::process::id() {
+            let _ = Python::try_attach(|py| py.detach(|| drop(core.take())));
+        }
+        // A forked child or an interpreter which bypassed atexit cannot
+        // safely join threads that might still need the interpreter.
+        std::mem::forget(core);
     }
+}
+
+#[pyfunction]
+pub(crate) fn shutdown_runtimes(py: Python) {
+    let runtimes = RUNTIMES
+        .begin_shutdown()
+        .into_iter()
+        .filter_map(|runtime| runtime.upgrade())
+        .filter(|runtime| runtime.pid == std::process::id())
+        .collect::<Vec<_>>();
+    // Tokio joins blocking tasks even after their Python futures completed or
+    // were cancelled. They must be able to acquire the GIL until the join ends.
+    py.detach(|| {
+        for runtime in runtimes {
+            runtime.shutdown();
+        }
+    });
 }
 
 #[derive(FromPyObject)]
@@ -118,6 +201,7 @@ const FORWARD_LOG_BUFFER_SIZE: usize = 2048;
 const FORWARD_LOG_MAX_FREQ_MS: u64 = 10;
 
 pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
+    RUNTIMES.check_running()?;
     let RuntimeOptions {
         telemetry: TelemetryConfig { logging, metrics },
         worker_heartbeat_interval_millis,
@@ -215,10 +299,14 @@ pub fn init_runtime(options: RuntimeOptions) -> PyResult<RuntimeRef> {
         }))
     });
 
+    let core = Arc::new(CoreRuntimeHandle {
+        pid: std::process::id(),
+        core: RwLock::new(Some(core)),
+    });
+    RUNTIMES.register(&core)?;
     Ok(RuntimeRef {
         runtime: Runtime {
-            pid: std::process::id(),
-            core: Arc::new(CoreRuntimeHandle(Some(core))),
+            core,
             metrics_call_buffer,
             log_forwarder_handle,
         },
@@ -239,16 +327,17 @@ impl Runtime {
         F: Future<Output = PyResult<T>> + Send + 'static,
         T: for<'py> IntoPyObject<'py> + Send + 'static,
     {
-        let _guard = self.core.tokio_handle().enter();
+        let handle = self.core.read()?.tokio_handle();
+        let _guard = handle.enter();
         pyo3_async_runtimes::generic::future_into_py::<TokioRuntime, _, T>(py, fut)
     }
 
     pub(crate) fn assert_same_process(&self, action: &'static str) -> PyResult<()> {
         let current_pid = std::process::id();
-        if self.pid != current_pid {
+        let runtime_pid = self.core.pid;
+        if runtime_pid != current_pid {
             Err(PyAssertionError::new_err(format!(
-                "Cannot {} across forks (original runtime PID is {}, current is {})",
-                action, self.pid, current_pid,
+                "Cannot {action} across forks (original runtime PID is {runtime_pid}, current is {current_pid})",
             )))
         } else {
             Ok(())
@@ -284,28 +373,32 @@ impl RuntimeRef {
         )
     }
 
-    fn write_test_info_log(&self, message: &str, extra_data: &str) {
+    fn write_test_info_log(&self, message: &str, extra_data: &str) -> PyResult<()> {
         let _g = tracing::subscriber::set_default(
             self.runtime
                 .core
+                .read()?
                 .telemetry()
                 .trace_subscriber()
                 .unwrap()
                 .clone(),
         );
         tracing::info!(message, extra_data = extra_data);
+        Ok(())
     }
 
-    fn write_test_debug_log(&self, message: &str, extra_data: &str) {
+    fn write_test_debug_log(&self, message: &str, extra_data: &str) -> PyResult<()> {
         let _g = tracing::subscriber::set_default(
             self.runtime
                 .core
+                .read()?
                 .telemetry()
                 .trace_subscriber()
                 .unwrap()
                 .clone(),
         );
         tracing::debug!(message, extra_data = extra_data);
+        Ok(())
     }
 }
 

@@ -1,11 +1,35 @@
+import subprocess
+import sys
+from pathlib import Path
 from threading import Event, Thread
 from time import sleep
+
+import pytest
 
 from temporalio.bridge.runtime import Runtime
 
 
 class SomeException(Exception):
     pass
+
+
+@pytest.mark.parametrize("runtime_count", [1, 3])
+def test_bridge_runtime_shutdown_before_finalization(runtime_count: int):
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-X",
+            "faulthandler",
+            str(Path(__file__).with_name("runtime_shutdown.py")),
+            str(runtime_count),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"completed callbacks: {runtime_count}"
+    assert result.stderr == ""
 
 
 def test_bridge_runtime_raise_in_thread():

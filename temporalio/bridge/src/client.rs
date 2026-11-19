@@ -110,13 +110,14 @@ pub fn connect_client<'a>(
     runtime_ref: &runtime::RuntimeRef,
     config: ClientConfig,
 ) -> PyResult<Bound<'a, PyAny>> {
+    runtime_ref.runtime.assert_same_process("create client")?;
     let metrics_meter = runtime_ref
         .runtime
         .core
+        .read()?
         .telemetry()
         .get_temporal_metric_meter();
     let opts = config.into_connection_options(metrics_meter)?;
-    runtime_ref.runtime.assert_same_process("create client")?;
     let runtime = runtime_ref.runtime.clone();
     runtime_ref.runtime.future_into_py(py, async move {
         Ok(ClientRef {
