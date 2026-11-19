@@ -556,17 +556,36 @@ async def test_replayer_async_ordering(
     Verify legacy and single-batch histories replay with the asyncio scheduling order that their
     original executions observed.
     """
+    global test_replayer_workflow_res
+
     with Path(__file__).with_name(history_filename).open() as f:
         history = WorkflowHistory.from_json("fake", f.read())
     assert (
         _history_uses_workflow_logic_flag(history, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG)
         is uses_single_batch
     )
-    await Replayer(
+    replayer = Replayer(
         workflows=[SignalsActivitiesTimersUpdatesTracingWorkflow],
         interceptors=[WorkerWorkflowResultInterceptor()],
-    ).replay_workflow(history)
+    )
+    test_replayer_workflow_res = None
+    await replayer.replay_workflow(history)
     assert test_replayer_workflow_res == expected
+
+    if uses_single_batch:
+        # These histories do not exercise cancellation, so the batching-only
+        # flag must replay them with the same scheduling order.
+        for event in history.events:
+            if event.HasField("workflow_task_completed_event_attributes"):
+                flags = event.workflow_task_completed_event_attributes.sdk_metadata.lang_used_flags
+                if _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG in flags:
+                    flags.remove(_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG)
+                    flags.append(
+                        _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH_ONLY
+                    )
+        test_replayer_workflow_res = None
+        await replayer.replay_workflow(history)
+        assert test_replayer_workflow_res == expected
 
 
 async def test_replayer_unflagged_history_uses_legacy_async_ordering() -> None:

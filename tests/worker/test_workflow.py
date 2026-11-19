@@ -1521,12 +1521,18 @@ class TrapCancelWorkflow:
 _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
     _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
 )
+_BATCH_ONLY_WORKFLOW_LOGIC_FLAG = (
+    _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH_ONLY
+)
 
 
-def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
-    assert (
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
-    )
+@pytest.mark.parametrize(
+    "flag", [_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, _BATCH_ONLY_WORKFLOW_LOGIC_FLAG]
+)
+def test_single_batch_workflow_activation_jobs_default_disabled(
+    flag: _WorkflowLogicFlag,
+) -> None:
+    assert flag not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
 
 
 @workflow.defn
@@ -1783,8 +1789,15 @@ class CancelAtChildCompletionWorkflow:
         return self._child_started
 
 
+@pytest.mark.parametrize(
+    "flag",
+    [
+        pytest.param(_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, id="with-cancellation-changes"),
+        pytest.param(_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, id="batch-only"),
+    ],
+)
 async def test_workflow_cancel_and_child_completion_in_same_activation(
-    client: Client,
+    client: Client, flag: _WorkflowLogicFlag
 ):
     parent_task_queue = str(uuid.uuid4())
     child_task_queue = str(uuid.uuid4())
@@ -1796,9 +1809,6 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
         client,
         CompleteChildOnSignalWorkflow,
         task_queue=child_task_queue,
-    )
-    child_worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
     )
     async with child_worker:
         handle = await client.start_workflow(
@@ -1817,9 +1827,7 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
             # worker stops on the normal queue.
             max_cached_workflows=0,
         )
-        parent_worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-        )
+        parent_worker._set_default_workflow_logic_flag(flag, enabled=True)
         async with parent_worker:
 
             async def child_started() -> bool:
@@ -1849,14 +1857,20 @@ async def test_workflow_cancel_and_child_completion_in_same_activation(
             task_queue=parent_task_queue,
             workflow_runner=runner,
         )
-        parent_worker._set_default_workflow_logic_flag(
-            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-        )
+        parent_worker._set_default_workflow_logic_flag(flag, enabled=True)
         async with parent_worker:
-            with pytest.raises(WorkflowFailureError) as err:
-                await handle.result()
-            assert isinstance(err.value.cause, CancelledError)
+            if flag == _BATCH_ONLY_WORKFLOW_LOGIC_FLAG:
+                # Legacy cancellation handling lets the completed child result win.
+                assert await handle.result() == "child complete"
+            else:
+                with pytest.raises(WorkflowFailureError) as err:
+                    await handle.result()
+                assert isinstance(err.value.cause, CancelledError)
 
+    assert any(
+        flag in completion.successful.used_internal_flags
+        for _, completion in runner._pairs
+    )
     assert any(
         {"resolve_child_workflow_execution", "cancel_workflow"}.issubset(
             {job.WhichOneof("variant") for job in activation.jobs}
