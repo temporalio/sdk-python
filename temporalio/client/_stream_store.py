@@ -166,9 +166,10 @@ class StreamStore(ABC):
       order as bytes. A page that gives the last Record of a closed Stream is ``done``.
     * :py:meth:`append_records` gives the offsets of the first and the last Record. A
       Workflow appends as a Producer of kind Workflow, with its Workflow Task as the
-      epoch. The Store refuses a batch of a lower epoch of that Producer with the reason
-      ``STREAM_ERROR_REASON_FENCED``. It writes a batch that comes again with the same
-      Producer, epoch and ``sequence`` once, since Core sends it again after an outage.
+      epoch. The Store writes a batch that comes again with the same Producer, epoch and
+      ``sequence`` once, since Core sends it again after an outage. A Store can refuse a
+      batch of a lower epoch of that Producer with the reason
+      ``STREAM_ERROR_REASON_FENCED``. It doesn't have to.
     * :py:meth:`close_stream` of a closed Stream succeeds, since Core may send a close
       again.
     * A replay of a read under :py:attr:`StreamReplaySource.STORE` reads the Records
@@ -418,8 +419,8 @@ class StreamConfig:
     such a call raises :py:class:`temporalio.exceptions.StreamConfigError`.
 
     An append or a close of Workflow code writes as the Workflow, with the Workflow Task
-    that runs it as its epoch. So the Store fences a late write of a failed Workflow
-    Task. A ``producer=`` of another kind raises
+    that runs it as its epoch. So a Store that fences refuses a late write of a failed
+    Workflow Task. A ``producer=`` of another kind raises
     :py:class:`temporalio.exceptions.StreamError` with the reason
     ``STREAM_ERROR_REASON_INVALID``. Core keeps the appends and the close of one Workflow on one Stream in the order
     of the calls.

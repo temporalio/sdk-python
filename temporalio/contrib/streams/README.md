@@ -159,8 +159,9 @@ never on a Workflow thread. For Workflow code, a Store must do these things.
   read that it stops.
 - Each Record has an offset of 1 to 1024 bytes, and offsets compare in order as bytes. A page
   that gives the last Record of a closed Stream is `done`.
-- `append_records` refuses a lower epoch of a Producer with `STREAM_ERROR_REASON_FENCED`, and
-  writes a batch that comes again with the same Producer, epoch and `sequence` once.
+- `append_records` writes a batch that comes again with the same Producer, epoch and `sequence`
+  once. It can refuse a lower epoch of a Producer with `STREAM_ERROR_REASON_FENCED`, and it
+  doesn't have to.
 - `close_stream` of a closed Stream succeeds.
 - The Store keeps the Records with their offsets for as long as a replay reads them.
 - An outage raises `StreamError` with `STREAM_ERROR_REASON_STORAGE_UNAVAILABLE`, and Core tries
