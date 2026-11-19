@@ -903,7 +903,7 @@ async def test_failure_encoded_attributes():
 
 def test_application_error_next_retry_delay_round_trip():
     converter = DataConverter.default
-    for next_retry_delay in [None, timedelta(seconds=3)]:
+    for next_retry_delay in [None, timedelta(0), timedelta(seconds=3)]:
         failure = Failure()
         converter.failure_converter.to_failure(
             ApplicationError("boom", next_retry_delay=next_retry_delay),
