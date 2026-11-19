@@ -1524,7 +1524,7 @@ _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
 _BATCH_ONLY_WORKFLOW_LOGIC_FLAG = (
     _WorkflowLogicFlag.APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS
 )
-_FIX_CANCELLATION_FLAG = _WorkflowLogicFlag.FIX_WORKFLOW_CANCELLATION
+_PRESERVE_TASK_CANCELLATION_FLAG = _WorkflowLogicFlag.PRESERVE_TASK_CANCELLATION
 
 
 @pytest.mark.parametrize(
@@ -1624,7 +1624,7 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
 
 
 @pytest.mark.parametrize(
-    "flag", [None, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, _FIX_CANCELLATION_FLAG]
+    "flag", [None, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, _PRESERVE_TASK_CANCELLATION_FLAG]
 )
 async def test_workflow_cancel_before_run(
     client: Client, flag: _WorkflowLogicFlag | None
@@ -1690,7 +1690,7 @@ class CancelAtWaitConditionWorkflow:
     [
         pytest.param((_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG,), id="original-single-batch"),
         pytest.param(
-            (_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, _FIX_CANCELLATION_FLAG),
+            (_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, _PRESERVE_TASK_CANCELLATION_FLAG),
             id="batching-with-task-cancellation",
         ),
     ],
@@ -1819,7 +1819,9 @@ async def test_workflow_shielded_wait_condition_after_cancel(
 ) -> None:
     worker = new_worker(client, ShieldedWaitConditionWorkflow)
     worker._set_default_workflow_logic_flag(batch_flag, enabled=True)
-    worker._set_default_workflow_logic_flag(_FIX_CANCELLATION_FLAG, enabled=True)
+    worker._set_default_workflow_logic_flag(
+        _PRESERVE_TASK_CANCELLATION_FLAG, enabled=True
+    )
     async with worker:
         handle = await client.start_workflow(
             ShieldedWaitConditionWorkflow.run,
@@ -1849,7 +1851,7 @@ async def test_workflow_shielded_wait_condition_after_cancel(
     )
     assert (
         any(
-            _FIX_CANCELLATION_FLAG
+            _PRESERVE_TASK_CANCELLATION_FLAG
             in event.workflow_task_completed_event_attributes.sdk_metadata.lang_used_flags
             for event in history.events
         )
@@ -1898,7 +1900,7 @@ class CancelAtChildCompletionWorkflow:
     [
         pytest.param(_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, id="with-cancellation-changes"),
         pytest.param(_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, id="batch-only"),
-        pytest.param(_FIX_CANCELLATION_FLAG, id="cancellation-only"),
+        pytest.param(_PRESERVE_TASK_CANCELLATION_FLAG, id="cancellation-only"),
     ],
 )
 async def test_workflow_cancel_and_child_completion_in_same_activation(
@@ -8542,7 +8544,7 @@ async def test_wait_condition_timer_options_not_used_by_later_timers(
         )
     worker = new_worker(client, WaitConditionThenSleepWorkflow)
     worker._set_default_workflow_logic_flag(
-        _FIX_CANCELLATION_FLAG, enabled=task_cancellation
+        _PRESERVE_TASK_CANCELLATION_FLAG, enabled=task_cancellation
     )
     async with worker:
         handle = await client.start_workflow(

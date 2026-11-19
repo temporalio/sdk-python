@@ -515,10 +515,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         # The task-local wait condition fix must not change the behavior of
         # histories that use the original single-batch flag.
-        self._fix_workflow_cancellation = (
+        self._preserve_task_cancellation = (
             not self._legacy_single_batch
             and self._workflow_logic_flag_enabled(
-                _WorkflowLogicFlag.FIX_WORKFLOW_CANCELLATION
+                _WorkflowLogicFlag.PRESERVE_TASK_CANCELLATION
             )
         )
         single_batch_activation = (
@@ -727,7 +727,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # workflow the ability to receive the cancellation, so we must defer
             # this cancellation to the next iteration of the event loop.
             self.call_soon(self._primary_task.cancel)
-        elif self._legacy_single_batch or self._fix_workflow_cancellation:
+        elif self._legacy_single_batch or self._preserve_task_cancellation:
             # Initialization is the only job that creates the primary task, so
             # retain a same-activation cancellation until that task exists.
             self._cancel_primary_task_pending = True
@@ -2077,7 +2077,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
-            if self._fix_workflow_cancellation:
+            if self._preserve_task_cancellation:
                 # A direct await lets the waiting task arbitrate cancellation
                 # and readiness without bypassing shielding or using wait_for.
                 async with asyncio.timeout(timeout):
@@ -2455,7 +2455,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 if fut.done():
                     # Retrying the shield after both futures become ready would
                     # return the result and erase the task cancellation.
-                    if self._legacy_single_batch or self._fix_workflow_cancellation:
+                    if self._legacy_single_batch or self._preserve_task_cancellation:
                         raise
                     if completed_cancellation_flag is not None and (
                         not self._is_replaying

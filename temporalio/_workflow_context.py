@@ -36,7 +36,7 @@ class _WorkflowLogicFlag(IntEnum):
     APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS = 4
     # Preserve task cancellation when a condition or operation completes concurrently.
     # Not enabled by default.
-    FIX_WORKFLOW_CANCELLATION = 5
+    PRESERVE_TASK_CANCELLATION = 5
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
