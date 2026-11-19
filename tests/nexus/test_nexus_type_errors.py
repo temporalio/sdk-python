@@ -111,7 +111,6 @@ class OperationKindsNotificationHandler:
     @temporalio.nexus.temporal_operation
     async def temporal_on_complete(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: temporalio.nexus.notifications.OnCompleteRequest[
             MyOutput, NotificationSourceContext
@@ -124,7 +123,6 @@ class OperationKindsNotificationHandler:
     @temporalio.nexus.temporal_operation
     async def temporal_on_raw_complete(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: temporalio.nexus.notifications.OnCompleteRequest[
             temporalio.common.RawValue, NotificationSourceContext
@@ -461,7 +459,6 @@ class MyServiceHandler:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
         client: temporalio.nexus.TemporalNexusClient,
         input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -683,7 +680,6 @@ class MyServiceHandler2:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -707,7 +703,6 @@ class MyServiceHandlerWithoutServiceDefinition:
     @temporalio.nexus.temporal_operation
     async def my_temporal_operation(
         self,
-        _ctx: temporalio.nexus.TemporalStartOperationContext,
         _client: temporalio.nexus.TemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
@@ -734,21 +729,18 @@ _bad_handler: TemporalOperationStartHandlerFunc[
 ] = MyServiceHandler.my_temporal_operation  # type: ignore
 
 
-class MyUnsafeContextAnnotationServiceHandler:
-    # A temporal operation receives TemporalStartOperationContext at runtime, so
-    # requiring an arbitrary user subclass is not safe.
-    class MyCustomTemporalStartOperationContext(
-        temporalio.nexus.TemporalStartOperationContext
-    ):
+class MyUnsafeParameterAnnotationServiceHandler:
+    # A temporal operation receives TemporalNexusClient at runtime, so requiring
+    # an arbitrary user subclass is not safe.
+    class MyCustomTemporalNexusClient(temporalio.nexus.TemporalNexusClient):
         def custom_state(self) -> str:
             raise NotImplementedError
 
     # assert-type-error-pyright: 'cannot be assigned to parameter "start".+temporal_operation'
     @temporalio.nexus.temporal_operation  # type: ignore
-    async def my_temporal_operation_with_workflow_run_context(
+    async def my_temporal_operation_with_custom_client(
         self,
-        _ctx: MyCustomTemporalStartOperationContext,
-        _client: temporalio.nexus.TemporalNexusClient,
+        _client: MyCustomTemporalNexusClient,
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
         raise NotImplementedError

@@ -71,23 +71,23 @@ async def test_dynamic_temporal_decorator(name: str):
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            ctx: temporalio.nexus.TemporalStartOperationContext,
             _client: temporalio.nexus.TemporalNexusClient,
             input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
             arguments = temporalio.converter.PayloadConverter.default.from_payload(
                 input.payload, dict
             )
-            if ctx.operation == "async":
+            info = temporalio.nexus.info()
+            if info.operation == "async":
                 return temporalio.nexus.TemporalOperationResult.async_token(
                     "operation-token"
                 )
-            if ctx.operation == "reject":
+            if info.operation == "reject":
                 raise nexusrpc.HandlerError(
                     "Unknown tool", type=nexusrpc.HandlerErrorType.NOT_FOUND
                 )
             return temporalio.nexus.TemporalOperationResult.sync(
-                (ctx.operation, ctx.request_id, arguments)
+                (info.operation, info.request_id, arguments)
             )
 
     service = ServiceHandler.from_user_instance(CatchAllService())
@@ -95,13 +95,7 @@ async def test_dynamic_temporal_decorator(name: str):
     handler = service.get_operation_handler(name)
     assert isinstance(handler, temporalio.nexus.TemporalOperationHandler)
     assert handler is service.dynamic_handler
-    ctx = temporalio.nexus.TemporalStartOperationContext(
-        service="tools",
-        operation=name,
-        headers={},
-        request_id="request-id",
-        task_cancellation=temporalio.worker._nexus._NexusTaskCancellation(),
-    )
+    info = mock.Mock(operation=name, request_id="request-id")
     serializer = mock.Mock()
     payload = temporalio.converter.PayloadConverter.default.to_payload(
         {"city": "Boston"}
@@ -110,18 +104,21 @@ async def test_dynamic_temporal_decorator(name: str):
         return_value=temporalio.common.RawValue(payload)
     )
     raw = nexusrpc.LazyValue(serializer=serializer, headers={})
-    if name == "reject":
-        with pytest.raises(nexusrpc.HandlerError) as error:
-            await handler.start_operation(ctx, mock.Mock(), raw)
-        assert error.value.type == nexusrpc.HandlerErrorType.NOT_FOUND
-    else:
-        result = await handler.start_operation(ctx, mock.Mock(), raw)
-        if name == "async":
-            nexus_result = result._to_nexus_result()
-            assert isinstance(nexus_result, nexusrpc.handler.StartOperationResultAsync)
-            assert nexus_result.token == "operation-token"
+    with mock.patch.object(temporalio.nexus, "info", return_value=info):
+        if name == "reject":
+            with pytest.raises(nexusrpc.HandlerError) as error:
+                await handler.start_operation(mock.Mock(), raw)
+            assert error.value.type == nexusrpc.HandlerErrorType.NOT_FOUND
         else:
-            assert result.value == (name, "request-id", {"city": "Boston"})
+            result = await handler.start_operation(mock.Mock(), raw)
+            if name == "async":
+                nexus_result = result._to_nexus_result()
+                assert isinstance(
+                    nexus_result, nexusrpc.handler.StartOperationResultAsync
+                )
+                assert nexus_result.token == "operation-token"
+            else:
+                assert result.value == (name, "request-id", {"city": "Boston"})
     assert (
         serializer.deserialize.call_args.kwargs["as_type"] is temporalio.common.RawValue
     )
@@ -142,7 +139,6 @@ def test_dynamic_temporal_decorator_requires_raw_input():
             @temporalio.nexus.temporal_operation(dynamic=True)
             async def forward(
                 self,
-                _ctx: temporalio.nexus.TemporalStartOperationContext,
                 _client: temporalio.nexus.TemporalNexusClient,
                 input: dict,
             ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -158,7 +154,6 @@ def test_second_dynamic_temporal_operation_fails_registration():
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            _ctx: temporalio.nexus.TemporalStartOperationContext,
             _client: temporalio.nexus.TemporalNexusClient,
             _input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -171,7 +166,6 @@ def test_second_dynamic_temporal_operation_fails_registration():
             @temporalio.nexus.temporal_operation(dynamic=True)
             async def other(
                 self,
-                _ctx: temporalio.nexus.TemporalStartOperationContext,
                 _client: temporalio.nexus.TemporalNexusClient,
                 _input: temporalio.common.RawValue,
             ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -384,7 +378,6 @@ async def test_workflow_caller_routes_named_and_dynamic_operations(
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
             input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -393,9 +386,10 @@ async def test_workflow_caller_routes_named_and_dynamic_operations(
                     input.payload, str
                 )
             )
-            if ctx.operation == "echo_sync":
+            operation = temporalio.nexus.info().operation
+            if operation == "echo_sync":
                 return temporalio.nexus.TemporalOperationResult.sync(f"sync:{value}")
-            if ctx.operation == "echo_workflow":
+            if operation == "echo_workflow":
                 return await client.start_workflow(
                     EchoWorkflow.run, value, id=str(uuid.uuid4())
                 )
@@ -453,7 +447,6 @@ async def test_workflow_caller_cancels_dynamic_workflow_operation(
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            _ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
             input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -513,7 +506,6 @@ async def test_standalone_caller_cancels_dynamic_activity_operation(
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            _ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
             input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -578,7 +570,6 @@ async def test_dynamic_update_custom_cancel(client: Client, env: WorkflowEnviron
     ):
         async def start_operation(
             self,
-            ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
             input: nexusrpc.LazyValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
@@ -590,7 +581,6 @@ async def test_dynamic_update_custom_cancel(client: Client, env: WorkflowEnviron
 
         async def cancel_workflow_update(
             self,
-            ctx: temporalio.nexus.TemporalCancelOperationContext,
             options: temporalio.nexus.CancelUpdateWorkflowOptions,
         ) -> None:
             cancelled.put_nowait(options)
@@ -659,11 +649,10 @@ async def test_cancel_by_token_after_tool_removal_and_restart(
         @temporalio.nexus.temporal_operation(dynamic=True)
         async def forward(
             self,
-            ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
             input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
-            if ctx.operation != operation or not available:
+            if temporalio.nexus.info().operation != operation or not available:
                 raise nexusrpc.HandlerError(
                     "Unknown tool", type=nexusrpc.HandlerErrorType.NOT_FOUND
                 )

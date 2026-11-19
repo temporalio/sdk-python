@@ -113,8 +113,8 @@ def nexus_ctx() -> Generator[_TemporalStartOperationContext]:
     ctx = temporalio.nexus._operation_context._TemporalStartOperationContext(
         nexus_context=nexus_context,
         client=mock.MagicMock(namespace=NAMESPACE),
-        info=lambda: temporalio.nexus.Info(
-            endpoint="endpoint", namespace=NAMESPACE, task_queue="tq"
+        info=temporalio.nexus.Info._from_operation_context(
+            nexus_context, endpoint="endpoint", namespace=NAMESPACE, task_queue="tq"
         ),
         _runtime_metric_meter=mock.MagicMock(),
         _worker_shutdown_event=mock.MagicMock(),
@@ -146,8 +146,8 @@ def nexus_ctx_linkless() -> Generator[_TemporalStartOperationContext]:
     ctx = temporalio.nexus._operation_context._TemporalStartOperationContext(
         nexus_context=nexus_context,
         client=mock.MagicMock(namespace=NAMESPACE),
-        info=lambda: temporalio.nexus.Info(
-            endpoint="endpoint", namespace=NAMESPACE, task_queue="tq"
+        info=temporalio.nexus.Info._from_operation_context(
+            nexus_context, endpoint="endpoint", namespace=NAMESPACE, task_queue="tq"
         ),
         _runtime_metric_meter=mock.MagicMock(),
         _worker_shutdown_event=mock.MagicMock(),

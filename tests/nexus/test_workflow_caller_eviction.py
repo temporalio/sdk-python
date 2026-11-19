@@ -45,7 +45,6 @@ class EvictionTestServiceHandler:
     @nexus.temporal_operation
     async def wait(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         workflow_id: str,
     ) -> nexus.TemporalOperationResult[str]:

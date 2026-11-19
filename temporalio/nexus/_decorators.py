@@ -22,10 +22,7 @@ from temporalio.nexus._temporal_client import (
 )
 from temporalio.types import NexusServiceType
 
-from ._operation_context import (
-    TemporalStartOperationContext,
-    WorkflowRunOperationContext,
-)
+from ._operation_context import WorkflowRunOperationContext
 from ._operation_handlers import (
     TemporalOperationHandler,
     WorkflowRunOperationHandler,
@@ -150,7 +147,6 @@ def workflow_run_operation(
 TemporalOperationStartHandlerFunc: TypeAlias = Callable[
     [
         NexusServiceType,
-        TemporalStartOperationContext,
         TemporalNexusClient,
         InputT,
     ],
@@ -188,7 +184,9 @@ def temporal_operation(
         TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
     ]
 ):
-    """Decorator marking a method as the start method for an operation that interacts with Temporal.
+    """Decorate an async ``(self, client, input)`` Nexus start method.
+
+    Return a :py:class:`TemporalOperationResult` and use :py:func:`info` for invocation information.
 
     Set dynamic=True to set a Nexus operation handler as a catch-all handler,
     which will handle any unknown operation that's dispatched to that Nexus service.
@@ -224,7 +222,6 @@ def temporal_operation(
             self: NexusServiceType,
         ) -> OperationHandler[InputT, OutputT]:
             async def _start(
-                ctx: TemporalStartOperationContext,
                 client: TemporalNexusClient,
                 input: InputT,
             ) -> TemporalOperationResult[OutputT]:
@@ -234,7 +231,6 @@ def temporal_operation(
                     )
                 return await start(
                     self,
-                    ctx,
                     client,
                     input,
                 )
@@ -243,11 +239,10 @@ def temporal_operation(
                 @override
                 async def start_operation(
                     self,
-                    ctx: TemporalStartOperationContext,
                     client: TemporalNexusClient,
                     input: InputT,
                 ) -> TemporalOperationResult[OutputT]:
-                    return await _start(ctx, client, input)
+                    return await _start(client, input)
 
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
             return _TemporalOperationHandler()
