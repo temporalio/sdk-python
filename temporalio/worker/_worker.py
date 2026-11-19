@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import hashlib
 import logging
+import os
 import sys
 import warnings
 from collections.abc import Awaitable, Callable, Sequence
@@ -106,6 +107,7 @@ class Worker:
         activities: Sequence[Callable] = [],
         nexus_service_handlers: Sequence[Any] = [],
         workflows: Sequence[type] = [],
+        wasm_workflow_bundle: str | os.PathLike[str] | None = None,
         activity_executor: concurrent.futures.Executor | None = None,
         workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         nexus_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
@@ -162,6 +164,8 @@ class Worker:
                 may be async functions or non-async functions.
             nexus_service_handlers: Instances of Nexus service handler classes
                 decorated with :py:func:`@nexusrpc.handler.service_handler<nexusrpc.handler.service_handler>`.
+            wasm_workflow_bundle: Path to an experimental WASM component containing
+                workflows for this worker. Can be used alongside native workflows.
             workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async
@@ -354,6 +358,7 @@ class Worker:
             activities=activities,
             nexus_service_handlers=nexus_service_handlers,
             workflows=workflows,
+            wasm_workflow_bundle=wasm_workflow_bundle,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
             nexus_task_executor=nexus_task_executor,
@@ -431,6 +436,7 @@ class Worker:
             config.get("activities")
             or config.get("nexus_service_handlers")
             or config.get("workflows")
+            or config.get("wasm_workflow_bundle") is not None
         ):
             raise ValueError(
                 "At least one activity, Nexus service, or workflow must be specified"
@@ -532,7 +538,8 @@ class Worker:
             )
         self._workflow_worker: _WorkflowWorker | None = None
         workflows = config.get("workflows")
-        if workflows:
+        wasm_workflow_bundle = config.get("wasm_workflow_bundle")
+        if workflows or wasm_workflow_bundle is not None:
             deployment_config = config.get("deployment_config")
             should_enforce_versioning_behavior = (
                 deployment_config is not None
@@ -553,7 +560,13 @@ class Worker:
                 bridge_worker=lambda: self._bridge_worker,
                 namespace=config["client"].namespace,  # type: ignore[reportTypedDictNotRequiredAccess]
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
-                workflows=workflows,
+                workflows=workflows or [],
+                wasm_workflow_bundle=wasm_workflow_bundle,
+                wasm_local_activities=(
+                    self._activity_worker.local_activity_registry()
+                    if self._activity_worker
+                    else ([], False)
+                ),
                 workflow_task_executor=config.get("workflow_task_executor"),
                 max_concurrent_workflow_tasks=config.get(
                     "max_concurrent_workflow_tasks"
@@ -1021,6 +1034,7 @@ class WorkerConfig(TypedDict, total=False):
     activities: Sequence[Callable]
     nexus_service_handlers: Sequence[Any]
     workflows: Sequence[type]
+    wasm_workflow_bundle: str | os.PathLike[str] | None
     activity_executor: concurrent.futures.Executor | None
     workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     nexus_task_executor: concurrent.futures.ThreadPoolExecutor | None

@@ -8,6 +8,8 @@ mod metric;
 mod runtime;
 mod testing;
 mod worker;
+#[cfg(feature = "wasm-workflows")]
+mod workflow_wasm;
 
 #[pymodule]
 fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -69,6 +71,12 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<worker::LocalActivitySlotInfo>()?;
     m.add_function(wrap_pyfunction!(new_worker, m)?)?;
     m.add_function(wrap_pyfunction!(new_replay_worker, m)?)?;
+
+    #[cfg(feature = "wasm-workflows")]
+    {
+        m.add_class::<workflow_wasm::WasmWorkflowBundle>()?;
+        m.add_class::<workflow_wasm::WasmWorkflowInstance>()?;
+    }
 
     // envconfig
     let envconfig_module = PyModule::new(py, "envconfig")?;

@@ -747,6 +747,9 @@ class _ActivityWorker:
         impl.init(_ActivityOutboundImpl(self, running_activity.info))
         return await impl.execute_activity(input)
 
+    def local_activity_registry(self) -> tuple[list[str], bool]:
+        return sorted(self._activities), self._dynamic_activity is not None
+
     def assert_activity_valid(self, activity: str) -> None:
         if self._dynamic_activity:
             return

@@ -59,12 +59,12 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
+from temporalio import __version__
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
     _start_system_nexus_operation,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
 )
-from temporalio.service import __version__
 
 from ..api.failure.v1.message_pb2 import Failure
 from ..workflow._event_groups import (

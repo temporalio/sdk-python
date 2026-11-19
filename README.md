@@ -74,6 +74,7 @@ informal introduction to the features and their implementation.
         - [Automatic Time Skipping](#automatic-time-skipping)
         - [Manual Time Skipping](#manual-time-skipping)
         - [Mocking Activities](#mocking-activities)
+      - [Python workflow components (experimental)](#python-workflow-components-experimental)
       - [Workflow Sandbox](#workflow-sandbox)
         - [How the Sandbox Works](#how-the-sandbox-works)
         - [Avoiding the Sandbox](#avoiding-the-sandbox)
@@ -1099,6 +1100,52 @@ method.
 
 Activities are just functions decorated with `@activity.defn`. Simply write different ones and pass those to the worker
 to have different activities called during the test.
+
+#### Python workflow components (experimental)
+
+The WASM prototype runs workflow definitions inside CPython 3.14 in Wasmtime. Core
+still handles workflow tasks, history replay, and commands. Register activities
+on native workers, including on the workflow worker for local activities. Nexus
+operations use the configured endpoint.
+
+1. From the SDK checkout, build the Python bridge with
+   `poe build-develop --features wasm-workflows`.
+2. Install `componentize-py==0.25.1` into a build virtual environment. Stage a
+   directory from your locked dependencies containing Python sources for
+   `protobuf`, `nexus-rpc`, `typing-extensions`, and any pure-Python workflow
+   dependencies.
+3. Use that virtual environment to package the workflow. Repeat `--workflow`
+   for each class.
+
+   ```sh
+   python scripts/build_workflow_wasm.py \
+       --source ./src \
+       --dependency-path ./guest-dependencies \
+       --workflow workflows:MyWorkflow \
+       --output workflows.wasm
+   ```
+
+4. Register the bundle on a test task queue with
+   `Worker(client, task_queue="python-wasm", wasm_workflow_bundle="workflows.wasm")`.
+   Start its workflows by their registered type names. Keep the exact artifact
+   and use `Replayer(wasm_workflow_bundle="workflows.wasm", namespace=client.namespace)`
+   for histories recorded on that queue.
+
+`Worker` and `Replayer` accept both `workflows` and `wasm_workflow_bundle`
+together. Workflow type names must be unique across both registrations, and
+there can be one dynamic workflow. Host workflow interceptors in a mixed worker
+apply to native workflows.
+
+The component has no access to host files, environment variables, sockets,
+threads, clocks, or entropy. Use the workflow APIs for time and randomness and
+execute I/O in an activity or Nexus handler. The guest loads Python sources from
+its bundle. Native extension wheels and filesystem-backed package resources need
+separate support. Registering a WASM bundle requires the default data converter.
+
+To run the WASM integration tests, set
+`TEMPORAL_WASM_COMPONENTIZER_PYTHON` to the build virtual environment's Python
+executable and `TEMPORAL_WASM_DEPENDENCY_PATH` to the staged dependencies.
+Run `poe test -n 0 tests/worker/test_workflow_wasm.py`.
 
 #### Workflow Sandbox
 

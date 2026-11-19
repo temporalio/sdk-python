@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
+import os
 from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
@@ -41,7 +42,8 @@ class Replayer:
     def __init__(
         self,
         *,
-        workflows: Sequence[type],
+        workflows: Sequence[type] = (),
+        wasm_workflow_bundle: str | os.PathLike[str] | None = None,
         workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
@@ -71,6 +73,7 @@ class Replayer:
         """
         self._config = ReplayerConfig(
             workflows=list(workflows),
+            wasm_workflow_bundle=wasm_workflow_bundle,
             workflow_task_executor=(
                 workflow_task_executor or concurrent.futures.ThreadPoolExecutor()
             ),
@@ -96,7 +99,10 @@ class Replayer:
             self._config = plugin.configure_replayer(self._config)
 
         # Validate workflows after plugin configuration
-        if not self._config.get("workflows"):
+        if (
+            not self._config.get("workflows")
+            and self._config.get("wasm_workflow_bundle") is None
+        ):
             raise ValueError("At least one workflow must be specified")
 
     def _set_default_workflow_logic_flag(
@@ -256,6 +262,7 @@ class Replayer:
                 namespace=self._config.get("namespace", "ReplayNamespace"),
                 task_queue=task_queue,
                 workflows=self._config.get("workflows", []),
+                wasm_workflow_bundle=self._config.get("wasm_workflow_bundle"),
                 workflow_task_executor=self._config.get("workflow_task_executor"),
                 max_concurrent_workflow_tasks=5,
                 workflow_runner=self._config.get("workflow_runner")
@@ -366,6 +373,16 @@ class Replayer:
             # Yield iterator
             async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:
                 async for history in histories:
+                    if self._config.get("wasm_workflow_bundle") is not None:
+                        # Core uses a synthetic polling queue during replay. The guest
+                        # needs the original queue as an input to workflow.info().
+                        workflow_worker._wasm_replay_task_queue = (
+                            history.events[
+                                0
+                            ].workflow_execution_started_event_attributes.task_queue.name
+                            if history.events
+                            else None
+                        )
                     # Clear last complete and push history
                     last_replay_complete.clear()
                     await pusher.push_history(
@@ -422,6 +439,7 @@ class ReplayerConfig(TypedDict, total=False):
     """TypedDict of config originally passed to :py:class:`Replayer`."""
 
     workflows: Sequence[type]
+    wasm_workflow_bundle: str | os.PathLike[str] | None
     workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner

@@ -11,7 +11,6 @@ import sys
 import threading
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass
-from datetime import timezone
 from types import TracebackType
 
 import temporalio.api.common.v1
@@ -40,6 +39,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
 )
+from ._workflow_info import workflow_info
 from ._workflow_instance import (
     _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
     PatchActivationInput,
@@ -48,6 +48,11 @@ from ._workflow_instance import (
     WorkflowRunner,
     _WorkflowExternFunctions,
     _WorkflowLogicFlag,
+)
+from ._workflow_wasm import (
+    _LocalActivityRegistry,
+    _WasmWorkflowBundle,
+    _WasmWorkflowInstance,
 )
 
 logger = logging.getLogger(__name__)
@@ -134,10 +139,15 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
         default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
+        wasm_workflow_bundle: str | os.PathLike[str] | None = None,
+        wasm_local_activities: _LocalActivityRegistry | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
         debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
 
+        self._wasm_bundle: _WasmWorkflowBundle | None = None
+        self._wasm_local_activities = wasm_local_activities
+        self._wasm_replay_task_queue: str | None = None
         self._bridge_worker = bridge_worker
         self._namespace = namespace
         self._task_queue = task_queue
@@ -193,6 +203,32 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
         )
 
+        if wasm_workflow_bundle is not None:
+            if data_converter != temporalio.converter.DataConverter.default:
+                raise ValueError(
+                    "WASM workflow bundles require the default data converter"
+                )
+            if workflow_failure_exception_types or should_enforce_versioning_behavior:
+                raise ValueError(
+                    "WASM workflow bundles do not support worker-level failure types "
+                    "or required workflow versioning annotations"
+                )
+            if not workflows and (
+                debug_mode
+                or self._interceptor_classes
+                or patch_activation_callback is not None
+                or self._extern_functions.keys()
+                - {
+                    "__temporal_get_metric_meter",
+                    "__temporal_assert_local_activity_valid",
+                }
+            ):
+                raise ValueError(
+                    "Debug mode, workflow interceptors, and patch activation callbacks "
+                    "require native workflow registrations"
+                )
+            self._wasm_bundle = _WasmWorkflowBundle(wasm_workflow_bundle)
+
         self._workflow_failure_exception_types = workflow_failure_exception_types
         self._patch_activation_callback = patch_activation_callback
         self._running_workflows: dict[str, _RunningWorkflow] = {}
@@ -205,26 +241,28 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
         self._throw_after_activation: Exception | None = None
 
-        # If debug mode is enabled, disable deadlock detection
-        # otherwise set to 2 seconds
         self._deadlock_timeout_seconds = None if self._debug_mode else 2
 
         # Keep track of workflows that could not be evicted
         self._could_not_evict_count = 0
 
         # Set the worker-level failure exception types into the runner
-        workflow_runner.set_worker_level_failure_exception_types(
-            workflow_failure_exception_types
-        )
+        if self._wasm_bundle is None or workflows:
+            workflow_runner.set_worker_level_failure_exception_types(
+                workflow_failure_exception_types
+            )
 
         # Validate and build workflow dict
         self._workflows: dict[str, temporalio.workflow._Definition] = {}
         self._dynamic_workflow: temporalio.workflow._Definition | None = None
+        wasm_types = self._wasm_bundle.workflow_types if self._wasm_bundle else ()
         for workflow in workflows:
             defn = temporalio.workflow._Definition.must_from_class(workflow)
             # Confirm name unique
-            if defn.name in self._workflows:
+            if defn.name in self._workflows or (defn.name and defn.name in wasm_types):
                 raise ValueError(f"More than one workflow named {defn.name}")
+            if defn.name is None and (self._dynamic_workflow or "" in wasm_types):
+                raise TypeError("More than one dynamic workflow")
             if should_enforce_versioning_behavior:
                 if (
                     defn.versioning_behavior
@@ -251,8 +289,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 raise RuntimeError(f"Failed validating workflow {defn.name}") from err
             if defn.name:
                 self._workflows[defn.name] = defn
-            elif self._dynamic_workflow:
-                raise TypeError("More than one dynamic workflow")
             else:
                 self._dynamic_workflow = defn
 
@@ -443,7 +479,8 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                 )
                 self._running_workflows[act.run_id] = workflow
 
-            if self._debug_mode:
+            is_wasm = isinstance(workflow.instance, _WasmWorkflowInstance)
+            if self._debug_mode and not is_wasm:
                 # Inline on the main thread so pdb / breakpoint() can read
                 # stdin. The loop blocks during the activation — that's the
                 # intended single-stepping semantic.
@@ -458,9 +495,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
 
                 # Wrap the future in a asyncio.Future so the current loop can await it
                 activation_future = asyncio.wrap_future(activation_job)
+                # Wasmtime fuel bounds guest execution independently of the native watchdog.
+                deadlock_timeout = None if is_wasm else self._deadlock_timeout_seconds
                 try:
                     completed = await _wait_until_done(
-                        activation_future, self._deadlock_timeout_seconds
+                        activation_future, deadlock_timeout
                     )
                 except asyncio.CancelledError:
                     # If wait is cancelled, manually forward to future
@@ -475,7 +514,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     cancelled_before_start = activation_job.cancel()
                     deadlock_exc = _DeadlockError.from_deadlocked_workflow(
                         None if cancelled_before_start else workflow.instance,
-                        self._deadlock_timeout_seconds,
+                        deadlock_timeout,
                     )
                     # if we weren't able to cancel the activation job, it is either running
                     # or finished. attempt_deadlock_interruption accounts for both scenarios
@@ -595,14 +634,13 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             "Evicting workflow with run ID %s, message: %s", act.run_id, job.message
         )
 
-        # Find the workflow to process safe eviction unless safe eviction
-        # disabled
-        workflow = None
-        if not self._disable_safe_eviction:
-            workflow = self._running_workflows.get(act.run_id)
-
-        # Safe eviction...
-        if workflow:
+        workflow = (
+            None
+            if self._disable_safe_eviction
+            else self._running_workflows.get(act.run_id)
+        )
+        # Dropping the store discards guest coroutines without invoking Python finalizers.
+        if workflow and not isinstance(workflow.instance, _WasmWorkflowInstance):
             # We have to wait on the deadlocked task if it is set. This is
             # because eviction may be the result of a deadlocked workflow but
             # we cannot safely evict until that task is done with its thread. We
@@ -750,66 +788,39 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         act: temporalio.bridge.proto.workflow_activation.WorkflowActivation,
         init: temporalio.bridge.proto.workflow_activation.InitializeWorkflow,
     ) -> WorkflowInstance:
-        # Get the definition
-        defn = self._workflows.get(init.workflow_type, self._dynamic_workflow)
+        defn = self._workflows.get(init.workflow_type)
+        wasm_bundle = self._wasm_bundle
+        if (
+            defn is None
+            and wasm_bundle is not None
+            and (
+                init.workflow_type in wasm_bundle.workflow_types
+                or "" in wasm_bundle.workflow_types
+            )
+        ):
+            return wasm_bundle.create_instance(
+                workflow_info(
+                    self._namespace,
+                    self._wasm_replay_task_queue or self._task_queue,
+                    act,
+                    init,
+                ),
+                sorted(self._default_workflow_logic_flags),
+                self._wasm_local_activities,
+                self._disable_eager_activity_execution,
+            )
+
+        defn = defn or self._dynamic_workflow
         if not defn:
-            workflow_names = ", ".join(sorted(self._workflows.keys()))
+            workflow_names = set(self._workflows)
+            if wasm_bundle is not None:
+                workflow_names.update(wasm_bundle.workflow_types)
             raise temporalio.exceptions.ApplicationError(
-                f"Workflow class {init.workflow_type} is not registered on this worker, available workflows: {workflow_names}",
+                f"Workflow class {init.workflow_type} is not registered on this worker, available workflows: {', '.join(sorted(workflow_names))}",
                 type="NotFoundError",
             )
 
-        # Build info
-        parent: temporalio.workflow.ParentInfo | None = None
-        root: temporalio.workflow.RootInfo | None = None
-        if init.HasField("parent_workflow_info"):
-            parent = temporalio.workflow.ParentInfo(
-                namespace=init.parent_workflow_info.namespace,
-                run_id=init.parent_workflow_info.run_id,
-                workflow_id=init.parent_workflow_info.workflow_id,
-            )
-        if init.HasField("root_workflow"):
-            root = temporalio.workflow.RootInfo(
-                run_id=init.root_workflow.run_id,
-                workflow_id=init.root_workflow.workflow_id,
-            )
-        info = temporalio.workflow.Info(
-            attempt=init.attempt,
-            continued_run_id=init.continued_from_execution_run_id or None,
-            cron_schedule=init.cron_schedule or None,
-            execution_timeout=init.workflow_execution_timeout.ToTimedelta()
-            if init.HasField("workflow_execution_timeout")
-            else None,
-            first_execution_run_id=init.first_execution_run_id,
-            headers=dict(init.headers),
-            namespace=self._namespace,
-            original_execution_run_id=init.original_execution_run_id or act.run_id,
-            parent=parent,
-            root=root,
-            raw_memo=dict(init.memo.fields),
-            retry_policy=temporalio.common.RetryPolicy.from_proto(init.retry_policy)
-            if init.HasField("retry_policy")
-            else None,
-            run_id=act.run_id,
-            run_timeout=init.workflow_run_timeout.ToTimedelta()
-            if init.HasField("workflow_run_timeout")
-            else None,
-            search_attributes=temporalio.converter.decode_search_attributes(
-                init.search_attributes
-            ),
-            start_time=act.timestamp.ToDatetime().replace(tzinfo=timezone.utc),
-            workflow_start_time=init.start_time.ToDatetime().replace(
-                tzinfo=timezone.utc
-            ),
-            task_queue=self._task_queue,
-            task_timeout=init.workflow_task_timeout.ToTimedelta(),
-            typed_search_attributes=temporalio.converter.decode_typed_search_attributes(
-                init.search_attributes
-            ),
-            workflow_id=init.workflow_id,
-            workflow_type=init.workflow_type,
-            priority=temporalio.common.Priority._from_proto(init.priority),
-        )
+        info = workflow_info(self._namespace, self._task_queue, act, init)
 
         last_failure = (
             init.continued_failure if init.HasField("continued_failure") else None

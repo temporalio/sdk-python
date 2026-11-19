@@ -1,0 +1,1 @@
+Experimental WASM workflow bundles can run Python workflows in CPython on Wasmtime with native activity and Nexus execution, including history replay through the Python Replayer. Workers and replayers can register both native workflows and a WASM bundle.
