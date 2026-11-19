@@ -5,7 +5,7 @@ It doesn't contain any test functions.
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, assert_type
 from unittest.mock import Mock
 
 import nexusrpc
@@ -707,6 +707,37 @@ class MyServiceHandlerWithoutServiceDefinition:
         _input: int,
     ) -> temporalio.nexus.TemporalOperationResult[None]:
         raise NotImplementedError
+
+    @temporalio.nexus.temporal_operation(name="direct_temporal_operation")
+    async def direct_temporal_operation(
+        self,
+        _client: temporalio.nexus.TemporalNexusClient,
+        _input: MyInput,
+    ) -> MyOutput | None:
+        return None
+
+
+async def direct_temporal_operation_types(client: Client) -> None:
+    service = MyServiceHandlerWithoutServiceDefinition
+    operation = service.direct_temporal_operation
+    workflow_client = workflow.create_nexus_client(service=service, endpoint="endpoint")
+    assert_type(
+        await workflow_client.start_operation(operation, MyInput()),
+        workflow.NexusOperationHandle[MyOutput | None],
+    )
+    assert_type(
+        await workflow_client.execute_operation(operation, MyInput()), MyOutput | None
+    )
+
+    nexus_client = client.create_nexus_client(service, "endpoint")
+    assert_type(
+        await nexus_client.start_operation(operation, MyInput(), id="op"),
+        NexusOperationHandle[MyOutput | None],
+    )
+    assert_type(
+        await nexus_client.execute_operation(operation, MyInput(), id="op"),
+        MyOutput | None,
+    )
 
 
 _handler: TemporalOperationStartHandlerFunc[
