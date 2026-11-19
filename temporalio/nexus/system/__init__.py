@@ -190,6 +190,20 @@ def _get_serialization_context(  # pyright: ignore[reportUnusedFunction]
     return operation_info.serialization_context(request)
 
 
+def _get_storage_target(  # pyright: ignore[reportUnusedFunction]
+    service: str,
+    operation: str,
+    request: Any,
+) -> temporalio.converter.StorageDriverWorkflowInfo | None:
+    """Return the destination for a system Nexus operation's stored payloads."""
+    from .workflow_service import __nexus_operation_registry__
+
+    operation_info = __nexus_operation_registry__.get((service, operation))
+    if operation_info is None or operation_info.storage_target is None:
+        return None
+    return operation_info.storage_target(request)
+
+
 __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
     "is_system_endpoint",
