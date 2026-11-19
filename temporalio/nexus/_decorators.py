@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from typing import (
+    Any,
     TypeAlias,
     cast,
     overload,
@@ -20,7 +21,7 @@ from temporalio.nexus._temporal_client import (
     TemporalNexusClient,
     TemporalOperationResult,
 )
-from temporalio.types import NexusServiceType
+from temporalio.types import NexusServiceType, ReturnType
 
 from ._operation_context import WorkflowRunOperationContext
 from ._operation_handlers import (
@@ -30,7 +31,7 @@ from ._operation_handlers import (
 from ._token import WorkflowHandle
 from ._util import (
     get_callable_name,
-    get_temporal_operation_start_method_input_and_output_type_annotations,
+    get_temporal_operation_start_method_types,
     get_workflow_run_start_method_input_and_output_type_annotations,
     is_async_callable,
     set_operation_factory,
@@ -145,19 +146,19 @@ def workflow_run_operation(
 
 
 TemporalOperationStartHandlerFunc: TypeAlias = Callable[
-    [
-        NexusServiceType,
-        TemporalNexusClient,
-        InputT,
-    ],
-    Awaitable[TemporalOperationResult[OutputT]],
+    [NexusServiceType, TemporalNexusClient, InputT],
+    Awaitable[TemporalOperationResult[OutputT] | OutputT],
+]
+
+_TemporalOperationMethod: TypeAlias = Callable[
+    [NexusServiceType, TemporalNexusClient, InputT], Awaitable[ReturnType]
 ]
 
 
 @overload
 def temporal_operation(
-    start: TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
-) -> TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]: ...
+    start: _TemporalOperationMethod[NexusServiceType, InputT, ReturnType],
+) -> _TemporalOperationMethod[NexusServiceType, InputT, ReturnType]: ...
 
 
 @overload
@@ -166,27 +167,31 @@ def temporal_operation(
     name: str | None = None,
     dynamic: bool = False,
 ) -> Callable[
-    [TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
-    TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+    [_TemporalOperationMethod[NexusServiceType, InputT, ReturnType]],
+    _TemporalOperationMethod[NexusServiceType, InputT, ReturnType],
 ]: ...
 
 
 def temporal_operation(
-    start: None
-    | TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT] = None,
+    start: None | _TemporalOperationMethod[NexusServiceType, InputT, ReturnType] = None,
     *,
     name: str | None = None,
     dynamic: bool = False,
 ) -> (
-    TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]
+    _TemporalOperationMethod[NexusServiceType, InputT, ReturnType]
     | Callable[
-        [TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
-        TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
+        [_TemporalOperationMethod[NexusServiceType, InputT, ReturnType]],
+        _TemporalOperationMethod[NexusServiceType, InputT, ReturnType],
     ]
 ):
     """Decorator marking a method as the start method for an operation that interacts with Temporal.
 
     The method receives ``(self, client, input)``. Use :py:func:`temporalio.nexus.info` for invocation information.
+
+    Declare and return the payload type to complete the Nexus operation synchronously.
+    Declare :py:class:`TemporalOperationResult` with the payload type to return an
+    explicit synchronous result or an asynchronous operation token. A method with an
+    unspecified return type, such as ``Any`` or no annotation, must return an explicit result.
 
     Set dynamic=True to set a Nexus operation handler as a catch-all handler,
     which will handle any unknown operation that's dispatched to that Nexus service.
@@ -202,17 +207,16 @@ def temporal_operation(
         raise ValueError("A dynamic operation handler cannot specify name")
 
     def decorator(
-        start: TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
-    ) -> TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]:
+        start: _TemporalOperationMethod[NexusServiceType, InputT, ReturnType],
+    ) -> _TemporalOperationMethod[NexusServiceType, InputT, ReturnType]:
         if not is_async_callable(start):
             raise RuntimeError(
                 f"{start} is not an `async def` method. "
                 "@temporal_operation must decorate an `async def` start method."
             )
-        (
-            input_type,
-            output_type,
-        ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
+        input_type, output_type, returns_wrapper = (
+            get_temporal_operation_start_method_types(start)
+        )
         if dynamic and input_type is not temporalio.common.RawValue:
             raise TypeError(
                 "A dynamic operation handler must accept temporalio.common.RawValue"
@@ -220,11 +224,11 @@ def temporal_operation(
 
         def operation_handler_factory(
             self: NexusServiceType,
-        ) -> OperationHandler[InputT, OutputT]:
+        ) -> OperationHandler[InputT, Any]:
             async def _start(
                 client: TemporalNexusClient,
                 input: InputT,
-            ) -> TemporalOperationResult[OutputT]:
+            ) -> ReturnType:
                 if dynamic:
                     input = await cast(nexusrpc.LazyValue, input).consume(
                         as_type=temporalio.common.RawValue
@@ -235,14 +239,22 @@ def temporal_operation(
                     input,
                 )
 
-            class _TemporalOperationHandler(TemporalOperationHandler):
+            class _TemporalOperationHandler(TemporalOperationHandler[Any, Any]):
                 @override
                 async def start_operation(
                     self,
                     client: TemporalNexusClient,
                     input: InputT,
-                ) -> TemporalOperationResult[OutputT]:
-                    return await _start(client, input)
+                ) -> TemporalOperationResult[Any]:
+                    result = await _start(client, input)
+                    if not returns_wrapper:
+                        return TemporalOperationResult.sync(result)
+                    if not isinstance(result, TemporalOperationResult):
+                        raise TypeError(
+                            f"@temporal_operation method {start} must return a "
+                            "TemporalOperationResult."
+                        )
+                    return result
 
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
             return _TemporalOperationHandler()
@@ -252,9 +264,9 @@ def temporal_operation(
             @nexusrpc.handler.operation_handler(dynamic=True)
             def dynamic_operation_handler_factory(
                 self: NexusServiceType,
-            ) -> OperationHandler[nexusrpc.LazyValue, OutputT]:
+            ) -> OperationHandler[nexusrpc.LazyValue, Any]:
                 return cast(
-                    OperationHandler[nexusrpc.LazyValue, OutputT],
+                    OperationHandler[nexusrpc.LazyValue, Any],
                     operation_handler_factory(self),
                 )
 

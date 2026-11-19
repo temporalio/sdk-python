@@ -1,4 +1,5 @@
 import asyncio
+import typing
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -62,6 +63,11 @@ class Input:
     update_value: str = ""
     update_id: str = ""
     expect_sync_response: bool = False
+
+
+@dataclass
+class DirectResult:
+    value: str
 
 
 def test_temporal_operation_result_validates_single_result_kind() -> None:
@@ -142,6 +148,7 @@ class TestService:
     concurrent_start: Operation[Input, str]
     retry_after_failed_start: Operation[Input, str]
     sync_result: Operation[Input, str]
+    direct_result: Operation[Input, list[DirectResult] | None]
     custom_cancel: Operation[str, None]
     update_op: Operation[Input, str]
     bad_update_stage_op: Operation[Input, str]
@@ -280,6 +287,14 @@ class TestServiceHandler:
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
         return nexus.TemporalOperationResult.sync(input.value)
+
+    @nexus.temporal_operation(name="direct_result")
+    async def direct_result(
+        self, _client: nexus.TemporalNexusClient, input: Input
+    ) -> list[DirectResult] | None:
+        if input.value:
+            return [DirectResult(value=input.value)]
+        return None
 
     @operation_handler
     def custom_cancel(self) -> nexus.TemporalOperationHandler[str, None]:
@@ -1574,6 +1589,111 @@ async def test_temporal_operation_sync_result(client: Client, env: WorkflowEnvir
         )
 
 
+@workflow.defn
+class DirectResultCaller:
+    @workflow.run
+    async def run(self, input: Input) -> list[DirectResult] | None:
+        client = workflow.create_nexus_client(
+            service=TestServiceHandler,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        result = await client.execute_operation(
+            TestServiceHandler.direct_result,
+            input,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+        if result is not None:
+            assert type(result[0]) is DirectResult
+        return result
+
+
+@pytest.mark.parametrize("sync", [True, False])
+async def test_temporal_operation_accepts_aliased_explicit_result(
+    client: Client, env: WorkflowEnvironment, sync: bool
+) -> None:
+    alias_type = getattr(typing, "TypeAliasType", None)
+    if alias_type is None:
+        pytest.skip("Native type aliases require Python 3.12")
+    if env.supports_time_skipping_v1:
+        pytest.skip("Standalone Nexus Operation tests don't work with time skipping")
+
+    @service
+    class AliasService:
+        echo: Operation[Input, str]
+
+    class Handler:
+        async def echo(
+            self, client: nexus.TemporalNexusClient, input: Input
+        ) -> nexus.TemporalOperationResult[str]:
+            if sync:
+                return nexus.TemporalOperationResult.sync(input.value)
+            return await client.start_workflow(
+                EchoWorkflow.run, input, id=str(uuid.uuid4())
+            )
+
+    Handler.echo.__annotations__["return"] = alias_type(
+        "Result", nexus.TemporalOperationResult[str]
+    )
+    setattr(Handler, "echo", nexus.temporal_operation(Handler.echo))
+    handler = service_handler(service=AliasService)(Handler)
+    task_queue = str(uuid.uuid4())
+    endpoint = make_nexus_endpoint_name(task_queue)
+    await env.create_nexus_endpoint(endpoint, task_queue)
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=[EchoWorkflow],
+        nexus_service_handlers=[handler()],
+    ):
+        nexus_client = client.create_nexus_client(AliasService, endpoint)
+        assert (
+            await nexus_client.execute_operation(
+                AliasService.echo,
+                Input(value="echo", task_queue=task_queue),
+                id=str(uuid.uuid4()),
+                schedule_to_close_timeout=timedelta(seconds=5),
+            )
+            == "echo"
+        )
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("test", [DirectResult("test")]), ("", None)]
+)
+async def test_temporal_operation_direct_result(
+    client: Client,
+    env: WorkflowEnvironment,
+    value: str,
+    expected: list[DirectResult] | None,
+):
+    task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[DirectResultCaller],
+    ):
+        handle = await client.start_workflow(
+            DirectResultCaller.run,
+            Input(value=value, task_queue=task_queue),
+            task_queue=task_queue,
+            id=str(uuid.uuid4()),
+        )
+        assert await handle.result() == expected
+        nexus_events = [
+            event.event_type
+            for event in (await handle.fetch_history()).events
+            if EventType.Name(event.event_type).startswith(
+                "EVENT_TYPE_NEXUS_OPERATION_"
+            )
+        ]
+        assert nexus_events == [
+            EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
+        ]
+
+
 async def test_temporal_operation_observes_invocation_timeout(
     client: Client, env: WorkflowEnvironment
 ) -> None:
@@ -1589,7 +1709,7 @@ async def test_temporal_operation_observes_invocation_timeout(
         @nexus.temporal_operation
         async def wait_for_cancellation(
             self, _client: nexus.TemporalNexusClient, _input: None
-        ) -> nexus.TemporalOperationResult[None]:
+        ) -> None:
             token = nexus.task_cancellation()
             assert not token.is_cancelled()
             assert token.cancellation_reason() is None
@@ -1606,7 +1726,6 @@ async def test_temporal_operation_observes_invocation_timeout(
                 await asyncio.wait_for(token.wait_until_cancelled(), timeout=1)
                 observed.set_result(token)
                 raise
-            return nexus.TemporalOperationResult.sync(None)
 
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)
