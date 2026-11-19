@@ -95,7 +95,9 @@ class RetryPolicy:
             return
         if self.initial_interval.total_seconds() < 0:
             raise ValueError("Initial interval cannot be negative")
-        if self.backoff_coefficient < 1:
+        # Zero means unset, and the server applies its default. The Go SDK
+        # stores RetryPolicy{MaximumAttempts: 3} this way.
+        if self.backoff_coefficient != 0 and self.backoff_coefficient < 1:
             raise ValueError("Backoff coefficient cannot be less than 1")
         if self.maximum_interval:
             if self.maximum_interval.total_seconds() < 0:

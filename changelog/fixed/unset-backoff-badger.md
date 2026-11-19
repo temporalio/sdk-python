@@ -1,0 +1,1 @@
+Fix ScheduleHandle.update() and other retry policy round trips failing with "Backoff coefficient cannot be less than 1" when the stored policy leaves the backoff coefficient unset, as the Go SDK does for RetryPolicy{MaximumAttempts: 3}. A zero backoff coefficient now means unset, and the server applies its default.

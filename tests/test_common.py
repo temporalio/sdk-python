@@ -42,6 +42,16 @@ def test_retry_policy_validate():
         RetryPolicy(maximum_attempts=-1)._validate()
 
 
+def test_retry_policy_from_proto_with_unset_backoff():
+    # Other SDKs leave fields at zero to mean unset, e.g. Go's
+    # RetryPolicy{MaximumAttempts: 3}
+    policy = RetryPolicy.from_proto(RetryPolicyProto(maximum_attempts=3))
+    proto = RetryPolicyProto()
+    policy.apply_to_proto(proto)
+    assert proto.backoff_coefficient == 0
+    assert proto.maximum_attempts == 3
+
+
 def some_hinted_func(_foo: str) -> DefinedLater:
     return DefinedLater()
 
