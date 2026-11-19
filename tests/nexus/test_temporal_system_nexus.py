@@ -921,22 +921,22 @@ class ConcurrentStorageTargetCaller:
     async def run(self, target_ids: list[str]) -> None:
         for signal_number in range(2):
             await asyncio.gather(
-                *(
-                    workflow.signal_with_start_workflow(
-                        target_type,
-                        f"start-{index}",
-                        id=target_id,
-                        task_queue=workflow.info().task_queue,
-                        signal="append",
-                        signal_args=[f"signal-{index}-{signal_number}"],
-                    )
-                    for index, (target_id, target_type) in enumerate(
-                        zip(
-                            target_ids,
-                            [StorageTargetWorkflowA.run, StorageTargetWorkflowB.run],
-                        )
-                    )
-                )
+                workflow.signal_with_start_workflow(
+                    StorageTargetWorkflowA.run,
+                    "start-0",
+                    id=target_ids[0],
+                    task_queue=workflow.info().task_queue,
+                    signal="append",
+                    signal_args=[f"signal-0-{signal_number}"],
+                ),
+                workflow.signal_with_start_workflow(
+                    StorageTargetWorkflowB.run,
+                    "start-1",
+                    id=target_ids[1],
+                    task_queue=workflow.info().task_queue,
+                    signal="append",
+                    signal_args=[f"signal-1-{signal_number}"],
+                ),
             )
 
 
@@ -1036,12 +1036,12 @@ async def test_system_nexus_storage_routes_concurrent_destinations(
             )
             assert name == driver.name()
         _assert_stored_payloads_include(driver, expected_payloads)
-        for context in driver._store_contexts:
-            assert context.namespace == client.namespace
-            assert isinstance(context.target, StorageDriverWorkflowInfo)
-            assert context.target.namespace == client.namespace
-            assert context.target.id == target_id
-            assert context.target.type == target_type
+        for store_context in driver._store_contexts:
+            assert store_context.namespace == client.namespace
+            assert isinstance(store_context.target, StorageDriverWorkflowInfo)
+            assert store_context.target.namespace == client.namespace
+            assert store_context.target.id == target_id
+            assert store_context.target.type == target_type
         assert driver._retrieve_calls > 0
 
     assert caller_driver._store_calls > 0
