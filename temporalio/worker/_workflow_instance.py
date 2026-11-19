@@ -515,6 +515,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._single_batch_cancellation = self._workflow_logic_flag_enabled(
             _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
         )
+        # Keep the original cancellation semantics for workflows that use flag 2,
+        # even when the worker opts new workflows into the wait condition fix.
+        self._wait_condition_task_cancellation = (
+            not self._single_batch_cancellation
+            and self._workflow_logic_flag_enabled(
+                _WorkflowLogicFlag.WAIT_CONDITION_USE_TASK_CANCELLATION
+            )
+        )
         single_batch_activation = (
             self._single_batch_cancellation
             or self._workflow_logic_flag_enabled(
@@ -2066,12 +2074,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         markers = _capture_event_group_markers(event_groups)
-        # asyncio.wait_for() starts its timer from this task, so the options are
-        # set in the task's context and reset once the wait ends
+        # Scope the timer options so later timers in this task don't inherit them.
         token = _TimerOptionsCtxVar.set(
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
+            if self._wait_condition_task_cancellation:
+                # A direct await lets the waiting task arbitrate cancellation
+                # and readiness without bypassing shielding or using wait_for.
+                async with asyncio.timeout(timeout):
+                    await fut
+                return
             await asyncio.wait_for(fut, timeout)
         except asyncio.TimeoutError:
             if cancellation_arrived():

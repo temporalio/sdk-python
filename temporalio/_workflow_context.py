@@ -34,6 +34,9 @@ class _WorkflowLogicFlag(IntEnum):
     # Batch activation jobs without enabling the cancellation changes in flag 2.
     # Not enabled by default.
     APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS = 4
+    # Use task-local cancellation in workflow.wait_condition.
+    # Not enabled by default.
+    WAIT_CONDITION_USE_TASK_CANCELLATION = 5
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
