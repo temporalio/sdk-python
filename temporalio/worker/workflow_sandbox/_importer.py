@@ -368,6 +368,8 @@ class Importer:
 
             return None
         # Do the pass through
+        if name == "__temporal_main__":
+            return _thread_local_sys_modules.orig["__main__"]
         with self._unapplied():
             _trace("Passing module %s through from host", name)
             global _trace_depth

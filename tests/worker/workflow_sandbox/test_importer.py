@@ -323,6 +323,16 @@ def test_workflow_sandbox_importer_passthrough_star_import():
     assert id(inside) == id(outside)
 
 
+def test_workflow_sandbox_importer_passthrough_all_modules_temporal_main():
+    with Importer(
+        restrictions.with_passthrough_all_modules(),
+        RestrictionContext(),
+        workflow_module_name="__temporal_main__",
+    ).applied():
+        imported_main = importlib.import_module("__temporal_main__")
+    assert imported_main is _thread_local_sys_modules.orig["__main__"]
+
+
 def test_workflow_sandbox_importer_passthrough_all_modules():
     import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
 
