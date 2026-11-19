@@ -727,6 +727,7 @@ def test_json_type_hints():
     ok(dict[int, str], {1: "1"})
     ok(dict[float, str], {1.0: "1"})
     ok(dict[bool, str], {True: "1"})
+    ok(dict[NewIntType, str], {NewIntType(1): "1"})
 
     # On a 3.10+ dict type, None isn't returned from a key. This is potentially a bug
     ok(dict[None, str], {"null": "1"})

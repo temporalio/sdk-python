@@ -939,18 +939,22 @@ def value_to_type(
                 # original type.
                 try:
                     if isinstance(key, str):
-                        if key_type is int or key_type is float:
-                            key = key_type(key)
+                        # A NewType key is serialized like its supertype
+                        base_key_type = key_type
+                        while hasattr(base_key_type, "__supertype__"):
+                            base_key_type = base_key_type.__supertype__
+                        if base_key_type is int or base_key_type is float:
+                            key = base_key_type(key)
                         elif (
-                            inspect.isclass(key_type)
-                            and issubclass(key_type, Enum)
-                            and issubclass(key_type, int)
+                            inspect.isclass(base_key_type)
+                            and issubclass(base_key_type, Enum)
+                            and issubclass(base_key_type, int)
                         ):
                             # JSON serializes int enum keys as their number
                             key = int(key)
-                        elif key_type is bool:
+                        elif base_key_type is bool:
                             key = {"true": True, "false": False}[key]
-                        elif key_type is type(None):
+                        elif base_key_type is type(None):
                             key = {"null": None}[key]
 
                     if not isinstance(key_type, type) or not isinstance(key, key_type):
