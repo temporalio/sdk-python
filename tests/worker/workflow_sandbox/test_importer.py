@@ -7,6 +7,7 @@ import sys
 import textwrap
 import time
 import types
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -337,6 +338,49 @@ def test_workflow_sandbox_importer_passthrough_all_modules():
     ).applied():
         import tests.worker.workflow_sandbox.testmodules.stateful_module as inside2
     assert id(outside) == id(inside2)
+
+
+@pytest.fixture
+def host_main_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> types.ModuleType:
+    main_file = tmp_path / "main_workflow.py"
+    main_file.write_text('module_state = ["file"]\n')
+    host_main = types.ModuleType("__main__")
+    host_main.__file__ = str(main_file)
+    setattr(host_main, "module_state", ["host"])
+    monkeypatch.setitem(sys.modules, "__main__", host_main)
+    return host_main
+
+
+@pytest.mark.parametrize(
+    "main_restrictions,passed_through",
+    [
+        (restrictions, False),
+        (restrictions.with_passthrough_all_modules(), True),
+        (restrictions.with_passthrough_modules("__temporal_main__"), True),
+    ],
+    ids=["default", "all_modules", "main_module"],
+)
+def test_workflow_sandbox_importer_main_module(
+    host_main_module: types.ModuleType,
+    main_restrictions: SandboxRestrictions,
+    passed_through: bool,
+):
+    importer = Importer(
+        main_restrictions,
+        RestrictionContext(),
+        workflow_module_name="__temporal_main__",
+    )
+    with importer.applied():
+        inside = importer.import_func("__temporal_main__")
+    if passed_through:
+        assert inside is host_main_module
+    else:
+        # Not passed through, so it is loaded again from the file __main__
+        # came from
+        assert inside is not host_main_module
+        assert getattr(inside, "module_state") == ["file"]
 
 
 def test_workflow_sandbox_importer_invalid_module_members():
