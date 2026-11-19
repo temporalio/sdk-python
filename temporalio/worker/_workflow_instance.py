@@ -510,21 +510,19 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._is_replaying = act.is_replaying
         self._current_thread_id = threading.get_ident()
         self._current_internal_flags = act.available_internal_flags
-        # The original flag also changed cancellation behavior. Histories using
-        # it must retain those semantics; the new flag only changes scheduling.
-        self._single_batch_cancellation = self._workflow_logic_flag_enabled(
+        self._legacy_single_batch = self._workflow_logic_flag_enabled(
             _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
         )
-        # Keep the original cancellation semantics for workflows that use flag 2,
-        # even when the worker opts new workflows into the wait condition fix.
-        self._wait_condition_task_cancellation = (
-            not self._single_batch_cancellation
+        # The task-local wait condition fix must not change the behavior of
+        # histories that use the original single-batch flag.
+        self._fix_workflow_cancellation = (
+            not self._legacy_single_batch
             and self._workflow_logic_flag_enabled(
-                _WorkflowLogicFlag.WAIT_CONDITION_USE_TASK_CANCELLATION
+                _WorkflowLogicFlag.FIX_WORKFLOW_CANCELLATION
             )
         )
         single_batch_activation = (
-            self._single_batch_cancellation
+            self._legacy_single_batch
             or self._workflow_logic_flag_enabled(
                 _WorkflowLogicFlag.APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS
             )
@@ -729,7 +727,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             # workflow the ability to receive the cancellation, so we must defer
             # this cancellation to the next iteration of the event loop.
             self.call_soon(self._primary_task.cancel)
-        elif self._single_batch_cancellation:
+        elif self._legacy_single_batch or self._fix_workflow_cancellation:
             # Initialization is the only job that creates the primary task, so
             # retain a same-activation cancellation until that task exists.
             self._cancel_primary_task_pending = True
@@ -2057,7 +2055,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         # cancellation and keep going.
         def cancellation_arrived() -> bool:
             return (
-                self._single_batch_cancellation
+                self._legacy_single_batch
                 and not cancellation_requested_before
                 and self._cancel_reason is not None
             )
@@ -2079,7 +2077,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
-            if self._wait_condition_task_cancellation:
+            if self._fix_workflow_cancellation:
                 # A direct await lets the waiting task arbitrate cancellation
                 # and readiness without bypassing shielding or using wait_for.
                 async with asyncio.timeout(timeout):
@@ -2457,7 +2455,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 if fut.done():
                     # Retrying the shield after both futures become ready would
                     # return the result and erase the task cancellation.
-                    if self._single_batch_cancellation:
+                    if self._legacy_single_batch or self._fix_workflow_cancellation:
                         raise
                     if completed_cancellation_flag is not None and (
                         not self._is_replaying
