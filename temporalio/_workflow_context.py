@@ -33,7 +33,7 @@ class _WorkflowLogicFlag(IntEnum):
     DECODE_DATETIME_PROXIES = 3
     # Batch activation jobs without enabling the cancellation changes in flag 2.
     # Not enabled by default.
-    PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH_ONLY = 4
+    APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS = 4
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()

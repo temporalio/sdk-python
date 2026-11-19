@@ -518,7 +518,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         single_batch_activation = (
             self._single_batch_cancellation
             or self._workflow_logic_flag_enabled(
-                _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH_ONLY
+                _WorkflowLogicFlag.APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS
             )
         )
         # Check this flag before queries can arrive,

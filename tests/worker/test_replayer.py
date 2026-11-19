@@ -581,7 +581,7 @@ async def test_replayer_async_ordering(
                 if _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG in flags:
                     flags.remove(_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG)
                     flags.append(
-                        _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH_ONLY
+                        _WorkflowLogicFlag.APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS
                     )
         test_replayer_workflow_res = None
         await replayer.replay_workflow(history)
