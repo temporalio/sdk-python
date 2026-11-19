@@ -296,7 +296,8 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
             endpoint, request.service, request.operation
         )
         temporalio.nexus._operation_context._TemporalCancelOperationContext(
-            info=lambda: Info(
+            info=Info._from_operation_context(
+                ctx,
                 endpoint=endpoint,
                 namespace=self._namespace,
                 task_queue=self._task_queue,
@@ -470,7 +471,8 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
         temporalio.nexus._operation_context._TemporalStartOperationContext(
             nexus_context=ctx,
             client=self._client,
-            info=lambda: Info(
+            info=Info._from_operation_context(
+                ctx,
                 endpoint=endpoint,
                 namespace=self._namespace,
                 task_queue=self._task_queue,

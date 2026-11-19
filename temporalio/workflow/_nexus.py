@@ -225,7 +225,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         operation: Callable[
             [
                 NexusServiceType,
-                temporalio.nexus.TemporalStartOperationContext,
                 temporalio.nexus.TemporalNexusClient,
                 InputT,
             ],
@@ -412,7 +411,6 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         operation: Callable[
             [
                 NexusServiceType,
-                temporalio.nexus.TemporalStartOperationContext,
                 temporalio.nexus.TemporalNexusClient,
                 InputT,
             ],

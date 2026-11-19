@@ -27,9 +27,9 @@ import nexusrpc
 from nexusrpc.handler import (
     CancelOperationContext,
     OperationContext,
+    OperationTaskCancellation,
     StartOperationContext,
 )
-from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.nexus.v1
@@ -114,6 +114,38 @@ _temporal_operation_signal_slot: ContextVar[_SignalSlot | None] = ContextVar(
 )
 
 
+class OperationCancellationToken:
+    """Observe cancellation of the current Nexus handler invocation.
+
+    A request to cancel the Nexus operation itself is delivered separately to the
+    handler's cancel method. Get this token from :py:attr:`Info.cancellation_token`.
+    """
+
+    def __init__(self, task_cancellation: OperationTaskCancellation) -> None:
+        """Initialize the token. Obtain one from the operation info."""
+        self.__task_cancellation = task_cancellation
+
+    def is_cancelled(self) -> bool:
+        """Return whether cancellation of the handler invocation was requested."""
+        return self.__task_cancellation.is_cancelled()
+
+    def cancellation_reason(self) -> str | None:
+        """Return the reason for cancellation, if available."""
+        return self.__task_cancellation.cancellation_reason()
+
+    async def wait_until_cancelled(self) -> None:
+        """Wait for cancellation of this invocation.
+
+        Async handlers can receive :py:class:`asyncio.CancelledError` at an await.
+        The worker records the cancellation reason before interrupting the handler.
+        """
+        await self.__task_cancellation.wait_until_cancelled()
+
+    def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
+        """Return whether cancellation occurred within the given timeout in seconds."""
+        return self.__task_cancellation.wait_until_cancelled_sync(timeout)
+
+
 @dataclass(frozen=True)
 class Info:
     """Information about the running Nexus operation.
@@ -130,6 +162,44 @@ class Info:
     task_queue: str
     """The task queue of the worker handling this Nexus operation."""
 
+    service: str
+    """The service name for the current Nexus request."""
+
+    operation: str
+    """The operation name for the current Nexus request."""
+
+    request_id: str | None
+    """Opaque ID shared by retries of the same start request, if available.
+
+    Cancel invocations have no start request ID.
+    """
+
+    cancellation_token: OperationCancellationToken
+    """Read-only token for observing cancellation of this handler invocation."""
+
+    @classmethod
+    def _from_operation_context(
+        cls,
+        context: OperationContext,
+        *,
+        endpoint: str,
+        namespace: str,
+        task_queue: str,
+    ) -> Info:
+        return cls(
+            endpoint=endpoint,
+            namespace=namespace,
+            task_queue=task_queue,
+            service=context.service,
+            operation=context.operation,
+            request_id=(
+                (context.request_id or None)
+                if isinstance(context, StartOperationContext)
+                else None
+            ),
+            cancellation_token=OperationCancellationToken(context.task_cancellation),
+        )
+
 
 def in_operation() -> bool:
     """Whether the current code is inside a Nexus operation."""
@@ -138,7 +208,7 @@ def in_operation() -> bool:
 
 def info() -> Info:
     """Get the current Nexus operation information."""
-    return _temporal_context().info()
+    return _temporal_context().info
 
 
 def client() -> temporalio.client.Client:
@@ -226,7 +296,7 @@ def _current_propagated_nexus_serialization_context() -> (  # pyright: ignore[re
     if nexus_ctx is None:
         return None
     return temporalio.api.nexus.v1.PropagatedSerializationContext(
-        endpoint=nexus_ctx.info().endpoint,
+        endpoint=nexus_ctx.info.endpoint,
         service=nexus_ctx.nexus_context.service,
         operation=nexus_ctx.nexus_context.operation,
     )
@@ -253,7 +323,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
     client: temporalio.client.Client
     """The Temporal client in use by the worker handling the current Nexus operation."""
 
-    info: Callable[[], Info]
+    info: Info
     """Temporal information about the running Nexus operation."""
 
     nexus_context: _OperationCtxT
@@ -270,7 +340,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
                 {
                     "nexus_service": self.nexus_context.service,
                     "nexus_operation": self.nexus_context.operation,
-                    "task_queue": self.info().task_queue,
+                    "task_queue": self.info.task_queue,
                 }
             )
         return self._metric_meter
@@ -642,34 +712,6 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
         _temporal_cancel_operation_context.set(self)
 
 
-class TemporalStartOperationContext(StartOperationContext):
-    """Context received by a Temporal Nexus operation when it is started.
-
-    .. warning::
-       This API is experimental and unstable.
-    """
-
-    @classmethod
-    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
-        return cls(
-            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
-        )
-
-
-class TemporalCancelOperationContext(CancelOperationContext):
-    """Context received by a Temporal Nexus operation when it is canceled.
-
-    .. warning::
-       This API is experimental and unstable.
-    """
-
-    @classmethod
-    def _from_cancel_operation_context(cls, ctx: CancelOperationContext) -> Self:
-        return cls(
-            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
-        )
-
-
 class LoggerAdapter(logging.LoggerAdapter):
     """Logger adapter that adds Nexus operation context information."""
 
@@ -685,7 +727,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         if tctx := _try_temporal_context():
             extra["service"] = tctx.nexus_context.service
             extra["operation"] = tctx.nexus_context.operation
-            extra["task_queue"] = tctx.info().task_queue
+            extra["task_queue"] = tctx.info.task_queue
         kwargs["extra"] = extra | kwargs.get("extra", {})
         return msg, kwargs
 
@@ -737,7 +779,7 @@ async def _start_nexus_backing_workflow(
             arg=arg,
             args=args,
             id=id,
-            task_queue=task_queue or temporal_context.info().task_queue,
+            task_queue=task_queue or temporal_context.info.task_queue,
             result_type=result_type,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,
