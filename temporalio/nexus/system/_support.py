@@ -87,9 +87,8 @@ def workflow_namespace() -> str:
 def signal_with_start_workflow_serialization_context(
     request: SignalWithStartWorkflowModelRequest,
 ) -> temporalio.converter.WorkflowSerializationContext:
-    target = signal_with_start_workflow_storage_target(request)
     return temporalio.converter.WorkflowSerializationContext(
-        namespace=target.namespace,
+        namespace=request.namespace,
         workflow_id=request.id,
     )
 
