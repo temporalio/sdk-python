@@ -2020,18 +2020,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> None:
         self._assert_not_read_only("wait condition")
-        cancellation_requested_before = self._cancel_reason is not None
-
-        # Some asyncio.wait_for implementations can prefer a ready condition
-        # result or timeout over task cancellation that becomes ready in the same
-        # event-loop turn. Only detect a new request so workflows can catch
-        # cancellation and keep going.
-        def cancellation_arrived() -> bool:
-            return (
-                self._single_batch_activation
-                and not cancellation_requested_before
-                and self._cancel_reason is not None
-            )
 
         fut = self.create_future()
         self._conditions.append((fn, fut))
@@ -2045,17 +2033,17 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             else None
         )
         markers = _capture_event_group_markers(event_groups)
-        # asyncio.wait_for() starts its timer from this task, so the options are
-        # set in the task's context and reset once the wait ends
+        # Scope the timeout timer's summary and event groups to this wait so
+        # later timers in this task do not inherit them.
         token = _TimerOptionsCtxVar.set(
             _TimerOptions(user_metadata=user_metadata, event_group_markers=markers)
         )
         try:
-            await asyncio.wait_for(fut, timeout)
-        except asyncio.TimeoutError:
-            if cancellation_arrived():
-                raise asyncio.CancelledError()
-            raise
+            if self._single_batch_activation:
+                async with asyncio.timeout(timeout):
+                    await fut
+            else:
+                await asyncio.wait_for(fut, timeout)
         finally:
             try:
                 _TimerOptionsCtxVar.reset(token)
@@ -2064,8 +2052,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 # unwinds it in another context, and the one the options were
                 # set in is being discarded anyway
                 pass
-        if cancellation_arrived():
-            raise asyncio.CancelledError()
 
     def workflow_get_current_details(self) -> str:
         return self._current_details

@@ -12,8 +12,9 @@ import pytest
 
 import temporalio.worker._workflow_instance
 from temporalio import activity, workflow
+from temporalio.api.enums.v1 import EventType
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
-from temporalio.exceptions import ApplicationError
+from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ExecuteWorkflowInput,
@@ -592,6 +593,93 @@ async def test_replayer_unflagged_history_uses_legacy_async_ordering() -> None:
         "counter-2",
         "act-done",
     ]
+
+
+@workflow.defn
+class ShieldedCleanupWorkflow:
+    def __init__(self) -> None:
+        self._confirmed = False
+        self._waiting = False
+        self._caught_cancel = False
+
+    async def _finalize(self, timeout: bool) -> None:
+        self._waiting = True
+        await workflow.wait_condition(
+            lambda: self._confirmed, timeout=1000 if timeout else None
+        )
+        await workflow.execute_activity(
+            say_hello, "cleanup", start_to_close_timeout=timedelta(seconds=30)
+        )
+
+    @workflow.run
+    async def run(self, timeout: bool) -> None:
+        finalize = asyncio.create_task(self._finalize(timeout))
+        try:
+            await asyncio.shield(finalize)
+        except asyncio.CancelledError:
+            self._caught_cancel = True
+            await finalize
+            raise
+
+    @workflow.signal
+    def confirm(self) -> None:
+        self._confirmed = True
+
+    @workflow.query
+    def state(self) -> tuple[bool, bool]:
+        return self._waiting, self._caught_cancel
+
+
+@pytest.mark.parametrize("single_batch", [False, True])
+@pytest.mark.parametrize("timeout", [False, True])
+async def test_replayer_shielded_cleanup_after_cancel(
+    client: Client, tmp_path: Path, single_batch: bool, timeout: bool
+) -> None:
+    worker = Worker(
+        client,
+        task_queue=str(uuid.uuid4()),
+        workflows=[ShieldedCleanupWorkflow],
+        activities=[say_hello],
+    )
+    worker._set_default_workflow_logic_flag(
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
+    )
+    async with worker:
+        handle = await client.start_workflow(
+            ShieldedCleanupWorkflow.run,
+            timeout,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def state() -> tuple[bool, bool]:
+            return await handle.query(ShieldedCleanupWorkflow.state)
+
+        await assert_eq_eventually((True, False), state)
+        await handle.cancel()
+        await assert_eq_eventually((True, True), state)
+        await handle.signal(ShieldedCleanupWorkflow.confirm)
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+    history = await handle.fetch_history()
+    assert (
+        _history_uses_workflow_logic_flag(history, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG)
+        is single_batch
+    )
+    # Workflow cancellation must not cancel a shielded cleanup task.
+    completed_activities = [
+        event
+        for event in history.events
+        if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED
+    ]
+    assert len(completed_activities) == 1
+    history_path = tmp_path / f"shielded-cleanup-{single_batch}.json"
+    history_path.write_text(history.to_json())
+    await Replayer(workflows=[ShieldedCleanupWorkflow]).replay_workflow(
+        WorkflowHistory.from_json(handle.id, history_path.read_text())
+    )
 
 
 @activity.defn
