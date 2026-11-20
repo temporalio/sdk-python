@@ -1621,7 +1621,7 @@ asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
 Start with the [Hello Nexus sample](https://github.com/temporalio/samples-python/tree/main/hello_nexus). It demonstrates a
 greeting that returns immediately and a greeting that completes when its backing Workflow finishes.
 
-> **Experimental option.** The `@nexus.temporal_operation` decorator supports both completion modes. See
+> **Pre-release.** The experimental `@nexus.temporal_operation` decorator supports both completion modes. See
 > **Experimental Temporal operation handlers** after the walkthrough for the same greeting service using one decorator.
 
 1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
