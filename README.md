@@ -1621,27 +1621,21 @@ Temporal supports calling Nexus operations **from a workflow** or directly from 
 Standalone Nexus Operations are in [Public Preview](https://docs.temporal.io/evaluate/development-production-features/release-stages#public-preview).
 We aim to preserve backward compatibility and avoid breaking changes. See https://docs.temporal.io/nexus.
 
-To get started quickly using Nexus with Temporal, see the Python Nexus sample:
-https://github.com/temporalio/samples-python/tree/nexus/hello_nexus.
+The experimental `@temporalio.nexus.temporal_operation` decorator supports both completion modes. Define the handler
+with `async def` and the signature `(self, client, input)`, where `client` is a `TemporalNexusClient`.
 
+- **Synchronous completion.** Annotate the handler with `TemporalOperationResult[Output]` and return
+  `TemporalOperationResult.sync(value)`.
+- **Asynchronous completion.** Annotate the handler with `TemporalOperationResult[Output]` and return the result of
+  the client method that starts a backing Workflow, Workflow Update, or Activity. That execution completes the
+  Nexus operation later.
 
-The walkthrough below uses two operation decorators:
+Custom cancel handlers receive their typed options. Use `nexus.info()` for invocation metadata and
+`nexus.info().cancellation_token` to observe cancellation of the current invocation. Worker Nexus inbound interceptors
+can read incoming headers from `input.ctx.headers`.
 
-- `@temporalio.nexus.workflow_run_operation`: a Nexus operation that is backed by a Temporal workflow. The operation
-  handler you write will start the handler workflow and then respond with a token indicating that the handler workflow
-  is in progress. When the handler workflow completes, Temporal server will automatically deliver the result (success or
-  failure) to the caller workflow.
-- `@nexusrpc.handler.sync_operation`: an operation that responds synchronously. It may be `def` or `async def` and it
-may do network I/O, but it must respond within 10 seconds.
-
-The experimental `@temporalio.nexus.temporal_operation` decorator takes an `async def` handler with signature
-`(self, client, input)`, where `client` is a `TemporalNexusClient`. Start handlers and typed cancel overrides no
-longer take a context argument. Use `nexus.info()` for invocation metadata and `nexus.info().cancellation_token`
-to observe cancellation of the current invocation. Worker Nexus inbound interceptors can still read incoming
-headers from `input.ctx.headers`.
-
-The following steps are an overview of the [Python Nexus sample](
-https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
+The walkthrough below shows both completion modes. For a complete service and Worker setup, see the
+[Python Nexus messaging sample](https://github.com/temporalio/samples-python/tree/main/nexus_messaging_temporal_operation).
 
 1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
     ```
@@ -1659,25 +1653,30 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
     ```python
     @nexusrpc.service
     class MyNexusService:
-        my_sync_operation: nexusrpc.Operation[MyInput, MyOutput]
-        my_workflow_run_operation: nexusrpc.Operation[MyInput, MyOutput]
+        greet_now: nexusrpc.Operation[MyInput, MyOutput]
+        greet_with_workflow: nexusrpc.Operation[MyInput, MyOutput]
     ```
 
 3. Implement your operation handlers in a service handler:
     ```python
+    import uuid
+
+    from nexusrpc.handler import service_handler
+    from temporalio import nexus
+
     @service_handler(service=MyNexusService)
     class MyNexusServiceHandler:
-        @sync_operation
-        async def my_sync_operation(
-            self, ctx: StartOperationContext, input: MyInput
-        ) -> MyOutput:
-            return MyOutput(message=f"Hello {input.name} from sync operation!")
+        @nexus.temporal_operation
+        async def greet_now(
+            self, client: nexus.TemporalNexusClient, input: MyInput
+        ) -> nexus.TemporalOperationResult[MyOutput]:
+            return nexus.TemporalOperationResult.sync(MyOutput(message=f"Hello, {input.name}!"))
 
-        @workflow_run_operation
-        async def my_workflow_run_operation(
-            self, ctx: WorkflowRunOperationContext, input: MyInput
-        ) -> nexus.WorkflowHandle[MyOutput]:
-            return await ctx.start_workflow(
+        @nexus.temporal_operation
+        async def greet_with_workflow(
+            self, client: nexus.TemporalNexusClient, input: MyInput
+        ) -> nexus.TemporalOperationResult[MyOutput]:
+            return await client.start_workflow(
                 WorkflowStartedByNexusOperation.run,
                 input,
                 id=str(uuid.uuid4()),
@@ -1709,13 +1708,13 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
         async def run(self, name: str) -> tuple[MyOutput, MyOutput]:
             # Start the Nexus operation and wait for the result in one go, using execute_operation.
             wf_result = await self.nexus_client.execute_operation(
-                MyNexusService.my_workflow_run_operation,
+                MyNexusService.greet_with_workflow,
                 MyInput(name),
             )
             # Or alternatively, obtain the operation handle using start_operation,
             # and then use it to get the result:
             sync_operation_handle = await self.nexus_client.start_operation(
-                MyNexusService.my_sync_operation,
+                MyNexusService.greet_now,
                 MyInput(name),
             )
             sync_result = await sync_operation_handle
