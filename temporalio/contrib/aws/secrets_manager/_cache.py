@@ -257,7 +257,6 @@ class SecretCache:
         except Exception as err:  # Shouldn't happen, but don't leave fut pending
             result = SecretFetchError(str(err), FailureReason.OTHER)
             result.__cause__ = err
-        latency = timedelta(seconds=self.now() - start)
 
         with entry.lock:
             prev_version_ids = entry.version_ids
@@ -274,6 +273,7 @@ class SecretCache:
         # Handle telemetry outside the lock, and resolve fut last so that the
         # fetch's metrics and logs are recorded by the time waiters return
         try:
+            latency = timedelta(seconds=self.now() - start)
             if isinstance(result, SecretFetchError):
                 self._record_failure(
                     entry,

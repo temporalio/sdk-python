@@ -32,8 +32,10 @@ _LAMBDA_EXTENSION_TOKEN_HEADER = "X-Aws-Parameters-Secrets-Token"
 _LAMBDA_EXTENSION_HOST = "localhost"
 _DEFAULT_LAMBDA_EXTENSION_PORT = "2773"
 # Probing a local port is either accepted or refused almost immediately, so this
-# only bounds pathological cases
-_LAMBDA_EXTENSION_PROBE_TIMEOUT_SECONDS = 0.01
+# only bounds pathological cases. It's generous since a missed extension silently
+# falls back to fetching directly from AWS, and a busy or CPU-throttled process
+# at startup may be slow to complete even a local connect.
+_LAMBDA_EXTENSION_PROBE_TIMEOUT_SECONDS = 1.0
 
 # Bounds each request made by the fetchers this package creates
 FETCH_TIMEOUT_SECONDS = 10.0

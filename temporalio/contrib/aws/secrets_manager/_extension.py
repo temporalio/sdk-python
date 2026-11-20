@@ -16,6 +16,7 @@ import temporalio.service
 from temporalio.contrib.aws.secrets_manager._cache import (
     FAILED_REFRESH_RETRY_INTERVAL_SECONDS,
     SecretCache,
+    SecretFetchError,
     SecretIDs,
     logger,
 )
@@ -295,7 +296,7 @@ class _SecretsManagerPlugin(temporalio.client.Plugin):
     async def _refresh_api_key(
         self,
         service_client_ref: weakref.ref[temporalio.service.ServiceClient],
-        api_key: str,
+        api_key: str | None,
         tel: Telemetry,
     ) -> None:
         """Keep a service client's API key up to date while it is alive.
@@ -311,26 +312,54 @@ class _SecretsManagerPlugin(temporalio.client.Plugin):
             self._cache.refresh_interval, FAILED_REFRESH_RETRY_INTERVAL_SECONDS
         )
         while True:
-            # Retry sooner if the last refresh failed
-            failing = entry.failed_at is not None
+            # Retry sooner if the last refresh failed or the key was removed
+            failing = entry.failed_at is not None or api_key is None
             await asyncio.sleep(
                 FAILED_REFRESH_RETRY_INTERVAL_SECONDS if failing else interval
             )
             # Stop before fetching for a client that was collected while waiting
             if service_client_ref() is None:
                 return
+            new_key: str | None
+            error: Exception | None = None
             try:
                 new_key = await self._cache.get(entry, tel)
-            except Exception:
-                # Already logged and counted by the cache, and the current key
-                # keeps being used
-                continue
+            except Exception as err:
+                # Expected failures are already counted by the cache, and are
+                # only raised when there's no value within the max staleness, so
+                # stop using the current key instead of using it indefinitely.
+                # Calls fail until a refresh succeeds. Anything else is a bug,
+                # but is still treated as having no usable key, rather than
+                # letting this task die and keep the current key forever.
+                if not isinstance(err, (SecretFetchError, TimeoutError)):
+                    logger.exception(
+                        "Unexpected error refreshing client API key from AWS Secrets Manager"
+                    )
+                new_key = None
+                error = err
             if new_key != api_key:
                 # Not held across awaits, so that the client can be collected
                 service_client = service_client_ref()
                 if service_client is None:
                     return
-                service_client.update_api_key(new_key)
+                try:
+                    # Like Client.api_key's setter, so that it reports the new key
+                    service_client.config.api_key = new_key
+                    service_client.update_api_key(new_key)
+                except Exception:
+                    logger.warning(
+                        "Stopped refreshing client API key from AWS Secrets Manager",
+                        exc_info=True,
+                    )
+                    return
                 del service_client
                 api_key = new_key
-                logger.debug("Updated client API key from AWS Secrets Manager")
+                if new_key is None:
+                    logger.warning(
+                        "Removed client API key, no AWS Secrets Manager value within max staleness "
+                        "(max_staleness=%s, error=%s)",
+                        timedelta(seconds=self._cache.max_staleness),
+                        error,
+                    )
+                else:
+                    logger.debug("Updated client API key from AWS Secrets Manager")
