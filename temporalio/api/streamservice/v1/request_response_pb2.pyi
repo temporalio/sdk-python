@@ -20,41 +20,39 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class CreateStreamRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Creates the Stream. When the Stream exists, FAIL fails with ALREADY_EXISTS, and USE_EXISTING
-    gets it with created false. A retry of the create that made the Stream, with the same
-    request_id, gets created true. Each policy fails with CLOSED on a closed Stream and EXPIRED on
-    an expired one. A create takes no Retention. The Store config holds it, as a namespace holds
-    the Retention of its Workflows.
+    Creates a Stream. If the Stream already exists, the result depends on `id_conflict_policy`.
+    `FAIL` fails with `ALREADY_EXISTS`, and `USE_EXISTING` returns the Stream with `created`
+    false. A retry of the create that made the Stream, with the same `request_id`, returns
+    `created` true. Either policy fails with `CLOSED` for a closed Stream and with `EXPIRED` for
+    an expired one.
+
+    A create has no Retention. Retention is a setting of the Store, as it's a setting of the
+    namespace for Workflows.
     (-- api-linter: core::0133=disabled
-        aip.dev/not-precedent: The request identifies a Stream by namespace and ref. --)
+        aip.dev/not-precedent: The request identifies a Stream by its ref. --)
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: builtins.int
     STREAM_REF_FIELD_NUMBER: builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
-    read it.
-    """
     id_conflict_policy: (
         temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType
     )
-    """What the create does when the Stream exists. Unspecified is FAIL."""
+    """What the create does if the Stream already exists. Unspecified means `FAIL`."""
     request_id: builtins.str
-    """Unique for each create call, and the same on its retries. The Store keeps the request_id of
-    the create that made the Stream, so a retry after a lost answer doesn't get ALREADY_EXISTS.
+    """A value that's unique to this create call and the same on its retries. The Store remembers
+    the `request_id` of the create that made the Stream, so a retry after a lost response
+    doesn't fail with `ALREADY_EXISTS`.
     """
     @property
     def stream_ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required. The ref of the Stream to create. Its id is the Stream id, and is never empty."""
+        """Required. The Stream to create. Its `id` must not be empty."""
 
     def __init__(
         self,
         *,
-        namespace: builtins.str = ...,
         stream_ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         id_conflict_policy: temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType = ...,
         request_id: builtins.str = ...,
@@ -67,8 +65,6 @@ class CreateStreamRequest(google.protobuf.message.Message):
         field_name: typing.Literal[
             "id_conflict_policy",
             b"id_conflict_policy",
-            "namespace",
-            b"namespace",
             "request_id",
             b"request_id",
             "stream_ref",
@@ -81,7 +77,7 @@ global___CreateStreamRequest = CreateStreamRequest
 @typing.final
 class CreateStreamResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Stream that a create made or got.
+    The Stream that the create made or found.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -89,12 +85,12 @@ class CreateStreamResponse(google.protobuf.message.Message):
     REF_FIELD_NUMBER: builtins.int
     CREATED_FIELD_NUMBER: builtins.int
     created: builtins.bool
-    """False when USE_EXISTING got a Stream that existed."""
+    """False when `USE_EXISTING` returned a Stream that already existed."""
     @property
     def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """The ref of the Stream, which the caller passes on as data. The SDK sets the name of the
-        Store that it picked, also when the request left the name empty. The server gives the ref
-        back as the request had it, since it doesn't know that name.
+        """The ref of the Stream. The caller can pass it to other code as data. A Store and the server
+        return the ref as the request had it, because they don't know the Store names of an SDK.
+        The SDK then sets `store` to the Store that it picked, before the caller gets the ref.
         """
 
     def __init__(
@@ -113,24 +109,21 @@ global___CreateStreamResponse = CreateStreamResponse
 @typing.final
 class AppendRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Appends one batch of Records as one Producer. The Store writes a resent batch, with the same
-    Producer, epoch and sequence, only once.
+    Appends one batch of Records as one Producer. If the same batch arrives again, with the same
+    Producer, attempt and `sequence`, the Store writes it only once.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: builtins.int
     REF_FIELD_NUMBER: builtins.int
     PRODUCER_FIELD_NUMBER: builtins.int
     SEQUENCE_FIELD_NUMBER: builtins.int
     RECORDS_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
-    read it.
-    """
     sequence: builtins.int
-    """The batch number in this epoch. With the Producer and epoch it is the dedupe key. Zero takes
-    the next number of the epoch. Such a batch has no dedupe, so a retry writes it again.
+    """The idempotency number of this batch within its attempt. A caller that got no response
+    sends the batch again with the same number, and the Store uses the Producer, the attempt
+    and this number to write it only once. With zero, the Store assigns the next number, and a
+    retry of that batch is written again.
     """
     @property
     def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
@@ -138,8 +131,8 @@ class AppendRecordsRequest(google.protobuf.message.Message):
 
     @property
     def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
-        """Required. The Producer of the batch. An append and a close of one Producer carry the same
-        Producer, so the Store orders each write the same way.
+        """Required. The Producer that writes the batch. A Producer sends the same value in its
+        appends and in its close, so the Store orders all of its writes the same way.
         """
 
     @property
@@ -151,7 +144,6 @@ class AppendRecordsRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        namespace: builtins.str = ...,
         ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
         sequence: builtins.int = ...,
@@ -166,8 +158,6 @@ class AppendRecordsRequest(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing.Literal[
-            "namespace",
-            b"namespace",
             "producer",
             b"producer",
             "records",
@@ -184,7 +174,7 @@ global___AppendRecordsRequest = AppendRecordsRequest
 @typing.final
 class AppendRecordsResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Where the batch's Records are in the Stream.
+    The offsets of the first and the last Record of the batch.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -211,19 +201,15 @@ global___AppendRecordsResponse = AppendRecordsResponse
 @typing.final
 class CloseStreamRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Closes a Stream. Readers drain what is left, then end, and later appends fail with CLOSED. A
-    close writes no Record and carries no value, so code that has a last value publishes it first.
+    Closes a Stream. Readers still get the Records that are left, and then their reads end. Later
+    appends fail with `CLOSED`. A close writes no Record and has no value, so code with a final
+    value appends it before the close.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: builtins.int
     REF_FIELD_NUMBER: builtins.int
     PRODUCER_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
-    read it.
-    """
     @property
     def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
         """Required."""
@@ -235,7 +221,6 @@ class CloseStreamRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        namespace: builtins.str = ...,
         ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
     ) -> None: ...
@@ -243,10 +228,7 @@ class CloseStreamRequest(google.protobuf.message.Message):
         self, field_name: typing.Literal["producer", b"producer", "ref", b"ref"]
     ) -> builtins.bool: ...
     def ClearField(
-        self,
-        field_name: typing.Literal[
-            "namespace", b"namespace", "producer", b"producer", "ref", b"ref"
-        ],
+        self, field_name: typing.Literal["producer", b"producer", "ref", b"ref"]
     ) -> None: ...
 
 global___CloseStreamRequest = CloseStreamRequest
@@ -254,7 +236,7 @@ global___CloseStreamRequest = CloseStreamRequest
 @typing.final
 class CloseStreamResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A close answers when the Store has the close. It gives nothing back.
+    The response to a close. The Store sends it after it has recorded the close.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -268,34 +250,31 @@ global___CloseStreamResponse = CloseStreamResponse
 @typing.final
 class ReadRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Reads one page of Records after an offset. At the end of the Stream, the read waits for a new
-    Record, so readers long poll.
+    Reads one page of Records after an offset. When no Record is left, the read waits for a new
+    one, so a reader long-polls.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: builtins.int
     REF_FIELD_NUMBER: builtins.int
     FROM_OFFSET_FIELD_NUMBER: builtins.int
     MAX_RECORDS_FIELD_NUMBER: builtins.int
-    WAIT_FIELD_NUMBER: builtins.int
     MAX_BYTES_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
-    read it.
-    """
+    WAIT_FIELD_NUMBER: builtins.int
     from_offset: builtins.bytes
-    """Read after this offset. It fails with OFFSET_TOO_HIGH if it is past the newest offset.
-    Leave empty to read from the beginning. To read only new Records, a caller gets last_offset
-    from a describe and reads after it.
+    """The read returns the Records after this offset. Empty means from the beginning. An offset
+    past the newest one fails with `OFFSET_TOO_HIGH`. To read only new Records, a caller gets
+    `last_offset` from a describe and reads after it.
     (-- api-linter: core::0140::prepositions=disabled
         aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
     """
     max_records: builtins.int
-    """The most Records in one page. Zero is 1000."""
+    """The maximum number of Records in one page. Zero means no limit."""
     max_bytes: builtins.int
-    """The most Record bytes in one page, so a page fits the caller's limit, such as a History
-    marker. A larger Record still comes alone, so the read always moves on. Zero is no cap.
+    """The maximum total size of the Records in one page, in bytes. A caller sets it so that a
+    page fits a limit of its own, such as the size of a History marker. A Record larger than
+    this is still returned, alone in its page, so a read always makes progress. Zero means no
+    limit.
     """
     @property
     def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
@@ -303,19 +282,18 @@ class ReadRecordsRequest(google.protobuf.message.Message):
 
     @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:
-        """How long the read waits for a new Record before it answers with an empty page. Empty answers
-        at once, and a wait longer than 60 s waits 60 s.
+        """How long the read waits for a new Record before it returns an empty page. When it's unset,
+        the read returns immediately. The deadline of the request must be longer than this wait.
         """
 
     def __init__(
         self,
         *,
-        namespace: builtins.str = ...,
         ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         from_offset: builtins.bytes = ...,
         max_records: builtins.int = ...,
-        wait: google.protobuf.duration_pb2.Duration | None = ...,
         max_bytes: builtins.int = ...,
+        wait: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing.Literal["ref", b"ref", "wait", b"wait"]
@@ -329,8 +307,6 @@ class ReadRecordsRequest(google.protobuf.message.Message):
             b"max_bytes",
             "max_records",
             b"max_records",
-            "namespace",
-            b"namespace",
             "ref",
             b"ref",
             "wait",
@@ -352,15 +328,14 @@ class ReadRecordsResponse(google.protobuf.message.Message):
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     DONE_FIELD_NUMBER: builtins.int
     last_offset: builtins.bytes
-    """The last offset that this read covered, which is the offset of the newest Record of the
-    page. The next read gives it as from_offset and starts after it. An empty page gives the
-    request's from_offset, and that is empty when the request had none. So it is always
-    known, and an empty value means that the next read starts as this one did.
+    """The offset of the last Record in this page. The next read passes it as `from_offset`. For
+    an empty page it's the `from_offset` of the request, so it's empty only when the request
+    had none, and the next read then starts where this one did.
     """
     done: builtins.bool
-    """True when the Stream is closed and this read gave its last Record. It is the only sign of a
-    close in a read, since a close stores no Record. A read of a closed Stream with no Record
-    left answers at once with done.
+    """True when the Stream is closed and this page has its last Record. A read has no other sign
+    of a close, because a close stores no Record. A read of a closed Stream with no Record left
+    returns immediately with `done`.
     """
     @property
     def records(
@@ -395,12 +370,7 @@ class DescribeStreamRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    NAMESPACE_FIELD_NUMBER: builtins.int
     REF_FIELD_NUMBER: builtins.int
-    namespace: builtins.str
-    """The caller's namespace. Only read by the server. The SDK sets it, and the SDK Stores don't
-    read it.
-    """
     @property
     def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
         """Required."""
@@ -408,21 +378,18 @@ class DescribeStreamRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        namespace: builtins.str = ...,
         ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
     ) -> None: ...
     def HasField(self, field_name: typing.Literal["ref", b"ref"]) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing.Literal["namespace", b"namespace", "ref", b"ref"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["ref", b"ref"]) -> None: ...
 
 global___DescribeStreamRequest = DescribeStreamRequest
 
 @typing.final
 class DescribeStreamResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The state of a Stream. It has no Retention, since the Retention is a setting of the Store and
-    not of one Stream.
+    The state of a Stream. It doesn't include Retention, which is a setting of the Store and not
+    of one Stream.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -431,7 +398,7 @@ class DescribeStreamResponse(google.protobuf.message.Message):
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     status: temporalio.api.enums.v1.stream_pb2.StreamStatus.ValueType
     last_offset: builtins.bytes
-    """The newest offset, of a Record. Empty when the Stream has none."""
+    """The offset of the newest Record. It's empty when the Stream has no Record."""
     def __init__(
         self,
         *,

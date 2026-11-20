@@ -18,8 +18,8 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class StreamRef(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Identifies one Stream. The id is opaque to callers. A Stream has no incarnations. A create of a
-    closed or expired Stream fails, and it doesn't make a second Stream with the same id.
+    A reference to one Stream. Callers treat the id as opaque. An id is never used for a second
+    Stream, so a create for a closed or expired Stream fails.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -28,11 +28,10 @@ class StreamRef(google.protobuf.message.Message):
     STORE_FIELD_NUMBER: builtins.int
     id: builtins.str
     store: builtins.str
-    """The name of the Store that holds the Stream, as the Worker and client config register it,
-    so every process routes a ref it receives. With no name, the SDK picks the Store from its
-    config. Only an SDK sets and reads it, since only the SDK knows the name that its config
-    gives a Store. A request carries the whole ref, and the server and a Store ignore this
-    field.
+    """The name under which the client and Worker config registered the Store of this Stream. An
+    SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
+    the Store from its config. Only an SDK sets and reads this field. The server and a Store
+    ignore it.
     """
     def __init__(
         self,
@@ -47,12 +46,12 @@ class StreamRef(google.protobuf.message.Message):
 global___StreamRef = StreamRef
 
 @typing.final
-class WorkflowTaskEpoch(google.protobuf.message.Message):
+class WorkflowTaskAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One Workflow Task attempt of a run. It orders by started_event_id, then attempt, then
-    started_time. An epoch orders the attempts of one Producer only, and a Producer belongs to one
-    run. So a reset run and the next run of a chain have other Producers, and their epochs start
-    again.
+    One attempt of a Workflow Task. Two attempts of the same Producer compare by
+    `started_event_id`, then `attempt`, then `started_time`. Attempts of different Producers have
+    no order. A Producer is for one run, so the attempts of a reset run or of the next run in a
+    chain have no order with the attempts of this run.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -63,11 +62,14 @@ class WorkflowTaskEpoch(google.protobuf.message.Message):
     started_event_id: builtins.int
     """Required."""
     attempt: builtins.int
-    """Required. 1 or more."""
+    """Required. The attempt number of the task, starting at 1. Every task starts at 1 again, so
+    this number alone can't order the writes of a run.
+    """
     @property
     def started_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Tells a reused started event id apart, for example after a dropped speculative task. Core
-        leaves it empty when the server gave the task no started time.
+        """When this attempt started. The server can use a started event id for a second task, for
+        example after it drops a speculative task, and this time distinguishes the two. It's empty
+        when the server sent no started time for the task.
         """
 
     def __init__(
@@ -92,14 +94,14 @@ class WorkflowTaskEpoch(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___WorkflowTaskEpoch = WorkflowTaskEpoch
+global___WorkflowTaskAttempt = WorkflowTaskAttempt
 
 @typing.final
-class LocalActivityEpoch(google.protobuf.message.Message):
+class LocalActivityAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The attempt of a Local Activity. It orders by task, then attempt, so the same call in a later
-    Workflow Task is a higher epoch. The Producer carries the run. Records of two runs have no
-    order by epoch, only their order in the Stream.
+    One attempt of a Local Activity. Two attempts compare by `task`, then `attempt`, so the same
+    call in a later Workflow Task is a later attempt. Attempts of two runs have no order. Their
+    Records have only their order in the Stream.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -107,15 +109,15 @@ class LocalActivityEpoch(google.protobuf.message.Message):
     TASK_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
     attempt: builtins.int
-    """Required. The Local Activity's own attempt in that Workflow Task, 1 or more."""
+    """Required. The Local Activity's own attempt number within that Workflow Task, starting at 1."""
     @property
-    def task(self) -> global___WorkflowTaskEpoch:
+    def task(self) -> global___WorkflowTaskAttempt:
         """Required. The Workflow Task attempt that dispatched the Local Activity."""
 
     def __init__(
         self,
         *,
-        task: global___WorkflowTaskEpoch | None = ...,
+        task: global___WorkflowTaskAttempt | None = ...,
         attempt: builtins.int = ...,
     ) -> None: ...
     def HasField(
@@ -125,12 +127,12 @@ class LocalActivityEpoch(google.protobuf.message.Message):
         self, field_name: typing.Literal["attempt", b"attempt", "task", b"task"]
     ) -> None: ...
 
-global___LocalActivityEpoch = LocalActivityEpoch
+global___LocalActivityAttempt = LocalActivityAttempt
 
 @typing.final
-class ActivityEpoch(google.protobuf.message.Message):
+class ActivityAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The attempt of an Activity. It orders by attempt_scheduled_time, then attempt.
+    One attempt of an Activity. Two attempts compare by `attempt_scheduled_time`, then `attempt`.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -138,11 +140,11 @@ class ActivityEpoch(google.protobuf.message.Message):
     ATTEMPT_SCHEDULED_TIME_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
     attempt: builtins.int
-    """Required. 1 or more."""
+    """Required. The attempt number, starting at 1."""
     @property
     def attempt_scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Required. When the server scheduled this attempt. An Activity reset starts the attempt count
-        again, so only this time orders the attempts across a reset.
+        """Required. When the server scheduled this attempt. A reset of the Activity starts the
+        attempt number at 1 again, so this time is what orders the attempts across a reset.
         """
 
     def __init__(
@@ -162,37 +164,41 @@ class ActivityEpoch(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___ActivityEpoch = ActivityEpoch
+global___ActivityAttempt = ActivityAttempt
 
 @typing.final
 class WorkflowProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A Workflow run Producer. On the server's Streams, a Workflow writes as this Producer in its
-    Workflow Task. On a Store, Workflow code writes through a Local Activity, so its writes carry a
-    Local Activity Producer.
+    The Producer of a Workflow run. Workflow code writes as this Producer when it appends or
+    closes in a Workflow Task. A write from one of its Local Activities uses a
+    `LocalActivityProducer`.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
-    EPOCH_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
     run_id: builtins.str
-    """Required. The run id of the Workflow run, not of its chain. Each run is its own Producer."""
+    """Required. The id of this run, not the first run id of its chain. Each run is a separate
+    Producer.
+    """
     @property
-    def epoch(self) -> global___WorkflowTaskEpoch:
-        """The Workflow Task of the write."""
+    def attempt(self) -> global___WorkflowTaskAttempt:
+        """The Workflow Task attempt that makes the write. Workflow code leaves it empty, and the SDK
+        sets it before it sends the write to the Store.
+        """
 
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
-        epoch: global___WorkflowTaskEpoch | None = ...,
+        attempt: global___WorkflowTaskAttempt | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["epoch", b"epoch"]
+        self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["epoch", b"epoch", "run_id", b"run_id"]
+        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
     ) -> None: ...
 
 global___WorkflowProducer = WorkflowProducer
@@ -200,30 +206,30 @@ global___WorkflowProducer = WorkflowProducer
 @typing.final
 class LocalActivityProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A Local Activity Producer, one for each call of a run.
+    The Producer of one Local Activity call of a Workflow run.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
-    EPOCH_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
     run_id: builtins.str
-    """Required. The run id of the Workflow run."""
+    """Required. The id of the Workflow run that made the call."""
     @property
-    def epoch(self) -> global___LocalActivityEpoch:
+    def attempt(self) -> global___LocalActivityAttempt:
         """Required."""
 
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
-        epoch: global___LocalActivityEpoch | None = ...,
+        attempt: global___LocalActivityAttempt | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["epoch", b"epoch"]
+        self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["epoch", b"epoch", "run_id", b"run_id"]
+        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
     ) -> None: ...
 
 global___LocalActivityProducer = LocalActivityProducer
@@ -231,32 +237,32 @@ global___LocalActivityProducer = LocalActivityProducer
 @typing.final
 class ActivityProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    An Activity Producer, for an Activity of a Workflow or a Standalone Activity.
+    The Producer of an Activity that a Workflow scheduled, or of a Standalone Activity.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RUN_ID_FIELD_NUMBER: builtins.int
-    EPOCH_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
     run_id: builtins.str
-    """The run id of the Workflow run that scheduled the Activity. Empty for a Standalone
-    Activity, whose own run id is in the Producer id.
+    """The id of the Workflow run that scheduled the Activity. It's empty for a Standalone
+    Activity, whose own run id is part of the Producer id.
     """
     @property
-    def epoch(self) -> global___ActivityEpoch:
+    def attempt(self) -> global___ActivityAttempt:
         """Required."""
 
     def __init__(
         self,
         *,
         run_id: builtins.str = ...,
-        epoch: global___ActivityEpoch | None = ...,
+        attempt: global___ActivityAttempt | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["epoch", b"epoch"]
+        self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["epoch", b"epoch", "run_id", b"run_id"]
+        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
     ) -> None: ...
 
 global___ActivityProducer = ActivityProducer
@@ -264,8 +270,8 @@ global___ActivityProducer = ActivityProducer
 @typing.final
 class ClientProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A client Producer. A client has no run and no epoch. So nothing fences a client's writes, and a
-    reader never hides them.
+    The Producer of a client. A client has no run and no attempt, so a Store never fences its
+    writes and a reader never hides them.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -279,12 +285,16 @@ global___ClientProducer = ClientProducer
 @typing.final
 class Producer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The code that wrote a batch, which is one unit of work. Its id stays the same across attempts,
-    and an epoch is one attempt. The kind's case orders its epochs. After a write of a higher epoch,
-    a write of a lower epoch of the same Producer fails with FENCED, and a reader may hide the
-    Records of the lower epoch. The rule is the same for every kind that has an epoch. A client has
-    none. The epochs of two Producers never compare. A new run has new Producers, so no write
-    fences or supersedes the Records of an earlier run, such as the base run of a reset.
+    The writer of a batch of Records. A Producer is one unit of work, such as one Activity or one
+    Workflow run. Its `id` is the same on every attempt, and every kind except a client also has
+    the attempt that made the write.
+
+    A Store that fences fails a write with `FENCED` when a later attempt of the same Producer has
+    already written. A Store that doesn't fence accepts the write. Each Record has its Producer
+    and attempt either way, so a reader can hide the Records of an earlier attempt.
+
+    Attempts of different Producers have no order. A new run has new Producers, so no write fences
+    or supersedes the Records of an earlier run, such as the base run of a reset.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -296,9 +306,9 @@ class Producer(google.protobuf.message.Message):
     STANDALONE_ACTIVITY_FIELD_NUMBER: builtins.int
     CLIENT_FIELD_NUMBER: builtins.int
     id: builtins.str
-    """Required. Stable across attempts, such as `wf:<run id>` for the Workflow Producer of a run.
-    It is unique in one Stream. The id of a run-based kind has its run id, so it stays unique
-    when Producers of more than one namespace write to one Stream.
+    """Required. The same on every attempt, for example `wf:<run id>` for the Producer of a
+    Workflow run. It's unique within one Stream. The id of a kind with a run contains the run
+    id, so it stays unique when Producers from several namespaces write to one Stream.
     """
     @property
     def workflow(self) -> global___WorkflowProducer: ...
@@ -310,8 +320,8 @@ class Producer(google.protobuf.message.Message):
 
     @property
     def standalone_activity(self) -> global___ActivityProducer:
-        """An Activity with no Workflow. Both Activity cases order their epochs the same way. The
-        case tells which identity the Producer has, since only the first has a Workflow run.
+        """A Standalone Activity. Its attempts compare as those of a Workflow's Activity do. It's a
+        separate case because it has no Workflow run.
         """
 
     @property
@@ -380,7 +390,8 @@ global___Producer = Producer
 @typing.final
 class AppendRecord(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One Record of a batch to append. The Store adds the batch's Producer and an offset.
+    One Record of a batch to append. The Store stores it with the Producer of the batch and
+    assigns its offset.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -405,8 +416,8 @@ global___AppendRecord = AppendRecord
 @typing.final
 class StreamRecord(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One Record that a Producer appended, as a read gives it. A read gives only Records. A close
-    stores no Record, so a read tells of it with the done flag of its response.
+    One Record of a Stream, as a read returns it. A read returns only Records. A close stores no
+    Record, so a read reports it with `done` in its response.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -415,11 +426,11 @@ class StreamRecord(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     OFFSET_FIELD_NUMBER: builtins.int
     offset: builtins.bytes
-    """Required. The Record's offset. An offset is ordered and unique in one Stream, and it is
-    sparse. Offsets have gaps, so they don't count Records. Two offsets of one Stream compare
-    bytewise, as unsigned bytes, in the order of their Records. So a reader, a Store and the
-    server order them without decoding them. An offset is never empty. A read gives its
-    Stream, so the read checks the offset against that Stream.
+    """Required. The position of this Record in its Stream. It's never empty. Offsets are unique
+    and ordered within one Stream, but they have gaps, so they don't count Records. Two offsets
+    of one Stream compare as unsigned bytes, in the order of their Records, so a reader, a
+    Store and the server can order them without decoding them. An offset doesn't identify
+    its Stream, so a read checks it against the Stream of the request.
     """
     @property
     def producer(self) -> global___Producer: ...
@@ -447,8 +458,8 @@ global___StreamRecord = StreamRecord
 @typing.final
 class StreamErrorDetails(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The details of a failed Stream call, in the gRPC status details and in the details of the
-    application failure of a Nexus operation.
+    The details of a failed Stream call. They're in the gRPC status details, and in the details
+    of the application failure when the call is a Nexus operation.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

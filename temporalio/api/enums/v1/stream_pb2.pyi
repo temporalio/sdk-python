@@ -30,20 +30,23 @@ class _StreamStatusEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     STREAM_STATUS_UNSPECIFIED: _StreamStatus.ValueType  # 0
     STREAM_STATUS_OPEN: _StreamStatus.ValueType  # 1
+    """The Stream accepts appends."""
     STREAM_STATUS_CLOSED: _StreamStatus.ValueType  # 2
-    STREAM_STATUS_EXPIRED: _StreamStatus.ValueType  # 3
+    """The Stream is closed. It accepts no append, and a read ends after its last Record."""
 
 class StreamStatus(_StreamStatus, metaclass=_StreamStatusEnumTypeWrapper):
     """Experimental. Might change in the future.
-    The state of a Stream, as a describe gives it.
+    The status of a Stream, as a describe returns it. A describe of an expired Stream fails with
+    the reason `EXPIRED`, so it has no status.
     (-- api-linter: core::0216::synonyms=disabled
-        aip.dev/not-precedent: Named consistently with WorkflowExecutionStatus. --)
+        aip.dev/not-precedent: It has the same form as WorkflowExecutionStatus. --)
     """
 
 STREAM_STATUS_UNSPECIFIED: StreamStatus.ValueType  # 0
 STREAM_STATUS_OPEN: StreamStatus.ValueType  # 1
+"""The Stream accepts appends."""
 STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
-STREAM_STATUS_EXPIRED: StreamStatus.ValueType  # 3
+"""The Stream is closed. It accepts no append, and a read ends after its last Record."""
 global___StreamStatus = StreamStatus
 
 class _StreamIdConflictPolicy:
@@ -59,22 +62,23 @@ class _StreamIdConflictPolicyEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     STREAM_ID_CONFLICT_POLICY_UNSPECIFIED: _StreamIdConflictPolicy.ValueType  # 0
     STREAM_ID_CONFLICT_POLICY_FAIL: _StreamIdConflictPolicy.ValueType  # 1
-    """The create fails with ALREADY_EXISTS."""
+    """The create fails with `ALREADY_EXISTS`."""
     STREAM_ID_CONFLICT_POLICY_USE_EXISTING: _StreamIdConflictPolicy.ValueType  # 2
-    """The create gets the open Stream, which keeps its own Retention."""
+    """The create returns the open Stream, and the Retention of that Stream doesn't change."""
 
 class StreamIdConflictPolicy(
     _StreamIdConflictPolicy, metaclass=_StreamIdConflictPolicyEnumTypeWrapper
 ):
     """Experimental. Might change in the future.
-    What a create does when its Stream exists. Unspecified is FAIL, as for a Workflow start.
+    What a create does if its Stream already exists. Unspecified means `FAIL`, as it does for a
+    Workflow start.
     """
 
 STREAM_ID_CONFLICT_POLICY_UNSPECIFIED: StreamIdConflictPolicy.ValueType  # 0
 STREAM_ID_CONFLICT_POLICY_FAIL: StreamIdConflictPolicy.ValueType  # 1
-"""The create fails with ALREADY_EXISTS."""
+"""The create fails with `ALREADY_EXISTS`."""
 STREAM_ID_CONFLICT_POLICY_USE_EXISTING: StreamIdConflictPolicy.ValueType  # 2
-"""The create gets the open Stream, which keeps its own Retention."""
+"""The create returns the open Stream, and the Retention of that Stream doesn't change."""
 global___StreamIdConflictPolicy = StreamIdConflictPolicy
 
 class _StreamErrorReason:
@@ -90,86 +94,90 @@ class _StreamErrorReasonEnumTypeWrapper(
     DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
     STREAM_ERROR_REASON_UNSPECIFIED: _StreamErrorReason.ValueType  # 0
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
-    """Nobody created the Stream. NOT_FOUND."""
+    """The Stream was never created (`NOT_FOUND`)."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
-    """The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
+    """The Retention of the Stream or its Producer idle TTL has passed (`NOT_FOUND`)."""
     STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
-    """The Stream is closed. FAILED_PRECONDITION."""
+    """The Stream is closed (`FAILED_PRECONDITION`)."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
-    """The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
-    STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
-    """The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
-    STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
-    """The batch has the `sequence` of the last one of its epoch, and other content.
-    FAILED_PRECONDITION.
+    """A later attempt of the same Producer has already written, and the Store fences
+    (`FAILED_PRECONDITION`).
     """
-    STREAM_ERROR_REASON_NOT_OWNER: _StreamErrorReason.ValueType  # 7
-    """The caller may not create or close this Stream. FAILED_PRECONDITION."""
+    STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
+    """The `sequence` of an append is lower than the `sequence` of the last batch of its attempt
+    (`FAILED_PRECONDITION`).
+    """
+    STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
+    """The batch has the same `sequence` as the last one of its attempt, but different content
+    (`FAILED_PRECONDITION`).
+    """
     STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 8
-    """A newer format version wrote the Stream. FAILED_PRECONDITION."""
+    """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
     STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 9
-    """The offset is past the newest offset, for example after a failover lost the newest Records.
-    A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+    """The offset is past the newest one, for example after a failover lost the newest Records. A
+    read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
     """
     STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 10
-    """A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""
-    STREAM_ERROR_REASON_INVALID: _StreamErrorReason.ValueType  # 11
-    """The request is malformed. INVALID_ARGUMENT."""
-    STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: _StreamErrorReason.ValueType  # 12
-    """The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
+    """A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
+    STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 11
+    """The request is malformed (`INVALID_ARGUMENT`)."""
+    STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 12
+    """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
     STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 13
-    """The Store lacks a capability that the call needs. UNIMPLEMENTED."""
+    """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
     STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 14
-    """A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
-    STREAM_ERROR_REASON_STORAGE_CORRUPT: _StreamErrorReason.ValueType  # 15
-    """The Store gave back data that isn't valid, such as a stored value with the wrong length. A
-    retry reads the same data. DATA_LOSS.
+    """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
+    STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 15
+    """The Store returned data that isn't valid, such as a stored value of the wrong length. A
+    retry reads the same data (`DATA_LOSS`).
     """
 
 class StreamErrorReason(
     _StreamErrorReason, metaclass=_StreamErrorReasonEnumTypeWrapper
 ):
     """Experimental. Might change in the future.
-    Why a Stream call failed. Each reason has one gRPC status code, and several reasons share a
-    code. So code matches on the reason, and not on the status code. An SDK raises one error type
-    that carries the reason.
+    Why a Stream call failed. Each reason maps to one gRPC status code, shown in parentheses, and
+    several reasons share a code. So callers check the reason and not the status code. An SDK
+    raises one error type with the reason in it.
     """
 
 STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
-"""Nobody created the Stream. NOT_FOUND."""
+"""The Stream was never created (`NOT_FOUND`)."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
-"""The Stream's Retention or its last-write TTL passed. NOT_FOUND."""
+"""The Retention of the Stream or its Producer idle TTL has passed (`NOT_FOUND`)."""
 STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
-"""The Stream is closed. FAILED_PRECONDITION."""
+"""The Stream is closed (`FAILED_PRECONDITION`)."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
-"""The Producer's epoch is lower than the newest one. FAILED_PRECONDITION."""
-STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
-"""The batch has a lower `sequence` than the last one of its epoch. FAILED_PRECONDITION."""
-STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
-"""The batch has the `sequence` of the last one of its epoch, and other content.
-FAILED_PRECONDITION.
+"""A later attempt of the same Producer has already written, and the Store fences
+(`FAILED_PRECONDITION`).
 """
-STREAM_ERROR_REASON_NOT_OWNER: StreamErrorReason.ValueType  # 7
-"""The caller may not create or close this Stream. FAILED_PRECONDITION."""
+STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
+"""The `sequence` of an append is lower than the `sequence` of the last batch of its attempt
+(`FAILED_PRECONDITION`).
+"""
+STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
+"""The batch has the same `sequence` as the last one of its attempt, but different content
+(`FAILED_PRECONDITION`).
+"""
 STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 8
-"""A newer format version wrote the Stream. FAILED_PRECONDITION."""
+"""The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
 STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 9
-"""The offset is past the newest offset, for example after a failover lost the newest Records.
-A read from it works again once the Stream has Records up to it. OUT_OF_RANGE.
+"""The offset is past the newest one, for example after a failover lost the newest Records. A
+read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
 """
 STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 10
-"""A Record or a batch is over the Store's limit. INVALID_ARGUMENT."""
-STREAM_ERROR_REASON_INVALID: StreamErrorReason.ValueType  # 11
-"""The request is malformed. INVALID_ARGUMENT."""
-STREAM_ERROR_REASON_STORAGE_UNAVAILABLE: StreamErrorReason.ValueType  # 12
-"""The Store failed or did not answer. A retry can succeed. UNAVAILABLE."""
+"""A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
+STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 11
+"""The request is malformed (`INVALID_ARGUMENT`)."""
+STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 12
+"""The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
 STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 13
-"""The Store lacks a capability that the call needs. UNIMPLEMENTED."""
+"""The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
 STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 14
-"""A create with the FAIL conflict policy is for a Stream that exists. ALREADY_EXISTS."""
-STREAM_ERROR_REASON_STORAGE_CORRUPT: StreamErrorReason.ValueType  # 15
-"""The Store gave back data that isn't valid, such as a stored value with the wrong length. A
-retry reads the same data. DATA_LOSS.
+"""A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
+STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 15
+"""The Store returned data that isn't valid, such as a stored value of the wrong length. A
+retry reads the same data (`DATA_LOSS`).
 """
 global___StreamErrorReason = StreamErrorReason
