@@ -304,6 +304,14 @@ def test_refresh_interval_and_max_staleness(
             max_staleness=timedelta(seconds=30),
         )
     ) == (60, 60)
+    # Including when it's 0
+    assert cache_settings(
+        SecretsManagerExtension(
+            secrets_client=client,
+            refresh_interval=timedelta(minutes=1),
+            max_staleness=timedelta(0),
+        )
+    ) == (60, 60)
 
     for bad in ("-1", "1.5", "abc", " 5"):
         monkeypatch.setenv("SECRETS_MANAGER_TTL", bad)
@@ -314,6 +322,14 @@ def test_refresh_interval_and_max_staleness(
         cache_settings(
             SecretsManagerExtension(
                 secrets_client=client, refresh_interval=timedelta(seconds=-1)
+            )
+        )
+    with pytest.raises(RuntimeError, match="max_staleness must not be negative"):
+        cache_settings(
+            SecretsManagerExtension(
+                secrets_client=client,
+                refresh_interval=timedelta(minutes=1),
+                max_staleness=timedelta(seconds=-1),
             )
         )
 
