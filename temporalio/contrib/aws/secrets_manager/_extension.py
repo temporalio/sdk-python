@@ -100,9 +100,11 @@ class SecretsManagerExtension(ClientConfigExtension):
             return None
 
         refresh_interval = self._refresh_interval()
-        max_staleness = self.max_staleness or _DEFAULT_MAX_STALENESS
-        if max_staleness <= timedelta(0):
+        max_staleness = self.max_staleness
+        if max_staleness is None:
             max_staleness = _DEFAULT_MAX_STALENESS
+        elif max_staleness < timedelta(0):
+            raise ValueError("max_staleness must not be negative")
         max_staleness = max(max_staleness, refresh_interval)
 
         fetcher: Fetcher
