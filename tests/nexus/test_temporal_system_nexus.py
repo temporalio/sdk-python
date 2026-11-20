@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import uuid
 from collections.abc import Sequence
 from datetime import timedelta
+from types import SimpleNamespace
 from typing import Any, cast
 
 import nexusrpc
@@ -12,6 +14,7 @@ from google.protobuf.descriptor import FieldDescriptor
 from google.protobuf.message import Message
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
 import temporalio.api.failure.v1
 import temporalio.api.workflowservice.v1.request_response_pb2 as workflowservice_pb2
 import temporalio.common
@@ -37,20 +40,28 @@ from temporalio.converter import (
     PayloadCodec,
     PayloadConverter,
     SerializationContext,
+    StorageDriver,
+    StorageDriverSelectContext,
+    StorageDriverWorkflowInfo,
     WithSerializationContext,
     WorkflowSerializationContext,
 )
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     Interceptor,
+    Replayer,
     StartNexusOperationInput,
     Worker,
     WorkflowInboundInterceptor,
     WorkflowInterceptorClassInput,
     WorkflowOutboundInterceptor,
 )
+from temporalio.worker._command_aware_visitor import CommandInfo
 from temporalio.worker._nexus import _NexusPayloadSerializer
-from temporalio.worker._workflow_instance import UnsandboxedWorkflowRunner
+from temporalio.worker._workflow_instance import (
+    UnsandboxedWorkflowRunner,
+    _WorkflowInstanceImpl,
+)
 from tests.test_extstore import InMemoryTestDriver
 
 interceptor_traces: list[tuple[str, object]] = []
@@ -170,6 +181,89 @@ def test_signal_with_start_serialization_context() -> None:
     assert isinstance(context, WorkflowSerializationContext)
     assert context.namespace == "target-namespace"
     assert context.workflow_id == "target-workflow-id"
+
+
+def test_signal_with_start_storage_target() -> None:
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow=ExternalHandleSignalWithStartWorkflowCaller.run,
+        id="target-workflow-id",
+        task_queue="target-task-queue",
+        signal="test-signal",
+        namespace="target-namespace",
+    )
+    target = nexus_system._get_storage_target(
+        "temporal.api.workflowservice.v1.WorkflowService",
+        "SignalWithStartWorkflowExecution",
+        request,
+    )
+    assert target == StorageDriverWorkflowInfo(
+        namespace="target-namespace",
+        id="target-workflow-id",
+        type="ExternalHandleSignalWithStartWorkflowCaller",
+    )
+    assert nexus_system._get_storage_target("unknown", "unknown", request) is None
+
+
+@pytest.mark.parametrize(
+    "endpoint, operation, destination",
+    [
+        (
+            nexus_system.TEMPORAL_SYSTEM_ENDPOINT,
+            "SignalWithStartWorkflowExecution",
+            True,
+        ),
+        ("ordinary-nexus-endpoint", "SignalWithStartWorkflowExecution", False),
+        (nexus_system.TEMPORAL_SYSTEM_ENDPOINT, "unknown-operation", False),
+    ],
+)
+def test_system_nexus_store_context(
+    endpoint: str, operation: str, destination: bool
+) -> None:
+    request = workflow_service_models.SignalWithStartWorkflowRequest(
+        workflow="TargetWorkflow",
+        id="target-id",
+        task_queue="target-queue",
+        signal="append",
+        namespace="target-namespace",
+    )
+    instance = SimpleNamespace(
+        _info=SimpleNamespace(
+            namespace="worker-namespace",
+            workflow_id="caller-id",
+            workflow_type="CallerWorkflow",
+            run_id="caller-run",
+        ),
+        _pending_nexus_operations={
+            7: SimpleNamespace(
+                _input=SimpleNamespace(
+                    endpoint=endpoint,
+                    service="temporal.api.workflowservice.v1.WorkflowService",
+                    operation_name=operation,
+                    input=request,
+                )
+            )
+        },
+    )
+    context = _WorkflowInstanceImpl.get_external_store_context(
+        cast(_WorkflowInstanceImpl, cast(object, instance)),
+        CommandInfo(
+            temporalio.api.enums.v1.CommandType.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION,
+            7,
+        ),
+    )
+    assert context.namespace == "worker-namespace"
+    assert context.target == (
+        StorageDriverWorkflowInfo(
+            namespace="target-namespace", id="target-id", type="TargetWorkflow"
+        )
+        if destination
+        else StorageDriverWorkflowInfo(
+            namespace="worker-namespace",
+            id="caller-id",
+            type="CallerWorkflow",
+            run_id="caller-run",
+        )
+    )
 
 
 class RejectOuterSystemNexusCodec(PayloadCodec):
@@ -791,6 +885,183 @@ def test_system_nexus_payload_converter_restores_user_context_on_failure() -> No
 
     with pytest.raises(RuntimeError, match="converter context is not active"):
         nexus_system._current_user_converters()
+
+
+class StorageTargetWorkflow:
+    def __init__(self) -> None:
+        self.signals: list[str] = []
+
+    @workflow.run
+    async def run(self, value: str) -> list[str]:
+        await workflow.wait_condition(lambda: len(self.signals) == 2)
+        return [value, *self.signals]
+
+    @workflow.signal
+    def append(self, value: str) -> None:
+        self.signals.append(value)
+
+
+@workflow.defn
+class StorageTargetWorkflowA(StorageTargetWorkflow):
+    @workflow.run
+    async def run(self, value: str) -> list[str]:
+        return await super().run(value)
+
+
+@workflow.defn
+class StorageTargetWorkflowB(StorageTargetWorkflow):
+    @workflow.run
+    async def run(self, value: str) -> list[str]:
+        return await super().run(value)
+
+
+@workflow.defn
+class ConcurrentStorageTargetCaller:
+    @workflow.run
+    async def run(self, target_ids: list[str]) -> None:
+        for signal_number in range(2):
+            await asyncio.gather(
+                workflow.signal_with_start_workflow(
+                    StorageTargetWorkflowA.run,
+                    "start-0",
+                    id=target_ids[0],
+                    task_queue=workflow.info().task_queue,
+                    signal="append",
+                    signal_args=[f"signal-0-{signal_number}"],
+                ),
+                workflow.signal_with_start_workflow(
+                    StorageTargetWorkflowB.run,
+                    "start-1",
+                    id=target_ids[1],
+                    task_queue=workflow.info().task_queue,
+                    signal="append",
+                    signal_args=[f"signal-1-{signal_number}"],
+                ),
+            )
+
+
+@pytest.mark.requires_local_server
+async def test_system_nexus_storage_routes_concurrent_destinations(
+    env: WorkflowEnvironment,
+) -> None:
+    if env.supports_time_skipping_v1:
+        pytest.skip("Nexus tests don't work with the Java test server")
+
+    target_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
+    target_types = ["StorageTargetWorkflowA", "StorageTargetWorkflowB"]
+    drivers = [InMemoryTestDriver(f"target-{index}") for index in range(2)]
+    caller_driver = InMemoryTestDriver("caller")
+    selections: list[
+        tuple[StorageDriverSelectContext, temporalio.api.common.v1.Payload, str]
+    ] = []
+
+    def selector(
+        context: StorageDriverSelectContext, payload: temporalio.api.common.v1.Payload
+    ) -> StorageDriver:
+        driver = caller_driver
+        if isinstance(context.target, StorageDriverWorkflowInfo):
+            for target_id, target_driver in zip(target_ids, drivers):
+                if context.target.id == target_id:
+                    driver = target_driver
+                    break
+        selections.append((context, payload, driver.name()))
+        return driver
+
+    data_converter = dataclasses.replace(
+        temporalio.converter.default(),
+        payload_codec=RejectOuterSystemNexusCodec(),
+        external_storage=ExternalStorage(
+            drivers=[caller_driver, *drivers],
+            driver_selector=selector,
+            payload_size_threshold=1,
+        ),
+    )
+    client_config = env.client.config()
+    client_config["data_converter"] = data_converter
+    client = Client(**client_config)
+    task_queue = str(uuid.uuid4())
+    workflows = [
+        ConcurrentStorageTargetCaller,
+        StorageTargetWorkflowA,
+        StorageTargetWorkflowB,
+    ]
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        workflows=workflows,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        caller = await client.start_workflow(
+            ConcurrentStorageTargetCaller.run,
+            target_ids,
+            id=str(uuid.uuid4()),
+            task_queue=task_queue,
+            execution_timeout=timedelta(seconds=30),
+        )
+        await caller.result()
+        for index, target_id in enumerate(target_ids):
+            assert await client.get_workflow_handle(target_id).result() == [
+                f"start-{index}",
+                f"signal-{index}-0",
+                f"signal-{index}-1",
+            ]
+        histories = [
+            await caller.fetch_history(),
+            *[
+                await client.get_workflow_handle(target_id).fetch_history()
+                for target_id in target_ids
+            ],
+        ]
+
+    for index, (target_id, target_type, driver) in enumerate(
+        zip(target_ids, target_types, drivers)
+    ):
+        expected_payloads = {
+            f'"start-{index}"'.encode(),
+            f'"signal-{index}-0"'.encode(),
+            f'"signal-{index}-1"'.encode(),
+        }
+        routed = [
+            (context, name)
+            for context, payload, name in selections
+            if payload.data in expected_payloads
+        ]
+        assert len(routed) == 4
+        for context, name in routed:
+            assert context.namespace == client.namespace
+            assert context.target == StorageDriverWorkflowInfo(
+                namespace=client.namespace,
+                id=target_id,
+                type=target_type,
+            )
+            assert name == driver.name()
+        _assert_stored_payloads_include(driver, expected_payloads)
+        for store_context in driver._store_contexts:
+            assert store_context.namespace == client.namespace
+            assert isinstance(store_context.target, StorageDriverWorkflowInfo)
+            assert store_context.target.namespace == client.namespace
+            assert store_context.target.id == target_id
+            assert store_context.target.type == target_type
+        assert driver._retrieve_calls > 0
+
+    assert caller_driver._store_calls > 0
+    assert all(
+        isinstance(context.target, StorageDriverWorkflowInfo)
+        and context.target.id == caller.id
+        for context in caller_driver._store_contexts
+    )
+    retrieve_calls = [driver._retrieve_calls for driver in drivers]
+    replayer = Replayer(
+        workflows=workflows,
+        data_converter=data_converter,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    )
+    for history in histories:
+        await replayer.replay_workflow(history)
+    assert all(
+        driver._retrieve_calls > previous
+        for driver, previous in zip(drivers, retrieve_calls)
+    )
 
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.
