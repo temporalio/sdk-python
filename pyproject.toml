@@ -9,7 +9,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["temporal", "workflow"]
 dependencies = [
-  "nexus-rpc==1.5.0",
+  "nexus-rpc @ git+https://github.com/long-nt-tran/nexus-rpc-sdk-python.git@50d1fb642004e0a6a719650043f8eb8f3225da1e",
   "protobuf>=4.21.12,<8.0.0",
   "types-protobuf>=4.24,<8.0.0",
   "typing-extensions>=4.2.0,<5",
