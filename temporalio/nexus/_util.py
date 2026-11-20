@@ -12,7 +12,8 @@ from typing import (
 )
 
 if sys.version_info >= (3, 12):
-    from typing import TypeAliasType
+    # CI type-checks under 3.11, where native type aliases are unavailable.
+    from typing import TypeAliasType  # pyright: ignore[reportUnreachable]
 
 import nexusrpc
 from nexusrpc import (
@@ -62,7 +63,7 @@ def get_temporal_operation_start_method_types(
         start, expected_param_types=(TemporalNexusClient,)
     )
     if sys.version_info >= (3, 12):
-        aliases: set[TypeAliasType] = set()
+        aliases: set[TypeAliasType] = set()  # pyright: ignore[reportUnreachable]
         while (
             isinstance(return_type, TypeAliasType) and not return_type.__type_params__
         ):
