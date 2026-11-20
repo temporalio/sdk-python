@@ -64,7 +64,7 @@ class Replayer:
         See :py:meth:`temporalio.worker.Worker.__init__` for a description of
         most of the arguments. Most of the same arguments need to be passed to
         the replayer that were passed to the worker when the workflow originally
-        ran.
+        ran. For WASM workflows, the data converter must match the bundle's profile.
 
         Note, unlike the worker, for the replayer the workflow_task_executor
         will default to a new thread pool executor with no max_workers set that

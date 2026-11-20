@@ -8,23 +8,34 @@ use temporalio_common::protos::coresdk::{
 use temporalio_workflow_wasm::activation::{
     ActivationComponent, ActivationInstance, LocalActivities,
 };
+use wasmparser::{Parser, Payload};
 
 #[pyclass]
-pub(crate) struct WasmWorkflowBundle(ActivationComponent);
+pub(crate) struct WasmWorkflowBundle {
+    component: ActivationComponent,
+    data_converter_profile: String,
+}
 
 #[pymethods]
 impl WasmWorkflowBundle {
     #[new]
     fn new(py: Python<'_>, bytes: Vec<u8>) -> PyResult<Self> {
         py.detach(|| {
-            ActivationComponent::new(&bytes)
-                .map(Self)
-                .map_err(runtime_error)
+            let data_converter_profile = read_data_converter_profile(&bytes)?;
+            let component = ActivationComponent::new(&bytes).map_err(runtime_error)?;
+            Ok(Self {
+                component,
+                data_converter_profile,
+            })
         })
     }
 
+    fn data_converter_profile(&self) -> &str {
+        &self.data_converter_profile
+    }
+
     fn workflow_types(&self) -> Vec<String> {
-        self.0.workflow_types().to_vec()
+        self.component.workflow_types().to_vec()
     }
 
     fn instantiate(
@@ -41,7 +52,7 @@ impl WasmWorkflowBundle {
             has_dynamic_handler,
         });
         py.detach(|| {
-            self.0
+            self.component
                 .instantiate(
                     &namespace,
                     &task_queue,
@@ -53,6 +64,27 @@ impl WasmWorkflowBundle {
                 .map_err(runtime_error)
         })
     }
+}
+
+fn read_data_converter_profile(bytes: &[u8]) -> PyResult<String> {
+    let mut depth = 0;
+    let mut profile = None;
+    for payload in Parser::new(0).parse_all(bytes) {
+        match payload.map_err(runtime_error)? {
+            Payload::Version { .. } => depth += 1,
+            Payload::End(_) => depth -= 1,
+            Payload::CustomSection(section)
+                if depth == 1 && section.name() == "temporal-python-data-converter" =>
+            {
+                let name = std::str::from_utf8(section.data()).map_err(runtime_error)?;
+                if profile.replace(name).is_some() {
+                    return Err(runtime_error("Duplicate WASM data converter profile"));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(profile.unwrap_or("default").to_owned())
 }
 
 #[pyclass]

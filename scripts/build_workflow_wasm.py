@@ -17,14 +17,17 @@ from pathlib import Path
 
 COMPONENTIZER_VERSION = "0.25.1"
 SDK_ROOT = Path(__file__).resolve().parents[1]
+# Match the shared modules recognized by the pinned componentizer.
+_EXTENSION_SUFFIXES = (".cpython-314-wasm32-wasi.so", ".abi3.so")
 
 
-def _sources(root: Path) -> Iterable[tuple[str, Path]]:
-    for path in sorted(root.rglob("*.py")):
+def _files(root: Path, pattern: str) -> Iterable[tuple[str, Path]]:
+    for path in sorted(root.rglob(pattern)):
         relative = path.relative_to(root)
         if (
             not any(part.startswith(".") for part in relative.parts)
             and not path.is_symlink()
+            and path.is_file()
         ):
             yield relative.as_posix(), path
 
@@ -35,8 +38,12 @@ def build(
     source: Path,
     dependencies: list[Path],
     core: Path,
+    *,
+    data_converter: str = "default",
 ) -> None:
     """Package source without importing the workflow modules on the build host."""
+    if data_converter not in {"default", "pydantic"}:
+        raise ValueError(f"Unknown WASM data converter {data_converter!r}")
     for root in [source, *dependencies]:
         if not root.is_dir():
             raise ValueError(f"Bundle input must be a directory: {root}")
@@ -68,7 +75,8 @@ def build(
     with tempfile.TemporaryDirectory(prefix="temporal-workflow-wasm-") as tmp:
         stage = Path(tmp)
         trusted = stage / "trusted"
-        for name, path in _sources(SDK_ROOT / "temporalio"):
+        staged_dependencies = stage / "dependencies"
+        for name, path in _files(SDK_ROOT / "temporalio", "*.py"):
             if name.startswith("bridge/sdk-core/"):
                 continue
             dest = trusted / "temporalio" / name
@@ -80,38 +88,50 @@ def build(
             f"__version__ = {sdk_version!r}\n"
         )
         (trusted / "temporalio/worker/__init__.py").write_text("")
+        extensions: dict[str, str] = {}
+        for dependency in dependencies:
+            for name, path in _files(dependency, "*.py"):
+                dest = staged_dependencies / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, dest)
+            for name, path in _files(dependency, "*.so"):
+                if name.startswith("temporalio/") or not name.endswith(
+                    _EXTENSION_SUFFIXES
+                ):
+                    continue
+                with path.open("rb") as extension:
+                    if extension.read(8) != b"\0asm\1\0\0\0":
+                        continue
+                dest = staged_dependencies / name
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, dest)
+                # The componentizer's linker names libraries by their -p mount index.
+                extensions[name] = f"/1/{name}"
+
         archive_file = io.BytesIO()
         with zipfile.ZipFile(archive_file, "w", zipfile.ZIP_DEFLATED) as archive:
-            for dependency in dependencies:
-                for name, path in _sources(dependency):
-                    if (
-                        name.startswith(("google/protobuf/", "nexusrpc/"))
-                        or name == "typing_extensions.py"
-                    ):
-                        dest = trusted / name
-                        dest.parent.mkdir(parents=True, exist_ok=True)
-                        shutil.copyfile(path, dest)
-                    else:
-                        archive.writestr(name, path.read_bytes())
             # SDK and generated protobuf modules can also be imported lazily.
-            for name, path in _sources(trusted):
-                archive.writestr(name, path.read_bytes())
-            for name, path in _sources(source):
+            for root in (staged_dependencies, trusted):
+                for name, path in _files(root, "*.py"):
+                    archive.writestr(name, path.read_bytes())
+            for name, path in _files(source, "*.py"):
                 if name.startswith("temporalio/"):
                     raise ValueError(
                         "Workflow source cannot replace the Temporal guest SDK"
                     )
                 archive.writestr(name, path.read_bytes())
         if (
-            not (trusted / "google/protobuf").is_dir()
-            or not (trusted / "nexusrpc").is_dir()
-            or not (trusted / "typing_extensions.py").is_file()
+            not (staged_dependencies / "google/protobuf").is_dir()
+            or not (staged_dependencies / "nexusrpc").is_dir()
+            or not (staged_dependencies / "typing_extensions.py").is_file()
         ):
             raise ValueError(
                 "Dependency paths must include protobuf, nexus-rpc, and typing-extensions"
             )
         (trusted / "temporal_wasm_bundle_data.py").write_text(
             f"ARCHIVE = {archive_file.getvalue()!r}\nWORKFLOWS = {entries!r}\n"
+            f"DATA_CONVERTER = {data_converter!r}\n"
+            f"EXTENSIONS = {extensions!r}\n"
         )
         shutil.copyfile(
             SDK_ROOT / "scripts/wasm/guest.py", trusted / "temporal_wasm_guest.py"
@@ -128,6 +148,8 @@ def build(
                 "--stub-wasi",
                 "-p",
                 str(trusted),
+                "-p",
+                str(staged_dependencies),
                 "temporal_wasm_guest",
                 "-o",
                 str(output.resolve()),
@@ -136,6 +158,13 @@ def build(
             env=env,
             check=True,
         )
+    if data_converter != "default":
+        # A top-level custom section keeps the converter profile with the component.
+        # Both lengths fit in one unsigned LEB128 byte for these fixed profiles.
+        section_name = b"temporal-python-data-converter"
+        section = bytes([len(section_name)]) + section_name + data_converter.encode()
+        with output.open("ab") as component:
+            component.write(bytes([0, len(section)]) + section)
     output.with_suffix(output.suffix + ".json").write_text(
         json.dumps(
             {
@@ -143,6 +172,7 @@ def build(
                 "componentize-py": version,
                 "guest-python": "3.14",
                 "sdk-python": sdk_version,
+                "data-converter": data_converter,
             },
             indent=2,
         )
@@ -157,6 +187,9 @@ if __name__ == "__main__":
     parser.add_argument("--workflow", action="append", required=True)
     parser.add_argument("--dependency-path", type=Path, action="append", required=True)
     parser.add_argument(
+        "--data-converter", choices=("default", "pydantic"), default="default"
+    )
+    parser.add_argument(
         "--core", type=Path, default=SDK_ROOT / "temporalio/bridge/sdk-core"
     )
     args = parser.parse_args()
@@ -166,4 +199,5 @@ if __name__ == "__main__":
         args.source.resolve(),
         [path.resolve() for path in args.dependency_path],
         args.core.resolve(),
+        data_converter=args.data_converter,
     )

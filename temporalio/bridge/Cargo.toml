@@ -37,7 +37,7 @@ tls-aws-lc = [
     "tokio-rustls/aws_lc_rs",
 ]
 fips = ["tls-aws-lc", "dep:aws-lc-rs"]
-wasm-workflows = ["dep:temporalio-workflow-wasm"]
+wasm-workflows = ["dep:temporalio-workflow-wasm", "dep:wasmparser"]
 
 [dependencies]
 anyhow = "1.0"
@@ -85,6 +85,7 @@ tokio-stream = "0.1"
 tonic = "0.14"
 tracing = "0.1"
 url = "2.2"
+wasmparser = { version = "0.254", optional = true, default-features = false, features = ["component-model", "std"] }
 
 [profile.release]
 opt-level = 3

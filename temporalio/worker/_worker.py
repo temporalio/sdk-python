@@ -166,6 +166,7 @@ class Worker:
                 decorated with :py:func:`@nexusrpc.handler.service_handler<nexusrpc.handler.service_handler>`.
             wasm_workflow_bundle: Path to an experimental WASM component containing
                 workflows for this worker. Can be used alongside native workflows.
+                The bundle's data converter profile must match the client's data converter.
             workflows: Workflow classes decorated with
                 :py:func:`@workflow.defn<temporalio.workflow.defn>`.
             activity_executor: Concurrent executor to use for non-async

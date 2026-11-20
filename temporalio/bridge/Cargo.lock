@@ -3054,6 +3054,7 @@ dependencies = [
  "tonic",
  "tracing",
  "url",
+ "wasmparser",
 ]
 
 [[package]]

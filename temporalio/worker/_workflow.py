@@ -204,10 +204,6 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         )
 
         if wasm_workflow_bundle is not None:
-            if data_converter != temporalio.converter.DataConverter.default:
-                raise ValueError(
-                    "WASM workflow bundles require the default data converter"
-                )
             if workflow_failure_exception_types or should_enforce_versioning_behavior:
                 raise ValueError(
                     "WASM workflow bundles do not support worker-level failure types "
@@ -228,6 +224,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     "require native workflow registrations"
                 )
             self._wasm_bundle = _WasmWorkflowBundle(wasm_workflow_bundle)
+            self._wasm_bundle.validate_data_converter(data_converter)
 
         self._workflow_failure_exception_types = workflow_failure_exception_types
         self._patch_activation_callback = patch_activation_callback

@@ -5,10 +5,10 @@ import os
 import subprocess
 import sys
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Protocol, cast
 
 import pytest
 import temporalio.bridge.temporal_sdk_bridge as temporal_sdk_bridge
@@ -24,15 +24,19 @@ from temporalio.common import RawValue
 from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError, CancelledError
 from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from temporalio.worker import Replayer, Worker
 from temporalio.worker._workflow_wasm import _BridgeBundle
 from tests.helpers.nexus import make_nexus_endpoint_name
 from tests.worker.wasm_fixtures.native import NativeWorkflow
 
 pytestmark = pytest.mark.timeout(240)
-_BuildBundle = Callable[[Path, list[str], Path], None]
-
 _GUEST_SOURCE_DIR = Path(__file__).with_name("wasm_fixtures")
+
+
+class _BuildBundle(Protocol):
+    def __call__(
+        self, source: Path, workflows: list[str], output: Path, *options: str
+    ) -> None: ...
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +50,7 @@ def wasm_builder() -> _BuildBundle:
     ):
         pytest.skip("requires componentize-py, guest dependencies, and the WASM bridge")
 
-    def build(source: Path, workflows: list[str], output: Path) -> None:
+    def build(source: Path, workflows: list[str], output: Path, *options: str) -> None:
         selection = [part for name in workflows for part in ("--workflow", name)]
         subprocess.run(
             [
@@ -59,6 +63,7 @@ def wasm_builder() -> _BuildBundle:
                 *selection,
                 "--output",
                 str(output),
+                *options,
             ],
             check=True,
             timeout=120,
@@ -81,6 +86,36 @@ def wasm_bundle(
     return output
 
 
+@pytest.fixture(scope="module")
+def wasm_pydantic_dependencies() -> Path:
+    dependency_path = os.environ.get("TEMPORAL_WASM_PYDANTIC_DEPENDENCY_PATH")
+    if not dependency_path:
+        pytest.skip(
+            "requires staged Pydantic guest dependencies and the WASM extension"
+        )
+    return Path(dependency_path)
+
+
+@pytest.fixture(scope="module")
+def wasm_pydantic_bundle(
+    tmp_path_factory: pytest.TempPathFactory,
+    wasm_builder: _BuildBundle,
+    wasm_pydantic_dependencies: Path,
+) -> Path:
+    pytest.importorskip("pydantic", minversion="2.11")
+    output = tmp_path_factory.mktemp("workflow-wasm-pydantic") / "workflows.wasm"
+    wasm_builder(
+        _GUEST_SOURCE_DIR,
+        ["guest.pydantic_workflow:WasmPydantic"],
+        output,
+        "--dependency-path",
+        str(wasm_pydantic_dependencies),
+        "--data-converter",
+        "pydantic",
+    )
+    return output
+
+
 def test_wasm_import_time_capabilities(
     tmp_path: Path, wasm_builder: _BuildBundle
 ) -> None:
@@ -88,6 +123,36 @@ def test_wasm_import_time_capabilities(
     wasm_builder(_GUEST_SOURCE_DIR, ["guest.import_clock:ImportClock"], output)
     with pytest.raises(RuntimeError, match="discovering WASM workflows"):
         getattr(temporal_sdk_bridge, "WasmWorkflowBundle")(output.read_bytes())
+
+
+def test_wasm_imports_native_extension_from_dependency_path(
+    tmp_path: Path, wasm_builder: _BuildBundle
+) -> None:
+    dependency_path = os.environ.get("TEMPORAL_WASM_NATIVE_DEPENDENCY_PATH")
+    if not dependency_path:
+        pytest.skip("requires the native extension fixture compiled for WASI")
+    output = tmp_path / "native-extension.wasm"
+    wasm_builder(
+        _GUEST_SOURCE_DIR,
+        ["guest.native_extension:WasmNativeExtension"],
+        output,
+        "--dependency-path",
+        dependency_path,
+    )
+
+    bundle = cast(
+        type[_BridgeBundle], getattr(temporal_sdk_bridge, "WasmWorkflowBundle")
+    )(output.read_bytes())
+    assert bundle.data_converter_profile() == "default"
+    completion = _activate_probe(bundle, False, "WasmNativeExtension")
+    result = completion.successful.commands[0].complete_workflow_execution.result
+    assert DataConverter.default.payload_converter.from_payloads([result], [int]) == [
+        42
+    ]
+    with pytest.raises(
+        RuntimeError, match=r"(?s)activating WASM workflow.*clock_gettime"
+    ):
+        _activate_probe(bundle, True, "WasmNativeExtension")
 
 
 @pytest.fixture(scope="module")
@@ -98,12 +163,12 @@ def wasm_component(wasm_bundle: Path) -> _BridgeBundle:
 
 
 def _activate_probe(
-    wasm_component: _BridgeBundle, probe: str
+    wasm_component: _BridgeBundle, probe: object, workflow_type: str = "WasmProbe"
 ) -> WorkflowActivationCompletion:
     instance = wasm_component.instantiate("default", "queue", [], ([], False), False)
     act = WorkflowActivation(run_id=str(uuid.uuid4()))
     init = act.jobs.add().initialize_workflow
-    init.workflow_type = "WasmProbe"
+    init.workflow_type = workflow_type
     init.workflow_id = "probe"
     init.randomness_seed = 17
     init.arguments.extend(DataConverter.default.payload_converter.to_payloads([probe]))
@@ -129,6 +194,71 @@ def test_wasm_limits_and_capabilities(wasm_component: _BridgeBundle) -> None:
     ]
 
 
+def test_wasm_pydantic_validator_cannot_access_clock(
+    wasm_pydantic_bundle: Path,
+) -> None:
+    component = cast(
+        type[_BridgeBundle], getattr(temporal_sdk_bridge, "WasmWorkflowBundle")
+    )(wasm_pydantic_bundle.read_bytes())
+    instance = component.instantiate("default", "queue", [], None, False)
+    act = WorkflowActivation(run_id=str(uuid.uuid4()))
+    init = act.jobs.add().initialize_workflow
+    init.workflow_type = "WasmPydantic"
+    init.workflow_id = "probe"
+    init.arguments.extend(
+        DataConverter.default.payload_converter.to_payloads(
+            [{"displayName": "use-clock"}]
+        )
+    )
+    with pytest.raises(RuntimeError, match="activating WASM workflow"):
+        instance.activate(act.SerializeToString())
+
+
+@pytest.mark.requires_local_server
+async def test_wasm_pydantic_round_trip_and_replay(
+    client: Client, wasm_pydantic_bundle: Path
+) -> None:
+    from temporalio.contrib.pydantic import pydantic_data_converter
+    from tests.worker.wasm_fixtures.guest.pydantic_workflow import (
+        WasmModel,
+        WasmPydantic,
+    )
+
+    queue = str(uuid.uuid4())
+    config = client.config()
+    # The shared test environment adds a native workflow interceptor.
+    config["interceptors"] = []
+    with pytest.raises(
+        ValueError, match="pydantic profile require pydantic_data_converter"
+    ):
+        Worker(
+            Client(**config),
+            task_queue=queue,
+            wasm_workflow_bundle=wasm_pydantic_bundle,
+        )
+
+    config["data_converter"] = pydantic_data_converter
+    client = Client(**config)
+    worker = Worker(client, task_queue=queue, wasm_workflow_bundle=wasm_pydantic_bundle)
+    async with asyncio.timeout(45), worker:
+        handle = await client.start_workflow(
+            WasmPydantic.run,
+            WasmModel(displayName=" Temporal "),
+            id=str(uuid.uuid4()),
+            task_queue=queue,
+        )
+        assert await handle.result() == WasmModel(displayName="temporal wasm")
+        history = await handle.fetch_history()
+
+    completed = history.events[-1].workflow_execution_completed_event_attributes
+    assert completed.result.payloads[0].data == b'{"displayName":"TEMPORAL WASM"}'
+    await Replayer(
+        wasm_workflow_bundle=wasm_pydantic_bundle,
+        namespace=client.namespace,
+        data_converter=pydantic_data_converter,
+    ).replay_workflow(history)
+
+
 @workflow.defn(dynamic=True)
 class DynamicWorkflow:
     @workflow.run
@@ -142,7 +272,10 @@ async def test_mixed_workflow_registration_conflicts(
     monkeypatch.setattr(
         workflow_worker,
         "_WasmWorkflowBundle",
-        lambda _: SimpleNamespace(workflow_types=frozenset({"NativeWorkflow", ""})),
+        lambda _: SimpleNamespace(
+            workflow_types=frozenset({"NativeWorkflow", ""}),
+            validate_data_converter=lambda _: None,
+        ),
     )
 
     with pytest.raises(ValueError, match="More than one workflow named NativeWorkflow"):

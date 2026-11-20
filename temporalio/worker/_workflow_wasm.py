@@ -25,6 +25,8 @@ class _BridgeInstance(Protocol):
 class _BridgeBundle(Protocol):
     def __init__(self, component: bytes) -> None: ...
 
+    def data_converter_profile(self) -> str: ...
+
     def workflow_types(self) -> list[str]: ...
 
     def instantiate(
@@ -50,6 +52,36 @@ class _WasmWorkflowBundle:
             Path(path).read_bytes()
         )
         self.workflow_types = frozenset(self.component.workflow_types())
+        self.data_converter_profile = self.component.data_converter_profile()
+
+    def validate_data_converter(
+        self, data_converter: temporalio.converter.DataConverter
+    ) -> None:
+        if self.data_converter_profile == "default":
+            expected = temporalio.converter.DataConverter.default
+            converter_name = "the default data converter"
+        elif self.data_converter_profile == "pydantic":
+            from temporalio.contrib.pydantic import pydantic_data_converter
+
+            expected = pydantic_data_converter
+            converter_name = "pydantic_data_converter"
+        else:
+            raise ValueError(
+                f"Unknown WASM data converter profile {self.data_converter_profile!r}"
+            )
+        if (
+            type(data_converter) is not type(expected)
+            or data_converter.payload_converter_class
+            is not expected.payload_converter_class
+            or data_converter.failure_converter_class
+            is not expected.failure_converter_class
+            or data_converter.payload_codec is not None
+            or data_converter.external_storage is not None
+        ):
+            raise ValueError(
+                f"WASM workflow bundles with the {self.data_converter_profile} profile "
+                f"require {converter_name}"
+            )
 
     def create_instance(
         self,

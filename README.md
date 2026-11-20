@@ -1112,7 +1112,7 @@ operations use the configured endpoint.
    `poe build-develop --features wasm-workflows`.
 2. Install `componentize-py==0.25.1` into a build virtual environment. Stage a
    directory from your locked dependencies containing Python sources for
-   `protobuf`, `nexus-rpc`, `typing-extensions`, and any pure-Python workflow
+   `protobuf`, `nexus-rpc`, `typing-extensions`, and any workflow
    dependencies.
 3. Use that virtual environment to package the workflow. Repeat `--workflow`
    for each class.
@@ -1139,12 +1139,51 @@ apply to native workflows.
 The component has no access to host files, environment variables, sockets,
 threads, clocks, or entropy. Use the workflow APIs for time and randomness and
 execute I/O in an activity or Nexus handler. The guest loads Python sources from
-its bundle. Native extension wheels and filesystem-backed package resources need
-separate support. Registering a WASM bundle requires the default data converter.
+its bundle. Native Python extensions can also be loaded inside the guest. Stage
+them under `--dependency-path` in their installed package layout as WebAssembly
+shared modules for CPython 3.14 on WASI. The builder discovers files ending in
+`.cpython-314-wasm32-wasi.so` or `.abi3.so` and links the WebAssembly binaries it
+finds. Use each extension's build tooling to produce a compatible binary.
+Extensions run with the same sandbox restrictions as Python workflow code.
+
+To use the Pydantic v2 data converter, stage the Python sources for `pydantic`,
+`pydantic-core`, `annotated-types`, and `typing-inspection` along with the standard guest
+dependencies. Use matching versions on the host and in the bundle. The prototype
+was tested with `pydantic==2.14.1` and `pydantic-core==2.50.1`. To build the
+extension, extract the matching `pydantic-core` source distribution, install
+[WASI SDK 33](https://github.com/WebAssembly/wasi-sdk/releases/tag/wasi-sdk-33),
+and use a Rust nightly toolchain.
+
+```sh
+rustup component add --toolchain nightly rust-src
+rustup target add --toolchain nightly wasm32-wasip1
+sh scripts/wasm/build_pydantic_core.sh ./pydantic_core-2.50.1 /path/to/wasi-sdk \
+    ./guest-pydantic-dependencies/pydantic_core/_pydantic_core.cpython-314-wasm32-wasi.so
+```
+
+Add `--dependency-path ./guest-pydantic-dependencies` and `--data-converter pydantic`
+to the bundle build. Use
+`temporalio.contrib.pydantic.pydantic_data_converter` on the client passed to
+`Worker` and as the `data_converter` argument to `Replayer`. The bundle embeds
+the profile, so it stays with the workflow code when you move the `.wasm` file.
 
 To run the WASM integration tests, set
 `TEMPORAL_WASM_COMPONENTIZER_PYTHON` to the build virtual environment's Python
 executable and `TEMPORAL_WASM_DEPENDENCY_PATH` to the staged dependencies.
+For the Pydantic tests, also set `TEMPORAL_WASM_PYDANTIC_DEPENDENCY_PATH` to the
+staged Pydantic dependencies, including the WASM shared module under `pydantic_core/`.
+For the standalone extension test, use WASI SDK and a CPython checkout configured
+for WASI to build the fixture.
+
+```sh
+mkdir -p ./guest-native-dependencies/example_native
+"$WASI_SDK_PATH/bin/clang" --target=wasm32-wasip2 -shared -fPIC \
+    -Wl,--allow-undefined -I /path/to/cpython/Include -I /path/to/cpython-wasi-build \
+    tests/worker/wasm_fixtures/native_probe.c \
+    -o ./guest-native-dependencies/example_native/probe.abi3.so
+export TEMPORAL_WASM_NATIVE_DEPENDENCY_PATH=./guest-native-dependencies
+```
+
 Run `poe test -n 0 tests/worker/test_workflow_wasm.py`.
 
 #### Workflow Sandbox

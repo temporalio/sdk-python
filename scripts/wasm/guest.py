@@ -19,7 +19,7 @@ from functools import cache
 from pathlib import Path
 
 from componentize_py_types import Err
-from temporal_wasm_bundle_data import ARCHIVE, WORKFLOWS
+from temporal_wasm_bundle_data import ARCHIVE, DATA_CONVERTER, EXTENSIONS, WORKFLOWS
 from wit_world.exports import Guest as GuestProtocol
 from wit_world.exports.guest import LocalActivities, WorkflowInstance
 
@@ -56,16 +56,24 @@ class _ArchiveImporter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
         }
         self._packages = {
             "/".join(name.split("/")[:i])
-            for name in self._sources
+            for name in self._sources.keys() | EXTENSIONS.keys()
             for i in range(1, len(name.split("/")))
         }
 
     def find_spec(self, fullname, path=None, target=None):
         key = fullname.replace(".", "/")
-        if key + "/__init__.py" in self._sources:
-            return importlib.util.spec_from_loader(fullname, self, is_package=True)
-        if key + ".py" in self._sources:
-            return importlib.util.spec_from_loader(fullname, self, is_package=False)
+        for stem, is_package in ((key + "/__init__", True), (key, False)):
+            for suffix in importlib.machinery.EXTENSION_SUFFIXES:
+                if (origin := EXTENSIONS.get(stem + suffix)) is not None:
+                    # The linker resolves this path inside the component without a filesystem.
+                    loader = importlib.machinery.ExtensionFileLoader(fullname, origin)
+                    return importlib.util.spec_from_file_location(
+                        fullname, origin, loader=loader
+                    )
+            if stem + ".py" in self._sources:
+                return importlib.util.spec_from_loader(
+                    fullname, self, is_package=is_package
+                )
         if key in self._packages:
             spec = importlib.machinery.ModuleSpec(fullname, None, is_package=True)
             spec.submodule_search_locations = [f"<temporal-wasm:{key}>"]
@@ -98,6 +106,19 @@ class _ArchiveImporter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
 _importer = _ArchiveImporter(
     zipfile.ZipFile(_stdlib_bytes), zipfile.ZipFile(io.BytesIO(ARCHIVE))
 )
+
+_data_converter = temporalio.converter.DataConverter.default
+if DATA_CONVERTER == "pydantic":
+    # Initialize Pydantic's lazy schema machinery while only trusted sources are
+    # importable. Workflow discovery otherwise exhausts its fuel on imports.
+    from pydantic import create_model
+
+    from temporalio.contrib.pydantic import pydantic_data_converter
+
+    create_model("_TemporalWasmModel", value=(str, ...)).model_validate_json(
+        '{"value":"bootstrap"}'
+    )
+    _data_converter = pydantic_data_converter
 
 
 @cache
@@ -191,10 +212,9 @@ class WorkflowInstanceImpl(WorkflowInstance):
             raise ValueError(
                 f"WASM workflow type {init.workflow_type!r} is not registered"
             )
-        converter = temporalio.converter.DataConverter.default
         details = WorkflowInstanceDetails(
-            payload_converter_factory=converter._new_payload_converter,
-            failure_converter_class=converter.failure_converter_class,
+            payload_converter_factory=_data_converter._new_payload_converter,
+            failure_converter_class=_data_converter.failure_converter_class,
             interceptor_classes=[],
             defn=definition,
             info=workflow_info(self.namespace, self.task_queue, act, init),
