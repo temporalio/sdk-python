@@ -45,6 +45,10 @@ import temporalio.worker._command_aware_visitor
 import temporalio.worker._workflow_instance
 import temporalio.workflow
 from temporalio import activity, workflow
+from temporalio._workflow_context import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    _WorkflowLogicFlag,
+)
 from temporalio.api.common.v1 import Payload, Payloads, WorkflowExecution
 from temporalio.api.enums.v1 import EventType
 from temporalio.api.failure.v1 import Failure
@@ -1514,7 +1518,6 @@ class TrapCancelWorkflow:
             return "cancelled"
 
 
-_WorkflowLogicFlag = temporalio.worker._workflow_instance._WorkflowLogicFlag
 _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
     _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
 )
@@ -1522,8 +1525,7 @@ _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
 
 def test_single_batch_workflow_activation_jobs_default_disabled() -> None:
     assert (
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG
-        not in temporalio.worker._workflow_instance._DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
+        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG not in _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS
     )
 
 
