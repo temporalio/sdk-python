@@ -10,6 +10,8 @@ import nexusrpc.handler
 import pytest
 from nexusrpc.handler._core import ServiceHandler
 
+import temporalio.common
+import temporalio.converter
 import temporalio.exceptions
 import temporalio.nexus
 import temporalio.worker._nexus
@@ -63,7 +65,7 @@ class UpdateTargetWorkflow:
         await workflow.wait_condition(lambda: False)
 
 
-# The decorator passes raw input and preserves sync results, async tokens, and handler errors.
+# The decorator converts Nexus input to RawValue and preserves results and handler errors.
 @pytest.mark.parametrize("name", ["get_weather", "async", "reject"])
 async def test_dynamic_temporal_decorator(name: str):
     @nexusrpc.handler.service_handler(name="tools")
@@ -73,9 +75,11 @@ async def test_dynamic_temporal_decorator(name: str):
             self,
             ctx: temporalio.nexus.TemporalStartOperationContext,
             _client: temporalio.nexus.TemporalNexusClient,
-            input: nexusrpc.LazyValue,
+            input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
-            arguments = await input.consume(as_type=dict)
+            arguments = temporalio.converter.PayloadConverter.default.from_payload(
+                input.payload, dict
+            )
             if ctx.operation == "async":
                 return temporalio.nexus.TemporalOperationResult.async_token(
                     "operation-token"
@@ -101,7 +105,12 @@ async def test_dynamic_temporal_decorator(name: str):
         task_cancellation=temporalio.worker._nexus._NexusTaskCancellation(),
     )
     serializer = mock.Mock()
-    serializer.deserialize = mock.AsyncMock(return_value={"city": "Boston"})
+    payload = temporalio.converter.PayloadConverter.default.to_payload(
+        {"city": "Boston"}
+    )
+    serializer.deserialize = mock.AsyncMock(
+        return_value=temporalio.common.RawValue(payload)
+    )
     raw = nexusrpc.LazyValue(serializer=serializer, headers={})
     if name == "reject":
         with pytest.raises(nexusrpc.HandlerError) as error:
@@ -115,7 +124,9 @@ async def test_dynamic_temporal_decorator(name: str):
             assert nexus_result.token == "operation-token"
         else:
             assert result.value == (name, "request-id", {"city": "Boston"})
-    assert serializer.deserialize.call_args.kwargs["as_type"] is dict
+    assert (
+        serializer.deserialize.call_args.kwargs["as_type"] is temporalio.common.RawValue
+    )
 
 
 # A dynamic Temporal operation cannot specify a name, including an empty string.
@@ -127,7 +138,7 @@ def test_dynamic_temporal_decorator_rejects_name(name: str):
 
 # Dynamic Temporal operations reject decoded input annotations.
 def test_dynamic_temporal_decorator_requires_raw_input():
-    with pytest.raises(TypeError, match="LazyValue"):
+    with pytest.raises(TypeError, match="RawValue"):
 
         class _Decoded:
             @temporalio.nexus.temporal_operation(dynamic=True)
@@ -151,7 +162,7 @@ def test_second_dynamic_temporal_operation_fails_registration():
             self,
             _ctx: temporalio.nexus.TemporalStartOperationContext,
             _client: temporalio.nexus.TemporalNexusClient,
-            _input: nexusrpc.LazyValue,
+            _input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
             raise NotImplementedError
 
@@ -164,7 +175,7 @@ def test_second_dynamic_temporal_operation_fails_registration():
                 self,
                 _ctx: temporalio.nexus.TemporalStartOperationContext,
                 _client: temporalio.nexus.TemporalNexusClient,
-                _input: nexusrpc.LazyValue,
+                _input: temporalio.common.RawValue,
             ) -> temporalio.nexus.TemporalOperationResult[Any]:
                 raise NotImplementedError
 
@@ -282,9 +293,13 @@ async def test_workflow_caller_routes_named_and_dynamic_operations(
             self,
             ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
-            input: nexusrpc.LazyValue,
+            input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
-            value = await input.consume(as_type=str)
+            value = (
+                temporalio.nexus.client().data_converter.payload_converter.from_payload(
+                    input.payload, str
+                )
+            )
             if ctx.operation == "echo_sync":
                 return temporalio.nexus.TemporalOperationResult.sync(f"sync:{value}")
             if ctx.operation == "echo_workflow":
@@ -345,10 +360,13 @@ async def test_workflow_caller_cancels_dynamic_workflow_operation(
             self,
             _ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
-            input: nexusrpc.LazyValue,
+            input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
             return await client.start_workflow(
-                WaitingWorkflow.run, id=await input.consume(as_type=str)
+                WaitingWorkflow.run,
+                id=temporalio.nexus.client().data_converter.payload_converter.from_payload(
+                    input.payload, str
+                ),
             )
 
     interceptor = RecordingInterceptor()
@@ -402,11 +420,13 @@ async def test_standalone_caller_cancels_dynamic_activity_operation(
             self,
             _ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
-            input: nexusrpc.LazyValue,
+            input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
             return await client.start_activity(
                 wait_for_cancel,
-                id=await input.consume(as_type=str),
+                id=temporalio.nexus.client().data_converter.payload_converter.from_payload(
+                    input.payload, str
+                ),
                 start_to_close_timeout=timedelta(seconds=30),
                 heartbeat_timeout=timedelta(seconds=1),
             )
@@ -546,13 +566,17 @@ async def test_cancel_by_token_after_tool_removal_and_restart(
             self,
             ctx: temporalio.nexus.TemporalStartOperationContext,
             client: temporalio.nexus.TemporalNexusClient,
-            input: nexusrpc.LazyValue,
+            input: temporalio.common.RawValue,
         ) -> temporalio.nexus.TemporalOperationResult[Any]:
             if ctx.operation != operation or not available:
                 raise nexusrpc.HandlerError(
                     "Unknown tool", type=nexusrpc.HandlerErrorType.NOT_FOUND
                 )
-            backing_id = await input.consume(as_type=str)
+            backing_id = (
+                temporalio.nexus.client().data_converter.payload_converter.from_payload(
+                    input.payload, str
+                )
+            )
             if operation == "wait_workflow":
                 return await client.start_workflow(WaitingWorkflow.run, id=backing_id)
             return await client.start_activity(

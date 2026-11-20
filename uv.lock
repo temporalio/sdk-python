@@ -2912,7 +2912,7 @@ wheels = [
 [[package]]
 name = "nexus-rpc"
 version = "1.5.0"
-source = { git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=c88388fa0b0ddac441c3b9dc18cb5919c5f1fd96#c88388fa0b0ddac441c3b9dc18cb5919c5f1fd96" }
+source = { git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=50d1fb642004e0a6a719650043f8eb8f3225da1e#50d1fb642004e0a6a719650043f8eb8f3225da1e" }
 dependencies = [
     { name = "typing-extensions" },
 ]
@@ -4608,7 +4608,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'boto3'", specifier = ">=1.26.0,<2" },
     { name = "gcloud-aio-storage", marker = "extra == 'gcloud-aio-storage'", specifier = ">=9.6.4,<10" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.49.1,<2" },
-    { name = "nexus-rpc", git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=c88388fa0b0ddac441c3b9dc18cb5919c5f1fd96" },
+    { name = "nexus-rpc", git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=50d1fb642004e0a6a719650043f8eb8f3225da1e" },
     { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
