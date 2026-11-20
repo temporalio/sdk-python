@@ -180,9 +180,9 @@ def temporal_operation(
         TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
     ]
 ):
-    """Decorate an async ``(self, client, input)`` Nexus start method.
+    """Decorator marking a method as the start method for an operation that interacts with Temporal.
 
-    Return a :py:class:`TemporalOperationResult` and use :py:func:`info` for invocation information.
+    The method receives ``(self, client, input)``. Use :py:func:`temporalio.nexus.info` for invocation information.
 
     .. warning::
        This API is experimental and unstable.
@@ -202,8 +202,18 @@ def temporal_operation(
         ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
 
         def operation_handler_factory(
-            instance: NexusServiceType,
+            self: NexusServiceType,
         ) -> OperationHandler[InputT, OutputT]:
+            async def _start(
+                client: TemporalNexusClient,
+                input: InputT,
+            ) -> TemporalOperationResult[OutputT]:
+                return await start(
+                    self,
+                    client,
+                    input,
+                )
+
             class _TemporalOperationHandler(TemporalOperationHandler):
                 @override
                 async def start_operation(
@@ -211,7 +221,7 @@ def temporal_operation(
                     client: TemporalNexusClient,
                     input: InputT,
                 ) -> TemporalOperationResult[OutputT]:
-                    return await start(instance, client, input)
+                    return await _start(client, input)
 
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
             return _TemporalOperationHandler()

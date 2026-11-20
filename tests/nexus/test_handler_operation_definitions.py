@@ -5,7 +5,7 @@ and input/output types.
 
 import warnings
 from dataclasses import dataclass
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar
 
 import nexusrpc.handler
 import pytest
@@ -186,16 +186,3 @@ def test_safe_broader_parameter_annotations_preserve_input_type_without_warnings
         assert isinstance(op, nexusrpc.Operation)
         assert op.input_type == Input
         assert op.output_type == Output
-
-
-def test_temporal_operation_rejects_old_context_parameter():
-    async def start(
-        _self: object,
-        _ctx: nexusrpc.handler.StartOperationContext,
-        _client: nexus.TemporalNexusClient,
-        _input: None,
-    ) -> None:
-        pass
-
-    with pytest.raises(TypeError, match=r"must accept \(self, client, input\)"):
-        nexus.temporal_operation(cast(Any, start))

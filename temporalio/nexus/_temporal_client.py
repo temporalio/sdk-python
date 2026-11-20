@@ -775,7 +775,7 @@ class _TemporalNexusClient(TemporalNexusClient):  # pyright: ignore[reportUnused
                     arg=arg,
                     args=args,
                     id=id,
-                    task_queue=task_queue or self._temporal_context.info.task_queue,
+                    task_queue=task_queue or self._temporal_context.info().task_queue,
                     result_type=result_type,
                     schedule_to_start_timeout=schedule_to_start_timeout,
                     schedule_to_close_timeout=schedule_to_close_timeout,
