@@ -1,0 +1,1 @@
+`@temporal_operation` handlers can return a typed payload directly to complete a Nexus Operation synchronously. Explicit `TemporalOperationResult` values continue to support synchronous and asynchronous completion.
