@@ -208,7 +208,7 @@ def in_operation() -> bool:
 
 def info() -> Info:
     """Get the current Nexus operation information."""
-    return _temporal_context().info
+    return _temporal_context().info()
 
 
 def client() -> temporalio.client.Client:
@@ -296,7 +296,7 @@ def _current_propagated_nexus_serialization_context() -> (  # pyright: ignore[re
     if nexus_ctx is None:
         return None
     return temporalio.api.nexus.v1.PropagatedSerializationContext(
-        endpoint=nexus_ctx.info.endpoint,
+        endpoint=nexus_ctx.info().endpoint,
         service=nexus_ctx.nexus_context.service,
         operation=nexus_ctx.nexus_context.operation,
     )
@@ -323,7 +323,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
     client: temporalio.client.Client
     """The Temporal client in use by the worker handling the current Nexus operation."""
 
-    info: Info
+    info: Callable[[], Info]
     """Temporal information about the running Nexus operation."""
 
     nexus_context: _OperationCtxT
@@ -340,7 +340,7 @@ class _TemporalOperationCtx(Generic[_OperationCtxT]):
                 {
                     "nexus_service": self.nexus_context.service,
                     "nexus_operation": self.nexus_context.operation,
-                    "task_queue": self.info.task_queue,
+                    "task_queue": self.info().task_queue,
                 }
             )
         return self._metric_meter
@@ -727,7 +727,7 @@ class LoggerAdapter(logging.LoggerAdapter):
         if tctx := _try_temporal_context():
             extra["service"] = tctx.nexus_context.service
             extra["operation"] = tctx.nexus_context.operation
-            extra["task_queue"] = tctx.info.task_queue
+            extra["task_queue"] = tctx.info().task_queue
         kwargs["extra"] = extra | kwargs.get("extra", {})
         return msg, kwargs
 
@@ -779,7 +779,7 @@ async def _start_nexus_backing_workflow(
             arg=arg,
             args=args,
             id=id,
-            task_queue=task_queue or temporal_context.info.task_queue,
+            task_queue=task_queue or temporal_context.info().task_queue,
             result_type=result_type,
             execution_timeout=execution_timeout,
             run_timeout=run_timeout,

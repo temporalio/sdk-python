@@ -184,9 +184,9 @@ def temporal_operation(
         TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
     ]
 ):
-    """Decorate an async ``(self, client, input)`` Nexus start method.
+    """Decorator marking a method as the start method for an operation that interacts with Temporal.
 
-    Return a :py:class:`TemporalOperationResult` and use :py:func:`info` for invocation information.
+    The method receives ``(self, client, input)``. Use :py:func:`temporalio.nexus.info` for invocation information.
 
     Set dynamic=True to set a Nexus operation handler as a catch-all handler,
     which will handle any unknown operation that's dispatched to that Nexus service.

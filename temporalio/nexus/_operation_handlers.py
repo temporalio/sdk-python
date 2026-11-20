@@ -184,7 +184,7 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
         client: TemporalNexusClient,
         input: InputT,
     ) -> TemporalOperationResult[OutputT]:
-        """Start the operation. Use :py:func:`temporalio.nexus.info` for invocation information."""
+        """Start the Temporal-backed Nexus operation."""
         ...
 
     async def start(

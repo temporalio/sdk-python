@@ -294,8 +294,7 @@ class TestServiceHandler:
             ) -> nexus.TemporalOperationResult[None]:
                 info = nexus.info()
                 result = await client.start_workflow(BlockingWorkflow.run, id=input)
-                assert nexus.info() is info
-                service_handler.custom_workflow_start_infos.append(info)
+                service_handler.custom_workflow_start_infos.extend((info, nexus.info()))
                 service_handler.started_custom_cancel_workflow.set()
                 return result
 
@@ -305,7 +304,10 @@ class TestServiceHandler:
                 options: nexus.CancelWorkflowRunOptions,
             ):
                 service_handler.custom_workflow_cancel_infos.append(nexus.info())
+                # get a handle to the workflow
                 handle = nexus.client().get_workflow_handle(options.workflow_id)
+
+                # cancel the workflow
                 await handle.cancel()
 
         return CustomCancelNexusOpHandler()
@@ -1154,15 +1156,20 @@ async def test_customized_temporal_operation_cancel_workflow(
 
         await assert_eventually(check_cancelled)
 
-        [start_info] = service_handler.custom_workflow_start_infos
+        start_info, refreshed_info = service_handler.custom_workflow_start_infos
         [cancel_info] = service_handler.custom_workflow_cancel_infos
-        assert start_info.service == cancel_info.service == "TestService"
-        assert start_info.operation == cancel_info.operation == "custom_cancel"
-        assert start_info.request_id
+        assert start_info is not refreshed_info
+        assert (
+            start_info.request_id and refreshed_info.request_id == start_info.request_id
+        )
         assert cancel_info.request_id is None
-        assert start_info.cancellation_token is not cancel_info.cancellation_token
-        assert not hasattr(start_info, "headers")
-        assert not hasattr(cancel_info, "headers")
+        for invocation_info in (start_info, refreshed_info, cancel_info):
+            assert invocation_info.endpoint == endpoint_name
+            assert invocation_info.namespace == env.client.namespace
+            assert invocation_info.task_queue == task_queue
+            assert invocation_info.service == "TestService"
+            assert invocation_info.operation == "custom_cancel"
+            assert not hasattr(invocation_info, "headers")
 
 
 @workflow.defn
@@ -1592,9 +1599,11 @@ async def test_temporal_operation_observes_invocation_timeout(
             try:
                 await asyncio.shield(waiter)
             except asyncio.CancelledError:
-                assert nexus.info().cancellation_token is token
                 assert token.is_cancelled()
                 assert token.wait_until_cancelled_sync(timeout=0)
+                assert (
+                    nexus.info().cancellation_token.cancellation_reason() == "TIMED_OUT"
+                )
                 await asyncio.wait_for(waiter, timeout=1)
                 await asyncio.wait_for(token.wait_until_cancelled(), timeout=1)
                 observed.set_result(token)

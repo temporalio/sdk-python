@@ -66,12 +66,6 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
     ``start`` must be a type-annotated start method that returns a
     :py:class:`temporalio.nexus.TemporalOperationResult`.
     """
-    try:
-        inspect.signature(start).bind(None, None, None)
-    except TypeError as err:
-        raise TypeError(
-            f"@temporal_operation method {start} must accept (self, client, input)."
-        ) from err
     return _get_wrapped_start_method_input_and_output_type_annotations(
         start,
         expected_param_types=(TemporalNexusClient,),
