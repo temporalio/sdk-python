@@ -4,6 +4,7 @@ import asyncio
 import gc
 import textwrap
 import threading
+import time
 from collections.abc import AsyncIterator, Mapping
 from datetime import timedelta
 from pathlib import Path
@@ -373,6 +374,7 @@ async def _connect(
 
     async def next(config: ConnectConfig) -> ServiceClient:
         seen.append(config)
+        service_client.config = config
         return service_client
 
     assert await plugin.connect_service_client(config, next) is service_client
@@ -507,6 +509,7 @@ async def test_api_key_refreshed_in_background(monkeypatch: pytest.MonkeyPatch):
     client.set("api-key", "key-2", "v2")
     await wait_until(lambda: bool(updates))
     assert updates == ["key-2"]
+    assert service_client.config.api_key == "key-2"
 
     # Fetch failures keep the current key
     entry = plugin._cache.api_key
@@ -535,6 +538,61 @@ async def test_api_key_refreshed_in_background(monkeypatch: pytest.MonkeyPatch):
     gc.collect()
     await asyncio.wait_for(task, 5)
     assert not plugin._refresh_tasks
+
+
+async def test_api_key_removed_past_max_staleness(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(_extension, "FAILED_REFRESH_RETRY_INTERVAL_SECONDS", 0.01)
+    client = _FakeSecretsClient()
+    client.set("api-key", "key-1", "v1")
+    plugin = _new_plugin(
+        {"api_key_id": "api-key"}, client, refresh_interval=timedelta(0)
+    )
+    _, service_client = await _connect(plugin, ConnectConfig(target_host="x"))
+    updates: list[str | None] = []
+    service_client.update_api_key.side_effect = updates.append
+
+    del client.secrets["api-key"]
+    now = time.monotonic() + plugin._cache.max_staleness + 1
+    plugin._cache.now = lambda: now
+    await wait_until(lambda: bool(updates))
+    assert updates == [None]
+    assert service_client.config.api_key is None
+
+    # A successful refresh sets the key again
+    client.set("api-key", "key-2", "v2")
+    await wait_until(lambda: len(updates) == 2)
+    assert updates == [None, "key-2"]
+    assert service_client.config.api_key == "key-2"
+    del service_client
+
+
+async def test_api_key_removed_on_unexpected_refresh_error(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(_extension, "FAILED_REFRESH_RETRY_INTERVAL_SECONDS", 0.01)
+    client = _FakeSecretsClient()
+    client.set("api-key", "key-1", "v1")
+    plugin = _new_plugin(
+        {"api_key_id": "api-key"}, client, refresh_interval=timedelta(0)
+    )
+    _, service_client = await _connect(plugin, ConnectConfig(target_host="x"))
+    updates: list[str | None] = []
+    service_client.update_api_key.side_effect = updates.append
+
+    # Not a fetch failure, so a bug in the cache
+    def broken_now() -> float:
+        raise ValueError("bug")
+
+    plugin._cache.now = broken_now
+    await wait_until(lambda: bool(updates))
+    assert updates == [None]
+
+    # The refresh task is still running
+    plugin._cache.now = time.monotonic
+    client.set("api-key", "key-2", "v2")
+    await wait_until(lambda: len(updates) == 2)
+    assert updates == [None, "key-2"]
+    del service_client
 
 
 async def test_client_connect_uses_plugin(tmp_path: Path):

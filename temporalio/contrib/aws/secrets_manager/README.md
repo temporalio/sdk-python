@@ -121,7 +121,8 @@ fetch fails. After that:
   caching), or 5 minutes if that's unset. Set `refresh_interval` to override
   it.
 - If a refresh fails, the last fetched value keeps being used for up to
-  `max_staleness` (default 24 hours).
+  `max_staleness` (default 24 hours) after it was fetched. After a failed
+  refresh, the next fetch attempt waits 30 seconds.
 
 ## Observability
 
