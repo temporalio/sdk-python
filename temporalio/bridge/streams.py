@@ -6,7 +6,8 @@ Nothing in this module should be considered stable. The API may change.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import temporalio.bridge.runtime
@@ -26,6 +27,17 @@ class StoreCaller(Protocol):
         return its encoded response.
         """
         ...
+
+
+@dataclass
+class WorkerStreams:
+    """Python representation of the Rust struct for the Stream Stores of a worker."""
+
+    limits: tuple[int, int, int] | None
+    """The ``max_record_bytes``, the ``max_batch_bytes`` and the ``max_batch_records``
+    of the Stream config, or ``None`` with no Stream config."""
+    stores: Sequence[tuple[str, StoreCaller]]
+    """The caller of each Stream Store that Workflow code can use, by Store name."""
 
 
 async def call_stream_store(

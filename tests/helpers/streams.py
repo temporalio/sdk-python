@@ -3,13 +3,19 @@
 import asyncio
 import collections
 import selectors
-from collections.abc import Awaitable, Callable, Coroutine, Iterator, Sequence
+import uuid
+from collections.abc import Awaitable, Callable, Coroutine, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any, TypeVar
 
 from google.protobuf.message import Message
 
-from temporalio.api.common.v1 import Payload
+from temporalio.api.common.v1 import Payload, Payloads
+from temporalio.api.enums.v1 import StreamErrorReason
+from temporalio.api.failure.v1 import ApplicationFailureInfo, Failure
+from temporalio.api.stream.v1 import StreamErrorDetails
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -22,13 +28,24 @@ from temporalio.api.streamservice.v1 import (
     ReadRecordsRequest,
     ReadRecordsResponse,
 )
-from temporalio.client import StreamStore
+from temporalio.client import (
+    Client,
+    StreamConfig,
+    StreamSelectContext,
+    StreamStore,
+    WorkflowFailureError,
+    WorkflowHandle,
+    WorkflowHistory,
+)
 from temporalio.converter import (
+    DataConverter,
     PayloadCodec,
     SerializationContext,
     WithSerializationContext,
 )
 from temporalio.testing import MemoryStreamStore
+from temporalio.worker import Replayer, Worker
+from tests.helpers import new_worker
 
 _T = TypeVar("_T")
 
@@ -151,7 +168,7 @@ class FaultStore(StreamStore):
 
     def __init__(self, name: str = "memory", **options: Any) -> None:
         self.memory = MemoryStreamStore(name=name, **options)
-        self.requests: list[Message] = []
+        self.requests: list[Any] = []
         self.faults: dict[str, collections.deque[Fault]] = collections.defaultdict(
             collections.deque
         )
@@ -180,10 +197,124 @@ class FaultStore(StreamStore):
 
     async def _call(self, method: str, request: Message) -> Any:
         self.requests.append(request)
-        call = lambda: getattr(self.memory, method)(request)
+
+        async def call() -> Any:
+            return await getattr(self.memory, method)(request)
+
         if self.faults[method]:
             return await self.faults[method].popleft()(call)
         return await call()
+
+
+def core_failure(reason: int, message: str = "The Store refused the call") -> Failure:
+    """Return the failure of a Stream job as SDK Core builds it, also for a reason
+    number that this SDK doesn't know.
+    """
+    unavailable = StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE
+    details = StreamErrorDetails(reason=reason)  # type: ignore[arg-type]
+    return Failure(
+        message=message,
+        application_failure_info=ApplicationFailureInfo(
+            type="stream_token",
+            non_retryable=reason != unavailable,
+            details=Payloads(
+                payloads=[
+                    Payload(
+                        metadata={
+                            "encoding": b"binary/protobuf",
+                            "messageType": details.DESCRIPTOR.full_name.encode(),
+                        },
+                        data=details.SerializeToString(),
+                    )
+                ]
+            ),
+        ),
+    )
+
+
+def stream_client(
+    client: Client,
+    *stores: StreamStore,
+    store_selector: Callable[[StreamSelectContext], StreamStore] | None = None,
+    data_converter: DataConverter | None = None,
+    **limits: int,
+) -> Client:
+    """Return a client on the connection of ``client`` with the given Stream Stores
+    and limits.
+    """
+    config = client.config()
+    config["stream_config"] = StreamConfig(
+        stores, store_selector=store_selector, **limits
+    )
+    if data_converter:
+        config["data_converter"] = data_converter
+    return Client(**config)
+
+
+@dataclass
+class RunOptions:
+    """What :py:func:`run` runs, and on which Worker."""
+
+    workflow: Any
+    """The Workflow class."""
+
+    args: Sequence[Any] = ()
+    activities: Sequence[Callable[..., Any]] = ()
+    cached: bool = True
+    """If false, the Worker caches no run, so each Workflow Task replays its run."""
+
+    replay: bool = False
+    """Whether a ``Replayer`` with the Stream config of the client replays the History."""
+
+    task_timeout: timedelta | None = None
+    worker: Mapping[str, Any] = field(default_factory=dict)
+    """More options of the Worker."""
+
+    during: Callable[[WorkflowHandle[Any, Any], Worker], Awaitable[None]] | None = None
+    """Called once the Workflow has started, while its Worker runs."""
+
+
+@dataclass
+class Run:
+    """What a Workflow of :py:func:`run` did."""
+
+    result: Any
+    """The result of the Workflow, or the error that it failed with."""
+
+    history: WorkflowHistory
+
+
+async def run(client: Client, options: RunOptions) -> Run:
+    """Run a Workflow to its end on a new Worker."""
+    async with new_worker(
+        client,
+        options.workflow,
+        activities=options.activities,
+        max_cached_workflows=1000 if options.cached else 0,
+        **options.worker,
+    ) as worker:
+        handle = await client.start_workflow(
+            options.workflow.run,
+            args=options.args,
+            id=f"wf-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+            task_timeout=options.task_timeout,
+        )
+        if options.during:
+            await options.during(handle, worker)
+        result: Any
+        try:
+            result = await handle.result()
+        except WorkflowFailureError as err:
+            result = err
+    history = await handle.fetch_history()
+    if options.replay:
+        await Replayer(
+            workflows=[options.workflow],
+            data_converter=client.data_converter,
+            stream_config=client._config["stream_config"],
+        ).replay_workflow(history)
+    return Run(result, history)
 
 
 class _JumpingSelector(selectors.DefaultSelector):

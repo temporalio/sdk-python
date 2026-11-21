@@ -271,6 +271,27 @@ class StreamConfig:
     gets it, and refuses one over a limit with
     ``STREAM_ERROR_REASON_TOO_LARGE``.
 
+    A client interceptor that changes the ``StreamRef`` of a request must change it
+    in place, since a created Stream keeps the ref object of the request.
+
+    For the Stream calls of Workflow code:
+
+    - A create and a describe run in a Local Activity of the SDK. The Workflow
+      and Activity interceptors of the Worker see it, as they see every Local
+      Activity.
+    - The ``producer`` argument of ``append`` and ``close`` has no effect. The
+      Worker writes as the Producer of the Workflow run.
+    - An append is at-least-once. If a Workflow Task fails after its append, the
+      next attempt of the task writes the batch again.
+    - An outage of the Store gives Workflow code no error. The Workflow Task
+      fails, and the server tries it again.
+    - A call that Workflow code doesn't await before the Workflow ends may not
+      happen. A Workflow that needs its close awaits it, as ``async with`` does.
+    - A call with no Store fails the Workflow Task, also when Workflow code catches
+      the error.
+    - A Worker reads the three limits when it starts. It refuses a new client with
+      other limits, as it refuses one with other Store names.
+
     .. warning::
         This API is experimental and subject to change.
     """
@@ -289,7 +310,8 @@ class StreamConfig:
     Store takes each such call.
 
     A Workflow replay calls the selector again, so it must return the same Store
-    for the same call.
+    for the same call. A created Stream has the name of its Store in its ref, so
+    its calls don't depend on the selector.
     """
 
     max_record_bytes: int = 1536 * 1024
@@ -342,6 +364,13 @@ class StreamConfig:
                 )
             names.add(name)
 
+    def _store(self, name: str) -> StreamStore:
+        """Return the Store with a name, raising :class:`ValueError` if none has it."""
+        for store in self.stores:
+            if store.name() == name:
+                return store
+        raise ValueError(f"No Stream Store found with name '{name}'")
+
     def _store_for(
         self,
         ref: StreamRef[Any],
@@ -351,10 +380,7 @@ class StreamConfig:
         there is none.
         """
         if ref.store:
-            for store in self.stores:
-                if store.name() == ref.store:
-                    return store
-            raise ValueError(f"No Stream Store found with name '{ref.store}'")
+            return self._store(ref.store)
         if self.store_selector is None:
             return self.stores[0]
         selected = self.store_selector(StreamSelectContext(id=ref.id, target=target))
@@ -555,7 +581,7 @@ class _StoreCaller:  # pyright: ignore[reportUnusedClass]
             if err.reason == unavailable and err.__cause__:
                 # Core keeps only the text of the error, so the traceback is logged here.
                 logger.warning(
-                    "Stream Store failed a %s call", operation, exc_info=err.__cause__
+                    "Stream Store failed the %s call", operation, exc_info=err.__cause__
                 )
             raise
         return response.SerializeToString()

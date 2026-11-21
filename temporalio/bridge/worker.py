@@ -18,6 +18,7 @@ import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
+import temporalio.bridge.streams
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.converter._extstore
@@ -63,6 +64,7 @@ class WorkerConfig:
     plugins: Sequence[tuple[str, str]]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
+    streams: temporalio.bridge.streams.WorkerStreams
 
 
 @dataclass

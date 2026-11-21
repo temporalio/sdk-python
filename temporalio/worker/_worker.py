@@ -45,6 +45,7 @@ from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowRunner,
 )
+from ._workflow_streams import _bridge_streams, _check_stream_swap, _stream_store_call
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -498,7 +499,10 @@ class Worker:
             or bridge_client.config.runtime
             or temporalio.runtime.Runtime.default()
         )
-        activities = config.get("activities")
+        activities = list(config.get("activities") or [])
+        if client_config["stream_config"] and config.get("workflows"):
+            # Workflow code creates and describes a Stream in this Local Activity.
+            activities.append(_stream_store_call)
         if activities:
             _warn_if_activity_executor_max_workers_is_inconsistent(config)
             self._activity_worker = _ActivityWorker(
@@ -575,6 +579,7 @@ class Worker:
                 disable_safe_eviction=config["disable_safe_workflow_eviction"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 should_enforce_versioning_behavior=should_enforce_versioning_behavior,
                 assert_local_activity_valid=check_activity,
+                stream_config=lambda: self.client._config["stream_config"],
                 encode_headers=client_config["header_codec_behavior"]
                 != HeaderCodecBehavior.NO_CODEC,
                 max_workflow_task_external_storage_concurrency=max_workflow_task_external_storage_concurrency,
@@ -667,7 +672,7 @@ class Worker:
                     enable_workflows=self._workflow_worker is not None,
                     enable_local_activities=self._activity_worker is not None
                     and self._workflow_worker is not None,
-                    enable_remote_activities=self._activity_worker is not None
+                    enable_remote_activities=bool(config.get("activities"))
                     and not config.get("no_remote_activities"),
                     enable_nexus=self._nexus_worker is not None,
                 ),
@@ -716,6 +721,7 @@ class Worker:
                 disable_payload_error_limit=config.get(
                     "disable_payload_error_limit", False
                 ),
+                streams=_bridge_streams(lambda: self.client._config["stream_config"]),
             ),
         )
 
@@ -758,6 +764,9 @@ class Worker:
             raise ValueError(
                 "New client is not on the same runtime as the existing client"
             )
+        _check_stream_swap(
+            self.client._config["stream_config"], value._config["stream_config"]
+        )
         assert bridge_client._bridge_client
         self._bridge_worker.replace_client(bridge_client._bridge_client)
         self._config["client"] = value

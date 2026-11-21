@@ -58,7 +58,14 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.nexus.system
 import temporalio.workflow
+from temporalio.client._stream_store import _STREAM_SERVICE, StreamConfig
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
+from temporalio.nexus.system.stream_service.workflow._system_nexus_interceptor import (
+    _start_system_nexus_operation as _start_stream_nexus_operation,
+)
+from temporalio.nexus.system.stream_service.workflow._system_nexus_interceptor import (
+    _SystemNexusWorkflowOutboundInterceptorTerminal as _StreamOutboundInterceptorTerminal,
+)
 from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
     _start_system_nexus_operation,
     _SystemNexusWorkflowOutboundInterceptorTerminal,
@@ -92,6 +99,7 @@ from ._interceptor import (
     WorkflowInboundInterceptor,
     WorkflowOutboundInterceptor,
 )
+from ._workflow_streams import _WorkflowStreams
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +360,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._pending_nexus_operations: dict[int, _NexusOperationHandle] = {}
         self._pending_external_signals: dict[int, tuple[asyncio.Future, str]] = {}
         self._pending_external_cancels: dict[int, tuple[asyncio.Future, str]] = {}
+        self._streams = _WorkflowStreams(self)
         # Keyed by type
         self._curr_seqs: dict[str, int] = {}
         # TODO(cretz): Any concerns about not sharing this? Maybe the types I
@@ -497,6 +506,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._finished_nexus_update_ids.clear()
 
         self._current_activation_error: Exception | None = None
+        self._streams.task_error = None
         self._deployment_version_for_current_task = (
             act.deployment_version_for_current_task
         )
@@ -575,10 +585,14 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         check_conditions=index == 1 or index == 2, jobs=act.jobs
                     )
         except Exception as err:
+            # A Stream call that the Worker can't serve fails the task, and so does a create
+            # or a describe in an outage, whatever the failure exception types are
+            if self._streams.task_error:
+                activation_err = self._streams.task_error
             # We want some errors during activation, like those that can happen
             # during payload conversion, to be able to fail the workflow not the
             # task
-            if self.workflow_is_failure_exception(err):
+            elif self.workflow_is_failure_exception(err):
                 try:
                     self._set_workflow_failure(err)
                 except Exception as inner_err:
@@ -695,6 +709,10 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._apply_resolve_signal_external_workflow(
                 job.resolve_signal_external_workflow
             )
+        elif job.HasField("resolve_stream_append"):
+            self._streams.resolve_append(job.resolve_stream_append)
+        elif job.HasField("resolve_stream_close"):
+            self._streams.resolve_close(job.resolve_stream_close)
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
         elif job.HasField("initialize_workflow"):
@@ -1848,7 +1866,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         event_groups: Sequence[temporalio.workflow.EventGroup] | None = None,
     ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
         if temporalio.nexus.system.is_system_endpoint(endpoint):
-            return await _start_system_nexus_operation(
+            start = (
+                _start_stream_nexus_operation
+                if service == _STREAM_SERVICE.name
+                else _start_system_nexus_operation
+            )
+            return await start(
                 self._outbound,
                 StartNexusOperationInput(
                     endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
@@ -3382,7 +3405,9 @@ class _WorkflowInboundImpl(WorkflowInboundInterceptor):
 
 
 class _WorkflowOutboundImpl(
-    _SystemNexusWorkflowOutboundInterceptorTerminal, WorkflowOutboundInterceptor
+    _SystemNexusWorkflowOutboundInterceptorTerminal,
+    _StreamOutboundInterceptorTerminal,
+    WorkflowOutboundInterceptor,
 ):
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:  # type: ignore
         # We are intentionally not calling the base class's __init__ here
@@ -3424,7 +3449,9 @@ class _WorkflowOutboundImpl(
 
     async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
-    ) -> _NexusOperationHandle[OutputT]:
+    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
+        if input.service == _STREAM_SERVICE.name:
+            return self._instance._streams.start(input)
         return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
@@ -4053,6 +4080,7 @@ def _encode_search_attributes(
 class _WorkflowExternFunctions(TypedDict):
     __temporal_get_metric_meter: Callable[[], temporalio.common.MetricMeter]
     __temporal_assert_local_activity_valid: Callable[[str], None]
+    __temporal_stream_config: Callable[[], StreamConfig | None]
 
 
 class _ReplaySafeMetricMeter(temporalio.common.MetricMeter):
