@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import typing
 from collections.abc import Callable, Generator
+from dataclasses import dataclass
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 import google.protobuf.json_format
@@ -16,6 +19,7 @@ import temporalio.api.failure.v1
 import temporalio.api.stream.v1
 import temporalio.api.streamservice.v1 as proto
 import temporalio.bridge.proto.workflow_activation
+import temporalio.bridge.proto.workflow_commands
 import temporalio.bridge.streams
 import temporalio.common
 import temporalio.exceptions
@@ -41,12 +45,26 @@ if TYPE_CHECKING:
 _STORE_CALL_ACTIVITY = "__temporal_stream_store_call"
 
 
+@dataclass
+class _Read:
+    """The read of one ``read_page`` call."""
+
+    after: bytes
+    """The offset that the read started from."""
+
+    waiter: asyncio.Future[Any]
+    """Gets the page of the call."""
+
+    page_type: Any
+    """The type of the page that the call returns."""
+
+
 class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
     """The Stream calls of one Workflow instance.
 
-    An append and a close are commands of SDK Core, which makes the Store call and
-    gives the result in a job. Core has no command for a create or a describe, so
-    those run in a Local Activity of the SDK.
+    An append, a close and a read are commands of SDK Core, which makes the Store
+    calls and gives each result in a job. Core has no command for a create or a
+    describe, so those run in a Local Activity of the SDK.
     """
 
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:
@@ -56,6 +74,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         self._closes: dict[int, asyncio.Future[Any]] = {}
         self.task_error: Exception | None = None
         """The error of a call that must fail the Workflow Task, if one came."""
+        # Each read whose job hasn't come, by seq. A cancelled read gets its one job too.
+        self._reads: dict[int, _Read] = {}
 
     def start(
         self, input: StartNexusOperationInput[Any, OutputT]
@@ -64,7 +84,9 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
         The command of the call is added before this returns, so commands are in
         the order of the calls. Cancelling the handle ends its wait immediately.
-        Core can't stop an append or a close, so those still run.
+        Core can't stop an append or a close, so those still run. A cancelled
+        read sends ``RequestCancelStreamRead``, and the job that still comes for
+        it is dropped.
         """
         instance = self._instance
         instance._assert_not_read_only("start a Stream call")
@@ -79,6 +101,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         request = temporalio.nexus.system._support.model_to_proto(model, *converters)
         # The future of the job of the call, or the task of its Local Activity
         result: asyncio.Future[Any]
+        # The seq of the call's read, or 0 for another operation
+        read_seq = 0
         if isinstance(request, proto.AppendRecordsRequest):
             stream = self._stream(model.ref)
             seq = instance._next_seq("stream_append")
@@ -94,6 +118,28 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             close.seq = seq
             close.stream.CopyFrom(stream)
             result = self._closes[seq] = instance.create_future()
+        elif isinstance(request, proto.ReadRecordsRequest):
+            # The converter refuses a body of no type, and the job of the page would
+            # then fail the Workflow Task.
+            if typing.get_args(result_type) == (object,):
+                raise TypeError(
+                    "Cannot read a Stream with no body type. Give get_stream a "
+                    "body_type, or a StreamRef with a type argument."
+                )
+            stream = self._stream(model.ref)
+            read_seq = instance._next_seq("stream_read")
+            instance._add_command().read_stream.CopyFrom(
+                temporalio.bridge.proto.workflow_commands.ReadStream(
+                    seq=read_seq,
+                    stream=stream,
+                    from_offset=request.from_offset,
+                    wait=request.wait if request.HasField("wait") else None,
+                    max_records=request.max_records,
+                    max_bytes=request.max_bytes,
+                )
+            )
+            result = instance.create_future()
+            self._reads[read_seq] = _Read(request.from_offset, result, result_type)
         else:
             # The Local Activity picks the Store of a ref with no Store name. A replay
             # has its result, so a replay asks no selector for it.
@@ -105,15 +151,25 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             # `asyncio.wait` ends at a cancel of this task. `await result` would pass the
             # cancel on and wait for the cancelled Local Activity.
             await asyncio.wait([result])
+            if isinstance(request, proto.ReadRecordsRequest):
+                return result.result()
             return temporalio.nexus.system._support.model_from_proto(
                 self._response(operation, model, request, result),
                 result_type,
                 *converters,
             )
 
+        def stop(_: asyncio.Task[OutputT]) -> None:
+            if result.done():
+                return
+            result.cancel()
+            # Only a read has a cancel command. An eviction sends no command.
+            if read_seq and not instance._deleting:
+                instance._add_command().request_cancel_stream_read.seq = read_seq
+
         task = instance.create_task(call(), name=f"stream: {operation}")
         # A callback also runs for a task that is cancelled before its first step.
-        task.add_done_callback(lambda _: result.done() or result.cancel())
+        task.add_done_callback(stop)
         return _StreamCall(task)
 
     def resolve_append(
@@ -125,6 +181,36 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamClose
     ) -> None:
         self._resolve(self._closes, job.seq, None, job)
+
+    def resolve_read(
+        self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamRead
+    ) -> None:
+        read = self._reads.pop(job.seq, None)
+        if read is None:
+            raise RuntimeError(f"Failed finding Stream read for sequence {job.seq}")
+        # The job of a cancelled call is dropped. A cancel job is dropped too if it comes first,
+        # as in a replay, since only the cancel of the call may end its wait.
+        if read.waiter.done() or job.HasField("cancelled"):
+            return
+        if job.HasField("failed"):
+            read.waiter.set_exception(self._error(job.failed))
+            return
+        records = job.page.records
+        page = proto.ReadRecordsResponse(
+            records=records,
+            last_offset=records[-1].offset if records else read.after,
+            done=job.page.done,
+        )
+        # A body that the converter refuses fails the Workflow Task, as a result of a
+        # Local Activity does.
+        read.waiter.set_result(
+            temporalio.nexus.system._support.model_from_proto(
+                page,
+                read.page_type,
+                self._instance._context_free_payload_converter,
+                self._instance._context_free_failure_converter,
+            )
+        )
 
     def _resolve(
         self,
@@ -140,14 +226,17 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         if future.done():
             return
         if job.HasField("failed"):
-            future.set_exception(
-                _stream_error_from_failure(job.failed)
-                or self._instance._context_free_failure_converter.from_failure(
-                    job.failed, self._instance._context_free_payload_converter
-                )
-            )
+            future.set_exception(self._error(job.failed))
         else:
             future.set_result(result)
+
+    def _error(self, failure: temporalio.api.failure.v1.Failure) -> BaseException:
+        instance = self._instance
+        return _stream_error_from_failure(failure) or (
+            instance._context_free_failure_converter.from_failure(
+                failure, instance._context_free_payload_converter
+            )
+        )
 
     def _schedule_store_call(
         self, operation: str, store: str, request: google.protobuf.message.Message
@@ -373,11 +462,13 @@ def _for_core(
 
 def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
     stream_config: Callable[[], StreamConfig | None],
+    read_max_wait: timedelta | None,
 ) -> temporalio.bridge.streams.WorkerStreams:
     """Return what the bridge needs for the Stream Stores of a worker.
 
     ``stream_config`` gives the Stream config that the worker has at a call,
-    which is the one of another client after a client swap.
+    which is the one of another client after a client swap. ``read_max_wait`` is
+    the longest wait of one Store call of a read, or ``None`` for Core's default.
     """
 
     def store(name: str) -> StreamStore:
@@ -393,6 +484,9 @@ def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
             (name, _StoreCaller(functools.partial(store, name)))
             for name in sorted(names)
         ],
+        read_max_wait_millis=int(1000 * read_max_wait.total_seconds())
+        if read_max_wait is not None
+        else None,
     )
 
 

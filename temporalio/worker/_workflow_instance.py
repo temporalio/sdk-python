@@ -713,6 +713,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
             self._streams.resolve_append(job.resolve_stream_append)
         elif job.HasField("resolve_stream_close"):
             self._streams.resolve_close(job.resolve_stream_close)
+        elif job.HasField("resolve_stream_read"):
+            self._streams.resolve_read(job.resolve_stream_read)
         elif job.HasField("signal_workflow"):
             self._apply_signal_workflow(job.signal_workflow)
         elif job.HasField("initialize_workflow"):

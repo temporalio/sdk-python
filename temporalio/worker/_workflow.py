@@ -868,6 +868,22 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             )
         }
 
+    def stream_replay_as_workflow_fail(self) -> bool:
+        return any(
+            issubclass(temporalio.workflow.StreamReplayError, typ)
+            for typ in self._workflow_failure_exception_types
+        )
+
+    def stream_replay_as_workflow_fail_for_types(self) -> set[str]:
+        return {
+            k
+            for k, v in self._workflows.items()
+            if any(
+                issubclass(temporalio.workflow.StreamReplayError, typ)
+                for typ in v.failure_exception_types
+            )
+        }
+
 
 class _DeadlockError(Exception):
     """Exception class for deadlocks. Contains functionality to swap the default traceback for another."""
