@@ -1,8 +1,12 @@
 import collections.abc
+import dataclasses
 import typing
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta
 
 import google.protobuf.duration_pb2
+import google.protobuf.message
+import google.protobuf.timestamp_pb2
 
 import temporalio.api.common.v1.message_pb2 as common_pb2
 import temporalio.api.enums.v1.workflow_pb2 as workflow_enums_pb2
@@ -12,11 +16,215 @@ import temporalio.api.workflow.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system
+from temporalio.converter._payload_converter import _get_transfer_type_converter
+
+if typing.TYPE_CHECKING:
+    import temporalio.activity
+    import temporalio.client
+    from temporalio.nexus.system.stream_service.models import (
+        Producer,
+        ReadRecordsRequest,
+        ReadRecordsResponse,
+        StreamRecord,
+        StreamRef,
+        Timestamp,
+    )
+
+_BodyT = typing.TypeVar("_BodyT")
+_ModelT = typing.TypeVar("_ModelT")
 
 
 class SignalWithStartWorkflowModelRequest(typing.Protocol):
     namespace: str
     id: str
+
+
+def model_to_proto(
+    model: object,
+    payload_converter: temporalio.converter.PayloadConverter,
+    failure_converter: temporalio.converter.FailureConverter,
+) -> google.protobuf.message.Message:
+    """Convert a system Nexus model to its proto message, with no payload in between."""
+    converter = _get_transfer_type_converter(type(model))
+    if converter is None:
+        raise TypeError(f"{type(model).__name__} is not a system Nexus model")
+    with temporalio.nexus.system._user_converter_context(
+        temporalio.nexus.system._SystemNexusUserConverters(
+            payload_converter, failure_converter
+        )
+    ):
+        return converter.to_transfer_type(model)
+
+
+def model_from_proto(
+    proto: google.protobuf.message.Message,
+    model_type: type[_ModelT],
+    payload_converter: temporalio.converter.PayloadConverter,
+    failure_converter: temporalio.converter.FailureConverter,
+) -> _ModelT:
+    """Convert a proto message to the system Nexus model of ``model_type``."""
+    converter = _get_transfer_type_converter(model_type)
+    if converter is None:
+        raise TypeError(f"{model_type} is not a system Nexus model")
+    with temporalio.nexus.system._user_converter_context(
+        temporalio.nexus.system._SystemNexusUserConverters(
+            payload_converter, failure_converter
+        )
+    ):
+        return converter.from_transfer_type(proto, model_type)
+
+
+def request_id() -> str:
+    from temporalio.workflow import in_workflow, info
+
+    # Each run of a chain sends the same id, so a Store answers the create of a later run
+    # as the create that made the Stream.
+    if in_workflow():
+        return info().first_execution_run_id
+    return str(uuid.uuid4())
+
+
+def append_request_id() -> str | None:
+    from temporalio.workflow import in_workflow
+
+    # Core makes the request id of an append of Workflow code.
+    if in_workflow():
+        return None
+    return str(uuid.uuid4())
+
+
+def default_producer(
+    nexus_client: "temporalio.client.NexusClient[typing.Any]",
+) -> "Producer":
+    """Return the Producer of a write of Activity or client code."""
+    import temporalio.activity
+    from temporalio.nexus.system.stream_service import models
+
+    if temporalio.activity.in_activity():
+        return activity_producer(temporalio.activity.info())
+    client: temporalio.client.Client = nexus_client._client  # type: ignore[attr-defined]
+    return models.Producer(
+        kind=models.ProducerKindClient(
+            models.ClientProducer(
+                namespace=client.namespace, id=client._stream_producer_id
+            )
+        )
+    )
+
+
+def workflow_producer() -> "Producer":
+    """Return the Producer of the Workflow run. It has no attempt, which Core sets."""
+    from temporalio.nexus.system.stream_service import models
+    from temporalio.workflow import info
+
+    return models.Producer(
+        kind=models.ProducerKindWorkflow(
+            models.WorkflowProducer(
+                namespace=info().namespace,
+                workflow_id=info().workflow_id,
+                run_id=info().run_id,
+            )
+        )
+    )
+
+
+def activity_producer(info: "temporalio.activity.Info") -> "Producer":
+    """Return the Producer of an attempt of an Activity, of the kind of the Activity."""
+    from temporalio.nexus.system.stream_service import models
+
+    workflow_id, run_id = info.workflow_id or "", info.workflow_run_id or ""
+    if info.is_local:
+        task = info.workflow_task
+        if task is None:
+            raise RuntimeError(
+                "Local Activity has no Workflow Task, which its Producer requires"
+            )
+        local_attempt = models.LocalActivityAttempt(
+            task=models.WorkflowTaskAttempt(
+                started_event_id=task.started_event_id,
+                attempt=task.attempt,
+                started_time=_timestamp(task.started_time)
+                if task.started_time
+                else None,
+            ),
+            attempt=info.attempt,
+        )
+        return models.Producer(
+            kind=models.ProducerKindLocalActivity(
+                models.LocalActivityProducer(
+                    namespace=info.namespace,
+                    workflow_id=workflow_id,
+                    run_id=run_id,
+                    activity_id=info.activity_id,
+                    attempt=local_attempt,
+                )
+            )
+        )
+    attempt = models.ActivityAttempt(
+        attempt_scheduled_time=_timestamp(info.current_attempt_scheduled_time),
+        attempt=info.attempt,
+    )
+    if run_id:
+        return models.Producer(
+            kind=models.ProducerKindWorkflowActivity(
+                models.WorkflowActivityProducer(
+                    namespace=info.namespace,
+                    workflow_id=workflow_id,
+                    run_id=run_id,
+                    activity_id=info.activity_id,
+                    attempt=attempt,
+                )
+            )
+        )
+    if not info.activity_run_id:
+        raise RuntimeError(
+            "Standalone Activity has no run id, which its Producer requires"
+        )
+    return models.Producer(
+        kind=models.ProducerKindStandaloneActivity(
+            models.StandaloneActivityProducer(
+                namespace=info.namespace,
+                activity_id=info.activity_id,
+                run_id=info.activity_run_id,
+                attempt=attempt,
+            )
+        )
+    )
+
+
+def _timestamp(time: datetime) -> "Timestamp":
+    from temporalio.nexus.system.stream_service import models
+
+    proto = google.protobuf.timestamp_pb2.Timestamp()
+    proto.FromDatetime(time)
+    return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
+
+
+def stream_ref_to_id(ref: "StreamRef[typing.Any]") -> str:
+    return ref.id
+
+
+def stream_ref_from_id(
+    id: str, ref_type: "type[StreamRef[_BodyT]]"
+) -> "StreamRef[_BodyT]":
+    return ref_type(id=id)
+
+
+def next_read_request(
+    request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
+) -> "ReadRecordsRequest[_BodyT] | None":
+    # A read with no wait, or a wait of zero, ends at its first page with no Record.
+    if response.done or (not request.wait and not response.records):
+        return None
+    return dataclasses.replace(
+        request, from_offset=response.last_offset or request.from_offset
+    )
+
+
+def resume_read_request(
+    request: "ReadRecordsRequest[_BodyT]", item: "StreamRecord[_BodyT]"
+) -> "ReadRecordsRequest[_BodyT]":
+    return dataclasses.replace(request, from_offset=item.offset)
 
 
 def retry_policy_from_proto(

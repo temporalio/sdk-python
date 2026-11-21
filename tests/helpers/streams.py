@@ -1,17 +1,34 @@
 """Helpers for the tests of Streams."""
 
 import asyncio
+import collections
 import selectors
-from collections.abc import Coroutine, Iterator, Sequence
+from collections.abc import Awaitable, Callable, Coroutine, Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
+from google.protobuf.message import Message
+
 from temporalio.api.common.v1 import Payload
+from temporalio.api.streamservice.v1 import (
+    AppendRecordsRequest,
+    AppendRecordsResponse,
+    CloseStreamRequest,
+    CloseStreamResponse,
+    CreateStreamRequest,
+    CreateStreamResponse,
+    DescribeStreamRequest,
+    DescribeStreamResponse,
+    ReadRecordsRequest,
+    ReadRecordsResponse,
+)
+from temporalio.client import StreamStore
 from temporalio.converter import (
     PayloadCodec,
     SerializationContext,
     WithSerializationContext,
 )
+from temporalio.testing import MemoryStreamStore
 
 _T = TypeVar("_T")
 
@@ -64,6 +81,10 @@ def wrapped(payload: Payload, context: SerializationContext | None = None) -> Pa
     )
 
 
+Fault = Callable[[Callable[[], Awaitable[Any]]], Awaitable[Any]]
+"""What a :py:class:`FaultStore` does with one call. It gets the call of the memory Store."""
+
+
 @contextmanager
 def failure_note(note: str) -> Iterator[None]:
     """Add ``note`` to a failure in the block, such as the seed of a generated case."""
@@ -72,6 +93,97 @@ def failure_note(note: str) -> Iterator[None]:
     except BaseException as err:
         err.add_note(note)
         raise
+
+
+def raises(error: BaseException) -> Fault:
+    """Return a fault that fails a call, and doesn't call the memory Store."""
+
+    async def fault(_call: Callable[[], Awaitable[Any]]) -> Any:
+        raise error
+
+    return fault
+
+
+def answers(response: Message) -> Fault:
+    """Return a fault that answers a call with ``response``, with no Store call."""
+
+    async def fault(_call: Callable[[], Awaitable[Any]]) -> Any:
+        return response
+
+    return fault
+
+
+def loses_answer() -> Fault:
+    """Return a fault that calls the memory Store and then fails as an outage."""
+
+    async def fault(call: Callable[[], Awaitable[Any]]) -> Any:
+        await call()
+        raise ConnectionError("The answer of the Store was lost")
+
+    return fault
+
+
+class Hold:
+    """A fault that holds a call until :py:meth:`release`, before the memory Store."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+        self._released = asyncio.Event()
+
+    def release(self) -> None:
+        self._released.set()
+
+    async def __call__(self, call: Callable[[], Awaitable[Any]]) -> Any:
+        self.started.set()
+        try:
+            await self._released.wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
+        return await call()
+
+
+class FaultStore(StreamStore):
+    """Stream Store around a :py:class:`MemoryStreamStore`, which logs each request
+    and runs the next fault of its method, if one is queued.
+    """
+
+    def __init__(self, name: str = "memory", **options: Any) -> None:
+        self.memory = MemoryStreamStore(name=name, **options)
+        self.requests: list[Message] = []
+        self.faults: dict[str, collections.deque[Fault]] = collections.defaultdict(
+            collections.deque
+        )
+
+    def name(self) -> str:
+        return self.memory.name()
+
+    async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
+        return await self._call("create_stream", request)
+
+    async def append_records(
+        self, request: AppendRecordsRequest
+    ) -> AppendRecordsResponse:
+        return await self._call("append_records", request)
+
+    async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
+        return await self._call("read_records", request)
+
+    async def close_stream(self, request: CloseStreamRequest) -> CloseStreamResponse:
+        return await self._call("close_stream", request)
+
+    async def describe_stream(
+        self, request: DescribeStreamRequest
+    ) -> DescribeStreamResponse:
+        return await self._call("describe_stream", request)
+
+    async def _call(self, method: str, request: Message) -> Any:
+        self.requests.append(request)
+        call = lambda: getattr(self.memory, method)(request)
+        if self.faults[method]:
+            return await self.faults[method].popleft()(call)
+        return await call()
 
 
 class _JumpingSelector(selectors.DefaultSelector):

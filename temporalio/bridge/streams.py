@@ -40,3 +40,15 @@ async def call_stream_store(
     return await temporalio.bridge.temporal_sdk_bridge.call_stream_store(
         runtime._ref, caller, operation, request
     )
+
+
+def check_append(limits: tuple[int, int, int], request: bytes) -> None:
+    """Check an encoded append as SDK Core checks one of Workflow code.
+
+    ``limits`` are the ``max_record_bytes``, the ``max_batch_bytes`` and the
+    ``max_batch_records`` of a Stream config.
+
+    Raises:
+        temporalio.exceptions.StreamError: The check refuses the append.
+    """
+    temporalio.bridge.temporal_sdk_bridge.check_stream_append(limits, request)

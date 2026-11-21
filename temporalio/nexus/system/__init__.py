@@ -194,3 +194,7 @@ __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
     "is_system_endpoint",
 ]
+
+# `temporalio.workflow` and the generated Workflow modules of a system service import each
+# other. It's loaded here last, so that any of those modules can be the first import.
+import temporalio.workflow  # noqa: E402  # pyright: ignore[reportUnusedImport]
