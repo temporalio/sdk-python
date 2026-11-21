@@ -2649,6 +2649,7 @@ dependencies = [
  "temporalio-client",
  "temporalio-common",
  "temporalio-sdk-core",
+ "temporalio-streams",
  "tokio",
  "tokio-rustls",
  "tokio-stream",

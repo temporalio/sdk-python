@@ -6,6 +6,7 @@ mod client_rpc_generated;
 mod envconfig;
 mod metric;
 mod runtime;
+mod streams;
 mod testing;
 mod worker;
 
@@ -51,6 +52,9 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "register",
         (wrap_pyfunction!(runtime::shutdown_runtimes, m)?,),
     )?;
+
+    // Stream stuff
+    m.add_function(wrap_pyfunction!(streams::call_stream_store, m)?)?;
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
