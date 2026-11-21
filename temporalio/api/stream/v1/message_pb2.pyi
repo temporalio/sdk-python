@@ -18,8 +18,8 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class StreamRef(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A reference to one Stream. Callers treat the id as opaque. An id is never used for a second
-    Stream, so a create for a closed or expired Stream fails.
+    A reference to one Stream, which code passes to other code as data. Only an SDK uses this
+    message. A request to a Store or to the server has the `id` alone.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -30,8 +30,7 @@ class StreamRef(google.protobuf.message.Message):
     store: builtins.str
     """The name under which the client and Worker config registered the Store of this Stream. An
     SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
-    the Store from its config. Only an SDK sets and reads this field. The server and a Store
-    ignore it.
+    the Store from its config.
     """
     def __init__(
         self,

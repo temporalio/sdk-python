@@ -68,14 +68,13 @@ class Stream(typing.Generic[BodyT]):
         self,
         *records: BodyT,
         producer: Producer | None = None,
-        sequence: int | None = None,
     ) -> AppendRecordsResponse:
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
             producer=((_support.workflow_producer()) if producer is None else producer),
-            sequence=sequence,
             records=[AppendRecord(body=value) for value in records],
+            request_id=_support.append_request_id(),
         )
         handle = await _append_records(request)
         return await handle

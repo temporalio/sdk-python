@@ -29,14 +29,18 @@ class CreateStreamRequest(google.protobuf.message.Message):
     A create has no Retention. Retention is a setting of the Store, as it's a setting of the
     namespace for Workflows.
     (-- api-linter: core::0133=disabled
-        aip.dev/not-precedent: The request identifies a Stream by its ref. --)
+        aip.dev/not-precedent: The request identifies a Stream by its id. --)
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    STREAM_REF_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
     ID_CONFLICT_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
+    stream_id: builtins.str
+    """Required. The id of the Stream to create. Callers treat it as opaque. An id is never used
+    for a second Stream, so a create for a closed or expired Stream fails.
+    """
     id_conflict_policy: (
         temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType
     )
@@ -46,20 +50,13 @@ class CreateStreamRequest(google.protobuf.message.Message):
     the `request_id` of the create that made the Stream, so a retry after a lost response
     doesn't fail with `ALREADY_EXISTS`.
     """
-    @property
-    def stream_ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required. The Stream to create. Its `id` must not be empty."""
-
     def __init__(
         self,
         *,
-        stream_ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream_id: builtins.str = ...,
         id_conflict_policy: temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType = ...,
         request_id: builtins.str = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing.Literal["stream_ref", b"stream_ref"]
-    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing.Literal[
@@ -67,8 +64,8 @@ class CreateStreamRequest(google.protobuf.message.Message):
             b"id_conflict_policy",
             "request_id",
             b"request_id",
-            "stream_ref",
-            b"stream_ref",
+            "stream_id",
+            b"stream_id",
         ],
     ) -> None: ...
 
@@ -82,27 +79,15 @@ class CreateStreamResponse(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REF_FIELD_NUMBER: builtins.int
     CREATED_FIELD_NUMBER: builtins.int
     created: builtins.bool
     """False when `USE_EXISTING` returned a Stream that already existed."""
-    @property
-    def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """The ref of the Stream. The caller can pass it to other code as data. A Store and the server
-        return the ref as the request had it, because they don't know the Store names of an SDK.
-        The SDK then sets `store` to the Store that it picked, before the caller gets the ref.
-        """
-
     def __init__(
         self,
         *,
-        ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         created: builtins.bool = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["ref", b"ref"]) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing.Literal["created", b"created", "ref", b"ref"]
-    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["created", b"created"]) -> None: ...
 
 global___CreateStreamResponse = CreateStreamResponse
 
@@ -110,25 +95,23 @@ global___CreateStreamResponse = CreateStreamResponse
 class AppendRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
     Appends one batch of Records as one Producer. If the same batch arrives again, with the same
-    Producer, attempt and `sequence`, the Store writes it only once.
+    Producer, attempt and `request_id`, the Store writes it only once.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REF_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
     PRODUCER_FIELD_NUMBER: builtins.int
-    SEQUENCE_FIELD_NUMBER: builtins.int
+    REQUEST_ID_FIELD_NUMBER: builtins.int
     RECORDS_FIELD_NUMBER: builtins.int
-    sequence: builtins.int
-    """The idempotency number of this batch within its attempt. A caller that got no response
-    sends the batch again with the same number, and the Store uses the Producer, the attempt
-    and this number to write it only once. With zero, the Store assigns the next number, and a
-    retry of that batch is written again.
+    stream_id: builtins.str
+    """Required."""
+    request_id: builtins.str
+    """A value that's unique to this append call and the same on its retries. A caller that got no
+    response sends the batch again with the same value, and the Store returns the offsets of
+    the first write. A Store remembers the `request_id` of the last batch of each Producer, so
+    a Producer sends one batch at a time. When it's empty, a retry is written again.
     """
-    @property
-    def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required."""
-
     @property
     def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
         """Required. The Producer that writes the batch. A Producer sends the same value in its
@@ -144,16 +127,16 @@ class AppendRecordsRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream_id: builtins.str = ...,
         producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
-        sequence: builtins.int = ...,
+        request_id: builtins.str = ...,
         records: collections.abc.Iterable[
             temporalio.api.stream.v1.message_pb2.AppendRecord
         ]
         | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["producer", b"producer", "ref", b"ref"]
+        self, field_name: typing.Literal["producer", b"producer"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -162,10 +145,10 @@ class AppendRecordsRequest(google.protobuf.message.Message):
             b"producer",
             "records",
             b"records",
-            "ref",
-            b"ref",
-            "sequence",
-            b"sequence",
+            "request_id",
+            b"request_id",
+            "stream_id",
+            b"stream_id",
         ],
     ) -> None: ...
 
@@ -208,12 +191,10 @@ class CloseStreamRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REF_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
     PRODUCER_FIELD_NUMBER: builtins.int
-    @property
-    def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required."""
-
+    stream_id: builtins.str
+    """Required."""
     @property
     def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
         """Required. The Producer that closes the Stream."""
@@ -221,14 +202,15 @@ class CloseStreamRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream_id: builtins.str = ...,
         producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["producer", b"producer", "ref", b"ref"]
+        self, field_name: typing.Literal["producer", b"producer"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["producer", b"producer", "ref", b"ref"]
+        self,
+        field_name: typing.Literal["producer", b"producer", "stream_id", b"stream_id"],
     ) -> None: ...
 
 global___CloseStreamRequest = CloseStreamRequest
@@ -256,11 +238,13 @@ class ReadRecordsRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REF_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
     FROM_OFFSET_FIELD_NUMBER: builtins.int
     MAX_RECORDS_FIELD_NUMBER: builtins.int
     MAX_BYTES_FIELD_NUMBER: builtins.int
     WAIT_FIELD_NUMBER: builtins.int
+    stream_id: builtins.str
+    """Required."""
     from_offset: builtins.bytes
     """The read returns the Records after this offset. Empty means from the beginning. An offset
     past the newest one fails with `OFFSET_TOO_HIGH`. To read only new Records, a caller gets
@@ -277,10 +261,6 @@ class ReadRecordsRequest(google.protobuf.message.Message):
     limit.
     """
     @property
-    def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required."""
-
-    @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:
         """How long the read waits for a new Record before it returns an empty page. When it's unset,
         the read returns immediately. The deadline of the request must be longer than this wait.
@@ -289,14 +269,14 @@ class ReadRecordsRequest(google.protobuf.message.Message):
     def __init__(
         self,
         *,
-        ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream_id: builtins.str = ...,
         from_offset: builtins.bytes = ...,
         max_records: builtins.int = ...,
         max_bytes: builtins.int = ...,
         wait: google.protobuf.duration_pb2.Duration | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["ref", b"ref", "wait", b"wait"]
+        self, field_name: typing.Literal["wait", b"wait"]
     ) -> builtins.bool: ...
     def ClearField(
         self,
@@ -307,8 +287,8 @@ class ReadRecordsRequest(google.protobuf.message.Message):
             b"max_bytes",
             "max_records",
             b"max_records",
-            "ref",
-            b"ref",
+            "stream_id",
+            b"stream_id",
             "wait",
             b"wait",
         ],
@@ -370,18 +350,17 @@ class DescribeStreamRequest(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    REF_FIELD_NUMBER: builtins.int
-    @property
-    def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef:
-        """Required."""
-
+    STREAM_ID_FIELD_NUMBER: builtins.int
+    stream_id: builtins.str
+    """Required."""
     def __init__(
         self,
         *,
-        ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream_id: builtins.str = ...,
     ) -> None: ...
-    def HasField(self, field_name: typing.Literal["ref", b"ref"]) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["ref", b"ref"]) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["stream_id", b"stream_id"]
+    ) -> None: ...
 
 global___DescribeStreamRequest = DescribeStreamRequest
 

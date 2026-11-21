@@ -45,7 +45,7 @@ _BodyT = typing_extensions.TypeVar("_BodyT", default=object)
 class CreateStreamRequest(typing.Generic[BodyT]):
     """Create a Stream. If it already exists, fail, or return it with use-existing."""
 
-    stream_ref: StreamRef[BodyT]
+    ref: StreamRef[BodyT]
     id_conflict_policy: StreamIdConflictPolicy | None = None
     request_id: str | None = None
 
@@ -68,16 +68,14 @@ class _CreateStreamRequestTransferTypeConverter(
         type_hint: type[CreateStreamRequest[BodyT]],
     ) -> CreateStreamRequest[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        if not value.HasField("stream_ref"):
-            raise ValueError("missing required field CreateStreamRequest.stream_ref")
-        stream_ref = typing.cast(
+        if not value.stream_id:
+            raise ValueError("missing required field CreateStreamRequest.ref")
+        ref = typing.cast(
             StreamRef[BodyT],
-            _StreamRefTransferTypeConverter().from_transfer_type(
-                value.stream_ref, StreamRef[body_type]
-            ),
+            _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
         )
         return CreateStreamRequest(
-            stream_ref=stream_ref,
+            ref=ref,
             id_conflict_policy=StreamIdConflictPolicy(value.id_conflict_policy)
             if value.id_conflict_policy != 0
             else None,
@@ -92,9 +90,7 @@ class _CreateStreamRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.CreateStreamRequest()
         )
-        message.stream_ref.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.stream_ref)
-        )
+        message.stream_id = _support.stream_ref_to_id(value.ref)
         if value.id_conflict_policy is not None:
             message.id_conflict_policy = (
                 temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType(
@@ -161,14 +157,13 @@ temporalio.converter.transfer_type_convertible(
 
 
 @dataclasses.dataclass(slots=True)
-class CreateStreamResult(typing.Generic[BodyT]):
-    ref: StreamRef[BodyT] | None = None
+class CreateStreamResult:
     created: bool | None = None
 
 
 class _CreateStreamResultTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        CreateStreamResult[BodyT],
+        CreateStreamResult,
         temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
     ]
 ):
@@ -181,40 +176,27 @@ class _CreateStreamResultTransferTypeConverter(
     def from_transfer_type(
         self,
         value: temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse,
-        type_hint: type[CreateStreamResult[BodyT]],
-    ) -> CreateStreamResult[BodyT]:
-        (body_type,) = typing.get_args(type_hint) or (typing.Any,)
+        type_hint: type[CreateStreamResult],
+    ) -> CreateStreamResult:
         return CreateStreamResult(
-            ref=typing.cast(
-                StreamRef[BodyT],
-                _StreamRefTransferTypeConverter().from_transfer_type(
-                    value.ref, StreamRef[body_type]
-                ),
-            )
-            if value.HasField("ref")
-            else None,
             created=value.created if bool(value.created) else None,
         )
 
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: CreateStreamResult[BodyT],
+        value: CreateStreamResult,
     ) -> temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse:
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.CreateStreamResponse()
         )
-        if value.ref is not None:
-            message.ref.CopyFrom(
-                _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-            )
         if value.created is not None:
             message.created = value.created
         return message
 
 
 temporalio.converter.transfer_type_convertible(
-    _CreateStreamResultTransferTypeConverter[typing.Any]
+    _CreateStreamResultTransferTypeConverter
 )(CreateStreamResult)  # pyright: ignore[reportUnusedCallResult]
 
 
@@ -225,7 +207,7 @@ class AppendRecordsRequest(typing.Generic[BodyT]):
     ref: StreamRef[BodyT]
     records: list[AppendRecord[BodyT]]
     producer: Producer
-    sequence: int | None = None
+    request_id: str | None = None
 
 
 class _AppendRecordsRequestTransferTypeConverter(
@@ -246,13 +228,11 @@ class _AppendRecordsRequestTransferTypeConverter(
         type_hint: type[AppendRecordsRequest[BodyT]],
     ) -> AppendRecordsRequest[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        if not value.HasField("ref"):
+        if not value.stream_id:
             raise ValueError("missing required field AppendRecordsRequest.ref")
         ref = typing.cast(
             StreamRef[BodyT],
-            _StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef[body_type]
-            ),
+            _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
         )
         records = [
             typing.cast(
@@ -272,7 +252,7 @@ class _AppendRecordsRequestTransferTypeConverter(
             ref=ref,
             records=records,
             producer=producer,
-            sequence=value.sequence if value.sequence != 0 else None,
+            request_id=value.request_id if bool(value.request_id) else None,
         )
 
     @typing_extensions.override
@@ -283,9 +263,7 @@ class _AppendRecordsRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.AppendRecordsRequest()
         )
-        message.ref.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-        )
+        message.stream_id = _support.stream_ref_to_id(value.ref)
         for element in value.records:
             item = message.records.add()
             item.CopyFrom(
@@ -294,8 +272,8 @@ class _AppendRecordsRequestTransferTypeConverter(
         message.producer.CopyFrom(
             _ProducerTransferTypeConverter().to_transfer_type(value.producer)
         )
-        if value.sequence is not None:
-            message.sequence = value.sequence
+        if value.request_id is not None:
+            message.request_id = value.request_id
         return message
 
 
@@ -949,13 +927,11 @@ class _CloseStreamRequestTransferTypeConverter(
         type_hint: type[CloseStreamRequest[BodyT]],
     ) -> CloseStreamRequest[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        if not value.HasField("ref"):
+        if not value.stream_id:
             raise ValueError("missing required field CloseStreamRequest.ref")
         ref = typing.cast(
             StreamRef[BodyT],
-            _StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef[body_type]
-            ),
+            _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
         )
         if not value.HasField("producer"):
             raise ValueError("missing required field CloseStreamRequest.producer")
@@ -975,9 +951,7 @@ class _CloseStreamRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.CloseStreamRequest()
         )
-        message.ref.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-        )
+        message.stream_id = _support.stream_ref_to_id(value.ref)
         message.producer.CopyFrom(
             _ProducerTransferTypeConverter().to_transfer_type(value.producer)
         )
@@ -1058,13 +1032,11 @@ class _ReadRecordsRequestTransferTypeConverter(
         type_hint: type[ReadRecordsRequest[BodyT]],
     ) -> ReadRecordsRequest[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        if not value.HasField("ref"):
+        if not value.stream_id:
             raise ValueError("missing required field ReadRecordsRequest.ref")
         ref = typing.cast(
             StreamRef[BodyT],
-            _StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef[body_type]
-            ),
+            _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
         )
         return ReadRecordsRequest(
             ref=ref,
@@ -1084,9 +1056,7 @@ class _ReadRecordsRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.ReadRecordsRequest()
         )
-        message.ref.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-        )
+        message.stream_id = _support.stream_ref_to_id(value.ref)
         if value.from_offset is not None:
             message.from_offset = value.from_offset
         if value.max_records is not None:
@@ -1252,13 +1222,11 @@ class _DescribeStreamRequestTransferTypeConverter(
         type_hint: type[DescribeStreamRequest[BodyT]],
     ) -> DescribeStreamRequest[BodyT]:
         (body_type,) = typing.get_args(type_hint) or (typing.Any,)
-        if not value.HasField("ref"):
+        if not value.stream_id:
             raise ValueError("missing required field DescribeStreamRequest.ref")
         ref = typing.cast(
             StreamRef[BodyT],
-            _StreamRefTransferTypeConverter().from_transfer_type(
-                value.ref, StreamRef[body_type]
-            ),
+            _support.stream_ref_from_id(value.stream_id, StreamRef[body_type]),
         )
         return DescribeStreamRequest(
             ref=ref,
@@ -1272,9 +1240,7 @@ class _DescribeStreamRequestTransferTypeConverter(
         message = (
             temporalio.api.streamservice.v1.request_response_pb2.DescribeStreamRequest()
         )
-        message.ref.CopyFrom(
-            _StreamRefTransferTypeConverter().to_transfer_type(value.ref)
-        )
+        message.stream_id = _support.stream_ref_to_id(value.ref)
         return message
 
 
