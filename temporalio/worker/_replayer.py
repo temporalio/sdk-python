@@ -75,7 +75,9 @@ class Replayer:
 
         ``stream_config`` is the Stream config of the client that the worker
         used. A replay takes the result of each append, close, create and
-        describe of a Stream from history, so it calls no Store for them.
+        describe of a Stream from history, so it calls no Store for them. It
+        reads the Records of each Stream read again from the Store, and fails if
+        the Store no longer has them.
         """
         self._config = ReplayerConfig(
             workflows=list(workflows),
@@ -318,6 +320,10 @@ class Replayer:
                     # per workflow type
                     nondeterminism_as_workflow_fail=workflow_worker.nondeterminism_as_workflow_fail(),
                     nondeterminism_as_workflow_fail_for_types=workflow_worker.nondeterminism_as_workflow_fail_for_types(),
+                    stream_replay_as_workflow_fail=workflow_worker.stream_replay_as_workflow_fail(),
+                    stream_replay_as_workflow_fail_for_types=(
+                        workflow_worker.stream_replay_as_workflow_fail_for_types()
+                    ),
                     # All values below are ignored but required by Core
                     max_cached_workflows=2,
                     tuner=temporalio.bridge.worker.TunerHolder(
@@ -367,7 +373,7 @@ class Replayer:
                         (plugin.name(), plugin.version()) for plugin in self.plugins
                     ],
                     storage_drivers=storage_driver_types,
-                    streams=_bridge_streams(lambda: stream_config),
+                    streams=_bridge_streams(lambda: stream_config, None),
                 ),
             )
             bridge_worker_scope = bridge_worker

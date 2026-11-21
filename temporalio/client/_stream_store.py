@@ -291,6 +291,18 @@ class StreamConfig:
       the error.
     - A Worker reads the three limits when it starts. It refuses a new client with
       other limits, as it refuses one with other Store names.
+    - A read with no ``max_records`` gives at most 256 Records in a page, and a
+      read with no ``max_bytes`` at most 4 MiB of them. A page has at most 16 MiB
+      of Records, also for a larger ``max_bytes``.
+    - A read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record over
+      :py:attr:`max_record_bytes`. So a reader needs a limit at least as large as
+      that of each writer of its Stream.
+    - A read that waits holds its Workflow Task. A Signal that comes meanwhile
+      waits until the read has its page, or until the heartbeat of the task.
+    - A read of a Stream with no body type raises :exc:`TypeError` in the call, as
+      in client code. A body that isn't of the Stream's type fails the Workflow
+      Task, as an Activity result that can't be converted does. It fails the
+      Workflow if the failure exception types have the error of the conversion.
 
     .. warning::
         This API is experimental and subject to change.
@@ -315,9 +327,10 @@ class StreamConfig:
     """
 
     max_record_bytes: int = 1536 * 1024
-    """Maximum size in bytes of one Record of an append. Defaults to 1.5 MiB.
-    Must be greater than or equal to one. The size is that of the stored
-    Record, which counts its Producer.
+    """Maximum size in bytes of one Record of an append, and of one Record that a
+    read of Workflow code gives. Defaults to 1.5 MiB. Must be greater than or
+    equal to one. The size is that of the stored Record, which counts its
+    Producer.
     """
 
     max_batch_bytes: int = 4 * 1024 * 1024

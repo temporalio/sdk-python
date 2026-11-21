@@ -119,6 +119,7 @@ from ._exceptions import (
     ContinueAsNewVersioningBehavior,
     NondeterminismError,
     ReadOnlyContextError,
+    StreamReplayError,
     VersioningIntent,
     _NotInWorkflowEventLoopError,
 )
@@ -246,6 +247,7 @@ __all__ = [
     "ContinueAsNewVersioningBehavior",
     "NondeterminismError",
     "ReadOnlyContextError",
+    "StreamReplayError",
     "VersioningIntent",
     "HandlerUnfinishedPolicy",
     "UnfinishedSignalHandlersWarning",

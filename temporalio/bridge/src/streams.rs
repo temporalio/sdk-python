@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{IntoPyDict, PyBytes, PyType};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
+use std::time::Duration;
 use temporalio_sdk_core::StreamRuntimes;
 use temporalio_streams::proto::{
     AppendRecordsRequest, AppendRecordsResponse, CloseStreamRequest, CloseStreamResponse,
@@ -258,6 +259,7 @@ fn store_limits(
 pub(crate) struct WorkerStreams {
     limits: Option<(usize, usize, usize)>,
     stores: Vec<(String, Py<PyAny>)>,
+    read_max_wait_millis: Option<u64>,
 }
 
 impl WorkerStreams {
@@ -276,7 +278,11 @@ impl WorkerStreams {
             let runtime = StreamRuntime::new(Arc::new(store), limits);
             (name, Arc::new(runtime))
         });
-        Ok(StreamRuntimes::new(runtimes))
+        let mut runtimes = StreamRuntimes::new(runtimes);
+        if let Some(millis) = self.read_max_wait_millis {
+            runtimes.settings.read_max_wait = Duration::from_millis(millis);
+        }
+        Ok(runtimes)
     }
 }
 

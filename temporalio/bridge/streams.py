@@ -38,6 +38,7 @@ class WorkerStreams:
     of the Stream config, or ``None`` with no Stream config."""
     stores: Sequence[tuple[str, StoreCaller]]
     """The caller of each Stream Store that Workflow code can use, by Store name."""
+    read_max_wait_millis: int | None
 
 
 async def call_stream_store(

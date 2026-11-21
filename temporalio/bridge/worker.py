@@ -65,6 +65,8 @@ class WorkerConfig:
     storage_drivers: set[str]
     disable_payload_error_limit: bool
     streams: temporalio.bridge.streams.WorkerStreams
+    stream_replay_as_workflow_fail: bool
+    stream_replay_as_workflow_fail_for_types: set[str]
 
 
 @dataclass
