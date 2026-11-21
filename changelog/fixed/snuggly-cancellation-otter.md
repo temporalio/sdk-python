@@ -1,0 +1,1 @@
+Add opt-in workflow cancellation handling that lets shielded tasks finish `workflow.wait_condition` and prevents a concurrently completed condition or Temporal operation from swallowing cancellation delivered to the waiting task.
