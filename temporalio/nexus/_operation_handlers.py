@@ -21,8 +21,6 @@ from nexusrpc.handler import (
 
 import temporalio.nexus
 from temporalio.nexus._operation_context import (
-    TemporalCancelOperationContext,
-    TemporalStartOperationContext,
     _SignalSlot,
     _temporal_cancel_operation_context,
 )
@@ -183,7 +181,6 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
     @abstractmethod
     async def start_operation(
         self,
-        ctx: TemporalStartOperationContext,
         client: TemporalNexusClient,
         input: InputT,
     ) -> TemporalOperationResult[OutputT]:
@@ -199,9 +196,8 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
            This API is experimental and unstable.
         """
         nexus_client = _TemporalNexusClient()
-        start_ctx = TemporalStartOperationContext._from_start_operation_context(ctx)
         with _SignalSlot.scope():
-            result = await self.start_operation(start_ctx, nexus_client, input)
+            result = await self.start_operation(nexus_client, input)
         return result._to_nexus_result()
 
     async def cancel(self, ctx: CancelOperationContext, token: str) -> None:
@@ -219,14 +215,13 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                 retryable_override=False,
             ) from err
 
-        cancel_ctx = TemporalCancelOperationContext._from_cancel_operation_context(ctx)
         match operation_token.type:
             case OperationTokenType.WORKFLOW:
                 assert operation_token.workflow_id is not None
                 options = CancelWorkflowRunOptions(
                     workflow_id=operation_token.workflow_id
                 )
-                await self.cancel_workflow_run(cancel_ctx, options)
+                await self.cancel_workflow_run(options)
             case OperationTokenType.UPDATE_WORKFLOW:
                 assert operation_token.workflow_id is not None
                 assert operation_token.update_id is not None
@@ -236,7 +231,7 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                     update_id=operation_token.update_id,
                     run_id=operation_token.run_id,
                 )
-                await self.cancel_workflow_update(cancel_ctx, cancel_options)
+                await self.cancel_workflow_update(cancel_options)
             case OperationTokenType.ACTIVITY:
                 assert operation_token.activity_id is not None
                 if not operation_token.run_id:
@@ -247,7 +242,6 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
                     )
 
                 await self.cancel_activity(
-                    cancel_ctx,
                     CancelActivityOptions(
                         activity_id=operation_token.activity_id,
                         run_id=operation_token.run_id,
@@ -256,7 +250,6 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
 
     async def cancel_workflow_run(
         self,
-        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelWorkflowRunOptions,
     ) -> None:
         """Cancels the workflow backing the Nexus operation.
@@ -271,7 +264,6 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
 
     async def cancel_workflow_update(
         self,
-        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelUpdateWorkflowOptions,  # pyright: ignore[reportUnusedParameter]
     ) -> None:
         """Cancels the Workflow Update triggered by the Nexus operation. There is no native way to cancel an accepted Update, so cancellation depends on the Update handler itself.
@@ -291,7 +283,6 @@ class TemporalOperationHandler(OperationHandler[InputT, OutputT], ABC):
 
     async def cancel_activity(
         self,
-        ctx: TemporalCancelOperationContext,  # pyright: ignore[reportUnusedParameter]
         options: CancelActivityOptions,
     ) -> None:
         """Requests cancellation of the standalone activity backing the operation."""

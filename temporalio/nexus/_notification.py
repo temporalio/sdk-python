@@ -13,10 +13,7 @@ import temporalio.common
 import temporalio.converter
 
 from . import notifications
-from ._operation_context import (
-    TemporalStartOperationContext,
-    WorkflowRunOperationContext,
-)
+from ._operation_context import WorkflowRunOperationContext
 from ._temporal_client import TemporalNexusClient, TemporalOperationResult
 from ._token import WorkflowHandle
 from ._util import get_operation_factory
@@ -257,7 +254,6 @@ def create_completion_callback(
     operation: Callable[
         [
             Any,
-            TemporalStartOperationContext,
             TemporalNexusClient,
             notifications.OnCompleteRequest[
                 temporalio.common.RawValue, HandlerSourceContextT
@@ -276,7 +272,6 @@ def create_completion_callback(
     operation: Callable[
         [
             Any,
-            TemporalStartOperationContext,
             TemporalNexusClient,
             notifications.OnCompleteRequest[HandlerOutputT, HandlerSourceContextT],
         ],
