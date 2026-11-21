@@ -639,6 +639,70 @@ class PayloadVisitor:
     ) -> None:
         pass
 
+    async def _visit_temporal_api_streamservice_v1_CreateStreamRequest(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_streamservice_v1_CreateStreamResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_stream_v1_AppendRecord(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("body"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.body)
+
+    async def _visit_temporal_api_streamservice_v1_AppendRecordsRequest(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        for v in o.records:
+            await self._visit_temporal_api_stream_v1_AppendRecord(fs, v)
+
+    async def _visit_temporal_api_streamservice_v1_AppendRecordsResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_streamservice_v1_CloseStreamRequest(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_streamservice_v1_CloseStreamResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_streamservice_v1_ReadRecordsRequest(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_stream_v1_StreamRecord(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("body"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.body)
+
+    async def _visit_temporal_api_streamservice_v1_ReadRecordsResponse(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        for v in o.records:
+            await self._visit_temporal_api_stream_v1_StreamRecord(fs, v)
+
+    async def _visit_temporal_api_streamservice_v1_DescribeStreamRequest(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
+    async def _visit_temporal_api_streamservice_v1_DescribeStreamResponse(
+        self, fs: VisitorFunctions, o: Any
+    ) -> None:
+        pass
+
     async def _visit_temporal_api_common_v1_Header(self, fs: VisitorFunctions, o: Any):
         for v in o.fields.values():
             await self._visit_temporal_api_common_v1_Payload(fs, v)
