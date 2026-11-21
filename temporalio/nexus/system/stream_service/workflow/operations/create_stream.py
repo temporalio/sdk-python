@@ -31,13 +31,11 @@ async def _create_stream(
     handle = await nexus_client.start_operation(
         operation="CreateStream",
         input=request,
-        output_type=CreateStreamResult[body_type],
+        output_type=CreateStreamResult,
     )
     result = await handle
-    if result.ref is None:
-        raise RuntimeError("CreateStream answered without `ref`")
     return Stream[body_type](
-        ref=result.ref,
+        ref=request.ref,
         created=result.created or None,
     )
 
@@ -81,12 +79,12 @@ async def create_stream(
     """
     if body_type is None:
         body_type = typing.Any
-    stream_ref = StreamRef(
+    ref = StreamRef[body_type](
         id=id,
         store=store,
     )
     request = CreateStreamRequest(
-        stream_ref=stream_ref,
+        ref=ref,
         id_conflict_policy=id_conflict_policy,
         request_id=_support.request_id(),
     )

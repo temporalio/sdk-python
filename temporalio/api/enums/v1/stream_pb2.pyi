@@ -103,31 +103,23 @@ class _StreamErrorReasonEnumTypeWrapper(
     """A later attempt of the same Producer has already written, and the Store fences
     (`FAILED_PRECONDITION`).
     """
-    STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: _StreamErrorReason.ValueType  # 5
-    """The `sequence` of an append is lower than the `sequence` of the last batch of its attempt
-    (`FAILED_PRECONDITION`).
-    """
-    STREAM_ERROR_REASON_SEQ_DIVERGENT: _StreamErrorReason.ValueType  # 6
-    """The batch has the same `sequence` as the last one of its attempt, but different content
-    (`FAILED_PRECONDITION`).
-    """
-    STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 8
+    STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 5
     """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
-    STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 9
+    STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 6
     """The offset is past the newest one, for example after a failover lost the newest Records. A
     read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
     """
-    STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 10
+    STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 7
     """A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
-    STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 11
+    STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 8
     """The request is malformed (`INVALID_ARGUMENT`)."""
-    STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 12
+    STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 9
     """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
-    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 13
+    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 10
     """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
-    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 14
+    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 11
     """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
-    STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 15
+    STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 12
     """The Store returned data that isn't valid, such as a stored value of the wrong length. A
     retry reads the same data (`DATA_LOSS`).
     """
@@ -152,31 +144,23 @@ STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
 """A later attempt of the same Producer has already written, and the Store fences
 (`FAILED_PRECONDITION`).
 """
-STREAM_ERROR_REASON_SEQUENCE_TOO_LOW: StreamErrorReason.ValueType  # 5
-"""The `sequence` of an append is lower than the `sequence` of the last batch of its attempt
-(`FAILED_PRECONDITION`).
-"""
-STREAM_ERROR_REASON_SEQ_DIVERGENT: StreamErrorReason.ValueType  # 6
-"""The batch has the same `sequence` as the last one of its attempt, but different content
-(`FAILED_PRECONDITION`).
-"""
-STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 8
+STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 5
 """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
-STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 9
+STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 6
 """The offset is past the newest one, for example after a failover lost the newest Records. A
 read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
 """
-STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 10
+STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 7
 """A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
-STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 11
+STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 8
 """The request is malformed (`INVALID_ARGUMENT`)."""
-STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 12
+STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 9
 """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
-STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 13
+STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 10
 """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
-STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 14
+STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 11
 """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
-STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 15
+STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 12
 """The Store returned data that isn't valid, such as a stored value of the wrong length. A
 retry reads the same data (`DATA_LOSS`).
 """
