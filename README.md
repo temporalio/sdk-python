@@ -1716,9 +1716,10 @@ We aim to preserve backward compatibility and avoid breaking changes. See https:
 **Experimental Temporal operation handlers**
 
 To implement the same service with one decorator, use `@nexus.temporal_operation`. An `async def` handler
-receives `(self, client, input)`, where `client` is a `TemporalNexusClient`. Use
-`TemporalOperationResult.sync(value)` to complete immediately, or return the result of the client method
-that starts a backing Workflow, Workflow Update, or Activity to complete later.
+receives `(self, client, input)`, where `client` is a `TemporalNexusClient`. Annotate the handler with the
+payload type and return the value directly to complete immediately. To complete later, return the result of the
+client method that starts a backing Workflow, Workflow Update, or Activity. A handler annotated with
+`TemporalOperationResult[Output]` can also return `TemporalOperationResult.sync(value)` to complete immediately.
 
 ```python
 @service_handler(service=MyNexusService)
@@ -1726,8 +1727,8 @@ class ExperimentalNexusServiceHandler:
     @nexus.temporal_operation
     async def my_sync_operation(
         self, client: nexus.TemporalNexusClient, input: MyInput
-    ) -> nexus.TemporalOperationResult[MyOutput]:
-        return nexus.TemporalOperationResult.sync(MyOutput(message=f"Hello, {input.name}!"))
+    ) -> MyOutput:
+        return MyOutput(message=f"Hello, {input.name}!")
 
     @nexus.temporal_operation
     async def my_workflow_run_operation(

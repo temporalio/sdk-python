@@ -13,7 +13,9 @@ import temporalio.common
 import temporalio.converter
 
 from . import notifications
-from ._operation_context import WorkflowRunOperationContext
+from ._operation_context import (
+    WorkflowRunOperationContext,
+)
 from ._temporal_client import TemporalNexusClient, TemporalOperationResult
 from ._token import WorkflowHandle
 from ._util import get_operation_factory
@@ -259,7 +261,10 @@ def create_completion_callback(
                 temporalio.common.RawValue, HandlerSourceContextT
             ],
         ],
-        Awaitable[TemporalOperationResult[notifications.OnCompleteResponse]],
+        Awaitable[
+            notifications.OnCompleteResponse
+            | TemporalOperationResult[notifications.OnCompleteResponse]
+        ],
     ],
     task_queue: str,
     source_context: HandlerSourceContextT,
@@ -275,7 +280,10 @@ def create_completion_callback(
             TemporalNexusClient,
             notifications.OnCompleteRequest[HandlerOutputT, HandlerSourceContextT],
         ],
-        Awaitable[TemporalOperationResult[notifications.OnCompleteResponse]],
+        Awaitable[
+            notifications.OnCompleteResponse
+            | TemporalOperationResult[notifications.OnCompleteResponse]
+        ],
     ],
     task_queue: str,
     source_context: HandlerSourceContextT,

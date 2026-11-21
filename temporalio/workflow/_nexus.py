@@ -217,7 +217,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         event_groups: Sequence[EventGroup] | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # Overload for temporal_operation methods
+    # Overloads for temporal_operation methods
     @overload
     @abstractmethod
     async def start_operation(
@@ -229,6 +229,30 @@ class NexusClient(ABC, Generic[NexusServiceType]):
                 InputT,
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
+        ],
+        input: InputT,
+        *,
+        output_type: type[OutputT] | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Mapping[str, str] | None = None,
+        summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[OutputT],
         ],
         input: InputT,
         *,
@@ -403,7 +427,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         event_groups: Sequence[EventGroup] | None = None,
     ) -> OutputT: ...
 
-    # Overload for temporal_operation methods
+    # Overloads for temporal_operation methods
     @overload
     @abstractmethod
     async def execute_operation(
@@ -415,6 +439,30 @@ class NexusClient(ABC, Generic[NexusServiceType]):
                 InputT,
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
+        ],
+        input: InputT,
+        *,
+        output_type: type[OutputT] | None = None,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        cancellation_type: NexusOperationCancellationType = NexusOperationCancellationType.WAIT_COMPLETED,
+        headers: Mapping[str, str] | None = None,
+        summary: str | None = None,
+        event_groups: Sequence[EventGroup] | None = None,
+    ) -> OutputT: ...
+
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[OutputT],
         ],
         input: InputT,
         *,

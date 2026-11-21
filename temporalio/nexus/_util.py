@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import functools
 import inspect
+import sys
+import types
 import typing
 import warnings
 from collections.abc import Awaitable, Callable
@@ -9,11 +11,16 @@ from typing import (
     Any,
 )
 
+if sys.version_info >= (3, 12):
+    # CI type-checks under 3.11, where native type aliases are unavailable.
+    from typing import TypeAliasType  # pyright: ignore[reportUnreachable]
+
 import nexusrpc
 from nexusrpc import (
     InputT,
     OutputT,
 )
+from nexusrpc.handler import StartOperationResultAsync, StartOperationResultSync
 
 from temporalio.nexus._operation_context import WorkflowRunOperationContext
 from temporalio.nexus._temporal_client import (
@@ -48,29 +55,56 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     )
 
 
-def get_temporal_operation_start_method_input_and_output_type_annotations(
-    start: Callable[
-        [
-            NexusServiceType,
-            TemporalNexusClient,
-            InputT,
-        ],
-        Awaitable[TemporalOperationResult[OutputT]],
-    ],
-) -> tuple[
-    type[InputT] | None,
-    type[OutputT] | None,
-]:
-    """Return operation input and output types.
-
-    ``start`` must be a type-annotated start method that returns a
-    :py:class:`temporalio.nexus.TemporalOperationResult`.
-    """
-    return _get_wrapped_start_method_input_and_output_type_annotations(
-        start,
-        expected_param_types=(TemporalNexusClient,),
-        expected_return_origin=TemporalOperationResult,
+def get_temporal_operation_start_method_types(
+    start: Callable[..., Any],
+) -> tuple[type[Any] | None, type[Any] | None, bool]:
+    """Return the input type, payload type, and whether the annotation requires a wrapper."""
+    input_type, return_type = _get_start_method_input_and_output_type_annotations(
+        start, expected_param_types=(TemporalNexusClient,)
     )
+    if sys.version_info >= (3, 12):
+        aliases: set[TypeAliasType] = set()  # pyright: ignore[reportUnreachable]
+        while (
+            isinstance(return_type, TypeAliasType) and not return_type.__type_params__
+        ):
+            if return_type in aliases:
+                raise TypeError(
+                    f"@temporal_operation method {start} has a cyclic return type alias."
+                )
+            aliases.add(return_type)
+            value = return_type.__value__
+            return_type = type(None) if value is None else value
+
+    if return_type is None or return_type is Any:
+        return input_type, None, True
+
+    origin = typing.get_origin(return_type) or return_type
+    if isinstance(origin, type) and issubclass(origin, TemporalOperationResult):
+        args = typing.get_args(return_type)
+        return input_type, args[0] if len(args) == 1 else None, True
+
+    result_types = (
+        (typing.get_origin(arg) or arg for arg in typing.get_args(return_type))
+        if origin in (typing.Union, types.UnionType)  # pyright: ignore[reportDeprecated]
+        else (origin,)
+    )
+    if any(
+        isinstance(result_type, type)
+        and issubclass(
+            result_type,
+            (
+                TemporalOperationResult,
+                StartOperationResultSync,
+                StartOperationResultAsync,
+            ),
+        )
+        for result_type in result_types
+    ):
+        raise TypeError(
+            f"@temporal_operation method {start} must declare a payload type or "
+            "TemporalOperationResult with the payload type inside the wrapper."
+        )
+    return input_type, return_type, False
 
 
 def _get_wrapped_start_method_input_and_output_type_annotations(
