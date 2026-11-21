@@ -1,10 +1,11 @@
 """Visitor that sets command context during payload traversal."""
 
 import contextvars
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
+from temporalio.api.common.v1.message_pb2 import Payload
 from temporalio.api.enums.v1.command_type_pb2 import CommandType
 from temporalio.bridge._visitor import PayloadVisitor
 from temporalio.bridge._visitor_functions import VisitorFunctions
@@ -16,8 +17,12 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveNexusOperationStart,
     ResolveRequestCancelExternalWorkflow,
     ResolveSignalExternalWorkflow,
+    ResolveStreamAppend,
+    ResolveStreamClose,
+    ResolveStreamRead,
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
+    AppendToStream,
     CompleteWorkflowExecution,
     FailWorkflowExecution,
     ScheduleActivity,
@@ -211,6 +216,52 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
                 fs, o
             )
 
+    # Stream commands and activation jobs. Core builds the failure of a Stream job with no
+    # codec, so nothing visits it.
+    async def _visit_coresdk_workflow_commands_AppendToStream(
+        self, fs: VisitorFunctions, o: AppendToStream
+    ) -> None:
+        await self._visit_stream_payloads(fs, o.seq, o.bodies)
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamRead(
+        self, fs: VisitorFunctions, o: ResolveStreamRead
+    ) -> None:
+        await self._visit_stream_payloads(
+            fs, o.seq, [record.body for record in o.page.records]
+        )
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamAppend(
+        self, fs: VisitorFunctions, o: ResolveStreamAppend
+    ) -> None:
+        pass
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamClose(
+        self, fs: VisitorFunctions, o: ResolveStreamClose
+    ) -> None:
+        pass
+
+    async def _visit_stream_payloads(
+        self, fs: VisitorFunctions, seq: int, payloads: Iterable[Payload]
+    ) -> None:
+        # A Record can come from any writer, so its body isn't trusted to be a system Nexus
+        # envelope, and a codec gets each body alone as it does in client code.
+        with current_command(CommandType.COMMAND_TYPE_UNSPECIFIED, seq):
+            for payload in payloads:
+                await fs.visit_payload(payload)
+
+
+class StoragePayloadVisitor(CommandAwarePayloadVisitor):
+    """Payload visitor for the passes of external storage and of its references.
+
+    These passes skip the payloads of a Stream. A Stream body is a value of its
+    writer, which can look like a reference to the storage of this Worker.
+    """
+
+    async def _visit_stream_payloads(
+        self, fs: VisitorFunctions, seq: int, payloads: Iterable[Payload]
+    ) -> None:
+        pass
+
 
 @contextmanager
 def current_command(
@@ -220,6 +271,8 @@ def current_command(
     update_protocol_instance_id: str | None = None,
 ) -> Iterator[None]:
     """Context manager for setting command info."""
+    # `COMMAND_TYPE_UNSPECIFIED` marks the body of a Stream Record, which gets no
+    # serialization context. No other command may use that type.
     token = current_command_info.set(
         CommandInfo(
             command_type=command_type,
