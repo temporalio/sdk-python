@@ -140,6 +140,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         max_workflow_task_external_storage_concurrency: int,
         default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
         wasm_workflow_bundle: str | os.PathLike[str] | None = None,
+        wasm_addressable_store: str | os.PathLike[str] | None = None,
         wasm_local_activities: _LocalActivityRegistry | None = None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
@@ -223,7 +224,11 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
                     "Debug mode, workflow interceptors, and patch activation callbacks "
                     "require native workflow registrations"
                 )
-            self._wasm_bundle = _WasmWorkflowBundle(wasm_workflow_bundle)
+            self._wasm_bundle = (
+                _WasmWorkflowBundle(wasm_workflow_bundle, wasm_addressable_store)
+                if wasm_addressable_store is not None
+                else _WasmWorkflowBundle(wasm_workflow_bundle)
+            )
             self._wasm_bundle.validate_data_converter(data_converter)
 
         self._workflow_failure_exception_types = workflow_failure_exception_types

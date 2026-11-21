@@ -108,6 +108,7 @@ class Worker:
         nexus_service_handlers: Sequence[Any] = [],
         workflows: Sequence[type] = [],
         wasm_workflow_bundle: str | os.PathLike[str] | None = None,
+        wasm_addressable_store: str | os.PathLike[str] | None = None,
         activity_executor: concurrent.futures.Executor | None = None,
         workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         nexus_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
@@ -164,6 +165,8 @@ class Worker:
                 may be async functions or non-async functions.
             nexus_service_handlers: Instances of Nexus service handler classes
                 decorated with :py:func:`@nexusrpc.handler.service_handler<nexusrpc.handler.service_handler>`.
+            wasm_addressable_store: Path to the experimental WASM content store
+                containing a published bindings.json and immutable subroutine artifacts.
             wasm_workflow_bundle: Path to an experimental WASM component containing
                 workflows for this worker. Can be used alongside native workflows.
                 The bundle's data converter profile must match the client's data converter.
@@ -360,6 +363,7 @@ class Worker:
             nexus_service_handlers=nexus_service_handlers,
             workflows=workflows,
             wasm_workflow_bundle=wasm_workflow_bundle,
+            wasm_addressable_store=wasm_addressable_store,
             activity_executor=activity_executor,
             workflow_task_executor=workflow_task_executor,
             nexus_task_executor=nexus_task_executor,
@@ -540,6 +544,9 @@ class Worker:
         self._workflow_worker: _WorkflowWorker | None = None
         workflows = config.get("workflows")
         wasm_workflow_bundle = config.get("wasm_workflow_bundle")
+        wasm_addressable_store = config.get("wasm_addressable_store")
+        if wasm_addressable_store is not None and wasm_workflow_bundle is None:
+            raise ValueError("wasm_addressable_store requires wasm_workflow_bundle")
         if workflows or wasm_workflow_bundle is not None:
             deployment_config = config.get("deployment_config")
             should_enforce_versioning_behavior = (
@@ -563,6 +570,7 @@ class Worker:
                 task_queue=config["task_queue"],  # type: ignore[reportTypedDictNotRequiredAccess]
                 workflows=workflows or [],
                 wasm_workflow_bundle=wasm_workflow_bundle,
+                wasm_addressable_store=wasm_addressable_store,
                 wasm_local_activities=(
                     self._activity_worker.local_activity_registry()
                     if self._activity_worker
@@ -1036,6 +1044,7 @@ class WorkerConfig(TypedDict, total=False):
     nexus_service_handlers: Sequence[Any]
     workflows: Sequence[type]
     wasm_workflow_bundle: str | os.PathLike[str] | None
+    wasm_addressable_store: str | os.PathLike[str] | None
     activity_executor: concurrent.futures.Executor | None
     workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     nexus_task_executor: concurrent.futures.ThreadPoolExecutor | None

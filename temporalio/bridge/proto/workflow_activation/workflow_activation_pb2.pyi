@@ -86,6 +86,24 @@ class WorkflowActivation(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class WasmFunctionBindingsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.bytes
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.bytes = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        ) -> None: ...
+
     RUN_ID_FIELD_NUMBER: builtins.int
     TIMESTAMP_FIELD_NUMBER: builtins.int
     IS_REPLAYING_FIELD_NUMBER: builtins.int
@@ -98,6 +116,7 @@ class WorkflowActivation(google.protobuf.message.Message):
     LAST_SDK_VERSION_FIELD_NUMBER: builtins.int
     SUGGEST_CONTINUE_AS_NEW_REASONS_FIELD_NUMBER: builtins.int
     TARGET_WORKER_DEPLOYMENT_VERSION_CHANGED_FIELD_NUMBER: builtins.int
+    WASM_FUNCTION_BINDINGS_FIELD_NUMBER: builtins.int
     run_id: builtins.str
     """The id of the currently active run of the workflow. Also used as a cache key. There may
     only ever be one active workflow task (and hence activation) of a run at one time.
@@ -164,6 +183,12 @@ class WorkflowActivation(google.protobuf.message.Message):
         of the previous run.
         """
 
+    @property
+    def wasm_function_bindings(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.bytes]:
+        """Recorded content-addressed bindings for the historical Workflow Task being replayed."""
+
     def __init__(
         self,
         *,
@@ -183,6 +208,8 @@ class WorkflowActivation(google.protobuf.message.Message):
         ]
         | None = ...,
         target_worker_deployment_version_changed: builtins.bool = ...,
+        wasm_function_bindings: collections.abc.Mapping[builtins.str, builtins.bytes]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -220,6 +247,8 @@ class WorkflowActivation(google.protobuf.message.Message):
             b"target_worker_deployment_version_changed",
             "timestamp",
             b"timestamp",
+            "wasm_function_bindings",
+            b"wasm_function_bindings",
         ],
     ) -> None: ...
 

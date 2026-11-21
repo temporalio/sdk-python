@@ -1,7 +1,9 @@
 """End-to-end tests for the opt-in CPython/WASM workflow prototype."""
 
 import asyncio
+import json
 import os
+import shutil
 import subprocess
 import sys
 import uuid
@@ -16,10 +18,17 @@ from nexusrpc.handler import StartOperationContext, service_handler, sync_operat
 
 import temporalio.worker._workflow as workflow_worker
 import temporalio.workflow as workflow
+from scripts.build_workflow_wasm import publish_addressable
 from temporalio import activity
+from temporalio.api.enums.v1 import EventType
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
 from temporalio.bridge.proto.workflow_completion import WorkflowActivationCompletion
-from temporalio.client import Client, WorkflowFailureError
+from temporalio.client import (
+    Client,
+    WorkflowFailureError,
+    WorkflowHandle,
+    WorkflowHistory,
+)
 from temporalio.common import RawValue
 from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError, CancelledError
@@ -372,3 +381,182 @@ async def test_wasm_workflow_commands_and_replay(
     assert await asyncio.wait_for(process.wait(), 120) == 0
     assert calls == previous_calls
     assert previous_calls[:4] == ["local", "local", "remote", "nexus"]
+
+
+def _addressable_bindings(history: WorkflowHistory) -> list[dict[str, bytes]]:
+    return [
+        dict(bindings)
+        for event in history.events
+        if (
+            bindings
+            := event.workflow_task_completed_event_attributes.sdk_metadata.wasm_function_bindings
+        )
+    ]
+
+
+@pytest.mark.requires_local_server
+@pytest.mark.timeout(360)
+async def test_wasm_content_addressed_rollouts(
+    client: Client, tmp_path: Path, wasm_builder: _BuildBundle
+) -> None:
+    fixture = _GUEST_SOURCE_DIR / "addressable"
+    manifest = fixture / "manifest.json"
+    source = tmp_path / "source"
+    source.mkdir()
+    shutil.copyfile(fixture / "workflows.py", source / "workflows.py")
+    shutil.copyfile(fixture / "v1" / "steps.py", source / "steps.py")
+    bundle = tmp_path / "workflow.wasm"
+    store = tmp_path / "functions"
+    wasm_builder(
+        source,
+        ["workflows:AddressableWorkflow", "workflows:AddressableBatch"],
+        bundle,
+        "--addressable-manifest",
+        str(manifest),
+    )
+
+    def publish(version: int) -> bytes:
+        publish_addressable(fixture / f"v{version}", manifest, store)
+        return bytes.fromhex(
+            json.loads((store / "bindings.json").read_text())["demo.score"]
+        )
+
+    config = client.config()
+    config["interceptors"] = []
+    client = Client(**config)
+    queue = str(uuid.uuid4())
+    converter = DataConverter.default.payload_converter
+    activity_calls: list[int] = []
+
+    @activity.defn(name="addressable_echo")
+    async def echo(value: int) -> int:
+        activity_calls.append(value)
+        return value
+
+    def worker() -> Worker:
+        return Worker(
+            client,
+            task_queue=queue,
+            wasm_workflow_bundle=bundle,
+            wasm_addressable_store=store,
+            activities=[echo],
+            max_cached_workflows=0,
+        )
+
+    async def wait_for_memo(
+        handle: WorkflowHandle[None, list[int]], count: int
+    ) -> None:
+        async for event in handle.fetch_history_events(wait_new_event=True):
+            fields = (
+                event.workflow_properties_modified_event_attributes.upserted_memo.fields
+            )
+            if (
+                "completed_calls" in fields
+                and converter.from_payload(fields["completed_calls"]) == count
+            ):
+                return
+        pytest.fail(f"Workflow closed before recording {count} completed calls")
+
+    async with asyncio.timeout(140):
+        first = publish(1)
+        async with worker():
+            handle = await client.start_workflow(
+                "AddressableWorkflow", id=str(uuid.uuid4()), task_queue=queue
+            )
+            await handle.signal("advance", 1)
+            async for event in handle.fetch_history_events(wait_new_event=True):
+                if event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
+                    break
+            else:
+                pytest.fail("Workflow closed before scheduling the first timer")
+            second = publish(2)
+
+        assert all(
+            event.event_type != EventType.EVENT_TYPE_WORKFLOW_PROPERTIES_MODIFIED
+            for event in (await handle.fetch_history()).events
+        )
+        async with worker():
+            await wait_for_memo(handle, 1)
+            await handle.signal("advance", 2)
+            await wait_for_memo(handle, 2)
+            third = publish(3)
+
+        async with worker():
+            await handle.signal("advance", 3)
+            assert await handle.result() == [11, 22, 33]
+            history = await handle.fetch_history()
+            batch = await client.start_workflow(
+                "AddressableBatch", id=str(uuid.uuid4()), task_queue=queue
+            )
+            assert await batch.result() == 1000
+            batch_history = await batch.fetch_history()
+
+    assert len({first, second, third}) == 3
+    assert _addressable_bindings(history) == [
+        {"demo.score": digest} for digest in (first, second, third)
+    ]
+    assert _addressable_bindings(batch_history) == [{"demo.score": third}]
+    assert [
+        event.event_type
+        for event in history.events
+        if event.event_type
+        in (
+            EventType.EVENT_TYPE_TIMER_STARTED,
+            EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+            EventType.EVENT_TYPE_MARKER_RECORDED,
+        )
+    ] == [
+        EventType.EVENT_TYPE_TIMER_STARTED,
+        EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+        EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED,
+        EventType.EVENT_TYPE_TIMER_STARTED,
+    ]
+
+    history_path = tmp_path / f"{history.workflow_id}.json"
+    history_path.write_text(history.to_json())
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        "-m",
+        "tests.worker.wasm_fixtures.replay_addressable",
+        str(bundle),
+        str(store),
+        str(history_path),
+        client.namespace,
+    )
+    try:
+        assert await asyncio.wait_for(process.wait(), 90) == 0
+    finally:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+    assert activity_calls == [22, 33]
+
+    def replayer() -> Replayer:
+        return Replayer(
+            namespace=client.namespace,
+            wasm_workflow_bundle=bundle,
+            wasm_addressable_store=store,
+        )
+
+    forced = WorkflowHistory.from_json(history.workflow_id, history_path.read_text())
+    for event in forced.events:
+        bindings = event.workflow_task_completed_event_attributes.sdk_metadata.wasm_function_bindings
+        if bindings.get("demo.score") == first:
+            bindings["demo.score"] = third
+            break
+    with pytest.raises(workflow.NondeterminismError, match="TimerStarted"):
+        await replayer().replay_workflow(forced)
+
+    capsule = store / f"{first.hex()}.wasm"
+    original = capsule.read_bytes()
+    try:
+        capsule.unlink()
+        with pytest.raises(RuntimeError, match=f"fetching WASM body {first.hex()}"):
+            await replayer().replay_workflow(history)
+        capsule.write_bytes(original + b"corrupt")
+        with pytest.raises(
+            RuntimeError, match=f"digest mismatch for WASM body {first.hex()}"
+        ):
+            await replayer().replay_workflow(history)
+    finally:
+        capsule.write_bytes(original)

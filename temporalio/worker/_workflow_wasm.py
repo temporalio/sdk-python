@@ -23,7 +23,9 @@ class _BridgeInstance(Protocol):
 
 
 class _BridgeBundle(Protocol):
-    def __init__(self, component: bytes) -> None: ...
+    def __init__(
+        self, component: bytes, addressable_store: Path | None = None
+    ) -> None: ...
 
     def data_converter_profile(self) -> str: ...
 
@@ -40,7 +42,11 @@ class _BridgeBundle(Protocol):
 
 
 class _WasmWorkflowBundle:
-    def __init__(self, path: str | os.PathLike[str]) -> None:
+    def __init__(
+        self,
+        path: str | os.PathLike[str],
+        addressable_store: str | os.PathLike[str] | None = None,
+    ) -> None:
         bundle_class = getattr(
             temporalio.bridge.temporal_sdk_bridge, "WasmWorkflowBundle", None
         )
@@ -49,7 +55,8 @@ class _WasmWorkflowBundle:
                 "WASM workflow bundles require a Python bridge built with the wasm-workflows feature"
             )
         self.component = cast(type[_BridgeBundle], bundle_class)(
-            Path(path).read_bytes()
+            Path(path).read_bytes(),
+            Path(addressable_store) if addressable_store is not None else None,
         )
         self.workflow_types = frozenset(self.component.workflow_types())
         self.data_converter_profile = self.component.data_converter_profile()

@@ -107,9 +107,28 @@ class Success(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class WasmFunctionBindingsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.bytes
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.bytes = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        ) -> None: ...
+
     COMMANDS_FIELD_NUMBER: builtins.int
     USED_INTERNAL_FLAGS_FIELD_NUMBER: builtins.int
     VERSIONING_BEHAVIOR_FIELD_NUMBER: builtins.int
+    WASM_FUNCTION_BINDINGS_FIELD_NUMBER: builtins.int
     versioning_behavior: (
         temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType
     )
@@ -128,6 +147,12 @@ class Success(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.int]:
         """Any internal flags which the lang SDK used in the processing of this activation"""
 
+    @property
+    def wasm_function_bindings(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.bytes]:
+        """Content-addressed bindings used by this live workflow activation."""
+
     def __init__(
         self,
         *,
@@ -137,6 +162,8 @@ class Success(google.protobuf.message.Message):
         | None = ...,
         used_internal_flags: collections.abc.Iterable[builtins.int] | None = ...,
         versioning_behavior: temporalio.api.enums.v1.workflow_pb2.VersioningBehavior.ValueType = ...,
+        wasm_function_bindings: collections.abc.Mapping[builtins.str, builtins.bytes]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -147,6 +174,8 @@ class Success(google.protobuf.message.Message):
             b"used_internal_flags",
             "versioning_behavior",
             b"versioning_behavior",
+            "wasm_function_bindings",
+            b"wasm_function_bindings",
         ],
     ) -> None: ...
 

@@ -44,6 +44,7 @@ class Replayer:
         *,
         workflows: Sequence[type] = (),
         wasm_workflow_bundle: str | os.PathLike[str] | None = None,
+        wasm_addressable_store: str | os.PathLike[str] | None = None,
         workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None = None,
         workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
         unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
@@ -74,6 +75,7 @@ class Replayer:
         self._config = ReplayerConfig(
             workflows=list(workflows),
             wasm_workflow_bundle=wasm_workflow_bundle,
+            wasm_addressable_store=wasm_addressable_store,
             workflow_task_executor=(
                 workflow_task_executor or concurrent.futures.ThreadPoolExecutor()
             ),
@@ -98,6 +100,11 @@ class Replayer:
         for plugin in plugins:
             self._config = plugin.configure_replayer(self._config)
 
+        if (
+            self._config.get("wasm_addressable_store") is not None
+            and self._config.get("wasm_workflow_bundle") is None
+        ):
+            raise ValueError("wasm_addressable_store requires wasm_workflow_bundle")
         # Validate workflows after plugin configuration
         if (
             not self._config.get("workflows")
@@ -263,6 +270,7 @@ class Replayer:
                 task_queue=task_queue,
                 workflows=self._config.get("workflows", []),
                 wasm_workflow_bundle=self._config.get("wasm_workflow_bundle"),
+                wasm_addressable_store=self._config.get("wasm_addressable_store"),
                 workflow_task_executor=self._config.get("workflow_task_executor"),
                 max_concurrent_workflow_tasks=5,
                 workflow_runner=self._config.get("workflow_runner")
@@ -440,6 +448,7 @@ class ReplayerConfig(TypedDict, total=False):
 
     workflows: Sequence[type]
     wasm_workflow_bundle: str | os.PathLike[str] | None
+    wasm_addressable_store: str | os.PathLike[str] | None
     workflow_task_executor: concurrent.futures.ThreadPoolExecutor | None
     workflow_runner: WorkflowRunner
     unsandboxed_workflow_runner: WorkflowRunner

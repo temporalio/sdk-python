@@ -1,9 +1,10 @@
-use std::sync::Mutex;
+use std::{mem, path::PathBuf, sync::Mutex};
 
 use prost::Message;
 use pyo3::{exceptions::PyRuntimeError, prelude::*, types::PyBytes};
 use temporalio_common::protos::coresdk::{
-    workflow_activation::WorkflowActivation, workflow_completion::WorkflowActivationCompletion,
+    workflow_activation::WorkflowActivation,
+    workflow_completion::{workflow_activation_completion, WorkflowActivationCompletion},
 };
 use temporalio_workflow_wasm::activation::{
     ActivationComponent, ActivationInstance, LocalActivities,
@@ -19,10 +20,13 @@ pub(crate) struct WasmWorkflowBundle {
 #[pymethods]
 impl WasmWorkflowBundle {
     #[new]
-    fn new(py: Python<'_>, bytes: Vec<u8>) -> PyResult<Self> {
+    #[pyo3(signature = (bytes, addressable_store=None))]
+    fn new(py: Python<'_>, bytes: Vec<u8>, addressable_store: Option<PathBuf>) -> PyResult<Self> {
         py.detach(|| {
             let data_converter_profile = read_data_converter_profile(&bytes)?;
-            let component = ActivationComponent::new(&bytes).map_err(runtime_error)?;
+            let component =
+                ActivationComponent::with_addressable_store(&bytes, addressable_store.as_deref())
+                    .map_err(runtime_error)?;
             Ok(Self {
                 component,
                 data_converter_profile,
@@ -94,19 +98,33 @@ pub(crate) struct WasmWorkflowInstance(Mutex<ActivationInstance>);
 impl WasmWorkflowInstance {
     fn activate<'py>(&self, py: Python<'py>, bytes: Vec<u8>) -> PyResult<Bound<'py, PyBytes>> {
         let completion = py.detach(|| {
-            let act = WorkflowActivation::decode(bytes.as_slice()).map_err(runtime_error)?;
-            let output = self
+            let mut act = WorkflowActivation::decode(bytes.as_slice()).map_err(runtime_error)?;
+            let recorded = mem::take(&mut act.wasm_function_bindings);
+            let guest_bytes = if recorded.is_empty() {
+                bytes
+            } else {
+                act.encode_to_vec()
+            };
+            let (output, used_bindings) = self
                 .0
                 .lock()
                 .map_err(runtime_error)?
-                .activate(&bytes)
+                .activate_with_bindings(&guest_bytes, act.is_replaying, recorded)
                 .map_err(runtime_error)?;
-            let completion =
+            let mut completion =
                 WorkflowActivationCompletion::decode(output.as_slice()).map_err(runtime_error)?;
             if completion.run_id != act.run_id || completion.status.is_none() {
                 return Err(PyRuntimeError::new_err(
                     "Invalid WASM workflow activation completion",
                 ));
+            }
+            if let Some(workflow_activation_completion::Status::Successful(success)) =
+                &mut completion.status
+            {
+                if !used_bindings.is_empty() || !success.wasm_function_bindings.is_empty() {
+                    success.wasm_function_bindings = used_bindings;
+                    return Ok(completion.encode_to_vec());
+                }
             }
             Ok(output)
         })?;

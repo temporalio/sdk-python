@@ -1186,6 +1186,37 @@ export TEMPORAL_WASM_NATIVE_DEPENDENCY_PATH=./guest-native-dependencies
 
 Run `poe test -n 0 tests/worker/test_workflow_wasm.py`.
 
+##### Content-addressed subroutines (experimental)
+
+List the async functions you want to publish independently in a manifest such
+as `addressable.json` containing `{"demo.score": "steps:score"}`. A workflow can
+import `score` from `steps` and call `await score(value)` as usual. Add
+`--addressable-manifest addressable.json` to the workflow bundle build. The
+builder installs a dispatch stub for each listed module.
+
+Publish the original function bodies before starting the worker. Run the same
+command with updated sources to publish a new revision.
+
+```sh
+python scripts/build_workflow_wasm.py --source ./src \
+    --addressable-manifest addressable.json --publish-addressables ./wasm-content
+```
+
+Pass `wasm_addressable_store="./wasm-content"` alongside `wasm_workflow_bundle`
+to `Worker` and `Replayer`. Roll workers on the task queue to pick up a new
+publication. Each live Workflow Task records one digest per called slot in
+its completion metadata. Replay uses those digests. Keep all referenced
+`.wasm` files in the store for the lifetime of any history you need to replay.
+
+This prototype supports one undecorated `async (int) -> int` entry point per
+dedicated module. A hash covers the module's canonicalized Python source
+packaged in a Wasm data section, including its private helpers. The workflow's
+CPython guest loads that source, so calls can await workflow APIs directly.
+Libraries imported from the workflow bundle stay fixed with that bundle.
+
+With the WASM test dependencies above, run the rollout and cold replay demo
+with `poe test -n 0 tests/worker/test_workflow_wasm.py -k content_addressed`.
+
 #### Workflow Sandbox
 
 By default workflows are run in a sandbox to help avoid non-deterministic code. If a call that is known to be

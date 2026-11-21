@@ -17,10 +17,29 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class WasmFunctionBindingsEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        value: builtins.bytes
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: builtins.bytes = ...,
+        ) -> None: ...
+        def ClearField(
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        ) -> None: ...
+
     CORE_USED_FLAGS_FIELD_NUMBER: builtins.int
     LANG_USED_FLAGS_FIELD_NUMBER: builtins.int
     SDK_NAME_FIELD_NUMBER: builtins.int
     SDK_VERSION_FIELD_NUMBER: builtins.int
+    WASM_FUNCTION_BINDINGS_FIELD_NUMBER: builtins.int
     sdk_name: builtins.str
     """Name of the SDK that processed the task. This is usually something like "temporal-go" and is
     usually the same as client-name gRPC header. This should only be set if its value changed
@@ -71,6 +90,14 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
             aip.dev/not-precedent: These really shouldn't have negative values. --)
         """
 
+    @property
+    def wasm_function_bindings(
+        self,
+    ) -> google.protobuf.internal.containers.ScalarMap[builtins.str, builtins.bytes]:
+        """Experimental content-addressed WASM function bindings used by this task.
+        Keys are stable dispatch slots and values are SHA-256 digests.
+        """
+
     def __init__(
         self,
         *,
@@ -78,6 +105,8 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
         lang_used_flags: collections.abc.Iterable[builtins.int] | None = ...,
         sdk_name: builtins.str = ...,
         sdk_version: builtins.str = ...,
+        wasm_function_bindings: collections.abc.Mapping[builtins.str, builtins.bytes]
+        | None = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -90,6 +119,8 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
             b"sdk_name",
             "sdk_version",
             b"sdk_version",
+            "wasm_function_bindings",
+            b"wasm_function_bindings",
         ],
     ) -> None: ...
 
