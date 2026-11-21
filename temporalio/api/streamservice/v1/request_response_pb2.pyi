@@ -38,8 +38,9 @@ class CreateStreamRequest(google.protobuf.message.Message):
     ID_CONFLICT_POLICY_FIELD_NUMBER: builtins.int
     REQUEST_ID_FIELD_NUMBER: builtins.int
     stream_id: builtins.str
-    """Required. The id of the Stream to create. Callers treat it as opaque. An id is never used
-    for a second Stream, so a create for a closed or expired Stream fails.
+    """Required. The id of the Stream to create. Callers treat it as opaque. A create for a closed
+    or expired Stream fails. A Store can forget an expired Stream after a time of its choice,
+    and a create for its id succeeds after that.
     """
     id_conflict_policy: (
         temporalio.api.enums.v1.stream_pb2.StreamIdConflictPolicy.ValueType
@@ -125,7 +126,9 @@ class AppendRecordsRequest(google.protobuf.message.Message):
         self,
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.stream.v1.message_pb2.AppendRecord
-    ]: ...
+    ]:
+        """Required. A batch has at least one Record."""
+
     def __init__(
         self,
         *,
@@ -235,7 +238,7 @@ global___CloseStreamResponse = CloseStreamResponse
 class ReadRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
     Reads one page of Records after an offset. When no Record is left, the read waits for a new
-    one, so a reader long-polls.
+    one or for the close of the Stream, so a reader long-polls.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -264,8 +267,9 @@ class ReadRecordsRequest(google.protobuf.message.Message):
     """
     @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:
-        """How long the read waits for a new Record before it returns an empty page. When it's unset,
-        the read returns immediately. The deadline of the request must be longer than this wait.
+        """How long the read waits for a new Record, or for the close of the Stream, before it returns
+        an empty page. When it's unset, the read returns immediately. The deadline of the request
+        must be longer than this wait.
         """
 
     def __init__(
@@ -310,9 +314,10 @@ class ReadRecordsResponse(google.protobuf.message.Message):
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     DONE_FIELD_NUMBER: builtins.int
     last_offset: builtins.bytes
-    """The offset of the last Record in this page. The next read passes it as `from_offset`. For
-    an empty page it's the `from_offset` of the request, so it's empty only when the request
-    had none, and the next read then starts where this one did.
+    """Where the next read goes on. The next read passes it as `from_offset`. It's never before
+    the last Record in this page, and it never skips a Record, but it can be after entries of
+    the Store that aren't Records. For an empty page it can be the `from_offset` of the
+    request, which is empty when the request had none.
     """
     done: builtins.bool
     """True when the Stream is closed and this page has its last Record. A read has no other sign
@@ -379,7 +384,9 @@ class DescribeStreamResponse(google.protobuf.message.Message):
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     status: temporalio.api.enums.v1.stream_pb2.StreamStatus.ValueType
     last_offset: builtins.bytes
-    """The offset of the newest Record. It's empty when the Stream has no Record."""
+    """The offset of the newest Record, or an offset after it that skips no Record. A read from it
+    returns only the Records that come later. It's empty when the Stream has no Record.
+    """
     def __init__(
         self,
         *,
