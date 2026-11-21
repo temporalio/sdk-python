@@ -7,11 +7,19 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 import google.protobuf.message
 import nexusrpc
 
+import temporalio.activity
+import temporalio.bridge.streams
+
+# pydoctor reads this module before the client package, for the worker modules that
+# import it. A `from` import of a sibling here would lose the package's re-exports.
+import temporalio.client
+import temporalio.nexus.system._support
 from temporalio.api.enums.v1 import StreamErrorReason
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
@@ -25,12 +33,20 @@ from temporalio.api.streamservice.v1 import (
     ReadRecordsRequest,
     ReadRecordsResponse,
 )
-from temporalio.converter import StorageDriverActivityInfo, StorageDriverWorkflowInfo
+from temporalio.converter import (
+    PayloadCodec,
+    StorageDriverActivityInfo,
+    StorageDriverWorkflowInfo,
+)
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 from temporalio.exceptions import StreamError
-from temporalio.nexus.system.stream_service import StreamRef, StreamService
+from temporalio.nexus.system.stream_service import StreamRef, StreamService, models
 
 logger = logging.getLogger(__name__)
+
+_definition = nexusrpc.get_service_definition(StreamService)
+assert _definition
+_STREAM_SERVICE: nexusrpc.ServiceDefinition = _definition
 
 
 class StreamStore(ABC):
@@ -348,6 +364,10 @@ class StreamConfig:
             )
         return selected
 
+    def _limits(self) -> tuple[int, int, int]:
+        """Return the three limits, in the order in which the bridge takes them."""
+        return self.max_record_bytes, self.max_batch_bytes, self.max_batch_records
+
 
 def _operation(
     name: str,
@@ -357,9 +377,7 @@ def _operation(
     """Return the :py:class:`StreamStore` method of a Stream operation, with the
     classes of its request message and of its response message.
     """
-    definition = nexusrpc.get_service_definition(StreamService)
-    assert definition
-    operation = definition.operation_definitions[name]
+    operation = _STREAM_SERVICE.operation_definitions[name]
     request, response = (
         _get_transfer_type_converter(model)
         for model in (operation.input_type, operation.output_type)
@@ -397,6 +415,107 @@ async def _call_method(
             reason=StreamErrorReason.STREAM_ERROR_REASON_STORE_CORRUPT,
         )
     return response
+
+
+async def _call_store(  # pyright: ignore[reportUnusedFunction]
+    store: StreamStore,
+    limits: tuple[int, int, int],
+    codec: PayloadCodec | None,
+    operation: str,
+    request: google.protobuf.message.Message,
+    timeout: timedelta | None = None,
+) -> google.protobuf.message.Message:
+    """Call a Store for client code, which is :py:func:`_call_method` with the
+    payload codec, the check of an append and a timeout.
+
+    The codec gets each body of an append and each Record of a read alone, with no
+    serialization context, since the reader of a Record can be any code. ``limits``
+    are those of the Stream config, from :py:meth:`StreamConfig._limits`.
+    """
+    if codec and isinstance(request, AppendRecordsRequest):
+        for appended in request.records:
+            [body] = await codec.encode([appended.body])
+            appended.body.CopyFrom(body)
+    if isinstance(request, AppendRecordsRequest):
+        # SDK Core checks an append of Workflow code the same way, so each path refuses
+        # the same batch before its Store gets it.
+        temporalio.bridge.streams.check_append(limits, request.SerializeToString())
+    try:
+        # A timeout of zero is no timeout, as for an RPC of the client.
+        async with asyncio.timeout(timeout.total_seconds() if timeout else None):
+            response = await _call_method(store, operation, request)
+    except TimeoutError as err:
+        raise StreamError(
+            f"The Stream Store '{store.name()}' didn't answer the {operation} call "
+            "within its rpc_timeout",
+            reason=StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE,
+        ) from err
+    if codec and isinstance(response, ReadRecordsResponse):
+        for record in response.records:
+            [body] = await codec.decode([record.body])
+            record.body.CopyFrom(body)
+    return response
+
+
+def _activity_target() -> StorageDriverActivityInfo | None:
+    """Return the running Activity as the target of a Stream call, if there is one."""
+    if not temporalio.activity.in_activity():
+        return None
+    info = temporalio.activity.info()
+    return StorageDriverActivityInfo(
+        id=info.activity_id,
+        type=info.activity_type,
+        run_id=info.activity_run_id,
+        namespace=info.namespace,
+    )
+
+
+async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]
+    client: temporalio.client.Client,
+    input: temporalio.client.StartNexusOperationInput,
+) -> temporalio.client.NexusOperationHandle[Any]:
+    """Call the Stream Store of a Stream operation of a client, and return a handle
+    that has its result.
+    """
+    stream_config = client._config["stream_config"]
+    if stream_config is None:
+        raise ValueError(
+            "Client has no stream_config, which every Stream call requires."
+        )
+    request = input.arg
+    store = stream_config._store_for(request.ref, _activity_target())
+    if isinstance(request, models.CreateStreamRequest):
+        # The created Stream takes the ref of its request.
+        request.ref.store = store.name()
+    data_converter = client.data_converter
+    converters = (
+        data_converter.payload_converter,
+        data_converter.failure_converter,
+    )
+    response = await _call_store(
+        store,
+        stream_config._limits(),
+        data_converter.payload_codec,
+        input.operation,
+        temporalio.nexus.system._support.model_to_proto(request, *converters),
+        input.rpc_timeout,
+    )
+    # Each generated Stream call gives its result type.
+    result_type: Any = input.result_type
+    handle: temporalio.client.NexusOperationHandle[Any] = (
+        temporalio.client.NexusOperationHandle(
+            client,
+            input.id,
+            result_type=result_type,
+            endpoint=input.endpoint,
+            service=input.service,
+            operation=input.operation,
+        )
+    )
+    handle._known_outcome = temporalio.nexus.system._support.model_from_proto(
+        response, result_type, *converters
+    )
+    return handle
 
 
 class _StoreCaller:  # pyright: ignore[reportUnusedClass]

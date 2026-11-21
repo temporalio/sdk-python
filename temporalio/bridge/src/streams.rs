@@ -239,6 +239,33 @@ pub fn call_stream_store<'p>(
     }
 }
 
+/// Returns the limits of a Stream config, which Python gives as its `max_record_bytes`,
+/// `max_batch_bytes` and `max_batch_records`.
+fn store_limits(
+    (max_record_bytes, max_batch_bytes, max_batch_records): (usize, usize, usize),
+) -> PyResult<StoreLimits> {
+    StoreLimits::default()
+        .with_max_record_bytes(max_record_bytes)
+        .and_then(|limits| limits.with_max_batch_bytes(max_batch_bytes))
+        .and_then(|limits| limits.with_max_batch_records(max_batch_records))
+        .map_err(|err| PyValueError::new_err(err.message))
+}
+
+/// Checks an encoded append of client code as the runtime of a Worker checks one of Workflow
+/// code, with the limits of the Stream config. Client code reaches its Store through no such
+/// runtime. Raises `StreamError` for an append that the check refuses.
+#[pyfunction]
+pub fn check_stream_append(
+    limits: (usize, usize, usize),
+    request: &Bound<'_, PyBytes>,
+) -> PyResult<()> {
+    let request = Message::decode(request.as_bytes())
+        .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
+    store_limits(limits)?
+        .check_append(&request)
+        .map_err(|err| stream_error(err.reason.into(), err.message))
+}
+
 /// Returns a `temporalio.exceptions.StreamError`, or the error that building it raised.
 fn stream_error(reason: StreamErrorReason, message: String) -> PyErr {
     Python::attach(|py| {
