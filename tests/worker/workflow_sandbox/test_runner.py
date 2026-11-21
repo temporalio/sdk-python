@@ -452,41 +452,45 @@ async def test_workflow_sandbox_known_issues(client: Client):
 @workflow.defn
 class BadAsyncioWorkflow:
     @workflow.run
-    async def run(self) -> list[str]:
+    async def run(self, call: str) -> None:
         # Two known bad asyncio task calls, as_completed and wait
         async def return_value(value: str) -> str:
             return value
 
-        ret = []
-        for coro in asyncio.as_completed([return_value("val1"), return_value("val2")]):
-            ret.append(await coro)
-        done, _ = await asyncio.wait(
-            [
-                asyncio.create_task(return_value("val3")),
-                asyncio.create_task(return_value("val4")),
-            ]
-        )
-        for task in done:
-            ret.append(await task)
-        return ret
+        task = asyncio.create_task(return_value("val1"))
+        try:
+            if call == "as_completed":
+                for coro in asyncio.as_completed([task]):
+                    await coro
+            else:
+                await asyncio.wait([task])
+        except RestrictedWorkflowAccessError as err:
+            raise ApplicationError(
+                str(err), type="RestrictedWorkflowAccessError"
+            ) from err
 
 
-async def test_workflow_sandbox_bad_asyncio(client: Client):
+@pytest.mark.parametrize(
+    "call,alternative",
+    [("as_completed", "workflow.as_completed()"), ("wait", "workflow.wait()")],
+)
+async def test_workflow_sandbox_bad_asyncio(
+    client: Client, call: str, alternative: str
+):
     async with new_worker(client, BadAsyncioWorkflow) as worker:
-        # We currently warn on this
-        with pytest.warns(UserWarning) as warnings:
-            result = await client.execute_workflow(
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
                 BadAsyncioWorkflow.run,
+                call,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        assert "val1" in result[:2]
-        assert "val2" in result[:2]
-        assert "val3" in result[2:]
-        assert "val4" in result[2:]
-        assert len(warnings) == 2
-        assert "asyncio.as_completed()" in str(warnings[0].message)
-        assert "asyncio.wait()" in str(warnings[1].message)
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "RestrictedWorkflowAccessError"
+        assert (
+            f"asyncio.{call}() is non-deterministic, use {alternative} instead"
+            in err.value.cause.message
+        )
 
 
 @workflow.defn

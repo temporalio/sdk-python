@@ -589,7 +589,6 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                     children={
                         "__call__": SandboxMatcher(
                             match_self=True,
-                            leaf_warning=UserWarning,
                             leaf_message="asyncio.as_completed() is non-deterministic, use workflow.as_completed() instead",
                         )
                     },
@@ -598,7 +597,6 @@ SandboxRestrictions.invalid_module_members_default = SandboxMatcher(
                     children={
                         "__call__": SandboxMatcher(
                             match_self=True,
-                            leaf_warning=UserWarning,
                             leaf_message="asyncio.wait() is non-deterministic, use workflow.wait() instead",
                         )
                     },

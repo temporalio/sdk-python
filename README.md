@@ -669,7 +669,7 @@ class GreetingWorkflow:
 
             # Wait for salutation update or complete signal (this can be
             # cancelled)
-            await asyncio.wait(
+            await workflow.wait(
                 [
                     asyncio.create_task(self._greeting_info_update.wait()),
                     asyncio.create_task(self._complete.wait()),
@@ -884,6 +884,8 @@ deterministic:
 
 * `asyncio.as_completed()` - use `workflow.as_completed()`
 * `asyncio.wait()` - use `workflow.wait()`
+
+The sandbox raises `RestrictedWorkflowAccessError` if the `asyncio` versions are called from a workflow.
 
 `asyncio.TaskGroup` tracks tasks in a `set()`, so cancellation order can differ between execution and replay.
 This can cause non-determinism errors, even if the workflow catches the task group's exception and completes
