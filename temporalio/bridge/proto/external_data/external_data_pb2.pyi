@@ -146,8 +146,8 @@ global___PatchedMarkerData = PatchedMarkerData
 @typing.final
 class StreamMarkerData(google.protobuf.message.Message):
     """The data of a `core_stream` marker. Core records one in each Workflow Task in which Workflow
-    code got a Stream result or asked for a close. The marker has these details:
-    * `data` has this message as JSON, with each `bytes` field as lower-case hex.
+    code got a Stream result or asked for a close. The marker has these details.
+    * `data` holds this message as JSON, with each `bytes` field in lower-case hex.
     * `records` has the body of each Record of the reads with `records_in_history`, one payload for
       each. They're in the order of `reads`, and those of one read in the order of its Stream. It's
       absent if the marker has no such Record.
@@ -155,11 +155,11 @@ class StreamMarkerData(google.protobuf.message.Message):
       same order. Each is its `temporalio.api.stream.v1.StreamRecord` with no body, with its length
       before it as a varint. It's absent if `records` is.
 
-    History keeps each marker, and every later version of Core reads it. So these rules hold for
-    each message of the marker:
-    * A field keeps its name, which is its key in the JSON.
-    * A new field is `optional`, since the markers of an earlier version don't have it.
-    * A new `repeated` field has `#[serde(default)]` in `build.rs`, for the same reason.
+    Every later version of Core must read the markers in History, so these rules apply to each
+    message of the marker.
+    * A field never changes its name, because the name is its key in the JSON.
+    * A new field is `optional`, because older markers don't have it.
+    * A new `repeated` field gets `#[serde(default)]` in `build.rs`, for the same reason.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -338,7 +338,7 @@ class StreamFailure(google.protobuf.message.Message):
     MESSAGE_FIELD_NUMBER: builtins.int
     reason: builtins.str
     """The name of the `temporalio.api.enums.v1.StreamErrorReason`, such as
-    `STREAM_ERROR_REASON_CLOSED`. History has the name for good, so a reason keeps its name.
+    `STREAM_ERROR_REASON_CLOSED`. History stores the name, so a reason must never change its name.
     """
     message: builtins.str
     """The message of the failure, of at most 4096 bytes."""

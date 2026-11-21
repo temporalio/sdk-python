@@ -2549,6 +2549,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
         if (
             command_info.command_type
+            == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_UNSPECIFIED
+        ):
+            # The body of a Stream Record, which any code may read, so it has no context
+            return None
+
+        if (
+            command_info.command_type
             == temporalio.api.enums.v1.command_type_pb2.CommandType.COMMAND_TYPE_SCHEDULE_ACTIVITY_TASK
             and command_info.command_seq in self._pending_activities
         ):

@@ -1971,40 +1971,40 @@ global___RequestCancelNexusOperation = RequestCancelNexusOperation
 
 @typing.final
 class AppendToStream(google.protobuf.message.Message):
-    """Appends Records to a Stream as the Workflow's Producer. The result comes in a
-    `ResolveStreamAppend` job. Core makes the request id of the append.
+    """Appends Records to a Stream as the Workflow's Producer. Core makes the request id of the append
+    and sends the result in a `ResolveStreamAppend` job.
 
     An append is at-least-once. A later attempt of the Workflow Task writes it again, on this Worker
-    or another. A try that reaches the Store after more batches than the Store remembers is written
-    again too, after them.
+    or on another one.
 
-    No command stops an append, so lang takes the job of an append whose awaiter is gone. Core drops
-    an append that has no result when the Workflow's last command comes, as it drops a Local
-    Activity. That append may have reached the Store or not, and lang gets no job for it.
+    No command cancels an append, so lang must accept the job of an append that nothing awaits.
+    When lang sends the Workflow's last command, Core drops each append that has no result, as it
+    does for a Local Activity. Such an append may or may not have reached the Store, and lang gets
+    no job for it.
 
-    The appends and the closes of one Stream reach the Store one at a time, in the order of their
-    commands. A close takes its place only once History has its intent. So an append that comes
-    after a `CloseStream`, before History has the task of that close, is written before the close.
+    Core sends the appends and the closes of one Stream to the Store one at a time, in the order of
+    their commands. A close gets its place in that order only when History has its intent. So an
+    append that lang sends after a `CloseStream`, but before History has the task of that close, is
+    written before the close.
 
-    Core fails the Workflow Task, and gives lang no failure of the append, in these cases:
+    Core fails the Workflow Task in each of these cases, and gives lang no failure of the append.
     * `seq` is 0, or isn't above the `seq` of the append before it.
     * `stream` is unset, its id is empty or longer than 4096 bytes, or its Store name is longer than
       4096 bytes.
     * The Worker has no Stream runtime for the Store of `stream`.
-    * The append waits to try again when the heartbeat of the Workflow Task comes, because the Store
-      answered `StoreUnavailable`, gave no answer or panicked. The message of that failure starts
-      with `StreamStoreUnavailable:`.
+    * The append must wait for the task's heartbeat to try again, because the Store answered
+      `StoreUnavailable`, gave no answer or panicked. The failure message then starts with
+      `StreamStoreUnavailable:`.
 
     An append with no `bodies`, or with a batch over the limits of its Store, doesn't fail the
     Workflow Task. Lang gets a `failed` job for it.
 
-    In a replay, Core compares the `seq` and the `stream` of the command with History, and not its
-    `bodies`. A `stream` with no Store name matches any Store of History. An append with no result
-    in History runs again once the replay is over, as a later attempt, so a reader of the Stream can
-    see its batch twice.
+    In a replay, Core compares the `seq` and the `stream` of the command with History, but not the
+    `bodies`. A `stream` with no Store name matches any Store in History. An append with no result
+    in History runs again after the replay, as a later attempt, so a reader can see its batch twice.
 
-    A completion of the Workflow Task while an append has no result in a marker forces a new task,
-    unless it has the Workflow's last command.
+    If lang completes the Workflow Task while an append has no result in a marker, Core forces a new
+    task, unless the completion has the Workflow's last command.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2044,19 +2044,19 @@ global___AppendToStream = AppendToStream
 
 @typing.final
 class CloseStream(google.protobuf.message.Message):
-    """Closes a Stream. The Workflow Task that sends the command records only the intent to close, and
-    Core closes the Stream once History has that task. The result comes in a `ResolveStreamClose`
-    job of a later task, so a close needs at least one more Workflow Task.
+    """Closes a Stream. The Workflow Task that sends the command records only the intent to close.
+    Core closes the Stream when History has that task, and sends the result in a
+    `ResolveStreamClose` job of a later task. So a close needs at least one more Workflow Task.
 
-    These rules of `AppendToStream` hold for a close too:
-    * No command stops it.
-    * Core drops it when the Workflow's last command comes and it has no result.
+    These rules of `AppendToStream` apply to a close too.
+    * No command cancels it.
+    * Core drops it if it has no result when lang sends the Workflow's last command.
     * The same cases fail the Workflow Task.
     * A replay compares the command with History in the same way.
-    * A completion of the Workflow Task while it has no result in a marker forces a new task.
+    * If lang completes the task while the close has no result in a marker, Core forces a new task.
 
-    Workflow code that needs its close awaits the result before its last command. A close whose
-    intent is in History with no result runs again once a replay is over.
+    Workflow code that needs its close must await the result before its last command. A close whose
+    intent is in History with no result runs again after a replay.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
