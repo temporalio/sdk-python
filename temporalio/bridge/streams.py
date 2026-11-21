@@ -1,0 +1,42 @@
+"""Stream Store calls through SDK Core. (unstable)
+
+Nothing in this module should be considered stable. The API may change.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable
+from typing import Any, Protocol
+
+import temporalio.bridge.runtime
+import temporalio.bridge.temporal_sdk_bridge
+
+
+class StoreCaller(Protocol):
+    """What SDK Core calls to reach a Stream Store that is a Python object."""
+
+    async def call(
+        self,
+        operation: str,
+        request: bytes,
+        on_task: Callable[[asyncio.Task[Any]], None],
+    ) -> bytes:
+        """Call the Store for a Stream operation with its encoded request, and
+        return its encoded response.
+        """
+        ...
+
+
+async def call_stream_store(
+    runtime: temporalio.bridge.runtime.Runtime,
+    caller: StoreCaller,
+    operation: str,
+    request: bytes,
+) -> bytes:
+    """Call a Stream Store through the Stream runtime of SDK Core, which checks
+    the request and the response.
+    """
+    return await temporalio.bridge.temporal_sdk_bridge.call_stream_store(
+        runtime._ref, caller, operation, request
+    )
