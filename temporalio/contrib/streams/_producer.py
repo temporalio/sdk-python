@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import temporalio.api.stream.v1
-import temporalio.client._stream_store
 import temporalio.converter._payload_converter
 import temporalio.nexus.system._support
 import temporalio.workflow
@@ -14,23 +13,23 @@ def current_producer() -> Producer:
     """Give the Producer that an append or a close of the calling code sends by default.
 
     An ``append`` or a ``close`` with no ``producer=`` sends this Producer. In an
-    Activity or a Local Activity it is the Producer of the current attempt. In any other
-    code it is the client Producer of this process. It does no I/O.
+    Activity or a Local Activity it is the Producer of the current attempt. In Workflow
+    code it is the Workflow's Producer. In any other code it is the client Producer of
+    this process. It does no I/O.
+
+    On a Store, an append or a close of Workflow code writes as this Producer, with the
+    Workflow Task that runs it as its epoch.
 
     An Activity can keep the result and pass it to a later ``append`` or ``close`` with
     ``producer=``. That call then writes as this Producer with its epoch, also in a
     later attempt. Heartbeat details give it back as its proto message, so pass it
     through :py:func:`as_producer` first.
 
-    Raises:
-        RuntimeError: It runs in Workflow code, which can't call a Stream in this
-            version.
-
     .. warning::
         This API is experimental and subject to change.
     """
     if temporalio.workflow.in_workflow():
-        raise temporalio.client._stream_store._workflow_stream_call_error()
+        return temporalio.nexus.system._support.workflow_producer()
     return temporalio.nexus.system._support.default_producer()
 
 

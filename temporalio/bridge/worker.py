@@ -5,9 +5,12 @@ Nothing in this module should be considered stable. The API may change.
 
 from __future__ import annotations
 
+import dataclasses
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import (
+    Any,
     TypeAlias,
 )
 
@@ -60,6 +63,20 @@ class WorkerConfig:
     plugins: Sequence[tuple[str, str]]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
+    stream_runtimes: Sequence[tuple[str, Any]] = ()
+    """The bridge's object of each Store's Stream runtime, by Store name."""
+    stream_read_ahead_bytes: int | None = None
+    """The most bytes of one read's Records that wait for Workflow code, or Core's default."""
+    stream_read_page_records: int | None = None
+    """The most Records of one read in one activation, or Core's default."""
+    stream_read_min_gap: timedelta | None = None
+    """The least time between two batches of one read, or Core's default of no gap."""
+    stream_replay_as_workflow_fail: bool = False
+    """Whether a replay that lost the Records of a read fails the Workflow."""
+    stream_replay_as_workflow_fail_for_types: set[str] = dataclasses.field(
+        default_factory=set
+    )
+    """The Workflow types for which such a replay fails the Workflow."""
 
 
 @dataclass
@@ -368,6 +385,7 @@ async def encode_completion(
                 skip_search_attributes=True,
                 skip_headers=not encode_headers,
                 concurrency_limit=storage_concurrency_limit,
+                skip_stream_bodies=True,
             ).visit(
                 _Visitor(data_converter._external_store_payload_sequence),
                 completion,

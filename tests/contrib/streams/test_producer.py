@@ -22,9 +22,11 @@ from temporalio.nexus.system.stream_service import (
     ProducerKindWorkflowActivity,
     StreamRecord,
     StreamRef,
+    StreamStatus,
     WorkflowProducer,
 )
 from temporalio.nexus.system.stream_service.client import Stream
+from temporalio.nexus.system.stream_service.workflow import create_stream
 from temporalio.testing import ActivityEnvironment
 from tests.helpers import new_worker
 from tests.helpers.streams import DictStreamStore
@@ -122,25 +124,43 @@ async def test_current_producer_in_an_activity_is_its_attempt_producer(
 @workflow.defn
 class CurrentProducerWorkflow:
     @workflow.run
-    async def run(self) -> str:
-        try:
-            current_producer()
-        except RuntimeError as err:
-            return str(err)
-        return "no error"
+    async def run(self, stream_id: str) -> Producer:
+        stream = await create_stream(id=stream_id, body_type=str)
+        producer = current_producer()
+        await stream.append("a", producer=producer)
+        await stream.close(producer=producer)
+        return producer
 
 
-async def test_current_producer_in_workflow_code_raises(client: Client):
-    async with new_worker(client, CurrentProducerWorkflow) as worker:
-        message = await client.execute_workflow(
+async def test_current_producer_in_workflow_code_is_the_workflow_producer(
+    client: Client,
+):
+    stream_client = _with_store(client, DictStreamStore())
+    stream_id = f"stream-{uuid.uuid4()}"
+    async with new_worker(stream_client, CurrentProducerWorkflow) as worker:
+        handle = await stream_client.start_workflow(
             CurrentProducerWorkflow.run,
+            stream_id,
             id=f"workflow-{uuid.uuid4()}",
             task_queue=worker.task_queue,
         )
-    assert message == (
-        "Workflow code can't call a Stream in this version. Call it from an Activity "
-        "through activity.client()."
+        producer = await handle.result()
+    run_id = handle.result_run_id
+    assert run_id
+    assert producer == Producer(
+        id=f"wf:{run_id}", kind=ProducerKindWorkflow(WorkflowProducer(run_id=run_id))
     )
+    # On a Store, the append writes as the Workflow, with its Workflow Task as the epoch.
+    # The close passes the Store's check of that epoch too.
+    stream = stream_client.get_stream(StreamRef(id=stream_id), body_type=str)
+    [record] = await _records(stream)
+    assert record.producer is not None
+    assert record.producer.id == producer.id
+    assert isinstance(record.producer.kind, ProducerKindWorkflow)
+    assert record.producer.kind.value.epoch is not None
+    assert record.producer.kind.value.epoch.attempt == 1
+    described = await stream.describe()
+    assert described.status == StreamStatus.StreamStatusClosed
 
 
 @pytest.mark.parametrize("kind", ["workflow", *_ACTIVITY_INFOS, "client"])

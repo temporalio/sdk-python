@@ -28,9 +28,10 @@ notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 NEX_GEN_VERSION = "0.2.8"
 # The Stream package needs a newer nexgen, which rejects the other WITs. One pin is enough
-# again once the api WITs and a nexgen release agree. The read, read pages and read page methods
-# of a poll are only in commit 07b565b6 of the fork https://github.com/moetemp/nexgen. So
-# NEX_GEN_STREAM_BIN points at a build of that commit.
+# again once the api WITs and a nexgen release agree. The Stream WIT uses `@nexus.helper` with
+# `sync=true` and `@nexus.support-type`, which only the fork https://github.com/moetemp/nexgen
+# has. Its commit 07b565b6 also has the poll iterators of the Workflow target and the read, read
+# pages and read page methods of a poll. So NEX_GEN_STREAM_BIN points at a build of that commit.
 NEX_GEN_STREAM_VERSION = "0.2.12"
 proto_files = [
     gen_protos.api_proto_dir

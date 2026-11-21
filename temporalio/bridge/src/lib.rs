@@ -6,6 +6,7 @@ mod client_rpc_generated;
 mod envconfig;
 mod metric;
 mod runtime;
+mod streams;
 mod testing;
 mod worker;
 
@@ -51,6 +52,10 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         "register",
         (wrap_pyfunction!(runtime::shutdown_runtimes, m)?,),
     )?;
+
+    // Stream stuff
+    m.add_class::<streams::StreamRuntimeRef>()?;
+    m.add_function(wrap_pyfunction!(new_python_stream_runtime, m)?)?;
 
     // Testing stuff
     m.add_class::<testing::EphemeralServerRef>()?;
@@ -106,6 +111,23 @@ fn init_runtime(options: runtime::RuntimeOptions) -> PyResult<runtime::RuntimeRe
 #[pyfunction]
 fn raise_in_thread(py: Python, thread_id: std::os::raw::c_long, exc: &Bound<'_, PyAny>) -> bool {
     runtime::raise_in_thread(py, thread_id, exc)
+}
+
+#[pyfunction]
+fn new_python_stream_runtime(
+    runtime_ref: &runtime::RuntimeRef,
+    caller: Py<PyAny>,
+    max_record_bytes: usize,
+    max_batch_bytes: usize,
+    max_batch_records: usize,
+) -> PyResult<streams::StreamRuntimeRef> {
+    streams::new_python_stream_runtime(
+        runtime_ref,
+        caller,
+        max_record_bytes,
+        max_batch_bytes,
+        max_batch_records,
+    )
 }
 
 #[pyfunction]

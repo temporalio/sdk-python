@@ -16,7 +16,7 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n%temporal/sdk/core/common/common.proto\x12\x0e\x63oresdk.common\x1a\x1egoogle/protobuf/duration.proto"U\n\x1bNamespacedWorkflowExecution\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t"D\n\x17WorkerDeploymentVersion\x12\x17\n\x0f\x64\x65ployment_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t"\x92\x01\n\x16\x45xternalStorageMetrics\x12\x15\n\rpayload_count\x18\x01 \x01(\x04\x12\x18\n\x10total_size_bytes\x18\x02 \x01(\x04\x12\x31\n\x0etotal_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x14\n\x0c\x64river_names\x18\x04 \x03(\t*@\n\x10VersioningIntent\x12\x0f\n\x0bUNSPECIFIED\x10\x00\x12\x0e\n\nCOMPATIBLE\x10\x01\x12\x0b\n\x07\x44\x45\x46\x41ULT\x10\x02\x42,\xea\x02)Temporalio::Internal::Bridge::Api::Commonb\x06proto3'
+    b'\n%temporal/sdk/core/common/common.proto\x12\x0e\x63oresdk.common\x1a\x1egoogle/protobuf/duration.proto"U\n\x1bNamespacedWorkflowExecution\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x13\n\x0bworkflow_id\x18\x02 \x01(\t\x12\x0e\n\x06run_id\x18\x03 \x01(\t"D\n\x17WorkerDeploymentVersion\x12\x17\n\x0f\x64\x65ployment_name\x18\x01 \x01(\t\x12\x10\n\x08\x62uild_id\x18\x02 \x01(\t"\x92\x01\n\x16\x45xternalStorageMetrics\x12\x15\n\rpayload_count\x18\x01 \x01(\x04\x12\x18\n\x10total_size_bytes\x18\x02 \x01(\x04\x12\x31\n\x0etotal_duration\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration\x12\x14\n\x0c\x64river_names\x18\x04 \x03(\t*\xc8\x01\n\x0eStreamReadStop\x12 \n\x1cSTREAM_READ_STOP_UNSPECIFIED\x10\x00\x12\x19\n\x15STREAM_READ_STOP_DONE\x10\x01\x12 \n\x1cSTREAM_READ_STOP_MAX_RECORDS\x10\x02\x12\x1e\n\x1aSTREAM_READ_STOP_MAX_BYTES\x10\x03\x12\x19\n\x15STREAM_READ_STOP_IDLE\x10\x04\x12\x1c\n\x18STREAM_READ_STOP_TIMEOUT\x10\x05*@\n\x10VersioningIntent\x12\x0f\n\x0bUNSPECIFIED\x10\x00\x12\x0e\n\nCOMPATIBLE\x10\x01\x12\x0b\n\x07\x44\x45\x46\x41ULT\x10\x02\x42,\xea\x02)Temporalio::Internal::Bridge::Api::Commonb\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -26,8 +26,10 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._serialized_options = (
         b"\352\002)Temporalio::Internal::Bridge::Api::Common"
     )
-    _VERSIONINGINTENT._serialized_start = 395
-    _VERSIONINGINTENT._serialized_end = 459
+    _STREAMREADSTOP._serialized_start = 396
+    _STREAMREADSTOP._serialized_end = 596
+    _VERSIONINGINTENT._serialized_start = 598
+    _VERSIONINGINTENT._serialized_end = 662
     _NAMESPACEDWORKFLOWEXECUTION._serialized_start = 89
     _NAMESPACEDWORKFLOWEXECUTION._serialized_end = 174
     _WORKERDEPLOYMENTVERSION._serialized_start = 176

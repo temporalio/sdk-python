@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import dataclasses
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
@@ -34,7 +33,7 @@ from temporalio.api.streamservice.v1 import (
     ReadRecordsRequest,
     ReadRecordsResponse,
 )
-from temporalio.client import StreamStore
+from temporalio.client import StreamBatchLimits, StreamStore
 from temporalio.exceptions import StreamError
 
 _RequestT = TypeVar("_RequestT", bound=Message)
@@ -106,6 +105,12 @@ class _DictStream:
     closed: bool = False
     # The id of a Producer is unique in one Stream.
     last_batches: dict[str, _LastBatch] = dataclasses.field(default_factory=dict)
+    changed: asyncio.Event = dataclasses.field(default_factory=asyncio.Event)
+
+    def wake(self) -> None:
+        """Wake the reads that wait, and give later reads a new event."""
+        self.changed.set()
+        self.changed = asyncio.Event()
 
 
 def _offset(index: int) -> bytes:
@@ -142,18 +147,26 @@ class DictStreamStore(StreamStore):
 
     It has no Retention and no expiry, and it checks no request. It resends the answer
     of a batch that comes again with the same Producer, epoch and sequence, and it
-    fences a Producer whose epoch is lower than its newest one. A read waits for a new
-    Record up to the ``wait`` of its request.
+    fences a Producer whose epoch is lower than its newest one. A read with a ``wait``
+    waits for an append or a close, as Core needs for Workflow code.
+    :py:attr:`waiting` counts the reads that wait, so a test sees one that stays.
     """
 
-    def __init__(self, name: str = "dict") -> None:
+    def __init__(
+        self, name: str = "dict", *, limits: StreamBatchLimits | None = None
+    ) -> None:
         self._name = name
+        self._limits = limits if limits is not None else StreamBatchLimits()
         self.streams: dict[str, _DictStream] = {}
-        self._changed = asyncio.Condition()
+        self.waiting = 0
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def limits(self) -> StreamBatchLimits:
+        return self._limits
 
     def _stream(self, ref: StreamRef) -> _DictStream:
         stream = self.streams.get(ref.id)
@@ -163,10 +176,6 @@ class DictStreamStore(StreamStore):
                 reason=StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND,
             )
         return stream
-
-    async def _notify(self) -> None:
-        async with self._changed:
-            self._changed.notify_all()
 
     async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
         ref = StreamRef(id=request.stream_ref.id, store=self.name)
@@ -219,22 +228,22 @@ class DictStreamStore(StreamStore):
             first_offset=_offset(first), last_offset=_offset(len(stream.records))
         )
         stream.last_batches[request.producer.id] = _LastBatch(epoch, sequence, response)
-        await self._notify()
+        if request.records:
+            stream.wake()
         return response
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
         stream = self._stream(request.ref)
         start = int.from_bytes(request.from_offset, "big") if request.from_offset else 0
-        wait = request.wait.ToTimedelta()
-        if wait and start >= len(stream.records) and not stream.closed:
-            async with self._changed:
-                with contextlib.suppress(TimeoutError):
-                    await asyncio.wait_for(
-                        self._changed.wait_for(
-                            lambda: len(stream.records) > start or stream.closed
-                        ),
-                        wait.total_seconds(),
-                    )
+        wait = request.wait.ToTimedelta().total_seconds()
+        if start >= len(stream.records) and not stream.closed and wait > 0:
+            self.waiting += 1
+            try:
+                await asyncio.wait_for(stream.changed.wait(), wait)
+            except TimeoutError:
+                pass
+            finally:
+                self.waiting -= 1
         page = stream.records[start : start + (request.max_records or 1000)]
         last_offset = page[-1].offset if page else request.from_offset
         return ReadRecordsResponse(
@@ -244,8 +253,9 @@ class DictStreamStore(StreamStore):
         )
 
     async def close_stream(self, request: CloseStreamRequest) -> CloseStreamResponse:
-        self._stream(request.ref).closed = True
-        await self._notify()
+        stream = self._stream(request.ref)
+        stream.closed = True
+        stream.wake()
         return CloseStreamResponse()
 
     async def describe_stream(

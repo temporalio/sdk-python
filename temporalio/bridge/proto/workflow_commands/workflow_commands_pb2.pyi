@@ -25,6 +25,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.stream.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -105,6 +106,10 @@ class WorkflowCommand(google.protobuf.message.Message):
     UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
     SCHEDULE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    START_STREAM_READ_FIELD_NUMBER: builtins.int
+    CLOSE_STREAM_READ_FIELD_NUMBER: builtins.int
+    APPEND_TO_STREAM_FIELD_NUMBER: builtins.int
+    CLOSE_STREAM_FIELD_NUMBER: builtins.int
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """User metadata that may or may not be persisted into history depending on the command type.
@@ -181,6 +186,14 @@ class WorkflowCommand(google.protobuf.message.Message):
     def request_cancel_nexus_operation(
         self,
     ) -> global___RequestCancelNexusOperation: ...
+    @property
+    def start_stream_read(self) -> global___StartStreamRead: ...
+    @property
+    def close_stream_read(self) -> global___CloseStreamRead: ...
+    @property
+    def append_to_stream(self) -> global___AppendToStream: ...
+    @property
+    def close_stream(self) -> global___CloseStream: ...
     def __init__(
         self,
         *,
@@ -219,10 +232,16 @@ class WorkflowCommand(google.protobuf.message.Message):
         schedule_nexus_operation: global___ScheduleNexusOperation | None = ...,
         request_cancel_nexus_operation: global___RequestCancelNexusOperation
         | None = ...,
+        start_stream_read: global___StartStreamRead | None = ...,
+        close_stream_read: global___CloseStreamRead | None = ...,
+        append_to_stream: global___AppendToStream | None = ...,
+        close_stream: global___CloseStream | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
+            "append_to_stream",
+            b"append_to_stream",
             "cancel_child_workflow_execution",
             b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
@@ -231,6 +250,10 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
+            "close_stream",
+            b"close_stream",
+            "close_stream_read",
+            b"close_stream_read",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -261,6 +284,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"signal_external_workflow_execution",
             "start_child_workflow_execution",
             b"start_child_workflow_execution",
+            "start_stream_read",
+            b"start_stream_read",
             "start_timer",
             b"start_timer",
             "update_response",
@@ -276,6 +301,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing.Literal[
+            "append_to_stream",
+            b"append_to_stream",
             "cancel_child_workflow_execution",
             b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
@@ -284,6 +311,10 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
+            "close_stream",
+            b"close_stream",
+            "close_stream_read",
+            b"close_stream_read",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -316,6 +347,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"signal_external_workflow_execution",
             "start_child_workflow_execution",
             b"start_child_workflow_execution",
+            "start_stream_read",
+            b"start_stream_read",
             "start_timer",
             b"start_timer",
             "update_response",
@@ -354,6 +387,10 @@ class WorkflowCommand(google.protobuf.message.Message):
             "update_response",
             "schedule_nexus_operation",
             "request_cancel_nexus_operation",
+            "start_stream_read",
+            "close_stream_read",
+            "append_to_stream",
+            "close_stream",
         ]
         | None
     ): ...
@@ -1931,3 +1968,211 @@ class RequestCancelNexusOperation(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["seq", b"seq"]) -> None: ...
 
 global___RequestCancelNexusOperation = RequestCancelNexusOperation
+
+@typing.final
+class StartStreamRead(google.protobuf.message.Message):
+    """Start a read of a Stream. Core reads the Store itself and gives each page of Records to the
+    workflow in a `ResolveStreamRead` job, until the read ends or the workflow closes it.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    FROM_OFFSET_FIELD_NUMBER: builtins.int
+    TIMEOUT_FIELD_NUMBER: builtins.int
+    IDLE_TIMEOUT_FIELD_NUMBER: builtins.int
+    MAX_RECORDS_FIELD_NUMBER: builtins.int
+    MAX_BYTES_FIELD_NUMBER: builtins.int
+    RECORDS_IN_HISTORY_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number of Stream reads, used as the read's identifier"""
+    from_offset: builtins.bytes
+    """The read starts after this offset. Empty means the start of the Stream."""
+    max_records: builtins.int
+    """The most Records the read gives. Zero means no cap."""
+    max_bytes: builtins.int
+    """The most bytes of Records the read gives. The first Record is always given. Zero means no
+    cap.
+    """
+    records_in_history: builtins.bool
+    """If set, the Records go into the workflow history, so a replay reads no Store."""
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    @property
+    def timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """The longest time the read may take. Unset means no bound. A set value of zero or less fails
+        the workflow task. A read that gave no Record yet looks at the Store once before its timeout
+        ends it.
+        """
+
+    @property
+    def idle_timeout(self) -> google.protobuf.duration_pb2.Duration:
+        """The read ends when no Record comes for this long. Unset means 1 minute. Zero gives the
+        Records that are in the Stream, and ends with no wait. A read that must wait longer sets a
+        longer value.
+        """
+
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        from_offset: builtins.bytes = ...,
+        timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        idle_timeout: google.protobuf.duration_pb2.Duration | None = ...,
+        max_records: builtins.int = ...,
+        max_bytes: builtins.int = ...,
+        records_in_history: builtins.bool = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "idle_timeout", b"idle_timeout", "stream", b"stream", "timeout", b"timeout"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "from_offset",
+            b"from_offset",
+            "idle_timeout",
+            b"idle_timeout",
+            "max_bytes",
+            b"max_bytes",
+            "max_records",
+            b"max_records",
+            "records_in_history",
+            b"records_in_history",
+            "seq",
+            b"seq",
+            "stream",
+            b"stream",
+            "timeout",
+            b"timeout",
+        ],
+    ) -> None: ...
+
+global___StartStreamRead = StartStreamRead
+
+@typing.final
+class CloseStreamRead(google.protobuf.message.Message):
+    """Stop a read that `StartStreamRead` started. The workflow gets no job for it."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's sequence number as passed to `StartStreamRead`"""
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["seq", b"seq"]) -> None: ...
+
+global___CloseStreamRead = CloseStreamRead
+
+@typing.final
+class AppendToStream(google.protobuf.message.Message):
+    """Append Records to a Stream. Core calls the Store itself and gives the result in a
+    `ResolveStreamAppend` job.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    BODIES_FIELD_NUMBER: builtins.int
+    PRODUCER_FIELD_NUMBER: builtins.int
+    SEQUENCE_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number of Stream appends, used as the append's identifier"""
+    sequence: builtins.int
+    """The `sequence` of the Store request, as the caller gives it. Zero means Core uses `seq`."""
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    @property
+    def bodies(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]:
+        """The bodies of the Records, in order"""
+
+    @property
+    def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
+        """The workflow's Producer, of kind workflow, with its id and run id and no epoch. Core sets the
+        epoch to the current workflow task.
+        """
+
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        bodies: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
+        producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
+        sequence: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["producer", b"producer", "stream", b"stream"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "bodies",
+            b"bodies",
+            "producer",
+            b"producer",
+            "seq",
+            b"seq",
+            "sequence",
+            b"sequence",
+            "stream",
+            b"stream",
+        ],
+    ) -> None: ...
+
+global___AppendToStream = AppendToStream
+
+@typing.final
+class CloseStream(google.protobuf.message.Message):
+    """Close a Stream. Core records the intent in this workflow task, closes the Stream after the
+    server took the task, and gives the result in a `ResolveStreamClose` job of a later task.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    PRODUCER_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number of Stream closes, used as the close's identifier"""
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    @property
+    def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
+        """The workflow's Producer, of kind workflow, with its id and run id and no epoch. Core sets the
+        epoch to the workflow task that recorded the close.
+        """
+
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        producer: temporalio.api.stream.v1.message_pb2.Producer | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["producer", b"producer", "stream", b"stream"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "producer", b"producer", "seq", b"seq", "stream", b"stream"
+        ],
+    ) -> None: ...
+
+global___CloseStream = CloseStream

@@ -5,7 +5,7 @@ use prost::Message;
 use pyo3::exceptions::{PyException, PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyTuple};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -65,6 +65,20 @@ pub struct WorkerConfig {
     plugins: Vec<(String, String)>,
     storage_drivers: HashSet<String>,
     disable_payload_error_limit: bool,
+    /// The Stream runtime of each Store, by Store name. Core reads and appends a Stream of
+    /// Workflow code through them.
+    stream_runtimes: Vec<(String, Py<crate::streams::StreamRuntimeRef>)>,
+    /// The most bytes of one read's Records that wait for Workflow code. `None` keeps Core's
+    /// default.
+    stream_read_ahead_bytes: Option<usize>,
+    /// The most Records of one read in one activation. `None` keeps Core's default.
+    stream_read_page_records: Option<usize>,
+    /// The least time between two batches of one read. `None` keeps Core's default of no gap.
+    stream_read_min_gap: Option<Duration>,
+    /// Whether a replay that lost the Records of a read fails the Workflow, for every type or
+    /// for the types listed.
+    stream_replay_as_workflow_fail: bool,
+    stream_replay_as_workflow_fail_for_types: HashSet<String>,
 }
 
 #[derive(FromPyObject)]
@@ -722,6 +736,44 @@ fn convert_worker_config(
 ) -> PyResult<temporalio_sdk_core::WorkerConfig> {
     let converted_tuner = convert_tuner_holder(conf.tuner, task_locals)?;
     let converted_versioning_strategy = convert_versioning_strategy(conf.versioning_strategy);
+    let stream_runtimes = temporalio_sdk_core::StreamRuntimes::new(
+        conf.stream_runtimes
+            .into_iter()
+            .map(|(store, runtime)| (store, runtime.get().streams.clone())),
+    );
+    let stream_runtimes = match conf.stream_read_ahead_bytes {
+        Some(bytes) => stream_runtimes.with_read_ahead_bytes(bytes),
+        None => stream_runtimes,
+    };
+    let stream_runtimes = match conf.stream_read_page_records {
+        Some(records) => stream_runtimes.with_read_page_records(records),
+        None => stream_runtimes,
+    };
+    let stream_runtimes = match conf.stream_read_min_gap {
+        Some(gap) => stream_runtimes.with_read_min_gap(gap),
+        None => stream_runtimes,
+    };
+    let mut workflow_failure_errors = HashSet::new();
+    if conf.nondeterminism_as_workflow_fail {
+        workflow_failure_errors.insert(WorkflowErrorType::Nondeterminism);
+    }
+    if conf.stream_replay_as_workflow_fail {
+        workflow_failure_errors.insert(WorkflowErrorType::StreamReplay);
+    }
+    let mut workflow_types_to_failure_errors: HashMap<String, HashSet<WorkflowErrorType>> =
+        HashMap::new();
+    for workflow_type in conf.nondeterminism_as_workflow_fail_for_types {
+        workflow_types_to_failure_errors
+            .entry(workflow_type)
+            .or_default()
+            .insert(WorkflowErrorType::Nondeterminism);
+    }
+    for workflow_type in conf.stream_replay_as_workflow_fail_for_types {
+        workflow_types_to_failure_errors
+            .entry(workflow_type)
+            .or_default()
+            .insert(WorkflowErrorType::StreamReplay);
+    }
     temporalio_sdk_core::WorkerConfig::builder()
         .namespace(conf.namespace)
         .task_queue(conf.task_queue)
@@ -751,22 +803,8 @@ fn convert_worker_config(
         // auto-cancel-activity behavior of shutdown will not occur, so we
         // always set it even if 0.
         .graceful_shutdown_period(Duration::from_millis(conf.graceful_shutdown_period_millis))
-        .workflow_failure_errors(if conf.nondeterminism_as_workflow_fail {
-            HashSet::from([WorkflowErrorType::Nondeterminism])
-        } else {
-            HashSet::new()
-        })
-        .workflow_types_to_failure_errors(
-            conf.nondeterminism_as_workflow_fail_for_types
-                .iter()
-                .map(|s| {
-                    (
-                        s.to_owned(),
-                        HashSet::from([WorkflowErrorType::Nondeterminism]),
-                    )
-                })
-                .collect(),
-        )
+        .workflow_failure_errors(workflow_failure_errors)
+        .workflow_types_to_failure_errors(workflow_types_to_failure_errors)
         .maybe_nexus_task_poller_behavior(conf.nexus_task_poller_behavior.map(Into::into))
         .plugins(
             conf.plugins
@@ -781,6 +819,7 @@ fn convert_worker_config(
                 .collect::<HashSet<_>>(),
         )
         .disable_payload_error_limit(conf.disable_payload_error_limit)
+        .stream_runtimes(stream_runtimes)
         .build()
         .map_err(|err| PyValueError::new_err(format!("Invalid worker config: {err}")))
 }

@@ -14,6 +14,7 @@ from typing import Generic, TypeVar
 from typing_extensions import Self
 
 import temporalio.nexus.system.stream_service.client
+import temporalio.workflow
 
 BodyT = TypeVar("BodyT")
 
@@ -32,8 +33,9 @@ class BufferedAppender(Generic[BodyT]):
     Records appended during a write wait for the next batch, and they keep their order. A batch
     holds at most ``max_batch_records`` Records.
 
-    It takes a client Stream, in a client or an Activity. It writes the buffered Records at
-    most ``max_delay`` after the first of them, or immediately when they fill a batch.
+    The appender writes the buffered Records at most ``max_delay`` after the first of them, or
+    immediately when they fill a batch. It is for client and Activity code. Workflow code can't
+    use it, and passes its Records to one ``append`` call of the Stream.
 
     Use it in ``async with``, which writes the remaining Records at the end of the block, or
     await :py:meth:`flush`. Without ``async with`` or a :py:meth:`flush`, the Records still in
@@ -62,7 +64,7 @@ class BufferedAppender(Generic[BodyT]):
         """Create an appender. It starts no write until the first append.
 
         Args:
-            stream: The client Stream to append to.
+            stream: The Stream to append to, from a client or from the client of an Activity.
             max_delay: The longest time that a Record waits in the buffer before its batch
                 starts to write. It must not be negative. ``None`` means 100 milliseconds.
             max_batch_records: The most Records of one batch, from 1 to 1,000. Set it to the
@@ -71,9 +73,15 @@ class BufferedAppender(Generic[BodyT]):
                 ``None`` means 1,000.
 
         Raises:
+            RuntimeError: The appender is built in Workflow code.
             ValueError: ``max_delay`` is negative, or ``max_batch_records`` is below 1 or
                 above 1,000.
         """
+        if temporalio.workflow.in_workflow():
+            raise RuntimeError(
+                "BufferedAppender is for client and Activity code. In Workflow code, pass "
+                "the Records to one append call."
+            )
         if max_delay is not None and max_delay < timedelta():
             raise ValueError("max_delay must not be negative")
         if max_batch_records is None:
@@ -89,6 +97,7 @@ class BufferedAppender(Generic[BodyT]):
         self._buffer: list[BodyT] = []
         # When the oldest buffered Record arrived, so its batch starts at most max_delay later.
         self._first_at = 0.0
+        # The timer that starts the next batch.
         self._timer: asyncio.Handle | None = None
         self._writing: asyncio.Task[None] | None = None
         self._appended = 0

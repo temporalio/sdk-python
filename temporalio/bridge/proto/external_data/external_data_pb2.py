@@ -16,8 +16,18 @@ _sym_db = _symbol_database.Default()
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
+from temporalio.api.failure.v1 import (
+    message_pb2 as temporal_dot_api_dot_failure_dot_v1_dot_message__pb2,
+)
+from temporalio.api.stream.v1 import (
+    message_pb2 as temporal_dot_api_dot_stream_dot_v1_dot_message__pb2,
+)
+from temporalio.bridge.proto.common import (
+    common_pb2 as temporal_dot_sdk_dot_core_dot_common_dot_common__pb2,
+)
+
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08\x42\x32\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
+    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a%temporal/api/failure/v1/message.proto\x1a$temporal/api/stream/v1/message.proto\x1a%temporal/sdk/core/common/common.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08"\xf1\x01\n\x10StreamMarkerData\x12\x35\n\x05reads\x18\x01 \x03(\x0b\x32&.coresdk.external_data.StreamReadEntry\x12\x39\n\x07\x61ppends\x18\x02 \x03(\x0b\x32(.coresdk.external_data.StreamAppendEntry\x12\x37\n\x06\x63loses\x18\x03 \x03(\x0b\x32\'.coresdk.external_data.StreamCloseEntry\x12\x32\n\x07streams\x18\x04 \x03(\x0b\x32!.temporal.api.stream.v1.StreamRef"\xae\x02\n\x0fStreamReadEntry\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x14\n\x0cstream_index\x18\x02 \x01(\r\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x0c\x12\x14\n\x0c\x61\x66ter_offset\x18\x04 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x05 \x01(\x0c\x12\r\n\x05\x63ount\x18\x06 \x01(\r\x12\x0e\n\x06\x64igest\x18\x07 \x01(\x0c\x12\x35\n\x07records\x18\x08 \x03(\x0b\x32$.temporal.api.stream.v1.StreamRecord\x12\x13\n\x0bpage_counts\x18\t \x03(\r\x12\x18\n\x10page_activations\x18\n \x03(\r\x12\x33\n\x03\x65nd\x18\x0b \x01(\x0b\x32&.coresdk.external_data.StreamReadEnded"\xa9\x01\n\x0fStreamReadEnded\x12\x13\n\x0blast_offset\x18\x01 \x01(\x0c\x12,\n\x04stop\x18\x02 \x01(\x0e\x32\x1e.coresdk.common.StreamReadStop\x12\x0c\n\x04\x64one\x18\x03 \x01(\x08\x12\x31\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x12\n\nactivation\x18\x05 \x01(\r"\xa8\x01\n\x11StreamAppendEntry\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x14\n\x0cstream_index\x18\x02 \x01(\r\x12\x14\n\x0c\x66irst_offset\x18\x03 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x04 \x01(\x0c\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x12\n\nactivation\x18\x06 \x01(\r"\xcf\x01\n\x10StreamCloseEntry\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x14\n\x0cstream_index\x18\x02 \x01(\r\x12?\n\x0cintent_epoch\x18\x03 \x01(\x0b\x32).temporal.api.stream.v1.WorkflowTaskEpoch\x12\x10\n\x08resolved\x18\x04 \x01(\x08\x12\x31\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32 .temporal.api.failure.v1.Failure\x12\x12\n\nactivation\x18\x06 \x01(\rB2\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -27,8 +37,18 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._serialized_options = (
         b"\352\002/Temporalio::Internal::Bridge::Api::ExternalData"
     )
-    _LOCALACTIVITYMARKERDATA._serialized_start = 144
-    _LOCALACTIVITYMARKERDATA._serialized_end = 450
-    _PATCHEDMARKERDATA._serialized_start = 452
-    _PATCHEDMARKERDATA._serialized_end = 503
+    _LOCALACTIVITYMARKERDATA._serialized_start = 260
+    _LOCALACTIVITYMARKERDATA._serialized_end = 566
+    _PATCHEDMARKERDATA._serialized_start = 568
+    _PATCHEDMARKERDATA._serialized_end = 619
+    _STREAMMARKERDATA._serialized_start = 622
+    _STREAMMARKERDATA._serialized_end = 863
+    _STREAMREADENTRY._serialized_start = 866
+    _STREAMREADENTRY._serialized_end = 1168
+    _STREAMREADENDED._serialized_start = 1171
+    _STREAMREADENDED._serialized_end = 1340
+    _STREAMAPPENDENTRY._serialized_start = 1343
+    _STREAMAPPENDENTRY._serialized_end = 1511
+    _STREAMCLOSEENTRY._serialized_start = 1514
+    _STREAMCLOSEENTRY._serialized_end = 1721
 # @@protoc_insertion_point(module_scope)

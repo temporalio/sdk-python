@@ -188,8 +188,10 @@ from ._schedule import (
 from ._stream_store import (
     StreamBatchLimits,
     StreamConfig,
+    StreamReplaySource,
     StreamSelectContext,
     StreamStore,
+    StreamStoreCallOptions,
 )
 from ._worker_versioning import (
     BuildIdOp,
@@ -358,8 +360,10 @@ __all__ = [
     "Plugin",
     "StreamBatchLimits",
     "StreamConfig",
+    "StreamReplaySource",
     "StreamSelectContext",
     "StreamStore",
+    "StreamStoreCallOptions",
     "Callback",
     "_ClientImpl",
     "_apply_headers",
