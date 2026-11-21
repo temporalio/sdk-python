@@ -6,6 +6,7 @@ use pyo3::prelude::*;
 use pyo3::sync::PyOnceLock;
 use pyo3::types::{IntoPyDict, PyBytes, PyType};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
+use temporalio_sdk_core::StreamRuntimes;
 use temporalio_streams::proto::{
     AppendRecordsRequest, AppendRecordsResponse, CloseStreamRequest, CloseStreamResponse,
     CreateStreamRequest, CreateStreamResponse, DescribeStreamRequest, DescribeStreamResponse,
@@ -249,6 +250,34 @@ fn store_limits(
         .and_then(|limits| limits.with_max_batch_bytes(max_batch_bytes))
         .and_then(|limits| limits.with_max_batch_records(max_batch_records))
         .map_err(|err| PyValueError::new_err(err.message))
+}
+
+/// The Stream Stores of a Worker, which Python gives as a `WorkerStreams` of
+/// `temporalio.bridge.streams`.
+#[derive(FromPyObject)]
+pub(crate) struct WorkerStreams {
+    limits: Option<(usize, usize, usize)>,
+    stores: Vec<(String, Py<PyAny>)>,
+}
+
+impl WorkerStreams {
+    /// Returns the runtime of each Store by its name. Each Store runs its calls on the event
+    /// loop of `task_locals`.
+    pub(crate) fn into_runtimes(
+        self,
+        task_locals: &Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
+    ) -> PyResult<StreamRuntimes> {
+        let limits = (self.limits.map(store_limits).transpose()?).unwrap_or_default();
+        let runtimes = self.stores.into_iter().map(|(name, caller)| {
+            let store = PythonStore {
+                caller,
+                event_loop_task_locals: task_locals.clone(),
+            };
+            let runtime = StreamRuntime::new(Arc::new(store), limits);
+            (name, Arc::new(runtime))
+        });
+        Ok(StreamRuntimes::new(runtimes))
+    }
 }
 
 /// Checks an encoded append of client code as the runtime of a Worker checks one of Workflow

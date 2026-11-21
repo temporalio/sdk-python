@@ -2,7 +2,9 @@
 
 import asyncio
 import concurrent.futures
+import copy
 import dataclasses
+import pickle
 import pkgutil
 import random
 import subprocess
@@ -23,10 +25,12 @@ import temporalio.converter
 import temporalio.nexus.system
 from temporalio.activity import WorkflowTaskAttempt
 from temporalio.api.enums.v1 import StreamErrorReason, StreamIdConflictPolicy
+from temporalio.api.failure.v1 import Failure
 from temporalio.api.stream.v1 import (
     AppendRecord,
     ClientProducer,
     Producer,
+    StreamErrorDetails,
 )
 from temporalio.client import (
     Client,
@@ -36,7 +40,7 @@ from temporalio.client import (
 )
 from temporalio.contrib.streams import as_producer, current_producer
 from temporalio.converter import StorageDriverActivityInfo
-from temporalio.exceptions import StreamError
+from temporalio.exceptions import ApplicationError, StreamError
 from temporalio.nexus.system import _support
 from temporalio.nexus.system.stream_service import (
     ReadRecordsRequest,
@@ -49,9 +53,11 @@ from temporalio.nexus.system.stream_service import (
 )
 from temporalio.service import ServiceClient
 from temporalio.testing import ActivityEnvironment
+from temporalio.worker._workflow_streams import _stream_error_from_failure
 from tests.helpers.streams import (
     FaultStore,
     Hold,
+    core_failure,
     failure_note,
     run_with_virtual_clock,
 )
@@ -298,6 +304,53 @@ def test_a_limit_below_one_raises(limit: str) -> None:
         match=rf"^StreamConfig\.{limit} must be greater than or equal to one\.$",
     ):
         StreamConfig([FaultStore()], **limits)
+
+
+async def test_a_stream_error_keeps_its_reason_on_every_path() -> None:
+    converter = temporalio.converter.DataConverter.default
+    for number in [*StreamErrorReason.values(), 99]:
+        known = number in StreamErrorReason.values()
+        reason = StreamErrorReason.ValueType(number if known else 0)
+        token = (
+            "stream_"
+            + StreamErrorReason.Name(reason)
+            .removeprefix("STREAM_ERROR_REASON_")
+            .lower()
+        )
+        message = f"The call failed with {number}"
+        expected = (reason, token, message, reason != _UNAVAILABLE)
+        details = StreamErrorDetails(reason=number)  # type: ignore[arg-type]
+
+        # Through an Activity, which gives its error to the default failure converter.
+        raised: ApplicationError = (
+            StreamError(message, reason=reason)
+            if known
+            else ApplicationError(message, details, type=token, non_retryable=True)
+        )
+        failure = Failure()
+        converter.failure_converter.to_failure(
+            raised, converter.payload_converter, failure
+        )
+        # From Core, which builds the failure of a Stream job itself.
+        from_core = core_failure(number, message)
+        for form in (failure, from_core):
+            error = _stream_error_from_failure(form)
+            assert error is not None, number
+            # A copy of the error, also one from another process, is the same error.
+            for same in (error, copy.copy(error), pickle.loads(pickle.dumps(error))):
+                assert (
+                    same.reason,
+                    same.type,
+                    same.message,
+                    same.non_retryable,
+                ) == expected, number
+        if not known:
+            # A newer Worker can record a reason by a name that this SDK doesn't have.
+            named = failure.application_failure_info.details.payloads[0]
+            named.data = b'{"reason": "STREAM_ERROR_REASON_ADDED_LATER"}'
+            later = _stream_error_from_failure(failure)
+            assert later and (later.reason, later.message) == (reason, message)
+    assert _stream_error_from_failure(Failure(message="other")) is None
 
 
 class _FakeReads(temporalio.client.OutboundInterceptor):

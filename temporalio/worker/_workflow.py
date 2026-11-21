@@ -27,6 +27,7 @@ import temporalio.converter._serialization_context
 import temporalio.exceptions
 import temporalio.workflow
 from temporalio.bridge.worker import PollShutdownError
+from temporalio.client._stream_store import StreamConfig
 from temporalio.converter import StorageDriverStoreContext, StorageDriverWorkflowInfo
 from temporalio.worker.workflow_sandbox._runner import SandboxedWorkflowRunner
 
@@ -136,6 +137,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
         encode_headers: bool,
         max_workflow_task_external_storage_concurrency: int,
         default_workflow_logic_flags: frozenset[_WorkflowLogicFlag] | None = None,
+        stream_config: Callable[[], StreamConfig | None] = lambda: None,
     ) -> None:
         # Debug mode is enabled if specified or if the TEMPORAL_DEBUG env var is truthy
         debug_mode = debug_mode or bool(os.environ.get("TEMPORAL_DEBUG"))
@@ -192,6 +194,7 @@ class _WorkflowWorker:  # type:ignore[reportUnusedClass]
             **_WorkflowExternFunctions(  # type: ignore
                 __temporal_get_metric_meter=lambda: metric_meter,
                 __temporal_assert_local_activity_valid=assert_local_activity_valid,
+                __temporal_stream_config=stream_config,
             )
         )
 
