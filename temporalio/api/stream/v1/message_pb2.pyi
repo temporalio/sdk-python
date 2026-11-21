@@ -175,8 +175,14 @@ class WorkflowProducer(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Required."""
+    workflow_id: builtins.str
+    """Required."""
     run_id: builtins.str
     """Required. The id of this run, not the first run id of its chain. Each run is a separate
     Producer.
@@ -190,6 +196,8 @@ class WorkflowProducer(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
         run_id: builtins.str = ...,
         attempt: global___WorkflowTaskAttempt | None = ...,
     ) -> None: ...
@@ -197,7 +205,17 @@ class WorkflowProducer(google.protobuf.message.Message):
         self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
+        self,
+        field_name: typing.Literal[
+            "attempt",
+            b"attempt",
+            "namespace",
+            b"namespace",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
     ) -> None: ...
 
 global___WorkflowProducer = WorkflowProducer
@@ -205,15 +223,24 @@ global___WorkflowProducer = WorkflowProducer
 @typing.final
 class LocalActivityProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of one Local Activity call of a Workflow run.
+    The Producer of one Local Activity of a Workflow run.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Required. The namespace of the Workflow that made the call."""
+    workflow_id: builtins.str
+    """Required."""
     run_id: builtins.str
-    """Required. The id of the Workflow run that made the call."""
+    """Required."""
+    activity_id: builtins.str
+    """Required."""
     @property
     def attempt(self) -> global___LocalActivityAttempt:
         """Required."""
@@ -221,31 +248,55 @@ class LocalActivityProducer(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
         run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
         attempt: global___LocalActivityAttempt | None = ...,
     ) -> None: ...
     def HasField(
         self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
+        self,
+        field_name: typing.Literal[
+            "activity_id",
+            b"activity_id",
+            "attempt",
+            b"attempt",
+            "namespace",
+            b"namespace",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
     ) -> None: ...
 
 global___LocalActivityProducer = LocalActivityProducer
 
 @typing.final
-class ActivityProducer(google.protobuf.message.Message):
+class WorkflowActivityProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of an Activity that a Workflow scheduled, or of a Standalone Activity.
+    The Producer of one Activity that a Workflow scheduled.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    WORKFLOW_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Required. The namespace of the Workflow that scheduled the Activity."""
+    workflow_id: builtins.str
+    """Required."""
     run_id: builtins.str
-    """The id of the Workflow run that scheduled the Activity. It's empty for a Standalone
-    Activity, whose own run id is part of the Producer id.
+    """Required."""
+    activity_id: builtins.str
+    """Required. A run can use an Activity id again after the first Activity ended. The second
+    Activity is then a later attempt of the same Producer.
     """
     @property
     def attempt(self) -> global___ActivityAttempt:
@@ -254,6 +305,61 @@ class ActivityProducer(google.protobuf.message.Message):
     def __init__(
         self,
         *,
+        namespace: builtins.str = ...,
+        workflow_id: builtins.str = ...,
+        run_id: builtins.str = ...,
+        activity_id: builtins.str = ...,
+        attempt: global___ActivityAttempt | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["attempt", b"attempt"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "activity_id",
+            b"activity_id",
+            "attempt",
+            b"attempt",
+            "namespace",
+            b"namespace",
+            "run_id",
+            b"run_id",
+            "workflow_id",
+            b"workflow_id",
+        ],
+    ) -> None: ...
+
+global___WorkflowActivityProducer = WorkflowActivityProducer
+
+@typing.final
+class StandaloneActivityProducer(google.protobuf.message.Message):
+    """Experimental. Might change in the future.
+    The Producer of a Standalone Activity. Its attempts compare as those of a Workflow's Activity
+    do.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    RUN_ID_FIELD_NUMBER: builtins.int
+    ATTEMPT_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Required."""
+    activity_id: builtins.str
+    """Required."""
+    run_id: builtins.str
+    """Required. The run id of the Activity itself."""
+    @property
+    def attempt(self) -> global___ActivityAttempt:
+        """Required."""
+
+    def __init__(
+        self,
+        *,
+        namespace: builtins.str = ...,
+        activity_id: builtins.str = ...,
         run_id: builtins.str = ...,
         attempt: global___ActivityAttempt | None = ...,
     ) -> None: ...
@@ -261,10 +367,20 @@ class ActivityProducer(google.protobuf.message.Message):
         self, field_name: typing.Literal["attempt", b"attempt"]
     ) -> builtins.bool: ...
     def ClearField(
-        self, field_name: typing.Literal["attempt", b"attempt", "run_id", b"run_id"]
+        self,
+        field_name: typing.Literal[
+            "activity_id",
+            b"activity_id",
+            "attempt",
+            b"attempt",
+            "namespace",
+            b"namespace",
+            "run_id",
+            b"run_id",
+        ],
     ) -> None: ...
 
-global___ActivityProducer = ActivityProducer
+global___StandaloneActivityProducer = StandaloneActivityProducer
 
 @typing.final
 class ClientProducer(google.protobuf.message.Message):
@@ -275,8 +391,22 @@ class ClientProducer(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    ID_FIELD_NUMBER: builtins.int
+    namespace: builtins.str
+    """Required."""
+    id: builtins.str
+    """Required. The caller can set it, for example to the id of the Nexus operation that
+    writes. Without one, the SDK makes an id for each client object.
+    """
     def __init__(
         self,
+        *,
+        namespace: builtins.str = ...,
+        id: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["id", b"id", "namespace", b"namespace"]
     ) -> None: ...
 
 global___ClientProducer = ClientProducer
@@ -285,8 +415,9 @@ global___ClientProducer = ClientProducer
 class Producer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
     The writer of a batch of Records. A Producer is one unit of work, such as one Activity or one
-    Workflow run. Its `id` is the same on every attempt, and every kind except a client also has
-    the attempt that made the write.
+    Workflow run. Two Producers are the same when they have the same kind and the same ids.
+    Every kind except a client also has the attempt that made the write, and the attempt is not
+    part of what identifies the Producer.
 
     A Store that fences fails a write with `FENCED` when a later attempt of the same Producer has
     already written. A Store that doesn't fence accepts the write. Each Record has its Producer
@@ -298,41 +429,28 @@ class Producer(google.protobuf.message.Message):
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
-    ID_FIELD_NUMBER: builtins.int
     WORKFLOW_FIELD_NUMBER: builtins.int
     LOCAL_ACTIVITY_FIELD_NUMBER: builtins.int
     WORKFLOW_ACTIVITY_FIELD_NUMBER: builtins.int
     STANDALONE_ACTIVITY_FIELD_NUMBER: builtins.int
     CLIENT_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    """Required. The same on every attempt, for example `wf:<run id>` for the Producer of a
-    Workflow run. It's unique within one Stream. The id of a kind with a run contains the run
-    id, so it stays unique when Producers from several namespaces write to one Stream.
-    """
     @property
     def workflow(self) -> global___WorkflowProducer: ...
     @property
     def local_activity(self) -> global___LocalActivityProducer: ...
     @property
-    def workflow_activity(self) -> global___ActivityProducer:
-        """An Activity that a Workflow scheduled."""
-
+    def workflow_activity(self) -> global___WorkflowActivityProducer: ...
     @property
-    def standalone_activity(self) -> global___ActivityProducer:
-        """A Standalone Activity. Its attempts compare as those of a Workflow's Activity do. It's a
-        separate case because it has no Workflow run.
-        """
-
+    def standalone_activity(self) -> global___StandaloneActivityProducer: ...
     @property
     def client(self) -> global___ClientProducer: ...
     def __init__(
         self,
         *,
-        id: builtins.str = ...,
         workflow: global___WorkflowProducer | None = ...,
         local_activity: global___LocalActivityProducer | None = ...,
-        workflow_activity: global___ActivityProducer | None = ...,
-        standalone_activity: global___ActivityProducer | None = ...,
+        workflow_activity: global___WorkflowActivityProducer | None = ...,
+        standalone_activity: global___StandaloneActivityProducer | None = ...,
         client: global___ClientProducer | None = ...,
     ) -> None: ...
     def HasField(
@@ -357,8 +475,6 @@ class Producer(google.protobuf.message.Message):
         field_name: typing.Literal[
             "client",
             b"client",
-            "id",
-            b"id",
             "kind",
             b"kind",
             "local_activity",

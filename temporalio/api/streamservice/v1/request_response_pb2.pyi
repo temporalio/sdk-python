@@ -95,7 +95,7 @@ global___CreateStreamResponse = CreateStreamResponse
 class AppendRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
     Appends one batch of Records as one Producer. If the same batch arrives again, with the same
-    Producer, attempt and `request_id`, the Store writes it only once.
+    Producer, attempt and `request_id`, the Store writes it only once while it remembers the id.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -109,8 +109,10 @@ class AppendRecordsRequest(google.protobuf.message.Message):
     request_id: builtins.str
     """A value that's unique to this append call and the same on its retries. A caller that got no
     response sends the batch again with the same value, and the Store returns the offsets of
-    the first write. A Store remembers the `request_id` of the last batch of each Producer, so
-    a Producer sends one batch at a time. When it's empty, a retry is written again.
+    the first write. A Store remembers the `request_id` of the most recent batches of each
+    Producer of the Stream. How many it remembers is a setting of the Store, so a try that
+    arrives after more batches than that is written again. When it's empty, a retry is written
+    again.
     """
     @property
     def producer(self) -> temporalio.api.stream.v1.message_pb2.Producer:
