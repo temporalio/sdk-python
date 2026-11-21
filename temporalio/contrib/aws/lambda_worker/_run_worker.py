@@ -25,7 +25,9 @@ from temporalio.contrib.aws.lambda_worker._defaults import (
     build_lambda_identity,
     lambda_default_config_file_path,
 )
-from temporalio.envconfig import ClientConfigProfile
+from temporalio.contrib.aws.secrets_manager import SecretsManagerExtension
+from temporalio.envconfig import ClientConfig
+from temporalio.envconfig import ClientConnectConfig as EnvConfigClientConnectConfig
 from temporalio.worker import WorkerConfig, WorkerDeploymentConfig
 
 logger = logging.getLogger(__name__)
@@ -51,14 +53,19 @@ class _WorkerDeps:
     create_worker: Callable[..., temporalio.worker.Worker] = field(
         default_factory=lambda: temporalio.worker.Worker
     )
-    load_config: Callable[[], ClientConfigProfile] | None = None
+    load_config: Callable[[], EnvConfigClientConnectConfig] | None = None
     getenv: Callable[[str], str | None] = field(default_factory=lambda: os.environ.get)
     extract_lambda_ctx: Callable[[Any], tuple[str, str] | None] | None = None
 
 
-def _default_load_config(getenv: Callable[[str], str | None]) -> ClientConfigProfile:
+def _default_load_config(
+    getenv: Callable[[str], str | None],
+) -> EnvConfigClientConnectConfig:
     config_path = lambda_default_config_file_path(getenv)  # type: ignore[arg-type]
-    return ClientConfigProfile.load(config_source=config_path)
+    return ClientConfig.load_client_connect_config(
+        config_file=str(config_path),
+        extensions=[SecretsManagerExtension()],
+    )
 
 
 def _default_extract_lambda_ctx(
@@ -213,8 +220,7 @@ def _run_worker_internal(
 
     # Load client config from envconfig / TOML.
     load_config = deps.load_config or (lambda: _default_load_config(deps.getenv))
-    profile = load_config()
-    base_connect_config: ClientConnectConfig = {**profile.to_client_connect_config()}
+    base_connect_config: ClientConnectConfig = {**load_config()}
 
     # Build base worker config with Lambda defaults.
     base_worker_config: WorkerConfig = {}
@@ -243,6 +249,12 @@ def _run_worker_internal(
             worker_config={**base_worker_config},
             shutdown_deadline_buffer=shutdown_buffer,
         )
+        if "plugins" in base_connect_config:
+            # Copied so that plugins appended in configure don't accumulate
+            # across invocations
+            config.client_connect_config["plugins"] = list(
+                base_connect_config["plugins"]
+            )
         if env_tq:
             config.worker_config["task_queue"] = env_tq
         return config
