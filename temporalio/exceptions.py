@@ -8,6 +8,7 @@ from typing import Any
 
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+import temporalio.api.stream.v1
 
 
 class TemporalError(Exception):
@@ -196,6 +197,76 @@ class ApplicationError(FailureError):
     def category(self) -> ApplicationErrorCategory:
         """Severity category of the application error"""
         return self._category
+
+
+_STREAM_ERROR_REASON_UNSPECIFIED = (
+    temporalio.api.enums.v1.StreamErrorReason.STREAM_ERROR_REASON_UNSPECIFIED
+)
+
+# The one reason that a retry can fix.
+_STREAM_RETRYABLE_REASONS: frozenset[int] = frozenset(
+    {temporalio.api.enums.v1.StreamErrorReason.STREAM_ERROR_REASON_STORAGE_UNAVAILABLE}
+)
+
+
+class StreamError(ApplicationError):
+    """A failed Stream call. ``reason`` tells the cases apart.
+
+    One class covers every failed call in client and Activity code, so match on
+    ``reason`` and not on the type. The reason is a ``StreamErrorReason``, such as
+    ``STREAM_ERROR_REASON_NOT_FOUND`` (nobody created the Stream),
+    ``STREAM_ERROR_REASON_CLOSED`` (the Stream is closed), or
+    ``STREAM_ERROR_REASON_ALREADY_EXISTS`` (a strict create of a Stream that exists).
+    A Store outage, ``STREAM_ERROR_REASON_STORAGE_UNAVAILABLE``, is the one retryable
+    reason.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason: temporalio.api.enums.v1.StreamErrorReason.ValueType | None = None,
+    ) -> None:
+        """Initialize a Stream error. ``reason`` defaults to the unspecified reason."""
+        if reason is None:
+            reason = _STREAM_ERROR_REASON_UNSPECIFIED
+        # The details carry the reason, so the error keeps it when it crosses an
+        # Activity or a Nexus operation.
+        super().__init__(
+            message,
+            temporalio.api.stream.v1.StreamErrorDetails(reason=reason),
+            type="StreamError",
+            non_retryable=reason not in _STREAM_RETRYABLE_REASONS,
+        )
+        self._reason = reason
+
+    @property
+    def reason(self) -> temporalio.api.enums.v1.StreamErrorReason.ValueType:
+        """Why the Stream call failed."""
+        return self._reason
+
+
+class StreamConfigError(RuntimeError):
+    """A Stream call can't find its Store, because of how the Stores are set up.
+
+    It is not a :py:class:`StreamError`. A Store didn't fail. The setup of the Stores
+    is wrong, and a retry won't help. These are its cases.
+
+    * A Stream call is made on a client with no Stream config. This release has no
+      Streams on the server, so every Stream call needs a Store.
+    * A :py:class:`temporalio.client.StreamConfig` has no Store, or has two Stores
+      with one name.
+    * A call names no Store on a config with more than one Store and no selector.
+    * A ref names a Store that the config of the client doesn't have.
+    * The selector returns a Store that isn't one of the config's Stores.
+    * A :py:class:`temporalio.client.StreamStore` is given in ``plugins``.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
 
 
 class CancelledError(FailureError):

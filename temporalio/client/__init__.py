@@ -185,6 +185,12 @@ from ._schedule import (
     ScheduleUpdate,
     ScheduleUpdateInput,
 )
+from ._stream_store import (
+    StreamBatchLimits,
+    StreamConfig,
+    StreamSelectContext,
+    StreamStore,
+)
 from ._worker_versioning import (
     BuildIdOp,
     BuildIdOpAddNewCompatible,
@@ -350,6 +356,10 @@ __all__ = [
     "TaskReachabilityType",
     "CloudOperationsClient",
     "Plugin",
+    "StreamBatchLimits",
+    "StreamConfig",
+    "StreamSelectContext",
+    "StreamStore",
     "Callback",
     "_ClientImpl",
     "_apply_headers",
