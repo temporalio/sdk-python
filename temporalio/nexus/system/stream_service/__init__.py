@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from .models import (
     ActivityAttempt,
-    ActivityProducer,
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -26,11 +25,13 @@ from .models import (
     ProducerKindWorkflowActivity,
     ReadRecordsRequest,
     ReadRecordsResponse,
+    StandaloneActivityProducer,
     StreamIdConflictPolicy,
     StreamRecord,
     StreamRef,
     StreamStatus,
     Timestamp,
+    WorkflowActivityProducer,
     WorkflowProducer,
     WorkflowTaskAttempt,
 )
@@ -38,7 +39,6 @@ from .services import StreamService
 
 __all__ = [
     "ActivityAttempt",
-    "ActivityProducer",
     "AppendRecord",
     "AppendRecordsRequest",
     "AppendRecordsResponse",
@@ -60,11 +60,13 @@ __all__ = [
     "ProducerKindClient",
     "ReadRecordsRequest",
     "ReadRecordsResponse",
+    "StandaloneActivityProducer",
     "StreamIdConflictPolicy",
     "StreamRecord",
     "StreamRef",
     "StreamStatus",
     "Timestamp",
+    "WorkflowActivityProducer",
     "WorkflowProducer",
     "WorkflowTaskAttempt",
     "StreamService",

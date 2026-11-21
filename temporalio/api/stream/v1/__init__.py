@@ -1,29 +1,31 @@
 from .message_pb2 import (
     ActivityAttempt,
-    ActivityProducer,
     AppendRecord,
     ClientProducer,
     LocalActivityAttempt,
     LocalActivityProducer,
     Producer,
+    StandaloneActivityProducer,
     StreamErrorDetails,
     StreamRecord,
     StreamRef,
+    WorkflowActivityProducer,
     WorkflowProducer,
     WorkflowTaskAttempt,
 )
 
 __all__ = [
     "ActivityAttempt",
-    "ActivityProducer",
     "AppendRecord",
     "ClientProducer",
     "LocalActivityAttempt",
     "LocalActivityProducer",
     "Producer",
+    "StandaloneActivityProducer",
     "StreamErrorDetails",
     "StreamRecord",
     "StreamRef",
+    "WorkflowActivityProducer",
     "WorkflowProducer",
     "WorkflowTaskAttempt",
 ]

@@ -331,7 +331,6 @@ temporalio.converter.transfer_type_convertible(
 class Producer:
     """The writer of a batch. A later attempt supersedes an earlier one."""
 
-    id: str
     kind: ProducerKind | None = None
 
 
@@ -350,9 +349,6 @@ class _ProducerTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.Producer,
         type_hint: type[Producer],
     ) -> Producer:
-        if not value.id:
-            raise ValueError("missing required field Producer.id")
-        id = value.id
         _oneof_kind: (
             ProducerKindWorkflow
             | ProducerKindLocalActivity
@@ -376,14 +372,14 @@ class _ProducerTransferTypeConverter(
                 )
             case "workflow_activity":
                 _oneof_kind = ProducerKindWorkflowActivity(
-                    _ActivityProducerTransferTypeConverter().from_transfer_type(
-                        value.workflow_activity, ActivityProducer
+                    _WorkflowActivityProducerTransferTypeConverter().from_transfer_type(
+                        value.workflow_activity, WorkflowActivityProducer
                     )
                 )
             case "standalone_activity":
                 _oneof_kind = ProducerKindStandaloneActivity(
-                    _ActivityProducerTransferTypeConverter().from_transfer_type(
-                        value.standalone_activity, ActivityProducer
+                    _StandaloneActivityProducerTransferTypeConverter().from_transfer_type(
+                        value.standalone_activity, StandaloneActivityProducer
                     )
                 )
             case "client":
@@ -395,7 +391,6 @@ class _ProducerTransferTypeConverter(
             case None:
                 _oneof_kind = None
         return Producer(
-            id=id,
             kind=_oneof_kind,
         )
 
@@ -405,7 +400,6 @@ class _ProducerTransferTypeConverter(
         value: Producer,
     ) -> temporalio.api.stream.v1.message_pb2.Producer:
         message = temporalio.api.stream.v1.message_pb2.Producer()
-        message.id = value.id
         if value.kind is not None:
             match value.kind:
                 case ProducerKindWorkflow():
@@ -422,13 +416,13 @@ class _ProducerTransferTypeConverter(
                     )
                 case ProducerKindWorkflowActivity():
                     message.workflow_activity.CopyFrom(
-                        _ActivityProducerTransferTypeConverter().to_transfer_type(
+                        _WorkflowActivityProducerTransferTypeConverter().to_transfer_type(
                             value.kind.value
                         )
                     )
                 case ProducerKindStandaloneActivity():
                     message.standalone_activity.CopyFrom(
-                        _ActivityProducerTransferTypeConverter().to_transfer_type(
+                        _StandaloneActivityProducerTransferTypeConverter().to_transfer_type(
                             value.kind.value
                         )
                     )
@@ -448,6 +442,8 @@ temporalio.converter.transfer_type_convertible(_ProducerTransferTypeConverter)(P
 class WorkflowProducer:
     """The Producer of a Workflow run."""
 
+    namespace: str
+    workflow_id: str
     run_id: str
     attempt: WorkflowTaskAttempt | None = None
 
@@ -467,10 +463,18 @@ class _WorkflowProducerTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.WorkflowProducer,
         type_hint: type[WorkflowProducer],
     ) -> WorkflowProducer:
+        if not value.namespace:
+            raise ValueError("missing required field WorkflowProducer.namespace")
+        namespace = value.namespace
+        if not value.workflow_id:
+            raise ValueError("missing required field WorkflowProducer.workflow_id")
+        workflow_id = value.workflow_id
         if not value.run_id:
             raise ValueError("missing required field WorkflowProducer.run_id")
         run_id = value.run_id
         return WorkflowProducer(
+            namespace=namespace,
+            workflow_id=workflow_id,
             run_id=run_id,
             attempt=_WorkflowTaskAttemptTransferTypeConverter().from_transfer_type(
                 value.attempt, WorkflowTaskAttempt
@@ -485,6 +489,8 @@ class _WorkflowProducerTransferTypeConverter(
         value: WorkflowProducer,
     ) -> temporalio.api.stream.v1.message_pb2.WorkflowProducer:
         message = temporalio.api.stream.v1.message_pb2.WorkflowProducer()
+        message.namespace = value.namespace
+        message.workflow_id = value.workflow_id
         message.run_id = value.run_id
         if value.attempt is not None:
             message.attempt.CopyFrom(
@@ -602,9 +608,12 @@ temporalio.converter.transfer_type_convertible(_TimestampTransferTypeConverter)(
 
 @dataclasses.dataclass(slots=True)
 class LocalActivityProducer:
-    """The Producer of one Local Activity call."""
+    """The Producer of one Local Activity of a Workflow run."""
 
+    namespace: str
+    workflow_id: str
     run_id: str
+    activity_id: str
     attempt: LocalActivityAttempt
 
 
@@ -624,16 +633,28 @@ class _LocalActivityProducerTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.LocalActivityProducer,
         type_hint: type[LocalActivityProducer],
     ) -> LocalActivityProducer:
+        if not value.namespace:
+            raise ValueError("missing required field LocalActivityProducer.namespace")
+        namespace = value.namespace
+        if not value.workflow_id:
+            raise ValueError("missing required field LocalActivityProducer.workflow_id")
+        workflow_id = value.workflow_id
         if not value.run_id:
             raise ValueError("missing required field LocalActivityProducer.run_id")
         run_id = value.run_id
+        if not value.activity_id:
+            raise ValueError("missing required field LocalActivityProducer.activity_id")
+        activity_id = value.activity_id
         if not value.HasField("attempt"):
             raise ValueError("missing required field LocalActivityProducer.attempt")
         attempt = _LocalActivityAttemptTransferTypeConverter().from_transfer_type(
             value.attempt, LocalActivityAttempt
         )
         return LocalActivityProducer(
+            namespace=namespace,
+            workflow_id=workflow_id,
             run_id=run_id,
+            activity_id=activity_id,
             attempt=attempt,
         )
 
@@ -643,7 +664,10 @@ class _LocalActivityProducerTransferTypeConverter(
         value: LocalActivityProducer,
     ) -> temporalio.api.stream.v1.message_pb2.LocalActivityProducer:
         message = temporalio.api.stream.v1.message_pb2.LocalActivityProducer()
+        message.namespace = value.namespace
+        message.workflow_id = value.workflow_id
         message.run_id = value.run_id
+        message.activity_id = value.activity_id
         message.attempt.CopyFrom(
             _LocalActivityAttemptTransferTypeConverter().to_transfer_type(value.attempt)
         )
@@ -707,56 +731,83 @@ temporalio.converter.transfer_type_convertible(
 )(LocalActivityAttempt)  # pyright: ignore[reportUnusedCallResult]
 
 
-@dataclasses.dataclass(slots=True, kw_only=True)
-class ActivityProducer:
-    """The Producer of an Activity."""
+@dataclasses.dataclass(slots=True)
+class WorkflowActivityProducer:
+    """The Producer of one Activity that a Workflow scheduled."""
 
-    run_id: str | None = None
+    namespace: str
+    workflow_id: str
+    run_id: str
+    activity_id: str
     attempt: ActivityAttempt
 
 
-class _ActivityProducerTransferTypeConverter(
+class _WorkflowActivityProducerTransferTypeConverter(
     temporalio.converter.TransferTypeConverter[
-        ActivityProducer, temporalio.api.stream.v1.message_pb2.ActivityProducer
+        WorkflowActivityProducer,
+        temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer,
     ]
 ):
     transfer_type: (
-        type[temporalio.api.stream.v1.message_pb2.ActivityProducer] | None
-    ) = temporalio.api.stream.v1.message_pb2.ActivityProducer
+        type[temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer] | None
+    ) = temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer
 
     @typing_extensions.override
     def from_transfer_type(
         self,
-        value: temporalio.api.stream.v1.message_pb2.ActivityProducer,
-        type_hint: type[ActivityProducer],
-    ) -> ActivityProducer:
+        value: temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer,
+        type_hint: type[WorkflowActivityProducer],
+    ) -> WorkflowActivityProducer:
+        if not value.namespace:
+            raise ValueError(
+                "missing required field WorkflowActivityProducer.namespace"
+            )
+        namespace = value.namespace
+        if not value.workflow_id:
+            raise ValueError(
+                "missing required field WorkflowActivityProducer.workflow_id"
+            )
+        workflow_id = value.workflow_id
+        if not value.run_id:
+            raise ValueError("missing required field WorkflowActivityProducer.run_id")
+        run_id = value.run_id
+        if not value.activity_id:
+            raise ValueError(
+                "missing required field WorkflowActivityProducer.activity_id"
+            )
+        activity_id = value.activity_id
         if not value.HasField("attempt"):
-            raise ValueError("missing required field ActivityProducer.attempt")
+            raise ValueError("missing required field WorkflowActivityProducer.attempt")
         attempt = _ActivityAttemptTransferTypeConverter().from_transfer_type(
             value.attempt, ActivityAttempt
         )
-        return ActivityProducer(
-            run_id=value.run_id if bool(value.run_id) else None,
+        return WorkflowActivityProducer(
+            namespace=namespace,
+            workflow_id=workflow_id,
+            run_id=run_id,
+            activity_id=activity_id,
             attempt=attempt,
         )
 
     @typing_extensions.override
     def to_transfer_type(
         self,
-        value: ActivityProducer,
-    ) -> temporalio.api.stream.v1.message_pb2.ActivityProducer:
-        message = temporalio.api.stream.v1.message_pb2.ActivityProducer()
-        if value.run_id is not None:
-            message.run_id = value.run_id
+        value: WorkflowActivityProducer,
+    ) -> temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer:
+        message = temporalio.api.stream.v1.message_pb2.WorkflowActivityProducer()
+        message.namespace = value.namespace
+        message.workflow_id = value.workflow_id
+        message.run_id = value.run_id
+        message.activity_id = value.activity_id
         message.attempt.CopyFrom(
             _ActivityAttemptTransferTypeConverter().to_transfer_type(value.attempt)
         )
         return message
 
 
-temporalio.converter.transfer_type_convertible(_ActivityProducerTransferTypeConverter)(
-    ActivityProducer
-)  # pyright: ignore[reportUnusedCallResult]
+temporalio.converter.transfer_type_convertible(
+    _WorkflowActivityProducerTransferTypeConverter
+)(WorkflowActivityProducer)  # pyright: ignore[reportUnusedCallResult]
 
 
 @dataclasses.dataclass(slots=True)
@@ -816,10 +867,84 @@ temporalio.converter.transfer_type_convertible(_ActivityAttemptTransferTypeConve
 
 
 @dataclasses.dataclass(slots=True)
+class StandaloneActivityProducer:
+    """The Producer of a Standalone Activity."""
+
+    namespace: str
+    activity_id: str
+    run_id: str
+    attempt: ActivityAttempt
+
+
+class _StandaloneActivityProducerTransferTypeConverter(
+    temporalio.converter.TransferTypeConverter[
+        StandaloneActivityProducer,
+        temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer,
+    ]
+):
+    transfer_type: (
+        type[temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer] | None
+    ) = temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer
+
+    @typing_extensions.override
+    def from_transfer_type(
+        self,
+        value: temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer,
+        type_hint: type[StandaloneActivityProducer],
+    ) -> StandaloneActivityProducer:
+        if not value.namespace:
+            raise ValueError(
+                "missing required field StandaloneActivityProducer.namespace"
+            )
+        namespace = value.namespace
+        if not value.activity_id:
+            raise ValueError(
+                "missing required field StandaloneActivityProducer.activity_id"
+            )
+        activity_id = value.activity_id
+        if not value.run_id:
+            raise ValueError("missing required field StandaloneActivityProducer.run_id")
+        run_id = value.run_id
+        if not value.HasField("attempt"):
+            raise ValueError(
+                "missing required field StandaloneActivityProducer.attempt"
+            )
+        attempt = _ActivityAttemptTransferTypeConverter().from_transfer_type(
+            value.attempt, ActivityAttempt
+        )
+        return StandaloneActivityProducer(
+            namespace=namespace,
+            activity_id=activity_id,
+            run_id=run_id,
+            attempt=attempt,
+        )
+
+    @typing_extensions.override
+    def to_transfer_type(
+        self,
+        value: StandaloneActivityProducer,
+    ) -> temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer:
+        message = temporalio.api.stream.v1.message_pb2.StandaloneActivityProducer()
+        message.namespace = value.namespace
+        message.activity_id = value.activity_id
+        message.run_id = value.run_id
+        message.attempt.CopyFrom(
+            _ActivityAttemptTransferTypeConverter().to_transfer_type(value.attempt)
+        )
+        return message
+
+
+temporalio.converter.transfer_type_convertible(
+    _StandaloneActivityProducerTransferTypeConverter
+)(StandaloneActivityProducer)  # pyright: ignore[reportUnusedCallResult]
+
+
+@dataclasses.dataclass(slots=True)
 class ClientProducer:
     """The Producer of a client. It has no run and no attempt."""
 
-    pass
+    namespace: str
+    id: str
 
 
 class _ClientProducerTransferTypeConverter(
@@ -837,7 +962,16 @@ class _ClientProducerTransferTypeConverter(
         value: temporalio.api.stream.v1.message_pb2.ClientProducer,
         type_hint: type[ClientProducer],
     ) -> ClientProducer:
-        return ClientProducer()
+        if not value.namespace:
+            raise ValueError("missing required field ClientProducer.namespace")
+        namespace = value.namespace
+        if not value.id:
+            raise ValueError("missing required field ClientProducer.id")
+        id = value.id
+        return ClientProducer(
+            namespace=namespace,
+            id=id,
+        )
 
     @typing_extensions.override
     def to_transfer_type(
@@ -845,6 +979,8 @@ class _ClientProducerTransferTypeConverter(
         value: ClientProducer,
     ) -> temporalio.api.stream.v1.message_pb2.ClientProducer:
         message = temporalio.api.stream.v1.message_pb2.ClientProducer()
+        message.namespace = value.namespace
+        message.id = value.id
         return message
 
 
@@ -1313,12 +1449,12 @@ class ProducerKindLocalActivity:
 
 @dataclasses.dataclass(slots=True)
 class ProducerKindWorkflowActivity:
-    value: ActivityProducer
+    value: WorkflowActivityProducer
 
 
 @dataclasses.dataclass(slots=True)
 class ProducerKindStandaloneActivity:
-    value: ActivityProducer
+    value: StandaloneActivityProducer
 
 
 @dataclasses.dataclass(slots=True)
@@ -1333,4 +1469,4 @@ ProducerKind = (
     | ProducerKindStandaloneActivity
     | ProducerKindClient
 )
-"""The kind of a Producer, with its run and attempt."""
+"""The kind of a Producer, with its ids and its attempt."""
