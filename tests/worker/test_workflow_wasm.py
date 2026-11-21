@@ -18,7 +18,10 @@ from nexusrpc.handler import StartOperationContext, service_handler, sync_operat
 
 import temporalio.worker._workflow as workflow_worker
 import temporalio.workflow as workflow
-from scripts.build_workflow_wasm import publish_addressable
+from scripts.build_workflow_wasm import (
+    _addressable_modules,
+    _discover_addressable_functions,
+)
 from temporalio import activity
 from temporalio.api.enums.v1 import EventType
 from temporalio.bridge.proto.workflow_activation import WorkflowActivation
@@ -394,32 +397,78 @@ def _addressable_bindings(history: WorkflowHistory) -> list[dict[str, bytes]]:
     ]
 
 
+def test_addressable_discovery_uses_selected_classes_and_import_bindings(
+    tmp_path: Path,
+) -> None:
+    package = tmp_path / "demo"
+    package.mkdir()
+    for name in ("steps", "shadowed", "unselected"):
+        (package / f"{name}.py").write_text(
+            "async def score(value: int) -> int:\n    return value\n"
+            "def other() -> str:\n    return 'still in the bundle'\n"
+        )
+    (package / "workflows.py").write_text(
+        """
+from .steps import score as call_score
+from .shadowed import score as shadowed
+from .unselected import score as unselected
+
+class Selected:
+    async def run(self, shadowed):
+        return await call_score(1) + await shadowed(2)
+
+class Unselected:
+    async def run(self):
+        return await unselected(3)
+"""
+    )
+
+    functions = _discover_addressable_functions(
+        tmp_path, [("demo.workflows", "Selected")]
+    )
+    assert list(functions) == [("demo/steps.py", "score")]
+    definition = functions["demo/steps.py", "score"]
+    assert definition.slot == "demo.steps:score"
+    assert b"def other()" in _addressable_modules(functions)["demo/steps.py"]
+
+
 @pytest.mark.requires_local_server
 @pytest.mark.timeout(360)
 async def test_wasm_content_addressed_rollouts(
     client: Client, tmp_path: Path, wasm_builder: _BuildBundle
 ) -> None:
     fixture = _GUEST_SOURCE_DIR / "addressable"
-    manifest = fixture / "manifest.json"
     source = tmp_path / "source"
     source.mkdir()
     shutil.copyfile(fixture / "workflows.py", source / "workflows.py")
     shutil.copyfile(fixture / "v1" / "steps.py", source / "steps.py")
     bundle = tmp_path / "workflow.wasm"
     store = tmp_path / "functions"
-    wasm_builder(
-        source,
-        ["workflows:AddressableWorkflow", "workflows:AddressableBatch"],
-        bundle,
-        "--addressable-manifest",
-        str(manifest),
-    )
+    workflows = ["workflows:AddressableWorkflow", "workflows:AddressableBatch"]
+    wasm_builder(source, workflows, bundle, "--addressable")
+    slot = "steps:score"
 
-    def publish(version: int) -> bytes:
-        publish_addressable(fixture / f"v{version}", manifest, store)
-        return bytes.fromhex(
-            json.loads((store / "bindings.json").read_text())["demo.score"]
+    def publish(version: int) -> dict[str, bytes]:
+        shutil.copyfile(fixture / f"v{version}" / "steps.py", source / "steps.py")
+        subprocess.run(
+            [
+                sys.executable,
+                "scripts/build_workflow_wasm.py",
+                "--source",
+                str(source),
+                "--publish-addressables",
+                str(store),
+                *[part for name in workflows for part in ("--workflow", name)],
+            ],
+            check=True,
+            timeout=10,
         )
+        return {
+            name: bytes.fromhex(digest)
+            for name, digest in json.loads(
+                (store / "bindings.json").read_text()
+            ).items()
+        }
 
     config = client.config()
     config["interceptors"] = []
@@ -444,7 +493,7 @@ async def test_wasm_content_addressed_rollouts(
         )
 
     async def wait_for_memo(
-        handle: WorkflowHandle[None, list[int]], count: int
+        handle: WorkflowHandle[None, list[tuple[int, list[str]]]], count: int
     ) -> None:
         async for event in handle.fetch_history_events(wait_new_event=True):
             fields = (
@@ -461,8 +510,12 @@ async def test_wasm_content_addressed_rollouts(
         first = publish(1)
         async with worker():
             handle = await client.start_workflow(
-                "AddressableWorkflow", id=str(uuid.uuid4()), task_queue=queue
+                "AddressableWorkflow",
+                id=str(uuid.uuid4()),
+                task_queue=queue,
+                result_type=list[tuple[int, list[str]]],
             )
+            assert await handle.query("preview", result_type=list[str]) == []
             await handle.signal("advance", 1)
             async for event in handle.fetch_history_events(wait_new_event=True):
                 if event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
@@ -483,7 +536,11 @@ async def test_wasm_content_addressed_rollouts(
 
         async with worker():
             await handle.signal("advance", 3)
-            assert await handle.result() == [11, 22, 33]
+            assert await handle.result() == [
+                (11, ["v1", "1/y/z!?"]),
+                (22, ["v2", "2/y/z!?"]),
+                (33, ["v3", "3/y/z!?"]),
+            ]
             history = await handle.fetch_history()
             batch = await client.start_workflow(
                 "AddressableBatch", id=str(uuid.uuid4()), task_queue=queue
@@ -491,11 +548,18 @@ async def test_wasm_content_addressed_rollouts(
             assert await batch.result() == 1000
             batch_history = await batch.fetch_history()
 
-    assert len({first, second, third}) == 3
-    assert _addressable_bindings(history) == [
-        {"demo.score": digest} for digest in (first, second, third)
-    ]
-    assert _addressable_bindings(batch_history) == [{"demo.score": third}]
+    versioned_slots = {slot, "steps:remember", "steps:remembered"}
+    assert (
+        first.keys()
+        == second.keys()
+        == third.keys()
+        == (versioned_slots | {"workflows:expected_labels"})
+    )
+    assert all(
+        len({first[name], second[name], third[name]}) == 3 for name in versioned_slots
+    )
+    assert _addressable_bindings(history) == [first, second, third]
+    assert _addressable_bindings(batch_history) == [{slot: third[slot]}]
     assert [
         event.event_type
         for event in history.events
@@ -541,21 +605,24 @@ async def test_wasm_content_addressed_rollouts(
     forced = WorkflowHistory.from_json(history.workflow_id, history_path.read_text())
     for event in forced.events:
         bindings = event.workflow_task_completed_event_attributes.sdk_metadata.wasm_function_bindings
-        if bindings.get("demo.score") == first:
-            bindings["demo.score"] = third
+        if bindings.get(slot) == first[slot]:
+            bindings[slot] = third[slot]
             break
     with pytest.raises(workflow.NondeterminismError, match="TimerStarted"):
         await replayer().replay_workflow(forced)
 
-    capsule = store / f"{first.hex()}.wasm"
+    historical_digest = first["steps:remembered"].hex()
+    capsule = store / f"{historical_digest}.wasm"
     original = capsule.read_bytes()
     try:
         capsule.unlink()
-        with pytest.raises(RuntimeError, match=f"fetching WASM body {first.hex()}"):
+        with pytest.raises(
+            RuntimeError, match=f"fetching WASM body {historical_digest}"
+        ):
             await replayer().replay_workflow(history)
         capsule.write_bytes(original + b"corrupt")
         with pytest.raises(
-            RuntimeError, match=f"digest mismatch for WASM body {first.hex()}"
+            RuntimeError, match=f"digest mismatch for WASM body {historical_digest}"
         ):
             await replayer().replay_workflow(history)
     finally:

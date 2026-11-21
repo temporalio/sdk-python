@@ -1188,18 +1188,19 @@ Run `poe test -n 0 tests/worker/test_workflow_wasm.py`.
 
 ##### Content-addressed subroutines (experimental)
 
-List the async functions you want to publish independently in a manifest such
-as `addressable.json` containing `{"demo.score": "steps:score"}`. A workflow can
-import `score` from `steps` and call `await score(value)` as usual. Add
-`--addressable-manifest addressable.json` to the workflow bundle build. The
-builder installs a dispatch stub for each listed module.
+Add `--addressable` to the workflow bundle build to discover subroutines from
+the workflow classes passed with `--workflow`. A workflow can import `score`
+from `steps` and call `await score(value)` as usual. The builder recognizes direct
+calls to source functions in the same module or through module-level imports
+and installs a dispatch stub under the stable slot `steps:score`.
 
-Publish the original function bodies before starting the worker. Run the same
-command with updated sources to publish a new revision.
+Publish the original function bodies before starting the worker. Use the same
+workflow selections and source layout for publishing and building. Run the
+publish command with updated subroutine sources to publish a new revision.
 
 ```sh
 python scripts/build_workflow_wasm.py --source ./src \
-    --addressable-manifest addressable.json --publish-addressables ./wasm-content
+    --workflow workflows:MyWorkflow --publish-addressables ./wasm-content
 ```
 
 Pass `wasm_addressable_store="./wasm-content"` alongside `wasm_workflow_bundle`
@@ -1208,11 +1209,20 @@ publication. Each live Workflow Task records one digest per called slot in
 its completion metadata. Replay uses those digests. Keep all referenced
 `.wasm` files in the store for the lifetime of any history you need to replay.
 
-This prototype supports one undecorated `async (int) -> int` entry point per
-dedicated module. A hash covers the module's canonicalized Python source
-packaged in a Wasm data section, including its private helpers. The workflow's
-CPython guest loads that source, so calls can await workflow APIs directly.
-Libraries imported from the workflow bundle stay fixed with that bundle.
+An addressable module can define multiple synchronous or asynchronous entry
+points with ordinary Python signatures. The selected implementation binds
+arguments and returns Python objects inside the CPython guest. Calls outside
+workflow execution and in read-only handlers use the bundled implementation.
+Automatic discovery requires a statically resolvable top-level function in
+the source tree. The slot includes the function's module and name, so keep both stable
+for existing histories. To retain a custom slot in an existing deployment,
+use `--addressable-manifest` with a mapping such as
+`{"demo.score": "steps:score"}` during both build and publication.
+
+A hash covers the module's canonicalized Python source packaged in a Wasm
+data section, including its private helpers. Entry points from the same
+module revision share globals. Libraries imported from the workflow bundle
+stay fixed with that bundle.
 
 With the WASM test dependencies above, run the rollout and cold replay demo
 with `poe test -n 0 tests/worker/test_workflow_wasm.py -k content_addressed`.

@@ -9,11 +9,15 @@ import json
 import os
 import shutil
 import subprocess
+import symtable
 import sys
 import tempfile
+import tokenize
 import zipfile
 from collections.abc import Iterable
+from copy import copy
 from dataclasses import dataclass
+from importlib.util import resolve_name
 from pathlib import Path
 
 COMPONENTIZER_VERSION = "0.25.1"
@@ -26,28 +30,238 @@ _ADDRESSABLE_HASH_DOMAIN = b"temporal-python-cpython-3.14-v1\0"
 @dataclass(frozen=True)
 class _AddressableFunction:
     slot: str
-    function: ast.AsyncFunctionDef
+    function: ast.FunctionDef | ast.AsyncFunctionDef
     module: ast.Module
 
-    def stub(self) -> bytes:
-        function = self.function
-        argument = function.args.args[0].arg
-        return (
-            "from temporalio._wasm_addressable import invoke as _invoke\n\n"
-            f"async def {function.name}({argument}: int) -> int:\n"
-            f"    return await _invoke({self.slot!r}, {argument})\n"
+
+_AddressableFunctions = dict[tuple[str, str], _AddressableFunction]
+
+
+def _addressable_modules(functions: _AddressableFunctions) -> dict[str, bytes]:
+    by_file: dict[str, list[_AddressableFunction]] = {}
+    for (filename, _), definition in functions.items():
+        by_file.setdefault(filename, []).append(definition)
+    sources = {}
+    for filename, definitions in by_file.items():
+        tree = definitions[0].module
+        alias = "_temporal_addressable_bind"
+        original = ast.unparse(tree)
+        while alias in original:
+            alias += "_"
+        replacements: dict[ast.stmt, ast.stmt] = {}
+        for definition in definitions:
+            function = copy(definition.function)
+            decorator = ast.parse(
+                f"{alias}({definition.slot!r}, __name__, __package__)", mode="eval"
+            ).body
+            function.decorator_list = [decorator, *function.decorator_list]
+            replacements[definition.function] = function
+        body = [replacements.get(node, node) for node in tree.body]
+        # Python requires future imports to precede the generated import.
+        position = int(ast.get_docstring(tree) is not None)
+        while (
+            position < len(body)
+            and isinstance(node := body[position], ast.ImportFrom)
+            and node.module == "__future__"
+        ):
+            position += 1
+        body[position:position] = ast.parse(
+            f"from temporalio._wasm_addressable import bind as {alias}"
+        ).body
+        sources[filename] = ast.unparse(
+            ast.Module(body=body, type_ignores=tree.type_ignores)
         ).encode()
+    return sources
 
 
-def _addressable_functions(
+def _addressable_definition(
+    module: ast.Module, name: str
+) -> ast.FunctionDef | ast.AsyncFunctionDef | None:
+    definitions = [
+        node
+        for node in module.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == name
+    ]
+    return definitions[0] if len(definitions) == 1 else None
+
+
+def _module_imports(
+    tree: ast.Module, scope: symtable.SymbolTable, package: str
+) -> dict[str, str]:
+    imports: dict[str, str] = {}
+    roots: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    for node in tree.body:
+        if isinstance(node, ast.Import):
+            bindings = [
+                (alias.asname or alias.name, alias.name) for alias in node.names
+            ]
+        elif isinstance(node, ast.ImportFrom):
+            try:
+                imported_module = resolve_name(
+                    "." * node.level + (node.module or ""), package
+                )
+            except ImportError:
+                continue
+            bindings = [
+                (alias.asname or alias.name, f"{imported_module}.{alias.name}")
+                for alias in node.names
+                if alias.name != "*"
+            ]
+        else:
+            continue
+        for local, imported in bindings:
+            root = local.partition(".")[0]
+            # Both `import pkg.sub` and `import pkg.other` bind the same root package.
+            binding = imported if root == local else root
+            if (
+                roots.setdefault(root, binding) != binding
+                or scope.lookup(root).is_assigned()
+            ):
+                ambiguous.add(root)
+            imports[local] = imported
+    return {
+        local: target
+        for local, target in imports.items()
+        if local.partition(".")[0] not in ambiguous
+    }
+
+
+def _module_calls(
+    body: list[ast.stmt], scope: symtable.SymbolTable, imports: dict[str, str]
+) -> Iterable[str]:
+    nodes: list[ast.AST] = list(body)
+    while nodes:
+        node = nodes.pop()
+        # Calls in nested scopes can use a different binding for the same name.
+        if isinstance(
+            node,
+            (
+                ast.FunctionDef,
+                ast.AsyncFunctionDef,
+                ast.ClassDef,
+                ast.Lambda,
+                ast.ListComp,
+                ast.SetComp,
+                ast.DictComp,
+                ast.GeneratorExp,
+            ),
+        ):
+            continue
+        nodes.extend(ast.iter_child_nodes(node))
+        if not isinstance(node, ast.Call):
+            continue
+        target = node.func
+        attributes = []
+        while isinstance(target, ast.Attribute):
+            attributes.append(target.attr)
+            target = target.value
+        if not isinstance(target, ast.Name) or not scope.lookup(target.id).is_global():
+            continue
+        path = [target.id, *reversed(attributes)]
+        for size in range(1, len(path) + 1):
+            imported = imports.get(".".join(path[:size]))
+            if imported is not None:
+                yield ".".join([imported, *path[size:]])
+                break
+
+
+def _discover_addressable_functions(
+    source: Path, workflows: list[tuple[str, str]]
+) -> _AddressableFunctions:
+    files = dict(_files(source, "*.py"))
+    trees: dict[str, ast.Module] = {}
+    functions: _AddressableFunctions = {}
+    for module, class_name in workflows:
+        module_path = module.replace(".", "/")
+        filename = f"{module_path}.py"
+        package = module.rpartition(".")[0]
+        if filename not in files:
+            filename = f"{module_path}/__init__.py"
+            package = module
+        if filename not in files:
+            raise ValueError(f"Workflow source module must be in --source: {module}")
+        with tokenize.open(files[filename]) as file:
+            workflow_source = file.read()
+        tree = ast.parse(workflow_source, filename=filename)
+        scope = symtable.symtable(workflow_source, filename, "exec")
+        imports = _module_imports(tree, scope, package)
+        imports.update(
+            (node.name, f"{module}.{node.name}")
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and not scope.lookup(node.name).is_imported()
+        )
+        body = tree.body
+        for part in class_name.split("."):
+            klass = next(
+                (
+                    node
+                    for node in body
+                    if isinstance(node, ast.ClassDef) and node.name == part
+                ),
+                None,
+            )
+            if klass is None:
+                raise ValueError(
+                    f"Expected a workflow class definition for {module}:{class_name}"
+                )
+            scope = next(
+                child
+                for child in scope.get_children()
+                if child.get_name() == part and child.get_lineno() == klass.lineno
+            )
+            body = klass.body
+        for method in body:
+            if not isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            method_scope = next(
+                child
+                for child in scope.get_children()
+                if child.get_name() == method.name
+                and child.get_lineno() == method.lineno
+            )
+            for target in _module_calls(method.body, method_scope, imports):
+                target_module, _, name = target.rpartition(".")
+                target_file = target_module.replace(".", "/") + ".py"
+                if target_file not in files:
+                    target_file = target_module.replace(".", "/") + "/__init__.py"
+                if target_file not in files:
+                    continue
+                if target_file not in trees:
+                    trees[target_file] = ast.parse(
+                        files[target_file].read_bytes(), filename=target_file
+                    )
+                target_tree = trees[target_file]
+                function = _addressable_definition(target_tree, name)
+                if function is None:
+                    continue
+                slot = f"{target_module}:{name}"
+                if len(slot.encode()) > 128:
+                    raise ValueError(f"Addressable slot exceeds 128 bytes: {slot}")
+                functions[target_file, name] = _AddressableFunction(
+                    slot, function, target_tree
+                )
+    if not functions:
+        raise ValueError(
+            "No eligible addressable calls found in the selected workflows"
+        )
+    if len(functions) > 1024:
+        raise ValueError("Too many addressable functions in the selected workflows")
+    return functions
+
+
+def _manifest_addressable_functions(
     source: Path, manifest: Path
-) -> dict[str, _AddressableFunction]:
+) -> _AddressableFunctions:
     entries = json.loads(manifest.read_text())
     if not isinstance(entries, dict) or not 1 <= len(entries) <= 1024:
         raise ValueError(
             "Addressable manifest must map slots to module:function entries"
         )
-    functions = {}
+    functions: _AddressableFunctions = {}
+    trees: dict[str, ast.Module] = {}
     for slot, entry in entries.items():
         if not slot or len(slot.encode()) > 128 or not isinstance(entry, str):
             raise ValueError(f"Invalid addressable entry {slot!r}")
@@ -59,43 +273,22 @@ def _addressable_functions(
         ):
             raise ValueError(f"Invalid addressable function {entry!r}")
         filename = module.replace(".", "/") + ".py"
-        if filename in functions:
-            raise ValueError(
-                f"Use one addressable function per source module: {module}"
-            )
+        if (filename, name) in functions:
+            raise ValueError(f"Use one addressable slot per function: {entry}")
         path = source / filename
         if not path.resolve().is_relative_to(source.resolve()) or path.is_symlink():
             raise ValueError(
                 f"Addressable source must be inside the bundle: {filename}"
             )
-        tree = ast.parse(path.read_bytes(), filename=filename)
-        definitions = [
-            node
-            for node in tree.body
-            if isinstance(node, ast.AsyncFunctionDef) and node.name == name
-        ]
-        if len(definitions) != 1:
-            raise ValueError(f"Expected one top-level async definition for {entry!r}")
-        function = definitions[0]
-        args = function.args
-        if (
-            function.decorator_list
-            or getattr(function, "type_params", [])
-            or len(args.args) != 1
-            or args.posonlyargs
-            or args.vararg
-            or args.kwarg
-            or args.kwonlyargs
-            or args.defaults
-            or not isinstance(args.args[0].annotation, ast.Name)
-            or args.args[0].annotation.id != "int"
-            or not isinstance(function.returns, ast.Name)
-            or function.returns.id != "int"
-        ):
+        if filename not in trees:
+            trees[filename] = ast.parse(path.read_bytes(), filename=filename)
+        tree = trees[filename]
+        function = _addressable_definition(tree, name)
+        if function is None:
             raise ValueError(
-                f"Expected an undecorated async (int) -> int function for {entry!r}"
+                f"Expected one top-level function definition for {entry!r}"
             )
-        functions[filename] = _AddressableFunction(slot, function, tree)
+        functions[filename, name] = _AddressableFunction(slot, function, tree)
     return functions
 
 
@@ -108,9 +301,33 @@ def _uleb128(value: int) -> bytes:
     return bytes(result)
 
 
-def publish_addressable(source: Path, manifest: Path, store: Path) -> None:
+def _workflow_entries(workflows: list[str]) -> list[tuple[str, str]]:
+    entries = []
+    for entry in workflows:
+        module, _, class_name = entry.partition(":")
+        if not all(
+            part.isidentifier()
+            for name in (module, class_name)
+            for part in name.split(".")
+        ):
+            raise ValueError("Workflow entries must have the form module:Class")
+        entries.append((module, class_name))
+    return entries
+
+
+def publish_addressable(
+    source: Path,
+    manifest: Path | None,
+    store: Path,
+    *,
+    workflows: list[str] | None = None,
+) -> None:
     """Publish immutable Python source capsules and replace the live slot map."""
-    functions = _addressable_functions(source, manifest)
+    functions = (
+        _manifest_addressable_functions(source, manifest)
+        if manifest is not None
+        else _discover_addressable_functions(source, _workflow_entries(workflows or []))
+    )
     store.mkdir(parents=True, exist_ok=True)
     bindings = {}
     # Publish the binding map only after every referenced blob is available.
@@ -162,6 +379,7 @@ def build(
     core: Path,
     *,
     data_converter: str = "default",
+    discover_addressables: bool = False,
     addressable_manifest: Path | None = None,
 ) -> None:
     """Package source without importing the workflow modules on the build host."""
@@ -170,26 +388,22 @@ def build(
     for root in [source, *dependencies]:
         if not root.is_dir():
             raise ValueError(f"Bundle input must be a directory: {root}")
-    addressable = (
-        _addressable_functions(source, addressable_manifest)
-        if addressable_manifest
-        else {}
-    )
+    entries = _workflow_entries(workflows)
+    if addressable_manifest is not None:
+        addressable = _addressable_modules(
+            _manifest_addressable_functions(source, addressable_manifest)
+        )
+    elif discover_addressables:
+        addressable = _addressable_modules(
+            _discover_addressable_functions(source, entries)
+        )
+    else:
+        addressable = {}
     version = importlib.metadata.version("componentize-py")
     if version != COMPONENTIZER_VERSION:
         raise ValueError(
             f"Expected componentize-py {COMPONENTIZER_VERSION}, found {version}"
         )
-    entries = []
-    for entry in workflows:
-        module, _, class_name = entry.partition(":")
-        if not all(
-            part.isidentifier()
-            for name in (module, class_name)
-            for part in name.split(".")
-        ):
-            raise ValueError("Workflow entries must have the form module:Class")
-        entries.append((module, class_name))
     version_assignment = next(
         node
         for node in ast.parse((SDK_ROOT / "temporalio/service.py").read_bytes()).body
@@ -249,9 +463,7 @@ def build(
                     )
                 archive.writestr(
                     name,
-                    addressable[name].stub()
-                    if name in addressable
-                    else path.read_bytes(),
+                    addressable[name] if name in addressable else path.read_bytes(),
                 )
         if (
             not (staged_dependencies / "google/protobuf").is_dir()
@@ -325,7 +537,13 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--workflow", action="append")
     parser.add_argument("--dependency-path", type=Path, action="append")
-    parser.add_argument("--addressable-manifest", type=Path)
+    addressable = parser.add_mutually_exclusive_group()
+    addressable.add_argument(
+        "--addressable",
+        action="store_true",
+        help="Discover addressable subroutines in the selected workflows",
+    )
+    addressable.add_argument("--addressable-manifest", type=Path)
     parser.add_argument(
         "--data-converter", choices=("default", "pydantic"), default="default"
     )
@@ -334,10 +552,15 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.publish_addressables is not None:
-        if args.addressable_manifest is None:
-            parser.error("--publish-addressables requires --addressable-manifest")
+        if args.addressable_manifest is None and not args.workflow:
+            parser.error(
+                "--publish-addressables requires --workflow or --addressable-manifest"
+            )
         publish_addressable(
-            args.source, args.addressable_manifest, args.publish_addressables
+            args.source,
+            args.addressable_manifest,
+            args.publish_addressables,
+            workflows=args.workflow,
         )
         sys.exit(0)
     if not args.workflow or not args.dependency_path:
@@ -349,5 +572,6 @@ if __name__ == "__main__":
         [path.resolve() for path in args.dependency_path],
         args.core.resolve(),
         data_converter=args.data_converter,
+        discover_addressables=args.addressable,
         addressable_manifest=args.addressable_manifest,
     )
