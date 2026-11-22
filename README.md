@@ -1235,6 +1235,18 @@ the workflow run method and shows source hashes alongside the capsule digests
 used by replay. Edge numbers order the statically resolved call sites within
 each caller, including repeated calls to the same function.
 
+#### WASM memory and AOT experiments
+
+The shared-source backing, memory measurements, CPython refcount side tables,
+idle byte deltas, and Wasmtime AOT benchmark are archived on
+`sj/wasm-memory-experiments` at commit `71bb8e0`. The archive includes the
+pinned CPython patch, the Core host patch used by the AOT benchmark, and
+reproduction instructions.
+
+```bash
+git show sj/wasm-memory-experiments:scripts/wasm/experiments/README.md
+```
+
 #### Workflow Sandbox
 
 By default workflows are run in a sandbox to help avoid non-deterministic code. If a call that is known to be

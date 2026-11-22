@@ -22,3 +22,5 @@ memory is the largest individual peak among their sequential replays.
 | Plain WASM, same history | 4.23 s | 631 MiB | 2.85 s |
 | Plain WASM, three fixed histories | 3.51 s | 583 MiB | 8.93 s |
 | Native Python, same three fixed histories | 1.92 s | 92 MiB | 0.19 s |
+
+See [WASM memory and AOT experiments](../../../README.md#wasm-memory-and-aot-experiments) for the follow-on studies archived on `sj/wasm-memory-experiments`.
