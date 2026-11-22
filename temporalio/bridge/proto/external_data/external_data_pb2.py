@@ -14,10 +14,11 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08\x42\x32\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
+    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08"\x81\x02\n\x10StreamMarkerData\x12?\n\rclose_intents\x18\x01 \x03(\x0b\x32(.coresdk.external_data.StreamCloseIntent\x12:\n\x07\x61ppends\x18\x02 \x03(\x0b\x32).coresdk.external_data.StreamAppendResult\x12\x38\n\x06\x63loses\x18\x03 \x03(\x0b\x32(.coresdk.external_data.StreamCloseResult\x12\x36\n\x05reads\x18\x04 \x03(\x0b\x32\'.coresdk.external_data.StreamReadResult"B\n\x11StreamCloseIntent\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t"\xe0\x01\n\x12StreamAppendResult\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t\x12\x18\n\x10\x61\x63tivation_index\x18\x04 \x01(\x04\x12>\n\x08\x61ppended\x18\x05 \x01(\x0b\x32*.coresdk.external_data.StreamAppendOffsetsH\x00\x12\x37\n\x07\x66\x61ilure\x18\x06 \x01(\x0b\x32$.coresdk.external_data.StreamFailureH\x00\x42\x08\n\x06result"@\n\x13StreamAppendOffsets\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c"0\n\rStreamFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t"q\n\x11StreamCloseResult\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x18\n\x10\x61\x63tivation_index\x18\x02 \x01(\x04\x12\x35\n\x07\x66\x61ilure\x18\x03 \x01(\x0b\x32$.coresdk.external_data.StreamFailure"\x97\x02\n\x10StreamReadResult\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t\x12\x18\n\x10\x61\x63tivation_index\x18\x04 \x01(\x04\x12\x13\n\x0b\x66rom_offset\x18\x05 \x01(\x0c\x12\x35\n\x04page\x18\x06 \x01(\x0b\x32%.coresdk.external_data.StreamReadPageH\x00\x12\x37\n\x07\x66\x61ilure\x18\x07 \x01(\x0b\x32$.coresdk.external_data.StreamFailureH\x00\x12+\n\tcancelled\x18\x08 \x01(\x0b\x32\x16.google.protobuf.EmptyH\x00\x42\x08\n\x06result"Z\n\x0eStreamReadPage\x12\x14\n\x0crecord_count\x18\x01 \x01(\r\x12\x0c\n\x04\x64one\x18\x02 \x01(\x08\x12\x0e\n\x06\x64igest\x18\x03 \x01(\x0c\x12\x14\n\x0crecord_bytes\x18\x04 \x01(\x04\x42\x32\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -27,8 +28,24 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._serialized_options = (
         b"\352\002/Temporalio::Internal::Bridge::Api::ExternalData"
     )
-    _LOCALACTIVITYMARKERDATA._serialized_start = 144
-    _LOCALACTIVITYMARKERDATA._serialized_end = 450
-    _PATCHEDMARKERDATA._serialized_start = 452
-    _PATCHEDMARKERDATA._serialized_end = 503
+    _LOCALACTIVITYMARKERDATA._serialized_start = 173
+    _LOCALACTIVITYMARKERDATA._serialized_end = 479
+    _PATCHEDMARKERDATA._serialized_start = 481
+    _PATCHEDMARKERDATA._serialized_end = 532
+    _STREAMMARKERDATA._serialized_start = 535
+    _STREAMMARKERDATA._serialized_end = 792
+    _STREAMCLOSEINTENT._serialized_start = 794
+    _STREAMCLOSEINTENT._serialized_end = 860
+    _STREAMAPPENDRESULT._serialized_start = 863
+    _STREAMAPPENDRESULT._serialized_end = 1087
+    _STREAMAPPENDOFFSETS._serialized_start = 1089
+    _STREAMAPPENDOFFSETS._serialized_end = 1153
+    _STREAMFAILURE._serialized_start = 1155
+    _STREAMFAILURE._serialized_end = 1203
+    _STREAMCLOSERESULT._serialized_start = 1205
+    _STREAMCLOSERESULT._serialized_end = 1318
+    _STREAMREADRESULT._serialized_start = 1321
+    _STREAMREADRESULT._serialized_end = 1600
+    _STREAMREADPAGE._serialized_start = 1602
+    _STREAMREADPAGE._serialized_end = 1692
 # @@protoc_insertion_point(module_scope)

@@ -308,6 +308,38 @@ class PayloadVisitor:
         if o.HasField("result"):
             await self._visit_coresdk_nexus_NexusOperationResult(fs, o.result)
 
+    async def _visit_temporal_api_stream_v1_StreamRecord(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("body"):
+            await self._visit_temporal_api_common_v1_Payload(fs, o.body)
+
+    async def _visit_coresdk_workflow_activation_StreamPage(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        for v in o.records:
+            await self._visit_temporal_api_stream_v1_StreamRecord(fs, v)
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamRead(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("page"):
+            await self._visit_coresdk_workflow_activation_StreamPage(fs, o.page)
+        elif o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamAppend(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+
+    async def _visit_coresdk_workflow_activation_ResolveStreamClose(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        if o.HasField("failed"):
+            await self._visit_temporal_api_failure_v1_Failure(fs, o.failed)
+
     async def _visit_coresdk_workflow_activation_WorkflowActivationJob(
         self, fs: VisitorFunctions, o: Any
     ):
@@ -352,6 +384,18 @@ class PayloadVisitor:
         elif o.HasField("resolve_nexus_operation"):
             await self._visit_coresdk_workflow_activation_ResolveNexusOperation(
                 fs, o.resolve_nexus_operation
+            )
+        elif o.HasField("resolve_stream_read"):
+            await self._visit_coresdk_workflow_activation_ResolveStreamRead(
+                fs, o.resolve_stream_read
+            )
+        elif o.HasField("resolve_stream_append"):
+            await self._visit_coresdk_workflow_activation_ResolveStreamAppend(
+                fs, o.resolve_stream_append
+            )
+        elif o.HasField("resolve_stream_close"):
+            await self._visit_coresdk_workflow_activation_ResolveStreamClose(
+                fs, o.resolve_stream_close
             )
 
     async def _visit_coresdk_workflow_activation_WorkflowActivation(
@@ -492,6 +536,11 @@ class PayloadVisitor:
         if o.HasField("input"):
             await self._visit_nexus_operation_input_payload(fs, o.input)
 
+    async def _visit_coresdk_workflow_commands_AppendToStream(
+        self, fs: VisitorFunctions, o: Any
+    ):
+        await self._visit_payload_container(fs, o.bodies)
+
     async def _visit_coresdk_workflow_commands_WorkflowCommand(
         self, fs: VisitorFunctions, o: Any
     ):
@@ -550,6 +599,10 @@ class PayloadVisitor:
         elif o.HasField("schedule_nexus_operation"):
             await self._visit_coresdk_workflow_commands_ScheduleNexusOperation(
                 fs, o.schedule_nexus_operation
+            )
+        elif o.HasField("append_to_stream"):
+            await self._visit_coresdk_workflow_commands_AppendToStream(
+                fs, o.append_to_stream
             )
 
     async def _visit_coresdk_workflow_completion_Success(
@@ -680,12 +733,6 @@ class PayloadVisitor:
         self, fs: VisitorFunctions, o: Any
     ) -> None:
         pass
-
-    async def _visit_temporal_api_stream_v1_StreamRecord(
-        self, fs: VisitorFunctions, o: Any
-    ):
-        if o.HasField("body"):
-            await self._visit_temporal_api_common_v1_Payload(fs, o.body)
 
     async def _visit_temporal_api_streamservice_v1_ReadRecordsResponse(
         self, fs: VisitorFunctions, o: Any
