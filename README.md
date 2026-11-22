@@ -1190,9 +1190,10 @@ Run `poe test -n 0 tests/worker/test_workflow_wasm.py`.
 
 Add `--addressable` to the workflow bundle build to discover subroutines from
 the workflow classes passed with `--workflow`. A workflow can import `score`
-from `steps` and call `await score(value)` as usual. The builder recognizes direct
-calls to source functions in the same module or through module-level imports
-and installs a dispatch stub under the stable slot `steps:score`.
+from `steps` and call `await score(value)` as usual. The builder follows direct
+calls to source functions in the same module or through module-level imports,
+including calls made by those functions. It installs a dispatch stub under the
+stable slot `steps:score`.
 
 Publish the original function bodies before starting the worker. Use the same
 workflow selections and source layout for publishing and building. Run the
@@ -1221,11 +1222,18 @@ use `--addressable-manifest` with a mapping such as
 
 A hash covers the module's canonicalized Python source packaged in a Wasm
 data section, including its private helpers. Entry points from the same
-module revision share globals. Libraries imported from the workflow bundle
-stay fixed with that bundle.
+module revision share globals. A discovered helper in a separate source module
+has its own binding. Updating that helper can leave the caller's capsule
+digest unchanged, and a guest that has loaded the caller can reuse it.
+Other libraries imported from the workflow bundle stay fixed with that bundle.
 
 With the WASM test dependencies above, run the rollout and cold replay demo
-with `poe test -n 0 tests/worker/test_workflow_wasm.py -k content_addressed`.
+with `poe test -n 0 -s tests/worker/test_workflow_wasm.py -k content_addressed`.
+Each rollout test prints a Mermaid call graph and the path to a Markdown
+report with the full hashes. The graph follows statically resolved calls from
+the workflow run method and shows source hashes alongside the capsule digests
+used by replay. Edge numbers order the statically resolved call sites within
+each caller, including repeated calls to the same function.
 
 #### Workflow Sandbox
 

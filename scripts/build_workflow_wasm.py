@@ -14,9 +14,10 @@ import sys
 import tempfile
 import tokenize
 import zipfile
+from collections import deque
 from collections.abc import Iterable
 from copy import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib.util import resolve_name
 from pathlib import Path
 
@@ -35,6 +36,22 @@ class _AddressableFunction:
 
 
 _AddressableFunctions = dict[tuple[str, str], _AddressableFunction]
+
+
+@dataclass(frozen=True)
+class _SourceModule:
+    filename: str
+    tree: ast.Module
+    scope: symtable.SymbolTable
+    bindings: dict[str, str]
+
+
+@dataclass
+class _SourceCallGraph:
+    definitions: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = field(
+        default_factory=dict
+    )
+    calls: dict[str, list[str]] = field(default_factory=dict)
 
 
 def _addressable_modules(functions: _AddressableFunctions) -> dict[str, bytes]:
@@ -129,11 +146,9 @@ def _module_imports(
 
 
 def _module_calls(
-    body: list[ast.stmt], scope: symtable.SymbolTable, imports: dict[str, str]
+    nodes: Iterable[ast.AST], scope: symtable.SymbolTable, bindings: dict[str, str]
 ) -> Iterable[str]:
-    nodes: list[ast.AST] = list(body)
-    while nodes:
-        node = nodes.pop()
+    for node in nodes:
         # Calls in nested scopes can use a different binding for the same name.
         if isinstance(
             node,
@@ -149,7 +164,8 @@ def _module_calls(
             ),
         ):
             continue
-        nodes.extend(ast.iter_child_nodes(node))
+        # Calls used as arguments run before their enclosing call.
+        yield from _module_calls(ast.iter_child_nodes(node), scope, bindings)
         if not isinstance(node, ast.Call):
             continue
         target = node.func
@@ -161,19 +177,44 @@ def _module_calls(
             continue
         path = [target.id, *reversed(attributes)]
         for size in range(1, len(path) + 1):
-            imported = imports.get(".".join(path[:size]))
+            imported = bindings.get(".".join(path[:size]))
             if imported is not None:
                 yield ".".join([imported, *path[size:]])
                 break
 
 
+def _definition_scope(
+    parent: symtable.SymbolTable,
+    definition: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
+) -> symtable.SymbolTable:
+    scope = next(
+        child
+        for child in parent.get_children()
+        if child.get_name() == definition.name
+        and child.get_lineno() == definition.lineno
+    )
+    if getattr(definition, "type_params", []):
+        # Python wraps a generic definition in a separate type-parameter scope.
+        return next(
+            child
+            for child in scope.get_children()
+            if child.get_name() == definition.name
+        )
+    return scope
+
+
 def _discover_addressable_functions(
-    source: Path, workflows: list[tuple[str, str]]
+    source: Path,
+    workflows: list[tuple[str, str]],
+    *,
+    call_graph: _SourceCallGraph | None = None,
 ) -> _AddressableFunctions:
     files = dict(_files(source, "*.py"))
-    trees: dict[str, ast.Module] = {}
-    functions: _AddressableFunctions = {}
-    for module, class_name in workflows:
+    modules: dict[str, _SourceModule] = {}
+
+    def load_module(module: str) -> _SourceModule | None:
+        if module in modules:
+            return modules[module]
         module_path = module.replace(".", "/")
         filename = f"{module_path}.py"
         package = module.rpartition(".")[0]
@@ -181,19 +222,29 @@ def _discover_addressable_functions(
             filename = f"{module_path}/__init__.py"
             package = module
         if filename not in files:
-            raise ValueError(f"Workflow source module must be in --source: {module}")
+            return None
         with tokenize.open(files[filename]) as file:
-            workflow_source = file.read()
-        tree = ast.parse(workflow_source, filename=filename)
-        scope = symtable.symtable(workflow_source, filename, "exec")
-        imports = _module_imports(tree, scope, package)
-        imports.update(
+            module_source = file.read()
+        tree = ast.parse(module_source, filename=filename)
+        scope = symtable.symtable(module_source, filename, "exec")
+        bindings = _module_imports(tree, scope, package)
+        bindings.update(
             (node.name, f"{module}.{node.name}")
             for node in tree.body
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and not scope.lookup(node.name).is_imported()
         )
-        body = tree.body
+        parsed = _SourceModule(filename, tree, scope, bindings)
+        modules[module] = parsed
+        return parsed
+
+    pending: deque[tuple[str, str | None, str]] = deque()
+    for module, class_name in workflows:
+        parsed = load_module(module)
+        if parsed is None:
+            raise ValueError(f"Workflow source module must be in --source: {module}")
+        body = parsed.tree.body
+        scope = parsed.scope
         for part in class_name.split("."):
             klass = next(
                 (
@@ -207,42 +258,55 @@ def _discover_addressable_functions(
                 raise ValueError(
                     f"Expected a workflow class definition for {module}:{class_name}"
                 )
-            scope = next(
-                child
-                for child in scope.get_children()
-                if child.get_name() == part and child.get_lineno() == klass.lineno
-            )
+            scope = _definition_scope(scope, klass)
             body = klass.body
         for method in body:
             if not isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            method_scope = next(
-                child
-                for child in scope.get_children()
-                if child.get_name() == method.name
-                and child.get_lineno() == method.lineno
-            )
-            for target in _module_calls(method.body, method_scope, imports):
-                target_module, _, name = target.rpartition(".")
-                target_file = target_module.replace(".", "/") + ".py"
-                if target_file not in files:
-                    target_file = target_module.replace(".", "/") + "/__init__.py"
-                if target_file not in files:
-                    continue
-                if target_file not in trees:
-                    trees[target_file] = ast.parse(
-                        files[target_file].read_bytes(), filename=target_file
-                    )
-                target_tree = trees[target_file]
-                function = _addressable_definition(target_tree, name)
-                if function is None:
-                    continue
-                slot = f"{target_module}:{name}"
-                if len(slot.encode()) > 128:
-                    raise ValueError(f"Addressable slot exceeds 128 bytes: {slot}")
-                functions[target_file, name] = _AddressableFunction(
-                    slot, function, target_tree
+            caller = f"{module}:{class_name}.{method.name}"
+            if call_graph is not None:
+                call_graph.definitions[caller] = method
+            pending.extend(
+                (target, None, caller)
+                for target in _module_calls(
+                    method.body, _definition_scope(scope, method), parsed.bindings
                 )
+            )
+
+    functions: _AddressableFunctions = {}
+    visited: set[str] = set()
+    while pending:
+        target, caller_module, caller = pending.popleft()
+        module, _, name = target.rpartition(".")
+        parsed = load_module(module)
+        if parsed is None:
+            continue
+        function = _addressable_definition(parsed.tree, name)
+        if function is None:
+            continue
+        slot = f"{module}:{name}"
+        if call_graph is not None:
+            call_graph.definitions[slot] = function
+            call_graph.calls.setdefault(caller, []).append(slot)
+        if caller_module != module:
+            if len(slot.encode()) > 128:
+                raise ValueError(f"Addressable slot exceeds 128 bytes: {slot}")
+            functions[parsed.filename, name] = _AddressableFunction(
+                slot, function, parsed.tree
+            )
+        if target in visited:
+            continue
+        visited.add(target)
+        # Calls in the same module use the caller's capsule. Follow them to
+        # reach imports that can dispatch independently from that capsule.
+        pending.extend(
+            (callee, module, slot)
+            for callee in _module_calls(
+                function.body,
+                _definition_scope(parsed.scope, function),
+                parsed.bindings,
+            )
+        )
     if not functions:
         raise ValueError(
             "No eligible addressable calls found in the selected workflows"

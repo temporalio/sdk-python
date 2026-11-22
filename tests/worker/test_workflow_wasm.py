@@ -21,6 +21,8 @@ import temporalio.workflow as workflow
 from scripts.build_workflow_wasm import (
     _addressable_modules,
     _discover_addressable_functions,
+    _SourceCallGraph,
+    publish_addressable,
 )
 from temporalio import activity
 from temporalio.api.enums.v1 import EventType
@@ -39,6 +41,7 @@ from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Replayer, Worker
 from temporalio.worker._workflow_wasm import _BridgeBundle
 from tests.helpers.nexus import make_nexus_endpoint_name
+from tests.worker.wasm_fixtures.addressable_call_graph import RolloutCallGraph
 from tests.worker.wasm_fixtures.native import NativeWorkflow
 
 pytestmark = pytest.mark.timeout(240)
@@ -405,17 +408,18 @@ def test_addressable_discovery_uses_selected_classes_and_import_bindings(
     for name in ("steps", "shadowed", "unselected"):
         (package / f"{name}.py").write_text(
             "async def score(value: int) -> int:\n    return value\n"
-            "def other() -> str:\n    return 'still in the bundle'\n"
+            "def other() -> int:\n    return 1\n"
         )
     (package / "workflows.py").write_text(
         """
 from .steps import score as call_score
+from .steps import other
 from .shadowed import score as shadowed
 from .unselected import score as unselected
 
 class Selected:
     async def run(self, shadowed):
-        return await call_score(1) + await shadowed(2)
+        return await call_score(other()) + await call_score(1) + await shadowed(2)
 
 class Unselected:
     async def run(self):
@@ -423,12 +427,20 @@ class Unselected:
 """
     )
 
+    graph = _SourceCallGraph()
     functions = _discover_addressable_functions(
-        tmp_path, [("demo.workflows", "Selected")]
+        tmp_path, [("demo.workflows", "Selected")], call_graph=graph
     )
-    assert list(functions) == [("demo/steps.py", "score")]
+    assert list(functions) == [("demo/steps.py", "other"), ("demo/steps.py", "score")]
     definition = functions["demo/steps.py", "score"]
     assert definition.slot == "demo.steps:score"
+    assert graph.calls == {
+        "demo.workflows:Selected.run": [
+            "demo.steps:other",
+            "demo.steps:score",
+            "demo.steps:score",
+        ]
+    }
     assert b"def other()" in _addressable_modules(functions)["demo/steps.py"]
 
 
@@ -447,6 +459,7 @@ async def test_wasm_content_addressed_rollouts(
     workflows = ["workflows:AddressableWorkflow", "workflows:AddressableBatch"]
     wasm_builder(source, workflows, bundle, "--addressable")
     slot = "steps:score"
+    call_graph = RolloutCallGraph(source, ("workflows", "AddressableWorkflow"))
 
     def publish(version: int) -> dict[str, bytes]:
         shutil.copyfile(fixture / f"v{version}" / "steps.py", source / "steps.py")
@@ -463,12 +476,14 @@ async def test_wasm_content_addressed_rollouts(
             check=True,
             timeout=10,
         )
-        return {
+        bindings = {
             name: bytes.fromhex(digest)
             for name, digest in json.loads(
                 (store / "bindings.json").read_text()
             ).items()
         }
+        call_graph.record(version, bindings)
+        return bindings
 
     config = client.config()
     config["interceptors"] = []
@@ -560,6 +575,7 @@ async def test_wasm_content_addressed_rollouts(
     )
     assert _addressable_bindings(history) == [first, second, third]
     assert _addressable_bindings(batch_history) == [{slot: third[slot]}]
+    call_graph.write(tmp_path / "call-graph.md")
     assert [
         event.event_type
         for event in history.events
@@ -627,3 +643,97 @@ async def test_wasm_content_addressed_rollouts(
             await replayer().replay_workflow(history)
     finally:
         capsule.write_bytes(original)
+
+
+@pytest.mark.requires_local_server
+async def test_wasm_content_addressed_nested_rollout(
+    client: Client, tmp_path: Path, wasm_builder: _BuildBundle
+) -> None:
+    fixture = _GUEST_SOURCE_DIR / "addressable" / "nested"
+    source = tmp_path / "source"
+    source.mkdir()
+    for filename in ("workflows.py", "scoring.py"):
+        shutil.copyfile(fixture / filename, source / filename)
+    workflows = ["workflows:AddressableNestedWorkflow"]
+    store = tmp_path / "functions"
+    bundle = tmp_path / "workflow.wasm"
+    caller_slot, helper_slot = "scoring:score", "adjustment:adjust"
+    call_graph = RolloutCallGraph(source, ("workflows", "AddressableNestedWorkflow"))
+
+    def publish(version: int) -> dict[str, bytes]:
+        shutil.copyfile(
+            fixture / f"v{version}" / "adjustment.py", source / "adjustment.py"
+        )
+        publish_addressable(source, None, store, workflows=workflows)
+        bindings = {
+            name: bytes.fromhex(digest)
+            for name, digest in json.loads(
+                (store / "bindings.json").read_text()
+            ).items()
+        }
+        call_graph.record(version, bindings)
+        return bindings
+
+    first = publish(1)
+    assert first.keys() == {caller_slot, helper_slot}
+    original_artifacts = set(store.glob("*.wasm"))
+    wasm_builder(source, workflows, bundle, "--addressable")
+
+    config = client.config()
+    config["interceptors"] = []
+    client = Client(**config)
+    queue = str(uuid.uuid4())
+    activity_calls: list[int] = []
+
+    @activity.defn(name="nested_echo")
+    async def echo(value: int) -> int:
+        activity_calls.append(value)
+        return value
+
+    def worker() -> Worker:
+        return Worker(
+            client,
+            task_queue=queue,
+            wasm_workflow_bundle=bundle,
+            wasm_addressable_store=store,
+            activities=[echo],
+            max_cached_workflows=0,
+        )
+
+    async with asyncio.timeout(90):
+        async with worker():
+            handle = await client.start_workflow(
+                "AddressableNestedWorkflow",
+                id=str(uuid.uuid4()),
+                task_queue=queue,
+                result_type=list[int],
+            )
+            async for event in handle.fetch_history_events(wait_new_event=True):
+                if event.event_type == EventType.EVENT_TYPE_TIMER_STARTED:
+                    break
+            else:
+                pytest.fail(
+                    "Workflow closed before the first helper scheduled its timer"
+                )
+            second = publish(2)
+            assert second.keys() == first.keys()
+            assert second[caller_slot] == first[caller_slot]
+            assert second[helper_slot] != first[helper_slot]
+            assert set(store.glob("*.wasm")) - original_artifacts == {
+                store / f"{second[helper_slot].hex()}.wasm"
+            }
+
+        async with worker():
+            await handle.signal("advance")
+            assert await handle.result() == [11, 22]
+            history = await handle.fetch_history()
+
+    assert _addressable_bindings(history) == [first, second]
+    call_graph.write(tmp_path / "call-graph.md")
+    assert activity_calls == [22]
+    await Replayer(
+        namespace=client.namespace,
+        wasm_workflow_bundle=bundle,
+        wasm_addressable_store=store,
+    ).replay_workflow(history)
+    assert activity_calls == [22]
