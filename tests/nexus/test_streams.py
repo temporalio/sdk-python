@@ -23,6 +23,7 @@ import temporalio.api.streamservice.v1 as proto
 import temporalio.client
 import temporalio.converter
 import temporalio.nexus.system
+import temporalio.workflow
 from temporalio.activity import WorkflowTaskAttempt
 from temporalio.api.enums.v1 import StreamErrorReason, StreamIdConflictPolicy
 from temporalio.api.failure.v1 import Failure
@@ -557,6 +558,84 @@ def test_a_stored_producer_comes_back_as_a_producer() -> None:
             [stored] = converter.from_payloads(converter.to_payloads([producer]))
             assert as_producer(stored) == producer
             assert as_producer(producer) is producer
+
+
+@dataclasses.dataclass
+class _Turn:
+    text: str
+
+
+def _refs(value: Any) -> list[Any]:
+    """Return each ``StreamRef`` of a value, in the order of its lists and fields."""
+    if isinstance(value, StreamRef):
+        return [value]
+    if isinstance(value, list):
+        return [ref for item in value for ref in _refs(item)]
+    if dataclasses.is_dataclass(value):
+        fields = dataclasses.fields(value)
+        return _refs([getattr(value, field.name) for field in fields])
+    return []
+
+
+def test_a_stream_ref_keeps_its_type_inside_a_value() -> None:
+    converter = temporalio.converter.DataConverter.default.payload_converter
+    config = StreamConfig([FaultStore()])
+    client = Client(Mock(spec=ServiceClient), stream_config=config)
+    # mypy takes a type argument from a variable only on a value of type Any.
+    ref_type: Any = StreamRef
+    list_type: Any = list
+    for seed in range(60):
+        rng = random.Random(seed)
+
+        def ref(typed: Any) -> Any:
+            store = rng.choice([None, "a", "b"])
+            return typed(id=f"stream-{rng.randrange(1000)}", store=store)
+
+        def shape(
+            kind: str, depth: int
+        ) -> tuple[Any, Callable[[], tuple[Any, list[Any]]]]:
+            """Return a hint with a ref in it, and a function that makes a value of
+            the hint with the body type of each of its refs, in their order.
+            """
+            if kind == "argument" or depth == 0:
+                body = rng.choice([_Turn, str, int])
+                return ref_type[body], lambda: (ref(ref_type[body]), [body])
+            if kind == "untyped field":
+                # A ref with no type argument reads bodies of any type.
+                untyped = dataclasses.make_dataclass("Untyped", [("ref", StreamRef)])
+                return untyped, lambda: (untyped(ref(StreamRef)), [object])
+            kinds = ["argument", "untyped field", "field", "list", "optional"]
+            hint, make = shape(rng.choice(kinds), depth - 1)
+            if kind == "optional":
+                return hint | None, lambda: make() if rng.random() < 0.7 else (None, [])
+            if kind == "list":
+
+                def make_list() -> tuple[Any, list[Any]]:
+                    made = [make() for _ in range(rng.randrange(3))]
+                    bodies = [body for _, bodies in made for body in bodies]
+                    return [value for value, _ in made], bodies
+
+                return list_type[hint], make_list
+            holder = dataclasses.make_dataclass("Holder", [("ref", hint)])
+
+            def make_field() -> tuple[Any, list[Any]]:
+                value, bodies = make()
+                return holder(value), bodies
+
+            return holder, make_field
+
+        # With a depth of 1, these are an argument or a result, a field with no type
+        # argument, a field, a list, and an argument or a result that can be None.
+        for top in ("argument", "untyped field", "field", "list", "optional"):
+            with failure_note(f"seed {seed}, {top}"):
+                hint, make = shape(top, rng.randrange(1, 4))
+                value, bodies = make()
+                payloads = converter.to_payloads([value])
+                [decoded] = converter.from_payloads(payloads, [hint])
+                assert decoded == value
+                refs = _refs(decoded)
+                for get_stream in (client.get_stream, temporalio.workflow.get_stream):
+                    assert [get_stream(ref).body_type for ref in refs] == bodies
 
 
 def test_each_stream_module_can_be_the_first_import() -> None:
