@@ -856,7 +856,7 @@ class _LatePagesWorkflow:
         t = workflow.get_stream(StreamRef[str](id=f"t of {how}"))
         if how == "a cancel":
             # The page of `t` makes the Workflow cancel its read of `s`, whose reader then
-            # reads `u`. A replay gives the cancel job of `s` with that page, before the cancel.
+            # reads `u`. A replay gives the cancel job of `s` after that cancel, as the first run.
             u = workflow.get_stream(StreamRef[str](id=f"u of {how}"))
 
             async def read_s() -> None:
@@ -912,7 +912,7 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
             assert len(_events(history, started)) > 1
 
         # The first task ends at its heartbeat with no page. The pages then come in several
-        # activations of the next task, which a replay with chunking on gives in one.
+        # activations of the next task, and a replay gives each page in its activation.
         await assert_eventually(second_task)
         for stream, body in writes:
             await stream.append(body)
@@ -933,6 +933,80 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
     events = [event.event_type for event in ran.history.events]
     completed = events.index(EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
     assert events[completed + 1] == EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+
+
+@workflow.defn
+class _TwoReadsWorkflow:
+    @workflow.run
+    async def run(self, first: str, second: str) -> list[list[str]]:
+        wait = timedelta(seconds=30)
+        streams = [workflow.get_stream(StreamRef[str](id=id)) for id in (first, second)]
+        pages = await asyncio.gather(
+            *(stream.read_page(wait=wait) for stream in streams)
+        )
+        return [[record.body for record in page.records] for page in pages]
+
+
+async def test_a_replay_gives_each_result_in_the_activation_of_the_first_run(
+    client: Client,
+) -> None:
+    # A local import, so that the sandbox of each Workflow here doesn't import that module.
+    from tests.worker.test_workflow import CustomWorkflowRunner
+
+    store, holds = FaultStore(), [Hold(), Hold()]
+    store.faults["read_records"].extend(holds)
+    client = stream_client(client, store)
+    for stream_id in ("first", "second"):
+        stream = await client.create_stream(id=stream_id, body_type=str)
+        await stream.append(stream_id)
+    live, replayed = CustomWorkflowRunner(), CustomWorkflowRunner()
+
+    def read_results(runner: CustomWorkflowRunner) -> list[list[int]]:
+        """Return the seqs of the read results of each activation that has one."""
+        activations = [
+            [
+                job.resolve_stream_read.seq
+                for job in activation.jobs
+                if job.HasField("resolve_stream_read")
+            ]
+            for activation, _ in runner._pairs
+        ]
+        return [seqs for seqs in activations if seqs]
+
+    async def release(handle: Any, _worker: Any) -> None:
+        async def forced_task() -> None:
+            history = await handle.fetch_history()
+            started = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
+            assert len(_events(history, started)) > 1
+
+        # Both reads wait past the heartbeat of the first task, which completes with no
+        # command. Legacy chunking takes that task and the next one as one in a replay.
+        await assert_eventually(forced_task)
+        for count, hold in enumerate(holds, 1):
+            hold.release()
+
+            async def given() -> None:
+                assert len(read_results(live)) == count
+
+            # This page gets its activation before the Store answers the other read.
+            await assert_eventually(given)
+
+    options = RunOptions(
+        _TwoReadsWorkflow,
+        ["first", "second"],
+        task_timeout=timedelta(seconds=2),
+        worker={"workflow_runner": live},
+        during=release,
+    )
+    ran = await run(client, options)
+    assert ran.result == [["first"], ["second"]]
+    await Replayer(
+        workflows=[_TwoReadsWorkflow],
+        workflow_runner=replayed,
+        stream_config=client._config["stream_config"],
+    ).replay_workflow(ran.history)
+    assert len(read_results(live)) == 2
+    assert read_results(replayed) == read_results(live)
 
 
 @workflow.defn

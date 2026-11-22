@@ -1,0 +1,1 @@
+A Workflow that starts on this version replays each Workflow Task separately, which keeps the grouping and the timestamps of the activations of its first run. A Workflow that started on an earlier version replays as before.

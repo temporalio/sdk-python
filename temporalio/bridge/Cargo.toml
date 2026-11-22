@@ -72,6 +72,8 @@ temporalio-sdk-core = { version = "0.12.0", path = "./sdk-core/crates/sdk-core",
     "ephemeral-server",
     "envconfig",
     "prometheus",
+    # With chunking, a replay can run Workflow code in another order than the first run.
+    "disable_workflow_task_chunking",
 ] }
 temporalio-streams = { version = "0.1.0", path = "./sdk-core/crates/streams" }
 tokio = "1.26"

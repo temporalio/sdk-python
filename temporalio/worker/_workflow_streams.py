@@ -188,8 +188,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         read = self._reads.pop(job.seq, None)
         if read is None:
             raise RuntimeError(f"Failed finding Stream read for sequence {job.seq}")
-        # The job of a cancelled call is dropped. A cancel job is dropped too if it comes first,
-        # as in a replay, since only the cancel of the call may end its wait.
+        # The job of a cancelled call is dropped. So is a cancel job that comes first, as in a
+        # replay with legacy chunking, since only the cancel of the call may end its wait.
         if read.waiter.done() or job.HasField("cancelled"):
             return
         if job.HasField("failed"):

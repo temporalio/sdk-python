@@ -799,7 +799,7 @@ async def _reads_script(
 
     for step in range(rng.randrange(2, 7)):
         # Each read gets one job, also a cancelled one, whose job has a cancel or the result
-        # that came before it. A replay can give a cancel job before the cancel.
+        # that came before it. A replay with legacy chunking gives a cancel job before the cancel.
         jobs: list[ResolveStreamRead] = []
         for seq, read in reads.items():
             if rng.random() >= 0.6:
