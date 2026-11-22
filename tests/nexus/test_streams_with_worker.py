@@ -1066,3 +1066,86 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
             asked = [(r.max_records, r.max_bytes, r.wait.ToSeconds()) for r in reads]
             # With one Record in a page, the read of each Record is one Store call.
             assert asked == [expected] * (3 if limits else 1)
+
+
+@dataclasses.dataclass
+class _Turn:
+    text: str
+
+
+@dataclasses.dataclass
+class _AgentInput:
+    turns: StreamRef[_Turn] | None = None
+
+
+@dataclasses.dataclass
+class _TurnsInput:
+    turns: StreamRef[_Turn]
+    texts: list[str]
+
+
+@activity.defn
+async def _append_turns(input: _TurnsInput) -> None:
+    stream = activity.client().get_stream(input.turns)
+    await stream.append(*(_Turn(text) for text in input.texts))
+
+
+@workflow.defn
+class _AgentWorkflow:
+    def __init__(self) -> None:
+        self._turns: StreamRef[_Turn] | None = None
+        self._go_on = False
+
+    @workflow.query
+    def turns(self) -> StreamRef[_Turn] | None:
+        return self._turns
+
+    @workflow.signal
+    def go_on(self) -> None:
+        self._go_on = True
+
+    @workflow.run
+    async def run(self, input: _AgentInput) -> list[str]:
+        self._turns = input.turns
+        await workflow.wait_condition(lambda: self._go_on)
+        if self._turns is None:
+            created = await workflow.create_stream(id="turns", body_type=_Turn)
+            self._turns = created.ref
+        await workflow.execute_activity(
+            _append_turns,
+            _TurnsInput(self._turns, ["a", "b"]),
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+        page = await workflow.get_stream(self._turns).read_page()
+        # Only a body that the read converted to its type has the attribute.
+        return [record.body.text for record in page.records]
+
+
+async def test_a_stream_ref_keeps_its_type_through_a_workflow(client: Client) -> None:
+    streams = stream_client(client, MemoryStreamStore())
+    ref: Any = None
+    # The first run gets no ref and creates the Stream. The second one gets that ref.
+    for texts in (["a", "b"], ["a", "b", "a", "b"]):
+        with failure_note(f"texts {texts}"):
+
+            async def answer(handle: Any, _worker: Any) -> None:
+                nonlocal ref
+                assert await handle.query(_AgentWorkflow.turns) == ref
+                await handle.signal(_AgentWorkflow.go_on)
+                await handle.result()
+                ref = await handle.query(_AgentWorkflow.turns)
+
+            options = RunOptions(
+                _AgentWorkflow,
+                [_AgentInput(ref)],
+                activities=[_append_turns],
+                during=answer,
+                replay=True,
+            )
+            assert (await run(streams, options)).result == texts
+            assert ref == StreamRef(id="turns", store="memory")
+            # The ref of the query has the body type, so the read needs no `body_type=`.
+            page = await streams.get_stream(ref).read_page()
+            assert [record.body for record in page.records] == [
+                _Turn(text) for text in texts
+            ]
