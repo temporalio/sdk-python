@@ -149,7 +149,7 @@ class NeverRunService:
 
 async def test_worker_fatal_error_run(client: Client):
     # Run worker with injected workflow poll error
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -158,7 +158,7 @@ async def test_worker_fatal_error_run(client: Client):
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
     # Run worker with injected activity poll error
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.activity.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -168,7 +168,7 @@ async def test_worker_fatal_error_run(client: Client):
 
     # Run worker with them both injected (was causing warning for not retrieving
     # the second error)
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -181,7 +181,7 @@ async def test_worker_fatal_error_run(client: Client):
 async def test_worker_fatal_error_with(client: Client):
     # Start the worker, wait a short bit, fail it, wait for long time (will be
     # cancelled)
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -192,7 +192,7 @@ async def test_worker_fatal_error_with(client: Client):
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
     # Raise inside the async with and confirm it works
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -200,7 +200,7 @@ async def test_worker_fatal_error_with(client: Client):
     assert str(err.value) == "IN WITH"
 
     # Demonstrate that inner re-thrown failure swallows worker failure
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -220,7 +220,7 @@ async def test_worker_fatal_error_callback(client: Client):
         nonlocal callback_err
         callback_err = exc
 
-    worker = await create_worker(client, on_fatal_error)
+    worker = await create_no_cache_worker(client, on_fatal_error)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -231,7 +231,7 @@ async def test_worker_fatal_error_callback(client: Client):
 
 
 async def test_worker_cancel_run(client: Client):
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     assert not worker.is_running and not worker.is_shutdown
     run_task = asyncio.create_task(worker.run())
     await asyncio.sleep(0.3)
@@ -291,7 +291,7 @@ async def test_worker_run_while_running_raises_already_started(client: Client):
 
 
 async def test_worker_run_after_shutdown_raises_already_started(client: Client):
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     async with worker:
 
         async def is_running() -> None:
@@ -343,7 +343,7 @@ async def test_worker_run_before_validation_finishes_raises_already_started(
 
 async def test_worker_run_inside_async_with_raises_already_started(client: Client):
     # `async with` already runs the worker in the background
-    worker = await create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError, match="^Already started$"):
         async with worker:
             await worker.run()
@@ -476,7 +476,6 @@ async def test_cant_specify_max_concurrent_and_tuner(client: Client):
 
 async def test_warns_when_workers_too_low(client: Client):
     # The Worker constructor gives these warnings, so the test does not run the workers.
-    # A worker that stops right after it starts can wait about a minute for a late poll.
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -1700,7 +1699,7 @@ async def wait_for_worker_deployment_routing_config_propagation(
     await assert_eventually(check)
 
 
-async def create_worker(
+async def create_no_cache_worker(
     client: Client,
     on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
 ) -> Worker:
