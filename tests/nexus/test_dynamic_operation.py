@@ -252,10 +252,105 @@ class _RecordingInbound(NexusOperationInboundInterceptor):
         return await self.next.execute_nexus_operation_cancel(input)
 
 
+# 1. Send encoded input to a named RawValue handler or a dynamic Nexus handler.
+# 2. Replace the RawValue in an interceptor and check that the handler receives the edit.
+# This validates that interception hides LazyValue without decoding codecs twice or
+# mistaking a named RawValue operation for a dynamic operation.
+@pytest.mark.parametrize("operation", ["named", "dynamic"])
+async def test_interceptor_replaces_raw_input(operation: str):
+    class DynamicHandler(nexusrpc.handler.OperationHandler[nexusrpc.LazyValue, str]):
+        async def start(
+            self,
+            ctx: nexusrpc.handler.StartOperationContext,
+            input: nexusrpc.LazyValue,
+        ) -> nexusrpc.handler.StartOperationResultSync[str]:
+            return nexusrpc.handler.StartOperationResultSync(
+                await input.consume(as_type=str)
+            )
+
+        async def cancel(
+            self, ctx: nexusrpc.handler.CancelOperationContext, token: str
+        ) -> None:
+            raise AssertionError("Cancellation is not expected")
+
+    @nexusrpc.handler.service_handler(name="tools")
+    class Tools:
+        @nexusrpc.handler.sync_operation
+        async def named(
+            self,
+            _ctx: nexusrpc.handler.StartOperationContext,
+            input: temporalio.common.RawValue,
+        ) -> str:
+            return temporalio.converter.PayloadConverter.default.from_payload(
+                input.payload, str
+            )
+
+        @nexusrpc.handler.operation_handler(dynamic=True)
+        def forward(self) -> nexusrpc.handler.OperationHandler[nexusrpc.LazyValue, str]:
+            return DynamicHandler()
+
+    class ModifyingInbound(NexusOperationInboundInterceptor):
+        async def execute_nexus_operation_start(
+            self, input: ExecuteNexusOperationStartInput
+        ) -> (
+            nexusrpc.handler.StartOperationResultSync[Any]
+            | nexusrpc.handler.StartOperationResultAsync
+        ):
+            assert isinstance(input.input, temporalio.common.RawValue)
+            assert (
+                temporalio.converter.PayloadConverter.default.from_payload(
+                    input.input.payload, str
+                )
+                == "original"
+            )
+            input.input = temporalio.common.RawValue(
+                temporalio.converter.PayloadConverter.default.to_payload("intercepted")
+            )
+            return await self.next.execute_nexus_operation_start(input)
+
+    class ModifyingInterceptor(Interceptor):
+        def intercept_nexus_operation(
+            self, next: NexusOperationInboundInterceptor
+        ) -> NexusOperationInboundInterceptor:
+            return ModifyingInbound(next)
+
+    codec = mock.Mock(spec=temporalio.converter.PayloadCodec)
+    codec.decode = mock.AsyncMock(side_effect=lambda payloads: list(payloads))
+    data_converter = temporalio.converter.DataConverter(payload_codec=codec)
+    payload = data_converter.payload_converter.to_payload("original")
+    handler = nexusrpc.handler.Handler(
+        [Tools()],
+        middleware=[
+            temporalio.worker._nexus._NexusMiddlewareForInterceptors(
+                [ModifyingInterceptor()]
+            )
+        ],
+    )
+    result = await handler.start_operation(
+        nexusrpc.handler.StartOperationContext(
+            service="tools",
+            operation=operation,
+            headers={},
+            request_id="request-id",
+            task_cancellation=temporalio.worker._nexus._NexusTaskCancellation(),
+        ),
+        nexusrpc.LazyValue(
+            serializer=temporalio.worker._nexus._NexusPayloadSerializer(
+                data_converter=data_converter, payload=payload
+            ),
+            headers={},
+        ),
+    )
+    assert isinstance(result, nexusrpc.handler.StartOperationResultSync)
+    assert result.value == "intercepted"
+    codec.decode.assert_awaited_once()
+
+
 # 1. Instantiate a Nexus service that has a "list_tools" operation handler
 #    and a dynamic handler that can handle "echo_sync" and "echo_workflow"
 #    operations.
 # 2. Validate that each operation gets the expected output.
+# 3. Check that interceptors receive decoded named input or RawValue for the fallback.
 # This parameterized test ensures that named operations (list_tools) get
 # dispatched to its registered operation handler, while others get dispatched
 # to the dynamic handler and correctly handled.
@@ -335,7 +430,7 @@ async def test_workflow_caller_routes_named_and_dynamic_operations(
         else:
             assert await caller.result() == expected
     assert interceptor.starts == [
-        (operation, str if operation == "list_tools" else nexusrpc.LazyValue)
+        (operation, str if operation == "list_tools" else temporalio.common.RawValue)
     ]
 
 
@@ -389,7 +484,7 @@ async def test_workflow_caller_cancels_dynamic_workflow_operation(
         with pytest.raises(WorkflowFailureError) as err:
             await client.get_workflow_handle(backing_id).result()
         assert isinstance(err.value.__cause__, temporalio.exceptions.CancelledError)
-    assert interceptor.starts == [("wait_workflow", nexusrpc.LazyValue)]
+    assert interceptor.starts == [("wait_workflow", temporalio.common.RawValue)]
     assert interceptor.cancels == ["wait_workflow"]
 
 
@@ -458,7 +553,7 @@ async def test_standalone_caller_cancels_dynamic_activity_operation(
             ).status is ActivityExecutionStatus.CANCELED
 
         await assert_eventually(cancelled)
-    assert interceptor.starts == [("wait_activity", nexusrpc.LazyValue)]
+    assert interceptor.starts == [("wait_activity", temporalio.common.RawValue)]
     assert interceptor.cancels == ["wait_activity"]
 
 
