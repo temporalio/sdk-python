@@ -83,6 +83,12 @@ def workflow_namespace() -> str:
     return info().namespace
 
 
+def workflow_task_queue() -> str:
+    from temporalio.workflow import info
+
+    return info().task_queue
+
+
 def signal_with_start_workflow_serialization_context(
     request: SignalWithStartWorkflowModelRequest,
 ) -> temporalio.converter.WorkflowSerializationContext:

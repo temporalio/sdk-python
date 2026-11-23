@@ -1915,7 +1915,10 @@ class WorkflowServiceServicer(object):
         raise NotImplementedError("Method not implemented!")
 
     def PollWorkflowExecutionTimeSkipping(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """PollWorkflowExecutionTimeSkipping waits for a fast-forward outcome for a workflow execution.
+
+        Experimental. Might change in the future.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")

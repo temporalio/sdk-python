@@ -1193,6 +1193,15 @@ impl ClientRef {
                         delete_nexus_endpoint
                     )
                 }
+                "describe_namespace_restore" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        OperatorService,
+                        operator_service,
+                        describe_namespace_restore
+                    )
+                }
                 "get_nexus_endpoint" => {
                     rpc_call!(
                         connection,
@@ -1245,6 +1254,24 @@ impl ClientRef {
                         OperatorService,
                         operator_service,
                         remove_search_attributes
+                    )
+                }
+                "restore_namespace" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        OperatorService,
+                        operator_service,
+                        restore_namespace
+                    )
+                }
+                "soft_delete_namespace" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        OperatorService,
+                        operator_service,
+                        soft_delete_namespace
                     )
                 }
                 "update_nexus_endpoint" => {
@@ -1318,6 +1345,15 @@ impl ClientRef {
                         create_billing_report
                     )
                 }
+                "create_caller_rate_limit" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_caller_rate_limit
+                    )
+                }
                 "create_connectivity_rule" => {
                     rpc_call!(
                         connection,
@@ -1363,6 +1399,15 @@ impl ClientRef {
                         create_nexus_endpoint
                     )
                 }
+                "create_project" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        create_project
+                    )
+                }
                 "create_service_account" => {
                     rpc_call!(
                         connection,
@@ -1400,6 +1445,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         delete_api_key
+                    )
+                }
+                "delete_caller_rate_limit" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        delete_caller_rate_limit
                     )
                 }
                 "delete_connectivity_rule" => {
@@ -1454,6 +1508,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         delete_nexus_endpoint
+                    )
+                }
+                "delete_project" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        delete_project
                     )
                 }
                 "delete_service_account" => {
@@ -1538,6 +1601,24 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_billing_report
+                    )
+                }
+                "get_caller_rate_limit" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_caller_rate_limit
+                    )
+                }
+                "get_caller_rate_limits" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_caller_rate_limits
                     )
                 }
                 "get_connectivity_rule" => {
@@ -1642,6 +1723,21 @@ impl ClientRef {
                         get_nexus_endpoints
                     )
                 }
+                "get_project" => {
+                    rpc_call!(connection, call, CloudService, cloud_service, get_project)
+                }
+                "get_project_scoped_service_accounts" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_project_scoped_service_accounts
+                    )
+                }
+                "get_projects" => {
+                    rpc_call!(connection, call, CloudService, cloud_service, get_projects)
+                }
                 "get_region" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_region)
                 }
@@ -1664,6 +1760,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         get_service_account_namespace_assignments
+                    )
+                }
+                "get_service_account_project_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_service_account_project_assignments
                     )
                 }
                 "get_service_accounts" => {
@@ -1708,6 +1813,15 @@ impl ClientRef {
                         get_user_group_namespace_assignments
                     )
                 }
+                "get_user_group_project_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_group_project_assignments
+                    )
+                }
                 "get_user_groups" => {
                     rpc_call!(
                         connection,
@@ -1726,8 +1840,35 @@ impl ClientRef {
                         get_user_namespace_assignments
                     )
                 }
+                "get_user_project_assignments" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        get_user_project_assignments
+                    )
+                }
                 "get_users" => {
                     rpc_call!(connection, call, CloudService, cloud_service, get_users)
+                }
+                "move_namespace_to_project" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        move_namespace_to_project
+                    )
+                }
+                "move_nexus_endpoint_to_project" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        move_nexus_endpoint_to_project
+                    )
                 }
                 "remove_user_group_member" => {
                     rpc_call!(
@@ -1756,6 +1897,15 @@ impl ClientRef {
                         set_service_account_namespace_access
                     )
                 }
+                "set_service_account_project_access" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        set_service_account_project_access
+                    )
+                }
                 "set_user_group_namespace_access" => {
                     rpc_call!(
                         connection,
@@ -1765,6 +1915,15 @@ impl ClientRef {
                         set_user_group_namespace_access
                     )
                 }
+                "set_user_group_project_access" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        set_user_group_project_access
+                    )
+                }
                 "set_user_namespace_access" => {
                     rpc_call!(
                         connection,
@@ -1772,6 +1931,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         set_user_namespace_access
+                    )
+                }
+                "set_user_project_access" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        set_user_project_access
                     )
                 }
                 "update_account" => {
@@ -1799,6 +1967,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         update_api_key
+                    )
+                }
+                "update_caller_rate_limit" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        update_caller_rate_limit
                     )
                 }
                 "update_custom_role" => {
@@ -1844,6 +2021,15 @@ impl ClientRef {
                         CloudService,
                         cloud_service,
                         update_nexus_endpoint
+                    )
+                }
+                "update_project" => {
+                    rpc_call!(
+                        connection,
+                        call,
+                        CloudService,
+                        cloud_service,
+                        update_project
                     )
                 }
                 "update_service_account" => {
