@@ -92,16 +92,6 @@ async def _create_env_from_envconfig() -> WorkflowEnvironment:
     return WorkflowEnvironment.from_client(await Client.connect(**config))
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.get_event_loop_policy().new_event_loop()  # type: ignore[reportDeprecated]
-    yield loop
-    try:
-        loop.close()
-    except TypeError:
-        raise
-
-
 class NoEventLoopPolicy(asyncio.AbstractEventLoopPolicy):  # type: ignore[name-defined]
     def __init__(self, underlying: asyncio.AbstractEventLoopPolicy):  # type: ignore[name-defined]
         super().__init__()
