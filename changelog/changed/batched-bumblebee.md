@@ -1,2 +1,0 @@
-Process workflow activation jobs as a single batch by default (workflow logic flag 2), so signal and update handlers no longer run before other jobs delivered in the same workflow task, such as the random seed update after a reset. Histories that record this flag replay with the new ordering only on SDK 1.31.0 or later.
-Cancelling a Nexus operation handle after its synchronous response has already arrived now raises `CancelledError` when the handle is awaited, matching activities, instead of returning the result.

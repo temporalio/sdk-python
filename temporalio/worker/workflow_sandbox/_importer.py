@@ -244,9 +244,9 @@ class Importer:
                         f"Module {full_name} was imported after initial workflow load."
                     )
 
-            # If the module is __temporal_main__ and not already in sys.modules,
-            # we load it from whatever file __main__ was originally in
-            if full_name == "__temporal_main__":
+            # If the module is __temporal_main__ and was not passed through, we
+            # load it from whatever file __main__ was originally in
+            if full_name == "__temporal_main__" and not passthrough_mod:
                 orig_mod = _thread_local_sys_modules.orig["__main__"]
                 new_spec = importlib.util.spec_from_file_location(
                     full_name, orig_mod.__file__
@@ -265,6 +265,9 @@ class Importer:
 
         mod = _loaded_module_for_import(full_name, fromlist, level)
         if mod is None:
+            package = sys.modules.get(full_name) if fromlist else None
+            if package is not None and hasattr(package, "__path__"):
+                self._pass_through_fromlist_submodules(package, fromlist)
             mod = importlib.__import__(name, globals, locals, fromlist, level)
         # Check for restrictions if necessary and apply
         if mod.__name__ not in self.modules_checked_for_restrictions:
@@ -275,6 +278,31 @@ class Importer:
                 mod = restricted_mod
 
         return mod
+
+    def _pass_through_fromlist_submodules(
+        self,
+        package: types.ModuleType,
+        fromlist: Sequence[str],
+        recursive: bool = False,
+    ) -> None:
+        # importlib imports a package's fromlist submodules with its own import
+        # function, so they never reach the passthrough handling in _import.
+        for item in fromlist:
+            if item == "*":
+                if not recursive and hasattr(package, "__all__"):
+                    self._pass_through_fromlist_submodules(
+                        package, package.__all__, recursive=True
+                    )
+            elif not hasattr(package, item):
+                submodule = f"{package.__name__}.{item}"
+                if self._is_passed_through(submodule):
+                    try:
+                        self.import_func(submodule)
+                    except ModuleNotFoundError as err:
+                        # Like importlib, leave an item that is not a module
+                        # for the from import to reject
+                        if err.name != submodule:
+                            raise
 
     def _assert_valid_module(self, name: str) -> None:
         if (
@@ -313,13 +341,16 @@ class Importer:
 
         return policy in self.restrictions.import_notification_policy
 
+    def _is_passed_through(self, name: str) -> bool:
+        return (
+            temporalio.workflow.unsafe.is_imports_passed_through()
+            or self.module_configured_passthrough(name)
+        )
+
     def _maybe_passthrough_module(self, name: str) -> types.ModuleType | None:
         # If imports not passed through and all modules are not passed through
         # and name not in passthrough modules, check parents
-        if (
-            not temporalio.workflow.unsafe.is_imports_passed_through()
-            and not self.module_configured_passthrough(name)
-        ):
+        if not self._is_passed_through(name):
             # Workflow modules are intentionally reloaded to isolate their state.
             if name == self._workflow_module_name:
                 return None
@@ -341,9 +372,12 @@ class Importer:
             _trace("Passing module %s through from host", name)
             global _trace_depth
             _trace_depth += 1
-            # Use our import outside of the sandbox
+            # Use our import outside of the sandbox. The host has no module
+            # named __temporal_main__, its counterpart is __main__.
             try:
-                return importlib.import_module(name)
+                return importlib.import_module(
+                    "__main__" if name == "__temporal_main__" else name
+                )
             finally:
                 _trace_depth -= 1
 

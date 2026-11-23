@@ -7,6 +7,7 @@ import sys
 import textwrap
 import time
 import types
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -281,6 +282,48 @@ def test_workflow_sandbox_importer_passthough_context_manager():
     assert id(outside) == id(inside)
 
 
+def test_workflow_sandbox_importer_passthrough_from_import():
+    import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
+
+    # The package is already loaded in the sandbox, like the package of a
+    # workflow module, so it has no attribute for the submodule yet
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox.testmodules as package
+
+        assert not hasattr(package, "stateful_module")
+        with workflow.unsafe.imports_passed_through():
+            from tests.worker.workflow_sandbox.testmodules import (
+                stateful_module as inside,
+            )
+    assert id(inside) == id(outside)
+
+
+def test_workflow_sandbox_importer_passthrough_relative_from_import():
+    import tests.worker.workflow_sandbox.test_restrictions as outside
+
+    with Importer(restrictions, RestrictionContext()).applied():
+        import tests.worker.workflow_sandbox as package
+
+        assert not hasattr(package, "test_restrictions")
+        with workflow.unsafe.imports_passed_through():
+            from . import test_restrictions as inside
+    assert id(inside) == id(outside)
+
+
+def test_workflow_sandbox_importer_passthrough_star_import():
+    import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
+
+    importer = Importer(restrictions, RestrictionContext())
+    package_name = "tests.worker.workflow_sandbox.testmodules"
+    with importer.applied():
+        importer.import_func(package_name)
+        setattr(sys.modules[package_name], "__all__", ["stateful_module"])
+        with workflow.unsafe.imports_passed_through():
+            importer.import_func(package_name, fromlist=("*",))
+        inside = sys.modules[f"{package_name}.stateful_module"]
+    assert id(inside) == id(outside)
+
+
 def test_workflow_sandbox_importer_passthrough_all_modules():
     import tests.worker.workflow_sandbox.testmodules.stateful_module as outside
 
@@ -295,6 +338,49 @@ def test_workflow_sandbox_importer_passthrough_all_modules():
     ).applied():
         import tests.worker.workflow_sandbox.testmodules.stateful_module as inside2
     assert id(outside) == id(inside2)
+
+
+@pytest.fixture
+def host_main_module(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> types.ModuleType:
+    main_file = tmp_path / "main_workflow.py"
+    main_file.write_text('module_state = ["file"]\n')
+    host_main = types.ModuleType("__main__")
+    host_main.__file__ = str(main_file)
+    setattr(host_main, "module_state", ["host"])
+    monkeypatch.setitem(sys.modules, "__main__", host_main)
+    return host_main
+
+
+@pytest.mark.parametrize(
+    "main_restrictions,passed_through",
+    [
+        (restrictions, False),
+        (restrictions.with_passthrough_all_modules(), True),
+        (restrictions.with_passthrough_modules("__temporal_main__"), True),
+    ],
+    ids=["default", "all_modules", "main_module"],
+)
+def test_workflow_sandbox_importer_main_module(
+    host_main_module: types.ModuleType,
+    main_restrictions: SandboxRestrictions,
+    passed_through: bool,
+):
+    importer = Importer(
+        main_restrictions,
+        RestrictionContext(),
+        workflow_module_name="__temporal_main__",
+    )
+    with importer.applied():
+        inside = importer.import_func("__temporal_main__")
+    if passed_through:
+        assert inside is host_main_module
+    else:
+        # Not passed through, so it is loaded again from the file __main__
+        # came from
+        assert inside is not host_main_module
+        assert getattr(inside, "module_state") == ["file"]
 
 
 def test_workflow_sandbox_importer_invalid_module_members():

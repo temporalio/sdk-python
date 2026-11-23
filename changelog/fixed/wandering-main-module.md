@@ -1,0 +1,1 @@
+Fix workflow validation failing with `ModuleNotFoundError: No module named '__temporal_main__'` for a workflow defined in `__main__` when the sandbox passes all modules through, or passes `__temporal_main__` through.

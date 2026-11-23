@@ -480,10 +480,14 @@ pub struct ResourceBasedTunerConfig {
 
 macro_rules! enter_sync {
     ($runtime:expr) => {
-        if let Some(subscriber) = $runtime.core.telemetry().trace_subscriber() {
+        let (subscriber, handle) = {
+            let core = $runtime.core.read()?;
+            (core.telemetry().trace_subscriber(), core.tokio_handle())
+        };
+        if let Some(subscriber) = subscriber {
             temporalio_common::telemetry::set_trace_subscriber_for_current_thread(subscriber);
         }
-        let _guard = $runtime.core.tokio_handle().enter();
+        let _guard = handle.enter();
     };
 }
 
@@ -497,7 +501,7 @@ pub fn new_worker(
     let event_loop_task_locals = Arc::new(OnceLock::new());
     let config = convert_worker_config(config, event_loop_task_locals.clone())?;
     let worker = temporalio_sdk_core::init_worker(
-        &runtime_ref.runtime.core,
+        &*runtime_ref.runtime.core.read()?,
         config,
         client.connection.clone(),
     )

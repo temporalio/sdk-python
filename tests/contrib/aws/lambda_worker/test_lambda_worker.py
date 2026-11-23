@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import itertools
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -258,6 +260,61 @@ def _make_test_deps(
     )
 
 
+async def _connect_fails(**_kwargs: Any) -> Any:
+    raise RuntimeError("cannot connect")
+
+
+def _create_worker_fails(_client: Any, **_kwargs: Any) -> Any:
+    raise ValueError("bad worker config")
+
+
+async def _run_fails() -> None:
+    raise RuntimeError("worker boom")
+
+
+async def _run_cancelled() -> None:
+    raise asyncio.CancelledError()
+
+
+def _create_worker_running(run: Callable[[], Awaitable[None]]) -> Callable[..., Any]:
+    """A create_worker whose worker runs *run* instead of returning right away."""
+    worker = MagicMock()
+    worker.run = run
+    return lambda _client, **_kwargs: worker
+
+
+def _invoke(
+    handler: Callable[[Any, Any], None], error: type[BaseException] | None
+) -> None:
+    """Invoke *handler* once, expecting it to raise *error* if one is given."""
+    if error is None:
+        handler({}, _make_lambda_context())
+    else:
+        with pytest.raises(error):
+            handler({}, _make_lambda_context())
+
+
+# (deps overrides, expected exception) for each way an invocation can end.
+_INVOCATION_ENDINGS = [
+    pytest.param({}, None, id="success"),
+    pytest.param({"getenv": lambda _: None}, ValueError, id="task-queue-error"),
+    pytest.param({"connect": _connect_fails}, RuntimeError, id="connect-error"),
+    pytest.param(
+        {"create_worker": _create_worker_fails}, ValueError, id="create-worker-error"
+    ),
+    pytest.param(
+        {"create_worker": _create_worker_running(_run_fails)},
+        RuntimeError,
+        id="worker-error",
+    ),
+    pytest.param(
+        {"create_worker": _create_worker_running(_run_cancelled)},
+        asyncio.CancelledError,
+        id="cancelled",
+    ),
+]
+
+
 class TestRunWorkerInternal:
     def test_returns_handler(self) -> None:
         deps = _make_test_deps()
@@ -435,6 +492,77 @@ class TestRunWorkerInternal:
         handler({}, _make_lambda_context())
         assert second_called
 
+    @pytest.mark.parametrize(("overrides", "error"), _INVOCATION_ENDINGS)
+    def test_shutdown_hooks_run_however_invocation_ends(
+        self, overrides: dict[str, Any], error: type[BaseException] | None
+    ) -> None:
+        deps = dataclasses.replace(_make_test_deps(), **overrides)
+        hook_calls = 0
+
+        def configure(config: LambdaWorkerConfig) -> None:
+            def hook() -> None:
+                nonlocal hook_calls
+                hook_calls += 1
+
+            config.shutdown_hooks.append(hook)
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        _invoke(handler, error)
+        assert hook_calls == 1
+
+    def test_shutdown_hook_error_keeps_invocation_failure(self) -> None:
+        deps = dataclasses.replace(
+            _make_test_deps(), create_worker=_create_worker_running(_run_fails)
+        )
+        order: list[str] = []
+
+        def configure(config: LambdaWorkerConfig) -> None:
+            def failing() -> None:
+                raise RuntimeError("flush failed")
+
+            config.shutdown_hooks.append(failing)
+            config.shutdown_hooks.append(lambda: order.append("second"))
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        with pytest.raises(RuntimeError, match="worker boom"):
+            handler({}, _make_lambda_context())
+        assert order == ["second"]
+
+    def test_shutdown_hooks_run_when_deadline_is_too_short(self) -> None:
+        deps = _make_test_deps()
+        order: list[str] = []
+
+        def configure(config: LambdaWorkerConfig) -> None:
+            config.shutdown_deadline_buffer = timedelta(milliseconds=1500)
+            config.shutdown_hooks.append(lambda: order.append("hook"))
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        with pytest.raises(RuntimeError, match="Lambda timeout is too short"):
+            handler({}, _make_lambda_context(remaining_ms=2000))
+        assert order == ["hook"]
+
+    def test_shutdown_hooks_run_when_deadline_stops_worker(self) -> None:
+        """The usual end of an invocation: the worker is cancelled at the deadline."""
+
+        async def run_until_cancelled() -> None:
+            await asyncio.Event().wait()
+
+        deps = dataclasses.replace(
+            _make_test_deps(), create_worker=_create_worker_running(run_until_cancelled)
+        )
+        order: list[str] = []
+
+        def configure(config: LambdaWorkerConfig) -> None:
+            config.shutdown_deadline_buffer = timedelta(milliseconds=500)
+            config.shutdown_hooks.append(lambda: order.append("hook"))
+
+        # The first reading passes the deadline check, the second leaves 50ms for work.
+        context = _make_lambda_context()
+        context.get_remaining_time_in_millis.side_effect = [2000, 550]
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, context)
+        assert order == ["hook"]
+
     def test_tight_deadline_raises_error(self) -> None:
         deps = _make_test_deps()
 
@@ -609,6 +737,26 @@ class TestAsyncConfigure:
         with pytest.raises(RuntimeError, match="worker boom"):
             handler({}, _make_lambda_context())
         assert torn_down
+
+    @pytest.mark.parametrize(("overrides", "error"), _INVOCATION_ENDINGS)
+    def test_async_generator_shutdown_hooks_run_before_teardown(
+        self, overrides: dict[str, Any], error: type[BaseException] | None
+    ) -> None:
+        """Shutdown hooks run before the post-yield teardown however the invocation ends,
+        so a hook can still use the resource the teardown closes."""
+        deps = dataclasses.replace(_make_test_deps(), **overrides)
+        events: list[str] = []
+
+        async def configure(config: LambdaWorkerConfig):
+            config.shutdown_hooks.append(lambda: events.append("hook"))
+            try:
+                yield
+            finally:
+                events.append("teardown")
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        _invoke(handler, error)
+        assert events == ["hook", "teardown"]
 
     def test_async_generator_resource_per_invocation(self) -> None:
         """Each invocation builds and tears down its own resource instance. Tagging each

@@ -80,6 +80,30 @@ class TaskQueueMetadata(google.protobuf.message.Message):
 global___TaskQueueMetadata = TaskQueueMetadata
 
 @typing.final
+class PollerPoolInfo(google.protobuf.message.Message):
+    """Worker-reported state about the poller pool issuing a poll, used by the server to spread
+    poller scaling suggestions across a fleet.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TARGET_POLLERS_FIELD_NUMBER: builtins.int
+    target_pollers: builtins.int
+    """Number of concurrent poll requests this worker is currently targeting for this task
+    queue and task type. 0 if unknown, such as a poller pool of fixed size.
+    """
+    def __init__(
+        self,
+        *,
+        target_pollers: builtins.int = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["target_pollers", b"target_pollers"]
+    ) -> None: ...
+
+global___PollerPoolInfo = PollerPoolInfo
+
+@typing.final
 class TaskQueueVersioningInfo(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

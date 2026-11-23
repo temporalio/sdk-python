@@ -10,8 +10,8 @@ from typing import Any
 
 import pytest
 
-import temporalio.worker._workflow_instance
 from temporalio import activity, workflow
+from temporalio._workflow_context import _WorkflowLogicFlag
 from temporalio.client import Client, WorkflowFailureError, WorkflowHistory
 from temporalio.exceptions import ApplicationError
 from temporalio.testing import WorkflowEnvironment
@@ -82,7 +82,6 @@ class SayHelloWorkflow:
         return self._waiting
 
 
-_WorkflowLogicFlag = temporalio.worker._workflow_instance._WorkflowLogicFlag
 _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
     _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
 )

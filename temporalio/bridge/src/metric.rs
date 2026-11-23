@@ -55,10 +55,11 @@ pub struct MetricGaugeFloatRef {
     gauge: metrics::GaugeF64,
 }
 
-pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
-    runtime_ref
+pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> PyResult<Option<MetricMeterRef>> {
+    Ok(runtime_ref
         .runtime
         .core
+        .read()?
         .telemetry()
         .get_metric_meter()
         .map(|meter| {
@@ -69,7 +70,7 @@ pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeter
                 meter,
                 default_attributes,
             }
-        })
+        }))
 }
 
 #[pymethods]

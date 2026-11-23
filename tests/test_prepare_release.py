@@ -263,19 +263,185 @@ def test_replace_versions() -> None:
     )
 
 
-def test_create_release_branch(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[list[str]] = []
+def test_release_with_core_update_commits_generated_files(
+    monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
+) -> None:
+    mock_preparation(monkeypatch)
+    calls: list[str] = []
+    core_fragment = release_repo / "changelog/fixed/core-llama.md"
+    generated = release_repo / "temporalio/api/generated.py"
+    manifest = release_repo / "temporalio/bridge/Cargo.toml"
+
+    def branch(_root: pathlib.Path, _version: str) -> str:
+        calls.append("branch")
+        return ""
+
+    def update(root: pathlib.Path, args: list[str]) -> None:
+        assert root == release_repo
+        assert args == ["--latest-tag"]
+        assert calls == ["branch"]
+        calls.append("core")
+        generated.parent.mkdir(parents=True)
+        generated.write_text("# Generated\n")
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text("# Updated manifest\n")
+        core_fragment.write_text("Core: A fix.\n")
+
+    def prepare(root: pathlib.Path, _version: str, _date: datetime.date) -> None:
+        assert calls == ["branch", "core"]
+        calls.append("release")
+        (root / "CHANGELOG.md").write_text("Release notes including Core.\n")
+        (root / "changelog/fixed/giggling-teapot.md").unlink()
+        core_fragment.unlink()
+
     monkeypatch.setattr(
-        subprocess, "run", lambda command, **_kwargs: calls.append(command)
+        scripts.prepare_release,
+        "__file__",
+        str(release_repo / "scripts/prepare_release.py"),
     )
-    create_release_branch(pathlib.Path("/repo"), "1.30.0")
-    assert calls[1] == [
-        "git",
-        "switch",
-        "--create",
-        "chore/release-1.30.0",
-        "origin/main",
-    ]
+    monkeypatch.setattr(scripts.prepare_release, "create_release_branch", branch)
+    monkeypatch.setattr(scripts.prepare_release, "update_core", update)
+    monkeypatch.setattr(scripts.prepare_release, "prepare_changelog", prepare)
+    monkeypatch.setattr(
+        scripts.prepare_release,
+        "push_release_branch",
+        lambda *_args: calls.append("push"),
+    )
+    monkeypatch.setattr(
+        scripts.prepare_release, "create_release_pr", lambda *_args: calls.append("pr")
+    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=release_repo, check=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=release_repo,
+        check=True,
+    )
+    scripts.prepare_release.main(["1.35.0", "--update-core", "--skip-lock"])
+    assert calls == ["branch", "core", "release", "push", "pr"]
+    ensure_clean_worktree(release_repo)
+    assert generated.exists()
+    assert manifest.exists()
+    assert not core_fragment.exists()
+    assert (
+        subprocess.check_output(
+            ["git", "show", "HEAD:temporalio/api/generated.py"],
+            cwd=release_repo,
+            text=True,
+        )
+        == "# Generated\n"
+    )
+
+
+def test_core_update_failure_stops_release(
+    monkeypatch: pytest.MonkeyPatch, release_repo: pathlib.Path
+) -> None:
+    monkeypatch.setattr(
+        scripts.prepare_release,
+        "__file__",
+        str(release_repo / "scripts/prepare_release.py"),
+    )
+    monkeypatch.setattr(
+        scripts.prepare_release, "create_release_branch", lambda *_args: None
+    )
+
+    def fail(*_args: object) -> None:
+        raise RuntimeError("proto generation failed")
+
+    monkeypatch.setattr(scripts.prepare_release, "update_core", fail)
+    with pytest.raises(RuntimeError, match="proto generation failed"):
+        scripts.prepare_release.main(["1.35.0", "--update-core", "--skip-lock"])
+    ensure_clean_worktree(release_repo)
+    assert "1.34.0" in (release_repo / "pyproject.toml").read_text()
+    assert (release_repo / "changelog/fixed/giggling-teapot.md").exists()
+
+
+@pytest.fixture
+def release_remote(
+    release_repo: pathlib.Path, tmp_path_factory: pytest.TempPathFactory
+) -> pathlib.Path:
+    remote = tmp_path_factory.mktemp("release-remote") / "remote.git"
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True)
+    for command in [
+        ["git", "config", "user.name", "Test"],
+        ["git", "config", "user.email", "test@example.com"],
+        ["git", "branch", "-M", "main"],
+        ["git", "remote", "add", "origin", str(remote)],
+        ["git", "push", "-u", "origin", "main"],
+    ]:
+        subprocess.run(command, cwd=release_repo, check=True)
+    return remote
+
+
+@pytest.mark.parametrize("local_exists", [False, True])
+@pytest.mark.parametrize("remote_exists", [False, True])
+def test_upsert_release_branch(
+    release_repo: pathlib.Path,
+    release_remote: pathlib.Path,
+    local_exists: bool,
+    remote_exists: bool,
+) -> None:
+    branch = "chore/release-1.35.0"
+    subprocess.run(["git", "switch", "-c", branch], cwd=release_repo, check=True)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "Previous release"],
+        cwd=release_repo,
+        check=True,
+    )
+    previous = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=release_repo, text=True
+    ).strip()
+    if remote_exists:
+        subprocess.run(["git", "push", "origin", branch], cwd=release_repo, check=True)
+    subprocess.run(["git", "switch", "main"], cwd=release_repo, check=True)
+    if not local_exists:
+        subprocess.run(["git", "branch", "-D", branch], cwd=release_repo, check=True)
+
+    expected = create_release_branch(release_repo, "1.35.0")
+    assert expected == (previous if remote_exists else "")
+    assert subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=release_repo
+    ) == subprocess.check_output(["git", "rev-parse", "main"], cwd=release_repo)
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "Regenerated release"],
+        cwd=release_repo,
+        check=True,
+    )
+    push_release_branch(release_repo, "1.35.0", expected)
+    assert subprocess.check_output(
+        ["git", "rev-parse", f"refs/heads/{branch}"], cwd=release_remote
+    ) == subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=release_repo)
+
+
+@pytest.mark.parametrize("remote_exists", [False, True])
+def test_release_push_rejects_concurrent_remote_change(
+    release_repo: pathlib.Path, release_remote: pathlib.Path, remote_exists: bool
+) -> None:
+    branch = "chore/release-1.35.0"
+    if remote_exists:
+        subprocess.run(
+            ["git", "push", "origin", f"main:refs/heads/{branch}"],
+            cwd=release_repo,
+            check=True,
+        )
+    expected = create_release_branch(release_repo, "1.35.0")
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-m", "Concurrent update"],
+        cwd=release_repo,
+        check=True,
+    )
+    subprocess.run(["git", "push", "origin", branch], cwd=release_repo, check=True)
+    concurrent_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=release_repo
+    )
+    create_release_branch(release_repo, "1.35.0")
+    with pytest.raises(subprocess.CalledProcessError):
+        push_release_branch(release_repo, "1.35.0", expected)
+    assert (
+        subprocess.check_output(
+            ["git", "rev-parse", f"refs/heads/{branch}"], cwd=release_remote
+        )
+        == concurrent_commit
+    )
 
 
 def test_clean_worktree_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -290,14 +456,25 @@ def test_clean_worktree_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
         ensure_only_release_changes(pathlib.Path("/repo"))
 
 
-def test_create_release_pr(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize(
+    "existing_url", ["", "https://github.com/example/repo/pull/123\n"]
+)
+def test_create_release_pr(monkeypatch: pytest.MonkeyPatch, existing_url: str) -> None:
     calls: list[list[str]] = []
-    monkeypatch.setattr(
-        subprocess, "run", lambda command, **_kwargs: calls.append(command)
-    )
+
+    def run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, existing_url)
+
+    monkeypatch.setattr(subprocess, "run", run)
     create_release_pr(pathlib.Path("/repo"), "1.30.0")
+    assert calls[0][:3] == ["gh", "pr", "list"]
     assert "chore/release-1.30.0" in calls[0]
-    assert calls[0][-2:] == ["--label", "skip-changelog"]
+    if existing_url:
+        assert len(calls) == 1
+    else:
+        assert calls[1][:3] == ["gh", "pr", "create"]
+        assert calls[1][-2:] == ["--label", "skip-changelog"]
 
 
 def test_push_release_branch(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -307,5 +484,12 @@ def test_push_release_branch(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     push_release_branch(pathlib.Path("/repo"), "1.30.0")
     assert calls == [
-        ["git", "push", "--set-upstream", "origin", "chore/release-1.30.0"]
+        [
+            "git",
+            "push",
+            "--force-with-lease=refs/heads/chore/release-1.30.0:",
+            "--set-upstream",
+            "origin",
+            "chore/release-1.30.0",
+        ]
     ]

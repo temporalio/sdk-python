@@ -253,12 +253,13 @@ class _NexusWorker:  # type:ignore[reportUnusedClass]
     def _data_converter_for_nexus_task(
         self, endpoint: str, service: str, operation: str
     ) -> temporalio.converter.DataConverter:
-        return self._data_converter.with_context(
+        return self._data_converter._with_contexts(
             temporalio.converter.NexusSerializationContext(
                 endpoint=endpoint,
                 service=service,
                 operation=operation,
-            )
+            ),
+            temporalio.converter.StorageDriverStoreContext(namespace=self._namespace),
         )
 
     # TODO(nexus-preview): stack trace pruning. See sdk-typescript NexusHandler.execute

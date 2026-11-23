@@ -1228,6 +1228,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -1267,6 +1268,14 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state, used to spread poller scaling suggestions across
+        a fleet. Optional.
+        """
+
     def __init__(
         self,
         *,
@@ -1281,12 +1290,16 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_version_capabilities",
@@ -1306,6 +1319,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_control_task_queue",
@@ -2097,6 +2112,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -2135,6 +2151,14 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state, used to spread poller scaling suggestions across
+        a fleet. Optional.
+        """
+
     def __init__(
         self,
         *,
@@ -2150,12 +2174,16 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -2175,6 +2203,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -8115,6 +8145,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -8153,6 +8184,12 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     ]:
         """Worker info to be sent to the server."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state. Optional."""
+
     def __init__(
         self,
         *,
@@ -8169,12 +8206,16 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
         ]
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_version_capabilities",
@@ -8192,6 +8233,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_heartbeat",

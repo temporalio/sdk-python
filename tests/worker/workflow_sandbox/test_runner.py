@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import importlib.util
 import inspect
 import os
 import sys
@@ -13,6 +14,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -36,6 +38,9 @@ from temporalio.worker.workflow_sandbox import (
 from temporalio.workflow import SandboxImportNotificationPolicy
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
+from tests.worker.workflow_sandbox.testmodules.from_import_workflow import (
+    FromImportPassthroughWorkflow,
+)
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 
 global_state = ["global orig"]
@@ -484,6 +489,30 @@ async def test_workflow_sandbox_bad_asyncio(client: Client):
         assert "asyncio.wait()" in str(warnings[1].message)
 
 
+@workflow.defn
+class UnsupportedTaskGroupWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        async with asyncio.TaskGroup() as group:
+            task = group.create_task(asyncio.sleep(0, result="done"))
+        return task.result()
+
+
+async def test_workflow_sandbox_task_group_warning(client: Client):
+    async with new_worker(client, UnsupportedTaskGroupWorkflow) as worker:
+        with pytest.warns(
+            UserWarning,
+            match=r"asyncio\.TaskGroup\(\) has non-deterministic task cancellation order",
+        ) as warnings:
+            result = await client.execute_workflow(
+                UnsupportedTaskGroupWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert result == "done"
+        assert len(warnings) == 1
+
+
 def new_worker(
     client: Client,
     *workflows: type,
@@ -591,6 +620,32 @@ async def test_workflow_sandbox_import_workflow_without_warning():
     )
 
 
+@pytest.mark.parametrize(
+    "main_restrictions",
+    [
+        SandboxRestrictions.default,
+        SandboxRestrictions.default.with_passthrough_all_modules(),
+        SandboxRestrictions.default.with_passthrough_modules("__temporal_main__"),
+    ],
+    ids=["default", "all_modules", "main_module"],
+)
+async def test_workflow_sandbox_validates_workflow_in_main_module(
+    main_restrictions: SandboxRestrictions, monkeypatch: pytest.MonkeyPatch
+):
+    # Load the file as __main__, like running it as a script
+    spec = importlib.util.spec_from_file_location(
+        "__main__", Path(__file__).parent / "testmodules" / "main_module_workflow.py"
+    )
+    assert spec and spec.loader
+    main_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(main_module)
+    monkeypatch.setitem(sys.modules, "__main__", main_module)
+
+    SandboxedWorkflowRunner(main_restrictions).prepare_workflow(
+        workflow._Definition.must_from_class(main_module.MainModuleWorkflow)
+    )
+
+
 async def test_workflow_sandbox_import_all_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
@@ -691,6 +746,18 @@ async def test_workflow_sandbox_import_suppress_warnings(client: Client):
                 task_queue=worker.task_queue,
             )
             assert len(recorder) == 0, "Expected no warnings to be issued"
+
+
+async def test_workflow_sandbox_passthrough_from_import_of_sibling_module(
+    client: Client,
+):
+    async with new_worker(client, FromImportPassthroughWorkflow) as worker:
+        module_id = await client.execute_workflow(
+            FromImportPassthroughWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert module_id == id(stateful_module)
 
 
 def _assert_expected_warnings(
