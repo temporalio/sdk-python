@@ -472,7 +472,7 @@ def _writer_info(rng: random.Random) -> _WriterInfo:
 
 
 def _default_producer(writer: _WriterInfo) -> Any:
-    """Return the Producer that a write of ``writer`` sends with no ``producer=``."""
+    """Return the default Producer of a write of ``writer``."""
     if writer.kind == "workflow":
         info = SimpleNamespace(
             namespace=writer.namespace,

@@ -279,8 +279,8 @@ class StreamConfig:
     - A create and a describe run in a Local Activity of the SDK. The Workflow
       and Activity interceptors of the Worker see it, as they see every Local
       Activity.
-    - The ``producer`` argument of ``append`` and ``close`` has no effect. The
-      Worker writes as the Producer of the Workflow run.
+    - An append and a close write as the Producer of the Workflow run, and the
+      Worker sets its Workflow Task attempt.
     - An append is at-least-once. If a Workflow Task fails after its append, the
       next attempt of the task writes the batch again.
     - An outage of the Store gives Workflow code no error. The Workflow Task
