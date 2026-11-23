@@ -332,7 +332,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 namespace=info.namespace,
             )
             try:
-                store = config._store_for(ref, target).name()
+                store = config._store_for(ref, target, info.namespace).name()
             except Exception as err:
                 raise self._fail_task(err)
         return temporalio.api.stream.v1.StreamRef(id=ref.id, store=store)
@@ -403,7 +403,9 @@ async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
         namespace=info.namespace,
     )
     picked = stream_config._store_for(
-        StreamRef(id=stream_request.stream_id, store=store or None), target
+        StreamRef(id=stream_request.stream_id, store=store or None),
+        target,
+        client.namespace,
     )
     response = await _call_store(
         picked,

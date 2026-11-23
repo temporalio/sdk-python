@@ -523,10 +523,10 @@ async def test_a_worker_uses_the_stream_config_of_its_new_client(
             # The new client has other Store objects, with the Streams of the first ones.
             new_first, new_second = FaultStore("first"), FaultStore("second")
             new_first.memory = first.memory
-            targets: list[Any] = []
+            selects: list[tuple[str, str | None]] = []
 
             def pick_first(context: Any) -> FaultStore:
-                targets.append(context.target)
+                selects.append((type(context.target).__name__, context.namespace))
                 return first
 
             before = stream_client(client, first, second, store_selector=pick_first)
@@ -579,8 +579,9 @@ async def test_a_worker_uses_the_stream_config_of_its_new_client(
                 ("AppendRecordsRequest", "shared"),
             ]
             assert not second.requests
-            # The selector of the Workflow's create got the Workflow as its target.
-            assert [type(t).__name__ for t in targets] == ["StorageDriverWorkflowInfo"]
+            # The selector of the Workflow's create got the Workflow as its target, and the
+            # namespace of the Worker.
+            assert selects == [("StorageDriverWorkflowInfo", client.namespace)]
 
 
 async def test_an_append_over_a_limit_of_the_config_never_reaches_the_store(

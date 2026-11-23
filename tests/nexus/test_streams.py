@@ -286,7 +286,11 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                 )
             used_selector = has_selector and ref_store is None
             assert selects == (
-                [StreamSelectContext(id=stream_id, target=target)]
+                [
+                    StreamSelectContext(
+                        id=stream_id, target=target, namespace=client.namespace
+                    )
+                ]
                 if used_selector
                 else []
             )

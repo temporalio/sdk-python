@@ -593,7 +593,7 @@ async def _calls_script(rng: random.Random) -> None:
             else:
                 store = stores[int(call.stream[1:]) % 2].name()
                 expected_selects.append(
-                    StreamSelectContext(id=call.stream, target=target)
+                    StreamSelectContext(id=call.stream, target=target, namespace="ns")
                 )
             kind = call.operation if call.operation in seqs else "activity"
             seqs[kind] += 1
