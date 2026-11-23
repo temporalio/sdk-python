@@ -261,6 +261,12 @@ class StreamSelectContext:
     """The Workflow or the Activity that makes the call, or ``None`` for other
     client code."""
 
+    namespace: str | None = None
+    """The namespace of the client or Worker that makes the call.
+
+    It is set even when :py:attr:`target` is ``None``, so that a selector can pick a
+    Store by namespace for plain client code too."""
+
 
 @dataclass(frozen=True)
 class StreamConfig:
@@ -388,6 +394,7 @@ class StreamConfig:
         self,
         ref: StreamRef[Any],
         target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None,
+        namespace: str,
     ) -> StreamStore:
         """Return the Store of a call on ``ref``, raising :class:`ValueError` if
         there is none.
@@ -396,7 +403,9 @@ class StreamConfig:
             return self._store(ref.store)
         if self.store_selector is None:
             return self.stores[0]
-        selected = self.store_selector(StreamSelectContext(id=ref.id, target=target))
+        selected = self.store_selector(
+            StreamSelectContext(id=ref.id, target=target, namespace=namespace)
+        )
         if not any(selected is store for store in self.stores):
             raise ValueError(
                 "Store returned by store_selector is not registered in StreamConfig.stores"
@@ -522,7 +531,7 @@ async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]
             "Client has no stream_config, which every Stream call requires."
         )
     request = input.arg
-    store = stream_config._store_for(request.ref, _activity_target())
+    store = stream_config._store_for(request.ref, _activity_target(), client.namespace)
     if isinstance(request, models.CreateStreamRequest):
         # The created Stream takes the ref of its request.
         request.ref.store = store.name()
