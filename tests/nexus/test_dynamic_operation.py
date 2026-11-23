@@ -26,8 +26,6 @@ from temporalio.client import (
     WorkflowFailureError,
     WorkflowUpdateStage,
 )
-from temporalio.common import NexusOperationExecutionStatus
-from temporalio.exceptions import NexusOperationError
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import (
     ExecuteNexusOperationCancelInput,
@@ -327,7 +325,9 @@ async def test_workflow_caller_routes_named_and_dynamic_operations(
         if expected is None:
             with pytest.raises(WorkflowFailureError) as err:
                 await caller.result()
-            assert isinstance(err.value.__cause__, NexusOperationError)
+            assert isinstance(
+                err.value.__cause__, temporalio.exceptions.NexusOperationError
+            )
             handler_error = err.value.__cause__.__cause__
             assert isinstance(handler_error, nexusrpc.HandlerError)
             assert handler_error.type == nexusrpc.HandlerErrorType.NOT_FOUND
@@ -396,7 +396,7 @@ async def test_workflow_caller_cancels_dynamic_workflow_operation(
 # 1. Start an Activity-backed dynamic operation and cancel its pending handle.
 # 2. Wait for both the Nexus operation and its backing Activity to become CANCELED.
 # This ensures that cancelation via token works as expected for activity-backed
-# operation in the dynamid handler.
+# operation in the dynamic handler.
 @pytest.mark.requires_local_server
 async def test_standalone_caller_cancels_dynamic_activity_operation(
     client: Client, env: WorkflowEnvironment
@@ -452,7 +452,7 @@ async def test_standalone_caller_cancels_dynamic_activity_operation(
         async def cancelled():
             assert (
                 await handle.describe()
-            ).status is NexusOperationExecutionStatus.CANCELED
+            ).status is temporalio.common.NexusOperationExecutionStatus.CANCELED
             assert (
                 await activity_handle.describe()
             ).status is ActivityExecutionStatus.CANCELED
@@ -466,7 +466,7 @@ async def test_standalone_caller_cancels_dynamic_activity_operation(
 # 2. Cancel the pending Nexus operation through a custom Update cancellation handler.
 # 3. Check the handler receives the backing Workflow and Update IDs from the token.
 # This ensures that cancelation via token works as expected for update-backed
-# operation in the dynamid handler.
+# operation in the dynamic handler.
 @pytest.mark.requires_local_server
 async def test_dynamic_update_custom_cancel(client: Client, env: WorkflowEnvironment):
     if env.supports_time_skipping_v1:
@@ -623,7 +623,7 @@ async def test_cancel_by_token_after_tool_removal_and_restart(
     ):
         assert (
             await pending.describe()
-        ).status is NexusOperationExecutionStatus.RUNNING
+        ).status is temporalio.common.NexusOperationExecutionStatus.RUNNING
         if operation == "wait_workflow":
             assert (
                 await client.get_workflow_handle(backing_id).describe()

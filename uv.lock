@@ -2911,10 +2911,14 @@ wheels = [
 
 [[package]]
 name = "nexus-rpc"
-version = "1.5.0"
-source = { git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=50d1fb642004e0a6a719650043f8eb8f3225da1e#50d1fb642004e0a6a719650043f8eb8f3225da1e" }
+version = "1.6.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/18/ba511fc6889802b0e797d60d8cfcaa51cf4c5037d52e5f62962599a51a21/nexus_rpc-1.6.0.tar.gz", hash = "sha256:c1981fb45ef42dd46529035d5fa5fd6748cbfbd4428fc9d3a0c1acb559e708e2", size = 101303, upload-time = "2026-11-23T19:04:46.535Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cf/d9/c0f4df94d0f0b0c69243aafaa79144d13e8f35953c4236ba213991864a73/nexus_rpc-1.6.0-py3-none-any.whl", hash = "sha256:a8220f62bd7cccdb9ab60a01bc2c095d1a9cc6a0ec65075efbad557554e339f6", size = 31563, upload-time = "2026-11-23T19:04:45.12Z" },
 ]
 
 [[package]]
@@ -4608,7 +4612,7 @@ requires-dist = [
     { name = "boto3", marker = "extra == 'boto3'", specifier = ">=1.26.0,<2" },
     { name = "gcloud-aio-storage", marker = "extra == 'gcloud-aio-storage'", specifier = ">=9.6.4,<10" },
     { name = "grpcio", marker = "extra == 'grpc'", specifier = ">=1.49.1,<2" },
-    { name = "nexus-rpc", git = "https://github.com/long-nt-tran/nexus-rpc-sdk-python.git?rev=50d1fb642004e0a6a719650043f8eb8f3225da1e" },
+    { name = "nexus-rpc", specifier = "==1.6.0" },
     { name = "opentelemetry-api", marker = "extra == 'cloud-run-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'lambda-worker-otel'", specifier = ">=1.26,<2" },
     { name = "opentelemetry-api", marker = "extra == 'opentelemetry'", specifier = ">=1.26,<2" },
