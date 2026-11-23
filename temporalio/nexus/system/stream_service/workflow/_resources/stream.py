@@ -22,7 +22,6 @@ from ...models import (
     CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
-    Producer,
     ReadRecordsRequest,
     ReadRecordsResponse,
     StreamRecord,
@@ -67,13 +66,12 @@ class Stream(typing.Generic[BodyT]):
     async def append(
         self,
         *records: BodyT,
-        producer: Producer | None = None,
     ) -> AppendRecordsResponse:
         """Append values, and return the offsets of the batch."""
         request = AppendRecordsRequest(
             ref=self.ref,
-            producer=((_support.workflow_producer()) if producer is None else producer),
             records=[AppendRecord(body=value) for value in records],
+            producer=_support.workflow_producer(),
             request_id=_support.append_request_id(),
         )
         handle = await _append_records(request)
@@ -81,12 +79,11 @@ class Stream(typing.Generic[BodyT]):
 
     async def close(
         self,
-        producer: Producer | None = None,
     ) -> None:
         """Close the Stream. Readers get the Records that are left, then end."""
         request = CloseStreamRequest(
             ref=self.ref,
-            producer=((_support.workflow_producer()) if producer is None else producer),
+            producer=_support.workflow_producer(),
         )
         handle = await _close_stream(request)
         await handle
