@@ -545,6 +545,11 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
             "within its rpc_timeout",
             reason=StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE,
         ) from err
+    if isinstance(response, ReadRecordsResponse) and not response.last_offset:
+        assert isinstance(request, ReadRecordsRequest)
+        # The page shows where it ended, so a Store doesn't have to say it.
+        records = response.records
+        response.last_offset = records[-1].offset if records else request.from_offset
     if codec and isinstance(response, ReadRecordsResponse):
         for record in response.records:
             [body] = await codec.decode([record.body])
