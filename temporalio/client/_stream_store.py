@@ -267,11 +267,12 @@ class StreamConfig:
     - A read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record over
       :py:attr:`max_record_bytes`. So a reader needs a limit at least as large
       as that of each writer of its Stream.
-    - A read that waits holds its Workflow Task, up to the read limit of the
-      task, which the Worker option ``stream_read_time`` sets. A Signal that
-      comes meanwhile waits until the read has its page, or until that limit. At
-      the limit, a read with no answer gives a page with no Record. A command
-      for the server doesn't wait for a read.
+    - A read holds its Workflow Task, up to the read limit of the task, which
+      the Worker option ``stream_read_time`` sets. A Signal that comes meanwhile
+      waits until the read has its page, or until that limit. At the limit, a
+      read with a wait gives a page with no Record, and a read with no wait
+      goes on without holding the task until the Store answers. A command for
+      the server doesn't wait for a read.
     - A body that isn't of the Stream's type fails the Workflow Task, as an
       Activity result that can't be converted does.
 
