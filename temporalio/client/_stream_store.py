@@ -59,30 +59,18 @@ class StreamStore(ABC):
     message of its operation and returns its response message, both from
     :py:mod:`temporalio.api.streamservice.v1`. A :py:class:`StreamConfig` registers
     a Store under its :py:meth:`name`, and the SDK sends each Stream call to the
-    Store of the call's ``StreamRef``. Each request has that ref. Only the SDK
-    reads the ``store`` of a ref, and a Store ignores it.
+    Store of the call's ``StreamRef``. Only the SDK reads the ``store`` of a ref.
 
-    A create and an append also take a ``request_id``, which is the same on each
-    try of one call. The SDK makes one for each call of client or Activity code,
-    and SDK Core makes one for each append of Workflow code. A create of Workflow
-    code has the first run id of its Workflow chain, so the create of a later run
-    of the chain is a retry of the create that made the Stream.
-
-    These docs use the following terms. A batch is the Records of one append. A
-    Producer is one writer of a Stream, which is a Workflow run, an Activity, a
-    Local Activity or a client. An attempt is the try of a Producer that made a
-    write, such as one Workflow Task or one attempt of an Activity.
-
-    Callers rely on a Store to follow these rules. SDK Core reads a Stream for
-    Workflow code and reads it again in a replay, and both depend on the rules of
-    the log.
+    Callers rely on a Store to follow the rules below and those of each method.
+    SDK Core reads a Stream for Workflow code and reads it again in a replay, and
+    both depend on them.
 
     The log:
 
-    * The body of a Record is the payload that the append gave, which the payload
-      codec has already encoded. The Store keeps it as it is.
-    * A Store writes a batch whole or not at all. The Records of a batch are next
-      to each other in the Stream, in the order of the request.
+    * A Store keeps the body of a Record as the append gave it. The payload codec
+      has already encoded it.
+    * A Store writes a batch, which is the Records of one append, whole or not at
+      all. Its Records are next to each other, in the order of the request.
     * The offsets of a Stream sort bytewise in the order of its Records, and the
       offset of a Record is never empty.
     * Once a response returned an offset, no Record ever appears at or below it
@@ -91,127 +79,37 @@ class StreamStore(ABC):
 
     Producers and attempts:
 
-    * Two Producers are the same when they have the same kind and the same ids of
-      that kind. The attempt isn't part of that.
+    * A Producer is one writer of a Stream, which is a Workflow run, an Activity,
+      a Local Activity or a client. Two Producers are the same when they have the
+      same kind and the same ids of that kind.
+    * An attempt is the try of a Producer that made a write, such as one Workflow
+      Task or one attempt of an Activity.
     * Fencing is optional. A Store that fences keeps the newest attempt of each
-      Producer that appended to a Stream, and refuses an append or a close of
-      that Producer from an earlier attempt. Only an append changes the newest
-      attempt, and a close doesn't. Every Record has its Producer and attempt
-      either way, so a reader can tell the attempts apart.
-
-    A create:
-
-    * A create for an id with no Stream makes the Stream and returns ``created``
-      true.
-    * A create returns the ref as the request had it. The SDK sets the ``store``
-      of that ref to the name of the Store before the caller gets it.
-    * A create with the ``request_id`` of the create that made the Stream is a
-      retry of it. A create with an empty ``request_id`` is never a retry.
-    * A Store checks a create for an id that has a Stream in this order, and the
-      first check that applies decides the answer:
-
-      1. The Stream expired, so the create fails with ``EXPIRED``.
-      2. The Stream is closed, so the create fails with ``CLOSED``.
-      3. The create is a retry, so it returns ``created`` true.
-      4. The policy is ``USE_EXISTING``, so the create returns ``created``
-         false, and the ``created`` of the caller's ``Stream`` is then ``None``.
-         With ``FAIL``, or with no policy, it fails with ``ALREADY_EXISTS``.
-
-    An append:
-
-    * A Store remembers the request ids of the recent batches of each Producer of
-      a Stream. How many is a setting of the Store, and it's at least the last
-      batch. An append with the Producer, the attempt and the ``request_id`` of a
-      remembered batch is a resend. An append with an empty ``request_id``, or
-      one that comes after more batches than the Store remembers, isn't one. A
-      Store that doesn't fence compares Producers and attempts for this rule too.
-    * A Store checks an append in this order, and the first check that applies
-      decides the answer:
-
-      1. The Stream doesn't exist or it expired, so the append fails with
-         ``NOT_FOUND`` or ``EXPIRED``.
-      2. The append is a resend, so the Store writes nothing and returns the
-         offsets of the first write of that batch. It doesn't compare the
-         Records, and the Stream can be closed by then.
-      3. The Store fences, and a later attempt of the Producer already wrote.
-         The append fails with ``FENCED``.
-      4. The Stream is closed, so the append fails with ``CLOSED``.
-
-    * An append returns the offsets of its first and its last Record.
-
-    A close:
-
-    * A Store checks a close in this order, and the first check that applies
-      decides the answer:
-
-      1. The Stream doesn't exist or it expired, so the close fails with
-         ``NOT_FOUND`` or ``EXPIRED``.
-      2. The Stream is already closed, so the close succeeds.
-      3. The Store fences, and a later attempt of the Producer already wrote.
-         The close fails with ``FENCED``.
-
-    A read:
-
-    * A read returns the Records after ``from_offset``, in the order of the
-      Stream. Each Record has its body and the Producer of its append.
-    * A page has at most ``max_records`` Records, and Records of at most
-      ``max_bytes`` in total, where zero is no limit. It always has its first
-      Record, even when that Record alone is over ``max_bytes``.
-    * The ``last_offset`` of a page is where the next read continues. It's never
-      below ``from_offset`` or the offset of a Record in the page, and it must not
-      skip a Record.
-    * A page is ``done`` when the Stream is closed and no Record comes after the
-      page. That holds for an empty page too.
-    * A read with nothing after ``from_offset`` answers once a Record comes, once
-      the Stream is closed, or once its ``wait`` is up. With no ``wait``, or one
-      of zero, it answers immediately.
-    * A Store takes every offset that a response returned as the ``from_offset``
-      of a read. That's the offset of a Record, an offset of an append, and a
-      ``last_offset``. A read fails with ``OFFSET_TOO_HIGH`` only when
-      ``from_offset`` is past the end of the Stream.
-
-    A describe returns the status of the Stream, and a ``last_offset`` that is
-    never below the offset of the newest Record.
+      Producer that appended to a Stream, and refuses an append or a close of an
+      earlier attempt of that Producer. Only an append changes the newest attempt.
+      Every Record has its Producer and attempt either way, so a reader can tell
+      the attempts apart.
 
     A method refuses a call by raising a
     :py:class:`temporalio.exceptions.StreamError` with the reason, such as
-    ``STREAM_ERROR_REASON_CLOSED`` for ``CLOSED`` above. Any other exception is an
-    outage of the Store, and the caller gets a ``StreamError`` with
-    ``STREAM_ERROR_REASON_STORE_UNAVAILABLE``.
+    ``STREAM_ERROR_REASON_CLOSED`` for ``CLOSED`` in these docs. Any other
+    exception is an outage of the Store, and the caller gets a ``StreamError``
+    with ``STREAM_ERROR_REASON_STORE_UNAVAILABLE``.
 
-    The SDK calls a Store in these ways:
+    How the SDK calls a Store:
 
     * Calls run at the same time on the event loop, and a read can wait while
       appends run.
-    * The SDK cancels the task of a call. It does so at the ``rpc_timeout`` of a
-      client call, when Workflow code cancels a read, when a Workflow is evicted,
-      when a Worker shuts down, and at the deadline that SDK Core gives each try
-      of a call of Workflow code.
-    * A cancelled call may still have taken effect, and the Store must stay
-      usable after it.
-    * A resend can come while its first try still runs, and the Store still
-      writes the batch once.
-
-    Who checks a call depends on the code that makes it:
-
-    * For an append, a close or a read of Workflow code, SDK Core checks the
-      request before the Store gets it and the response before Workflow code
-      does, and it tries the call again during an outage.
-    * For every call of client or Activity code, and for a create or a describe
-      of Workflow code, the SDK checks the request of an append as SDK Core
-      does for one of Workflow code, and no other request. It only checks that
-      a response is the response message of the operation, and that the ref of
-      a create's response has the Stream id of the request. It sends one request
-      for each call and tries nothing again, so a Store that needs more checks
-      runs them itself. Such a Store then checks the appends, closes and reads
-      of Workflow code a second time.
-
-    The limits of a batch are those of the :py:class:`StreamConfig` of the
-    caller. The SDK checks each append against them before the Store gets it,
-    in Workflow code as in client and Activity code.
-
-    The ``rpc_metadata`` of a Stream call has no effect, since a call to a Store
-    is not an RPC of the Temporal server.
+    * The SDK can cancel the task of a call, for example at a timeout, at an
+      eviction or at a Worker shutdown. The call may still have taken effect, and
+      the Store must stay usable after it.
+    * A resend can come while its first try still runs, and the Store still writes
+      the batch once.
+    * SDK Core checks each append, close and read of Workflow code, and its
+      response, and tries the call again during an outage. For every other call
+      the SDK checks only an append, against the limits of the
+      :py:class:`StreamConfig`, and sends one request. A Store that needs more
+      checks runs them itself.
 
     .. warning::
         This API is experimental and subject to change.
@@ -229,10 +127,20 @@ class StreamStore(ABC):
     async def create_stream(
         self, request: CreateStreamRequest, *, request_id: str
     ) -> CreateStreamResponse:
-        """Create a Stream, or return the open one that already exists if the
-        conflict policy of the request allows it.
+        """Create a Stream, or return the open one if the conflict policy allows it.
 
-        Each try of one create has the same ``request_id``.
+        Each try of one create has the same ``request_id``. A create with the
+        ``request_id`` of the create that made the Stream is a retry of it, and a
+        create with an empty ``request_id`` never is. The response has the ref as
+        the request had it.
+
+        A Store checks a create for an id that has a Stream in this order:
+
+        1. The Stream expired, so the create fails with ``EXPIRED``.
+        2. The Stream is closed, so the create fails with ``CLOSED``.
+        3. The create is a retry, so it returns ``created`` true.
+        4. The policy is ``USE_EXISTING``, so it returns ``created`` false. With
+           ``FAIL``, or with no policy, it fails with ``ALREADY_EXISTS``.
         """
         raise NotImplementedError
 
@@ -242,25 +150,68 @@ class StreamStore(ABC):
     ) -> AppendRecordsResponse:
         """Append one batch from one Producer.
 
-        Each try of one append has the same ``request_id``.
+        Each try of one append has the same ``request_id``. A Store remembers the
+        request ids of the recent batches of each Producer of a Stream, at least
+        the last one. An append with the Producer, the attempt and the
+        ``request_id`` of a remembered batch is a resend. An append with an empty
+        ``request_id`` never is.
+
+        A Store checks an append in this order:
+
+        1. The Stream doesn't exist or it expired, so the append fails with
+           ``NOT_FOUND`` or ``EXPIRED``.
+        2. The append is a resend, so the Store writes nothing and returns the
+           offsets of the first write. It doesn't compare the Records, and the
+           Stream can be closed by then.
+        3. The Store fences, and a later attempt of the Producer already wrote, so
+           the append fails with ``FENCED``.
+        4. The Stream is closed, so the append fails with ``CLOSED``.
+
+        The response has the offsets of the first and the last Record.
         """
         raise NotImplementedError
 
     @abstractmethod
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
-        """Read one page of Records after ``from_offset``."""
+        """Read one page of Records after ``from_offset``, in the order of the Stream.
+
+        * A page has at most ``max_records`` Records, and Records of at most
+          ``max_bytes`` in total, where zero is no limit. It always has its first
+          Record, even when that Record alone is over ``max_bytes``.
+        * ``last_offset`` is where the next read continues. A Store doesn't have to
+          set it. If it's empty, the caller gets the offset of the last Record of
+          the page, or ``from_offset`` for a page with no Record.
+        * A page is ``done`` when the Stream is closed and no Record comes after
+          the page.
+        * A read with nothing after ``from_offset`` answers once a Record comes,
+          once the Stream is closed, or once its ``wait`` is up.
+        * Every offset that a response returned is a valid ``from_offset``. A read
+          fails with ``OFFSET_TOO_HIGH`` only when ``from_offset`` is past the end
+          of the Stream.
+        """
         raise NotImplementedError
 
     @abstractmethod
     async def close_stream(self, request: CloseStreamRequest) -> CloseStreamResponse:
-        """Close a Stream."""
+        """Close a Stream.
+
+        A Store checks a close in this order:
+
+        1. The Stream doesn't exist or it expired, so the close fails with
+           ``NOT_FOUND`` or ``EXPIRED``.
+        2. The Stream is already closed, so the close succeeds.
+        3. The Store fences, and a later attempt of the Producer already wrote, so
+           the close fails with ``FENCED``.
+        """
         raise NotImplementedError
 
     @abstractmethod
     async def describe_stream(
         self, request: DescribeStreamRequest
     ) -> DescribeStreamResponse:
-        """Return the status and the newest offset of a Stream."""
+        """Return the status of a Stream, and a ``last_offset`` that is never below
+        the offset of its newest Record.
+        """
         raise NotImplementedError
 
 
@@ -293,37 +244,33 @@ class StreamConfig:
     The SDK checks each append against :py:attr:`max_record_bytes`,
     :py:attr:`max_batch_bytes` and :py:attr:`max_batch_records` before its Store
     gets it, and refuses one over a limit with
-    ``STREAM_ERROR_REASON_TOO_LARGE``.
+    ``STREAM_ERROR_REASON_TOO_LARGE``. The ``rpc_metadata`` of a Stream call has
+    no effect, since a call to a Store is not an RPC of the Temporal server.
 
     For the Stream calls of Workflow code:
 
-    - A create and a describe run in a Local Activity of the SDK. The Workflow
-      and Activity interceptors of the Worker see it, as they see every Local
-      Activity.
-    - An append and a close write as the Producer of the Workflow run, and the
-      Worker sets its Workflow Task attempt.
+    - SDK Core makes each append, close and read. A create and a describe run in
+      a Local Activity of the SDK, which the interceptors of the Worker see as
+      any other Local Activity.
     - An append is at-least-once. If a Workflow Task fails after its append, the
       next attempt of the task writes the batch again.
     - An outage of the Store gives Workflow code no error. The Workflow Task
       fails, and the server tries it again.
     - A call that Workflow code doesn't await before the Workflow ends may not
       happen. A Workflow that needs its close awaits it, as ``async with`` does.
-    - A call with no Store fails the Workflow Task, also when Workflow code catches
-      the error.
-    - A Worker reads the three limits when it starts. It refuses a new client with
-      other limits, as it refuses one with other Store names.
-    - A read with no ``max_records`` gives at most 256 Records in a page, and a
-      read with no ``max_bytes`` at most 4 MiB of them. A page has at most 16 MiB
-      of Records, also for a larger ``max_bytes``.
+    - A call with no Store fails the Workflow Task, also when Workflow code
+      catches the error.
+    - A Worker reads the three limits when it starts. It refuses a new client
+      with other limits, as it refuses one with other Store names.
+    - A page of a read has at most 256 Records and 4 MiB of Records by default,
+      and never more than 16 MiB.
     - A read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record over
-      :py:attr:`max_record_bytes`. So a reader needs a limit at least as large as
-      that of each writer of its Stream.
+      :py:attr:`max_record_bytes`. So a reader needs a limit at least as large
+      as that of each writer of its Stream.
     - A read that waits holds its Workflow Task. A Signal that comes meanwhile
       waits until the read has its page, or until the heartbeat of the task.
-    - A read of a Stream with no body type raises :exc:`TypeError` in the call, as
-      in client code. A body that isn't of the Stream's type fails the Workflow
-      Task, as an Activity result that can't be converted does. It fails the
-      Workflow if the failure exception types have the error of the conversion.
+    - A body that isn't of the Stream's type fails the Workflow Task, as an
+      Activity result that can't be converted does.
 
     .. warning::
         This API is experimental and subject to change.

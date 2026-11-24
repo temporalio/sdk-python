@@ -45,15 +45,13 @@ _Attempt = tuple[int, ...]
 class MemoryStreamStore(StreamStore):
     """Stream Store that keeps its Streams in the memory of this process.
 
-    It's for tests and local runs. It loses its Streams when the process ends,
-    and a client and a Worker see the same Streams only through the same
-    instance, in one event loop.
+    It's for tests and local runs. A client and a Worker see the same Streams
+    only through the same instance, in one event loop.
 
     The Store runs the checks of SDK Core on each request and on each response,
     also for a call of client or Activity code. So a call fails on it as it fails
-    on a Store package that runs those checks. An append, a close or a read of
-    Workflow code is then checked twice, by the Worker and by the Store. The
-    Store has no limit of a batch, since the limits are those of the
+    on a Store package that runs those checks. The Store has no limit of a batch,
+    since the limits are those of the
     :py:class:`temporalio.client.StreamConfig` of the caller.
 
     .. warning::
@@ -383,18 +381,11 @@ def _attempt(producer: Producer) -> _Attempt:
     """Return a value that orders the attempts of one Producer, as the attempt key
     of SDK Core does.
 
-    Its fields are these, in the order that two attempts compare by them:
-
-    1. The started event id of the Workflow Task
-    2. The attempt number of that Workflow Task
-    3. The seconds of the task's started time
-    4. The nanoseconds of the task's started time
-    5. The seconds of the Activity attempt's scheduled time
-    6. The nanoseconds of the Activity attempt's scheduled time
-    7. The attempt number of the Activity or the Local Activity
-
-    A field that the kind of the Producer doesn't have, or that is negative, is
-    zero. So every write of a client has the same attempt.
+    Two attempts compare by the Workflow Task first (its started event id, its
+    attempt number, its started time), and then by the Activity attempt (its
+    scheduled time, its attempt number). A field that the kind of the Producer
+    doesn't have, or that is negative, is zero. So every write of a client has
+    the same attempt.
     """
     attempt = getattr(_kind(producer), "attempt", None)
     task, scheduled, number = WorkflowTaskAttempt(), ActivityAttempt(), 0

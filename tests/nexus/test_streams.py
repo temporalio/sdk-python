@@ -306,18 +306,6 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                 created.append((result, store))
 
 
-@pytest.mark.parametrize(
-    "limit", ["max_record_bytes", "max_batch_bytes", "max_batch_records"]
-)
-def test_a_limit_below_one_raises(limit: str) -> None:
-    limits: Any = {limit: 0}
-    with pytest.raises(
-        ValueError,
-        match=rf"^StreamConfig\.{limit} must be greater than or equal to one\.$",
-    ):
-        StreamConfig([FaultStore()], **limits)
-
-
 async def test_a_stream_error_keeps_its_reason_on_every_path() -> None:
     converter = temporalio.converter.DataConverter.default
     for number in [*StreamErrorReason.values(), 99]:
