@@ -7,6 +7,56 @@ This file contains assembled releases only.
 
 # Changelog
 
+## [1.37.0] - 2026-11-24
+
+### Added
+
+- Core: SDK bridges can opt in at build time to preserving workflow task boundaries during replay, for new workflows only. The mode is recorded on the first successful task completion and defaults to off. Core handles tasks with no activation jobs internally, without polling workflow routines; see [Disabling chunking](../../arch_docs/workflow_task_chunking.md#disabling-chunking).
+
+- Core: Cloud API bindings support v0.27.0, including user group memberships, projects, project-scoped custom roles, and caller rate limit operations.
+- Core: Low-level Operator Service calls support namespace soft deletion, restoration, and restore progress queries.
+
+- Experimental: external storage store and select contexts now have an optional `namespace` holding the namespace of the client or worker performing the operation.
+
+### Changed
+
+- **Experimental**: `workflow.signal_with_start_workflow` now defaults an omitted task queue to the caller's task queue.
+
+- Experimental: the S3 and GCS storage drivers now write payloads stored without a target under `v0/ns/{namespace}/d/sha256/...`, using the namespace of the storing client or worker (`null` when it is unknown), instead of `v0/d/sha256/...`. Existing objects remain retrievable.
+
+- Core: Workflow task completions and failures set `resource_id` to `workflow:<workflow_id>`, on every page of a paginated completion. Activity task completions, failures, cancellations, and heartbeats set it to `workflow:<workflow_id>`, or `activity:<activity_id>` for a standalone activity. Worker heartbeats set it to `worker:<worker_grouping_key>`, the grouping key each heartbeat already reports in its host info. Proxies can identify the workflow, activity, or worker without decoding task tokens or heartbeat contents.
+
+### :boom: Breaking Changes
+
+- **Experimental**: Remove the generic `WorkflowOutboundInterceptor.start_system_nexus_operation` hook. System Nexus operations use only their operation-specific interceptor chain before scheduling.
+
+### Fixed
+
+- Core: Core and lang SDK flags sent with a workflow task completion that the server discards, such as an update rejected on the first task of a workflow started with a start delay, are no longer treated as recorded. Core keeps sending them with later completions until history records them. On a cached run, live and query activations still list lang flags that lang already reported in `available_internal_flags`, even before history records them, while activations that replay history list only the lang flags history has recorded, as a fresh replay would. Previously, a later `patched` call could fail replay with a nondeterminism error, and lang flags used afterward could be missing from history so that replay selected different flag-dependent behavior.
+- Core: Downloading an ephemeral dev or test server binary retries a transfer that breaks while the archive streams in, such as a reset connection, instead of failing the server start.
+- Core: A workflow whose first workflow task completion only rejects updates, such as an update rejected during a start delay, is now evicted from the cache afterward (reason `UNSPECIFIED`), because the server may discard that completion without recording it. Previously the cached workflow kept state from initialization that history never recorded, so it could fail a later task with a nondeterminism error when another worker had handled the first recorded task.
+- Core: A local activity that finishes while the SDK answers a query attached to a workflow task now records its result on the task that delivers it. This prevents replay nondeterminism when a signal or other event arrives before that task. Command-free task coalescing remains subject to [#1737](https://github.com/temporalio/sdk-rust/issues/1737).
+
+- Fix `workflow.unsafe.imports_passed_through()` reloading a submodule in the sandbox when it is imported with `from package import module` from a workflow in the same package.
+
+- Core: Nexus operations cancelled or timed out before starting retain their cancellation or timeout failure type even when the corresponding history event omits its failure.
+- Core: A Nexus operation cancelled with the `ABANDON` cancellation type that later completes, fails, or times out no longer fails workflow tasks with a nondeterminism error.
+- Core: Cancelling a Nexus operation with `ABANDON` or `TRY_CANCEL` before it starts now resolves it with a failed `ResolveNexusOperationStart` carrying a cancelled failure, instead of a `ResolveNexusOperation`. Core no longer sends a second resolution when the server later records the operation's start or outcome, which lang SDKs rejected as an unknown sequence number.
+- Core: With `WAIT_CANCELLATION_REQUESTED`, an operation whose cancel request fails is no longer resolved a second time when it later finishes.
+- Core: Workflows no longer get stuck failing workflow tasks when an activity cancelled with the `ABANDON` cancellation type later fails or times out. Those late outcomes are now ignored, as late completions of abandoned activities already were.
+- Core: Draining a metrics buffer after it has overflowed no longer panics with "You must initialize the reference before using it" (Python: `MetricBuffer.retrieve_updates`). Core already drops an instrument or attribute set when the buffer cannot accept its creation, and now also drops later recordings that depend on that dropped creation, so the next drain keeps working.
+- Core: Slot gauges now reflect the current number of used and available slots after concurrent worker updates.
+
+- Fix workflow eviction getting stuck after a deadlock interrupt during task completion. Eviction now waits for timed-out activations to finish, avoids overlapping eviction retries, and tolerates lost done callbacks for finished tasks.
+
+- Fix type checking for dynamic workflows that set `failure_exception_types` in `@workflow.defn`.
+
+- Shut down native runtimes before Python interpreter finalization to prevent short-lived clients from crashing or hanging while Rust callbacks finish.
+
+- Add flag-controlled support for decoding sandboxed datetime type hints. The flag remains disabled by default in this release.
+
+- Fix workflow validation failing with `ModuleNotFoundError: No module named '__temporal_main__'` for a workflow defined in `__main__` when the sandbox passes all modules through, or passes `__temporal_main__` through.
+
 ## [1.36.1] - 2026-11-13
 
 ### Changed
