@@ -1971,40 +1971,42 @@ global___RequestCancelNexusOperation = RequestCancelNexusOperation
 
 @typing.final
 class AppendToStream(google.protobuf.message.Message):
-    """Appends Records to a Stream as the Workflow's Producer. The result comes in a
-    `ResolveStreamAppend` job. Core makes the request id of the append.
+    """Appends Records to a Stream as the Workflow's Producer. Core makes the request id of the append
+    and sends the result in a `ResolveStreamAppend` job. History keeps the result in the ledger of
+    the Workflow Task in which lang got it, on the completion of that task.
 
     An append is at-least-once. A later attempt of the Workflow Task writes it again, on this Worker
-    or another. A try that reaches the Store after more batches than the Store remembers is written
-    again too, after them.
+    or on another one.
 
-    No command stops an append, so lang takes the job of an append whose awaiter is gone. Core drops
-    an append that has no result when the Workflow's last command comes, as it drops a Local
-    Activity. That append may have reached the Store or not, and lang gets no job for it.
+    No command cancels an append, so lang must accept the job of an append that nothing awaits.
+    When lang sends the Workflow's last command, Core drops each append that has no result, as it
+    does for a Local Activity. Such an append may or may not have reached the Store, and lang gets
+    no job for it.
 
-    The appends and the closes of one Stream reach the Store one at a time, in the order of their
-    commands. A close takes its place only once History has its intent. So an append that comes
-    after a `CloseStream`, before History has the task of that close, is written before the close.
+    Core sends the appends and the closes of one Stream to the Store one at a time, in the order of
+    their commands. A close gets its place in that order only when History has its intent. So an
+    append that lang sends after a `CloseStream`, but before History has the task of that close, is
+    written before the close.
 
-    Core fails the Workflow Task, and gives lang no failure of the append, in these cases:
+    Core fails the Workflow Task in each of these cases, and gives lang no failure of the append.
     * `seq` is 0, or isn't above the `seq` of the append before it.
     * `stream` is unset, its id is empty or longer than 4096 bytes, or its Store name is longer than
       4096 bytes.
     * The Worker has no Stream runtime for the Store of `stream`.
-    * The append waits to try again when the heartbeat of the Workflow Task comes, because the Store
-      answered `StoreUnavailable`, gave no answer or panicked. The message of that failure starts
-      with `StreamStoreUnavailable:`.
+    * The server doesn't take the `sdk_metadata` of a completion, so History can't keep the result.
+    * The append must wait for the task's heartbeat to try again, because the Store answered
+      `StoreUnavailable` or gave no answer. The failure message then starts with
+      `StreamStoreUnavailable:`.
 
     An append with no `bodies`, or with a batch over the limits of its Store, doesn't fail the
     Workflow Task. Lang gets a `failed` job for it.
 
-    In a replay, Core compares the `seq` and the `stream` of the command with History, and not its
-    `bodies`. A `stream` with no Store name matches any Store of History. An append with no result
-    in History runs again once the replay is over, as a later attempt, so a reader of the Stream can
-    see its batch twice.
+    In a replay, Core compares the `seq` and the `stream` of the command with History, but not the
+    `bodies`. A `stream` with no Store name matches any Store in History. An append with no result
+    in History runs again after the replay, as a later attempt, so a reader can see its batch twice.
 
-    A completion of the Workflow Task while an append has no result in a marker forces a new task,
-    unless it has the Workflow's last command.
+    If lang completes the Workflow Task while an append has no result in a ledger, Core forces a new
+    task, unless the completion has the Workflow's last command.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2044,19 +2046,19 @@ global___AppendToStream = AppendToStream
 
 @typing.final
 class CloseStream(google.protobuf.message.Message):
-    """Closes a Stream. The Workflow Task that sends the command records only the intent to close, and
-    Core closes the Stream once History has that task. The result comes in a `ResolveStreamClose`
-    job of a later task, so a close needs at least one more Workflow Task.
+    """Closes a Stream. The Workflow Task that sends the command records only the intent to close.
+    Core closes the Stream when History has that task, and sends the result in a
+    `ResolveStreamClose` job of a later task. So a close needs at least one more Workflow Task.
 
-    These rules of `AppendToStream` hold for a close too:
-    * No command stops it.
-    * Core drops it when the Workflow's last command comes and it has no result.
+    These rules of `AppendToStream` apply to a close too.
+    * No command cancels it.
+    * Core drops it if it has no result when lang sends the Workflow's last command.
     * The same cases fail the Workflow Task.
     * A replay compares the command with History in the same way.
-    * A completion of the Workflow Task while it has no result in a marker forces a new task.
+    * If lang completes the task while the close has no result in a ledger, Core forces a new task.
 
-    Workflow code that needs its close awaits the result before its last command. A close whose
-    intent is in History with no result runs again once a replay is over.
+    Workflow code that needs its close must await the result before its last command. A close whose
+    intent is in History with no result runs again after a replay.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2093,24 +2095,21 @@ class ReadStream(google.protobuf.message.Message):
     * no Records and `done`, if the Stream is closed and has none after `from_offset`
     * no Records, if none came within `wait`
 
-    To read on, lang sends a new `ReadStream` whose `from_offset` is the offset of the last Record
-    that it got. A page with no Record gives no offset, so the next read starts at the `from_offset`
-    of this one.
+    To read on, lang sends a new `ReadStream` whose `from_offset` is the `last_offset` of the page.
 
     What a read costs:
-    * Each page takes a command, an activation and an entry in the marker of its Workflow Task.
+    * Each page takes a command, an activation and an entry in the ledger of its Workflow Task.
     * A read holds its Workflow Task open while it waits for the Store, as a Local Activity does. A
       Signal, a timer or an Activity result reaches Workflow code in the next task. The task in hand
       completes once Workflow code sends a command for the server while only reads hold the task,
       and at the latest at its heartbeat. A read that still waits adds the three events of a forced
       Workflow Task at each heartbeat.
-    * One Workflow Task gives at most 16 MiB of Records, and its marker holds at most 1 MiB of them
-      for reads with `records_in_history`. A page that doesn't fit comes in the next task, which
-      Core forces.
-    * Without `records_in_history`, History has the count and a digest of the Records of each page.
-      A replay reads each page from the Store again, within the timeout of its Workflow Task. A
-      query of a run that isn't cached replays too. Once the Store no longer has the same Records,
-      each replay fails, also the one for a query of a closed Workflow.
+    * One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the next
+      task, which Core forces.
+    * History has the count and a digest of the Records of each page. A replay reads each page from
+      the Store again, within the timeout of its Workflow Task. A query of a run that isn't cached
+      replays too. Once the Store no longer has the same Records, each replay fails, also the one for
+      a query of a closed Workflow.
 
     A read gets no job at the Workflow's last command, at a failed Workflow Task, at an eviction and
     at the shutdown of the Worker. After the last three the Workflow replays. The replay gives each
@@ -2133,7 +2132,6 @@ class ReadStream(google.protobuf.message.Message):
     STREAM_FIELD_NUMBER: builtins.int
     FROM_OFFSET_FIELD_NUMBER: builtins.int
     WAIT_FIELD_NUMBER: builtins.int
-    RECORDS_IN_HISTORY_FIELD_NUMBER: builtins.int
     MAX_RECORDS_FIELD_NUMBER: builtins.int
     MAX_BYTES_FIELD_NUMBER: builtins.int
     seq: builtins.int
@@ -2142,17 +2140,11 @@ class ReadStream(google.protobuf.message.Message):
     """The page has the Records after this offset. If it's empty, the page starts at the beginning
     of the Stream.
     """
-    records_in_history: builtins.bool
-    """If set, the marker of the task holds the Records of the page, so a replay doesn't read the
-    Store. A marker can't hold a Record whose Producer and body have more than 1.5 MiB, so the
-    read fails with `stream_unsupported` for one.
-    """
     max_records: builtins.int
     """The maximum number of Records in the page, which is 256 if this is zero."""
     max_bytes: builtins.int
     """The maximum size of the Records in the page, which is 4 MiB if this is zero. Core asks the
-    Store for at most 16 MiB, and for at most 1 MiB with `records_in_history`. One larger Record
-    still comes as a page, unless the read fails for it with `records_in_history`.
+    Store for at most 16 MiB. One larger Record still comes as a page.
     """
     @property
     def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
@@ -2169,7 +2161,6 @@ class ReadStream(google.protobuf.message.Message):
         stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
         from_offset: builtins.bytes = ...,
         wait: google.protobuf.duration_pb2.Duration | None = ...,
-        records_in_history: builtins.bool = ...,
         max_records: builtins.int = ...,
         max_bytes: builtins.int = ...,
     ) -> None: ...
@@ -2185,8 +2176,6 @@ class ReadStream(google.protobuf.message.Message):
             b"max_bytes",
             "max_records",
             b"max_records",
-            "records_in_history",
-            b"records_in_history",
             "seq",
             b"seq",
             "stream",
@@ -2210,7 +2199,7 @@ class RequestCancelStreamRead(google.protobuf.message.Message):
     is. So an SDK that runs Workflow code between the jobs of one activation can give that code a
     page of a read that it already cancelled, in the first run and in a replay.
 
-    A cancel costs an activation and an entry in the marker of its Workflow Task, for the
+    A cancel costs an activation and an entry in the ledger of its Workflow Task, for the
     `cancelled` job. If the task completes at its heartbeat before that job, the cancel also costs
     the events of a forced Workflow Task.
 

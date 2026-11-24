@@ -6,7 +6,7 @@ from .external_data_pb2 import (
     StreamCloseIntent,
     StreamCloseResult,
     StreamFailure,
-    StreamMarkerData,
+    StreamLedger,
     StreamReadPage,
     StreamReadResult,
 )
@@ -19,7 +19,7 @@ __all__ = [
     "StreamCloseIntent",
     "StreamCloseResult",
     "StreamFailure",
-    "StreamMarkerData",
+    "StreamLedger",
     "StreamReadPage",
     "StreamReadResult",
 ]

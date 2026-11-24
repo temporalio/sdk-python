@@ -144,22 +144,17 @@ class PatchedMarkerData(google.protobuf.message.Message):
 global___PatchedMarkerData = PatchedMarkerData
 
 @typing.final
-class StreamMarkerData(google.protobuf.message.Message):
-    """The data of a `core_stream` marker. Core records one in each Workflow Task in which Workflow
-    code got a Stream result or asked for a close. The marker has these details:
-    * `data` has this message as JSON, with each `bytes` field as lower-case hex.
-    * `records` has the body of each Record of the reads with `records_in_history`, one payload for
-      each. They're in the order of `reads`, and those of one read in the order of its Stream. It's
-      absent if the marker has no such Record.
-    * `record_info` has one `binary/plain` payload with the rest of each of those Records, in the
-      same order. Each is its `temporalio.api.stream.v1.StreamRecord` with no body, with its length
-      before it as a varint. It's absent if `records` is.
+class StreamLedger(google.protobuf.message.Message):
+    """The ledger of a Workflow Task, which has the results and the close intents of its Stream calls.
+    Core puts it on the completion of each task in which Workflow code got a Stream result or asked
+    for a close, as the protobuf encoding of this message in the `core_stream_calls` of the
+    `sdk_metadata`.
 
-    History keeps each marker, and every later version of Core reads it. So these rules hold for
-    each message of the marker:
-    * A field keeps its name, which is its key in the JSON.
-    * A new field is `optional`, since the markers of an earlier version don't have it.
-    * A new `repeated` field has `#[serde(default)]` in `build.rs`, for the same reason.
+    Every later version of Core must read the ledgers in History, so these rules apply to each
+    message of the ledger.
+    * A field keeps its number and its type.
+    * The default value of a new field means what an older ledger meant, since an older ledger
+      decodes to that value.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -215,7 +210,7 @@ class StreamMarkerData(google.protobuf.message.Message):
         ],
     ) -> None: ...
 
-global___StreamMarkerData = StreamMarkerData
+global___StreamLedger = StreamLedger
 
 @typing.final
 class StreamCloseIntent(google.protobuf.message.Message):
@@ -338,7 +333,7 @@ class StreamFailure(google.protobuf.message.Message):
     MESSAGE_FIELD_NUMBER: builtins.int
     reason: builtins.str
     """The name of the `temporalio.api.enums.v1.StreamErrorReason`, such as
-    `STREAM_ERROR_REASON_CLOSED`. History has the name for good, so a reason keeps its name.
+    `STREAM_ERROR_REASON_CLOSED`. History stores the name, so a reason must never change its name.
     """
     message: builtins.str
     """The message of the failure, of at most 4096 bytes."""
@@ -484,19 +479,21 @@ class StreamReadPage(google.protobuf.message.Message):
     DONE_FIELD_NUMBER: builtins.int
     DIGEST_FIELD_NUMBER: builtins.int
     RECORD_BYTES_FIELD_NUMBER: builtins.int
+    LAST_OFFSET_FIELD_NUMBER: builtins.int
     record_count: builtins.int
     """The number of Records in the page."""
     done: builtins.bool
     """True if the Stream was closed and had no Record after this page."""
     digest: builtins.bytes
-    """The first 16 bytes of the SHA-256 of the Records. It's empty for a read with
-    `records_in_history`, whose Records are in the details of the marker, or if the page has no
-    Record.
-    """
+    """The first 16 bytes of the SHA-256 of the Records. It's empty if the page has no Record."""
     record_bytes: builtins.int
     """The bytes of the Records, each as a page of a read encodes it, with the tag and the length of
     its field. That is the measure of the `max_bytes` of a read. It's set when `digest` is, so a
     replay knows how much it reads.
+    """
+    last_offset: builtins.bytes
+    """The `last_offset` that Workflow code got with the page. A replay gives the same value, since
+    another read of the Store can end at another offset.
     """
     def __init__(
         self,
@@ -505,6 +502,7 @@ class StreamReadPage(google.protobuf.message.Message):
         done: builtins.bool = ...,
         digest: builtins.bytes = ...,
         record_bytes: builtins.int = ...,
+        last_offset: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -513,6 +511,8 @@ class StreamReadPage(google.protobuf.message.Message):
             b"digest",
             "done",
             b"done",
+            "last_offset",
+            b"last_offset",
             "record_bytes",
             b"record_bytes",
             "record_count",
