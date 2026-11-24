@@ -59,6 +59,15 @@ jobs:
       - run: poe build-develop
       - run: poe lint
       - run: mkdir junit-xml
+      - name: Repeat Nexus update test
+        shell: bash
+        timeout-minutes: 15
+        run: |
+          for attempt in {1..20}; do
+            poe test -sv \
+              tests/nexus/test_temporal_operation.py::test_temporal_operation_update_workflow \
+              --junit-xml=junit-xml/nexus-update-${attempt}.xml || exit $?
+          done
       - run: poe test ${{matrix.pytestExtraArgs}} -s --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}.xml
         timeout-minutes: 20
       - run: poe test ${{matrix.pytestExtraArgs}} -s --workflow-environment time-skipping-v2 --junit-xml=junit-xml/${{ matrix.python }}--${{ matrix.os }}--time-skipping-v2.xml
