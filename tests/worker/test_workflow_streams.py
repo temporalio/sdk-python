@@ -812,6 +812,9 @@ async def _reads_script(
             if rng.random() >= 0.6:
                 continue
             records = [read.after + 1 + at for at in range(rng.randrange(4))]
+            # The last_offset of a page can be past its last Record, also in a page with
+            # no Record.
+            last = (records[-1] if records else read.after) + rng.choice([0, 0, 1])
             page = StreamPage(
                 records=[
                     StreamRecord(
@@ -820,6 +823,7 @@ async def _reads_script(
                     )
                     for number in records
                 ],
+                last_offset=_offset(last),
                 done=rng.random() < 0.3,
             )
             job = ResolveStreamRead(seq=seq, page=page)
@@ -901,10 +905,9 @@ async def _reads_script(
                 outcomes[call].append(StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND)
                 continue
             bodies = [converter.from_payload(r.body) for r in job.page.records]
-            if bodies:
-                positions[call] = int.from_bytes(job.page.records[-1].offset, "big")
-            # A page with no Record has the offset of its call.
-            outcomes[call].append((bodies, _offset(positions[call]), job.page.done))
+            # The next page comes after the last_offset of this one.
+            positions[call] = int.from_bytes(job.page.last_offset, "big")
+            outcomes[call].append((bodies, job.page.last_offset, job.page.done))
             if not job.page.done and len(outcomes[call]) < reader.pages:
                 call_read(call, commands)
 
