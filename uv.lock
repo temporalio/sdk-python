@@ -11,7 +11,7 @@ resolution-markers = [
 ]
 
 [options]
-exclude-newer = "2026-10-30T23:59:12.555513Z"
+exclude-newer = "2026-11-10T22:12:29.321476Z"
 exclude-newer-span = "P2W"
 
 [options.exclude-newer-package]
@@ -4507,7 +4507,7 @@ wheels = [
 
 [[package]]
 name = "temporalio"
-version = "1.36.1"
+version = "1.37.0"
 source = { virtual = "." }
 dependencies = [
     { name = "nexus-rpc" },
