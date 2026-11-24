@@ -132,14 +132,28 @@ def replace_marker_block(
 
 
 def generate_workflow_exports() -> None:
-    exports = generated_exports(workflow_output_dir / "__init__.py")
-    import_block = [
-        "# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n",
-        "from temporalio.nexus.system.workflow_service import (\n",
-        *[f"    {export},\n" for export in exports],
-        ")\n",
-        "# END GENERATED NEXUS SYSTEM EXPORTS\n",
-    ]
+    exports: list[str] = []
+    import_block = ["# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n"]
+    for module, init_path in (
+        (
+            "temporalio.nexus.system.stream_service.workflow",
+            base_dir / "temporalio/nexus/system/stream_service/workflow/__init__.py",
+        ),
+        (
+            "temporalio.nexus.system.workflow_service",
+            workflow_output_dir / "__init__.py",
+        ),
+    ):
+        package_exports = generated_exports(init_path)
+        exports.extend(package_exports)
+        import_block.extend(
+            [
+                f"from {module} import (\n",
+                *[f"    {export},\n" for export in package_exports],
+                ")\n",
+            ]
+        )
+    import_block.append("# END GENERATED NEXUS SYSTEM EXPORTS\n")
     all_block = [
         "    # BEGIN GENERATED NEXUS SYSTEM __ALL__\n",
         *[f'    "{export}",\n' for export in exports],
