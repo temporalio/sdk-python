@@ -709,6 +709,7 @@ class _ActivityWorker:
             )
             if start.HasField("workflow_task")
             else None,
+            _scheduled_event_id=start.scheduled_event_id,
         )
 
         if self._encode_headers:

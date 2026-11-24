@@ -249,6 +249,43 @@ async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
     )
 
 
+@activity.defn
+async def _append_one(stream_id: str) -> None:
+    await activity.client().get_stream(StreamRef[int](id=stream_id)).append(1)
+
+
+@workflow.defn
+class _OneActivityIdWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> None:
+        for _ in range(2):
+            await workflow.execute_activity(
+                _append_one,
+                stream_id,
+                activity_id="one id",
+                start_to_close_timeout=timedelta(seconds=10),
+            )
+
+
+async def test_two_activities_with_one_id_write_as_two_producers(
+    client: Client,
+) -> None:
+    store = FaultStore()
+    client = stream_client(client, store)
+    await client.create_stream(id="one id", body_type=int)
+    options = RunOptions(_OneActivityIdWorkflow, ["one id"], activities=[_append_one])
+    ran = await run(client, options)
+    # The Producer of each Activity has the id of the Activity's scheduled event.
+    scheduled = _events(ran.history, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED)
+    page = await store.memory.read_records(
+        ReadRecordsRequest(ref=RefProto(id="one id"))
+    )
+    producers = [record.producer.workflow_activity for record in page.records]
+    assert [(p.activity_id, p.scheduled_event_id) for p in producers] == [
+        ("one id", event.event_id) for event in scheduled
+    ]
+
+
 def _events(history: Any, event_type: EventType.ValueType) -> list[Any]:
     return [event for event in history.events if event.event_type == event_type]
 

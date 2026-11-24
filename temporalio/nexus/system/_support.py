@@ -144,6 +144,8 @@ def activity_producer(info: "temporalio.activity.Info") -> "Producer":
         attempt=info.attempt,
     )
     if run_id:
+        # Zero is a task whose scheduled event Core couldn't read.
+        scheduled_event_id = info._scheduled_event_id or None  # pyright: ignore[reportPrivateUsage]
         return models.Producer(
             kind=models.ProducerKindWorkflowActivity(
                 models.WorkflowActivityProducer(
@@ -151,6 +153,7 @@ def activity_producer(info: "temporalio.activity.Info") -> "Producer":
                     workflow_id=workflow_id,
                     run_id=run_id,
                     activity_id=info.activity_id,
+                    scheduled_event_id=scheduled_event_id,
                     attempt=attempt,
                 )
             )

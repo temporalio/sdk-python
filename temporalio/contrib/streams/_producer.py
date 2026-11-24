@@ -20,10 +20,11 @@ def current_producer() -> Producer:
     it, such as in heartbeat details, gets it back from :py:func:`as_producer`.
 
     The Producer of an Activity of a Workflow has the Activity id, which is the
-    sequence number of the Activity in the run unless the Workflow set one. A
-    run can use an Activity id again after the first Activity with it has
-    ended. The second Activity is then a later attempt of the same Producer, so
-    a Store that fences refuses a late write of the first one.
+    sequence number of the Activity in the run unless the Workflow set one, and
+    the id of the Activity's ``ActivityTaskScheduled`` event. A run can use an
+    Activity id again after the first Activity with it has ended. The second
+    Activity is then a separate Producer, since its scheduled event is another
+    one.
 
     A Local Activity whose retry waits longer than its ``local_retry_threshold``
     runs again under a new sequence number. Each such retry then writes as a new
