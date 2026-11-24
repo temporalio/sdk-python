@@ -179,6 +179,19 @@ def test_workflow_definition_with_versioning_behavior():
     )
 
 
+@workflow.defn(dynamic=True, failure_exception_types=[ValueError])
+class DynamicFailureExceptionTypesDefn:
+    @workflow.run
+    async def run(self, _args: Sequence[RawValue]) -> None:
+        raise NotImplementedError
+
+
+def test_workflow_defn_dynamic_failure_exception_types():
+    defn = workflow._Definition.must_from_class(DynamicFailureExceptionTypesDefn)
+    assert defn.name is None
+    assert defn.failure_exception_types == [ValueError]
+
+
 class BadDefnBase:
     @workflow.signal
     def base_signal(self):

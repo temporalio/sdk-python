@@ -49,6 +49,7 @@ def defn(
     *,
     sandboxed: bool = True,
     dynamic: bool = False,
+    failure_exception_types: Sequence[type[BaseException]] = [],
     versioning_behavior: temporalio.common.VersioningBehavior = temporalio.common.VersioningBehavior.UNSPECIFIED,
 ) -> Callable[[ClassType], ClassType]: ...
 
