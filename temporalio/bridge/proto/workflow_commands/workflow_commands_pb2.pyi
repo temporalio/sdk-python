@@ -2063,9 +2063,11 @@ class ReadStream(google.protobuf.message.Message):
 
     A read has a time limit in each Workflow Task (`StreamSettings::read_time`), which is always
     before the heartbeat of the task. So a read alone never keeps a task open with heartbeats. At
-    the limit, a read with no answer gives a page with no Record whose `last_offset` is its
-    `from_offset`. It fails with `STREAM_ERROR_REASON_STORE_UNAVAILABLE` only if its last try failed
-    or got no answer.
+    the limit, a read with no answer fails with `STREAM_ERROR_REASON_STORE_UNAVAILABLE` if its last
+    try failed or got no answer. Otherwise a read with a `wait` gives a page with no Record whose
+    `last_offset` is its `from_offset`, and a read with no `wait` goes on until the Store answers,
+    since only the Store can say that the Stream has no Record. From the limit on, no read keeps
+    the task open.
 
     Core keeps the Workflow Task while a read has no answer, as for an append, with one difference.
     A command or a message for the server doesn't wait for a read. Core then completes the task and
