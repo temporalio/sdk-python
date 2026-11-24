@@ -18,15 +18,17 @@ from typing import (
 
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType as EventType
-from temporalio.api.enums.v1 import IndexedValueType
+from temporalio.api.enums.v1 import IndexedValueType, TaskQueueType
 from temporalio.api.history.v1 import HistoryEvent
 from temporalio.api.operatorservice.v1 import (
     AddSearchAttributesRequest,
     ListSearchAttributesRequest,
 )
+from temporalio.api.taskqueue.v1 import TaskQueue
 from temporalio.api.update.v1 import UpdateRef
 from temporalio.api.workflow.v1 import PendingActivityInfo
 from temporalio.api.workflowservice.v1 import (
+    DescribeTaskQueueRequest,
     PauseActivityRequest,
     PollWorkflowExecutionUpdateRequest,
     UnpauseActivityRequest,
@@ -66,6 +68,36 @@ def new_worker(
         workflow_failure_exception_types=workflow_failure_exception_types,
         **kwargs,
     )
+
+
+async def load_task_queue(client: Client, task_queue: str) -> None:
+    """Make the server load a new task queue before a worker polls it.
+
+    A worker that stops right after it starts can send a poll that gets to the server after
+    ``ShutdownWorker``. If the server did not load the task queue yet, it accepts that poll
+    and keeps it open for about a minute. The shutdown of the worker waits for that poll.
+    When the server loaded the task queue before ``ShutdownWorker``, it refuses the late poll
+    immediately.
+    """
+    for task_queue_type in (
+        TaskQueueType.TASK_QUEUE_TYPE_WORKFLOW,
+        TaskQueueType.TASK_QUEUE_TYPE_ACTIVITY,
+        TaskQueueType.TASK_QUEUE_TYPE_NEXUS,
+    ):
+        try:
+            await client.workflow_service.describe_task_queue(
+                DescribeTaskQueueRequest(
+                    namespace=client.namespace,
+                    task_queue=TaskQueue(name=task_queue),
+                    task_queue_type=task_queue_type,
+                )
+            )
+        except RPCError as err:
+            # The Java test server does not have this call. It also does not wait for the
+            # server to end polls at shutdown, so it does not need the task queue loaded.
+            if err.status != RPCStatusCode.UNIMPLEMENTED:
+                raise
+            return
 
 
 T = TypeVar("T")
