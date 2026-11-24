@@ -25,7 +25,7 @@ wit_deps_dir = wit_input_dir / "deps"
 workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
-NEX_GEN_VERSION = "0.2.8"
+NEX_GEN_VERSION = "0.2.13"
 proto_files = [
     gen_protos.api_proto_dir
     / "temporal"
@@ -89,7 +89,7 @@ def generate_package(
 ) -> None:
     args = [*command, "python", str(wit_input_dir / wit_name), str(wit_deps_dir)]
     if native_api:
-        args.append("--native-api")
+        args.extend(["--targets", "workflow"])
     subprocess.check_call(
         [
             *args,

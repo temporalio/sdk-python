@@ -208,6 +208,12 @@ class CloudServiceStub:
     ]
     """Delete a nexus endpoint"""
 
+    MoveNexusEndpointToProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectResponse,
+    ]
+    """Move a nexus endpoint to a different project within the same account"""
+
     GetUserGroups: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
@@ -355,6 +361,36 @@ class CloudServiceStub:
     This operation verifies that the sink is correctly configured, accessible, and ready for data export.
     """
 
+    CreateCallerRateLimit: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitResponse,
+    ]
+    """Create a caller rate limit"""
+
+    GetCallerRateLimit: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitResponse,
+    ]
+    """Get a caller rate limit"""
+
+    GetCallerRateLimits: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsResponse,
+    ]
+    """Get caller rate limits"""
+
+    UpdateCallerRateLimit: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitResponse,
+    ]
+    """Update a caller rate limit"""
+
+    DeleteCallerRateLimit: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitResponse,
+    ]
+    """Delete a caller rate limit"""
+
     UpdateNamespaceTags: grpc.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
@@ -494,6 +530,84 @@ class CloudServiceStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
     ]
     """Get user groups with access to a namespace"""
+
+    GetProjects: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsResponse,
+    ]
+    """Get all projects"""
+
+    GetProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectResponse,
+    ]
+    """Get a project"""
+
+    CreateProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectResponse,
+    ]
+    """Create a new project"""
+
+    UpdateProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectResponse,
+    ]
+    """Update a project"""
+
+    MoveNamespaceToProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectResponse,
+    ]
+    """Move a namespace to a different project within the same account"""
+
+    DeleteProject: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectResponse,
+    ]
+    """Delete a project"""
+
+    SetUserProjectAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessResponse,
+    ]
+    """Set a user's access to a project"""
+
+    SetUserGroupProjectAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessResponse,
+    ]
+    """Set a user group's access to a project"""
+
+    SetServiceAccountProjectAccess: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessResponse,
+    ]
+    """Set a service account's access to a project"""
+
+    GetUserProjectAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsResponse,
+    ]
+    """Get users with access to a project"""
+
+    GetServiceAccountProjectAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsResponse,
+    ]
+    """Get service accounts with access to a project"""
+
+    GetUserGroupProjectAssignments: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsResponse,
+    ]
+    """Get user groups with access to a project"""
+
+    GetProjectScopedServiceAccounts: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsResponse,
+    ]
+    """Get service accounts scoped to a project"""
 
 class CloudServiceAsyncStub:
     """WARNING: This service is currently experimental and may change in
@@ -678,6 +792,12 @@ class CloudServiceAsyncStub:
     ]
     """Delete a nexus endpoint"""
 
+    MoveNexusEndpointToProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectResponse,
+    ]
+    """Move a nexus endpoint to a different project within the same account"""
+
     GetUserGroups: grpc.aio.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsResponse,
@@ -825,6 +945,36 @@ class CloudServiceAsyncStub:
     This operation verifies that the sink is correctly configured, accessible, and ready for data export.
     """
 
+    CreateCallerRateLimit: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitResponse,
+    ]
+    """Create a caller rate limit"""
+
+    GetCallerRateLimit: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitResponse,
+    ]
+    """Get a caller rate limit"""
+
+    GetCallerRateLimits: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsResponse,
+    ]
+    """Get caller rate limits"""
+
+    UpdateCallerRateLimit: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitResponse,
+    ]
+    """Update a caller rate limit"""
+
+    DeleteCallerRateLimit: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitResponse,
+    ]
+    """Delete a caller rate limit"""
+
     UpdateNamespaceTags: grpc.aio.UnaryUnaryMultiCallable[
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsResponse,
@@ -964,6 +1114,84 @@ class CloudServiceAsyncStub:
         temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupNamespaceAssignmentsResponse,
     ]
     """Get user groups with access to a namespace"""
+
+    GetProjects: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsResponse,
+    ]
+    """Get all projects"""
+
+    GetProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectResponse,
+    ]
+    """Get a project"""
+
+    CreateProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectResponse,
+    ]
+    """Create a new project"""
+
+    UpdateProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectResponse,
+    ]
+    """Update a project"""
+
+    MoveNamespaceToProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectResponse,
+    ]
+    """Move a namespace to a different project within the same account"""
+
+    DeleteProject: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectResponse,
+    ]
+    """Delete a project"""
+
+    SetUserProjectAccess: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessResponse,
+    ]
+    """Set a user's access to a project"""
+
+    SetUserGroupProjectAccess: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessResponse,
+    ]
+    """Set a user group's access to a project"""
+
+    SetServiceAccountProjectAccess: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessResponse,
+    ]
+    """Set a service account's access to a project"""
+
+    GetUserProjectAssignments: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsResponse,
+    ]
+    """Get users with access to a project"""
+
+    GetServiceAccountProjectAssignments: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsResponse,
+    ]
+    """Get service accounts with access to a project"""
+
+    GetUserGroupProjectAssignments: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsResponse,
+    ]
+    """Get user groups with access to a project"""
+
+    GetProjectScopedServiceAccounts: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsRequest,
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsResponse,
+    ]
+    """Get service accounts scoped to a project"""
 
 class CloudServiceServicer(metaclass=abc.ABCMeta):
     """WARNING: This service is currently experimental and may change in
@@ -1352,6 +1580,19 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         """Delete a nexus endpoint"""
 
     @abc.abstractmethod
+    def MoveNexusEndpointToProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNexusEndpointToProjectResponse
+        ],
+    ]:
+        """Move a nexus endpoint to a different project within the same account"""
+
+    @abc.abstractmethod
     def GetUserGroups(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupsRequest,
@@ -1666,6 +1907,71 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
+    def CreateCallerRateLimit(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateCallerRateLimitResponse
+        ],
+    ]:
+        """Create a caller rate limit"""
+
+    @abc.abstractmethod
+    def GetCallerRateLimit(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitResponse
+        ],
+    ]:
+        """Get a caller rate limit"""
+
+    @abc.abstractmethod
+    def GetCallerRateLimits(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetCallerRateLimitsResponse
+        ],
+    ]:
+        """Get caller rate limits"""
+
+    @abc.abstractmethod
+    def UpdateCallerRateLimit(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateCallerRateLimitResponse
+        ],
+    ]:
+        """Update a caller rate limit"""
+
+    @abc.abstractmethod
+    def DeleteCallerRateLimit(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteCallerRateLimitResponse
+        ],
+    ]:
+        """Delete a caller rate limit"""
+
+    @abc.abstractmethod
     def UpdateNamespaceTags(
         self,
         request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateNamespaceTagsRequest,
@@ -1965,6 +2271,175 @@ class CloudServiceServicer(metaclass=abc.ABCMeta):
         ],
     ]:
         """Get user groups with access to a namespace"""
+
+    @abc.abstractmethod
+    def GetProjects(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectsResponse
+        ],
+    ]:
+        """Get all projects"""
+
+    @abc.abstractmethod
+    def GetProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectResponse
+        ],
+    ]:
+        """Get a project"""
+
+    @abc.abstractmethod
+    def CreateProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.CreateProjectResponse
+        ],
+    ]:
+        """Create a new project"""
+
+    @abc.abstractmethod
+    def UpdateProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.UpdateProjectResponse
+        ],
+    ]:
+        """Update a project"""
+
+    @abc.abstractmethod
+    def MoveNamespaceToProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.MoveNamespaceToProjectResponse
+        ],
+    ]:
+        """Move a namespace to a different project within the same account"""
+
+    @abc.abstractmethod
+    def DeleteProject(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.DeleteProjectResponse
+        ],
+    ]:
+        """Delete a project"""
+
+    @abc.abstractmethod
+    def SetUserProjectAccess(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserProjectAccessResponse
+        ],
+    ]:
+        """Set a user's access to a project"""
+
+    @abc.abstractmethod
+    def SetUserGroupProjectAccess(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetUserGroupProjectAccessResponse
+        ],
+    ]:
+        """Set a user group's access to a project"""
+
+    @abc.abstractmethod
+    def SetServiceAccountProjectAccess(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.SetServiceAccountProjectAccessResponse
+        ],
+    ]:
+        """Set a service account's access to a project"""
+
+    @abc.abstractmethod
+    def GetUserProjectAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserProjectAssignmentsResponse
+        ],
+    ]:
+        """Get users with access to a project"""
+
+    @abc.abstractmethod
+    def GetServiceAccountProjectAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetServiceAccountProjectAssignmentsResponse
+        ],
+    ]:
+        """Get service accounts with access to a project"""
+
+    @abc.abstractmethod
+    def GetUserGroupProjectAssignments(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetUserGroupProjectAssignmentsResponse
+        ],
+    ]:
+        """Get user groups with access to a project"""
+
+    @abc.abstractmethod
+    def GetProjectScopedServiceAccounts(
+        self,
+        request: temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsResponse,
+        collections.abc.Awaitable[
+            temporalio.api.cloud.cloudservice.v1.request_response_pb2.GetProjectScopedServiceAccountsResponse
+        ],
+    ]:
+        """Get service accounts scoped to a project"""
 
 def add_CloudServiceServicer_to_server(
     servicer: CloudServiceServicer, server: typing.Union[grpc.Server, grpc.aio.Server]

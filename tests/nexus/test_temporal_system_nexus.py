@@ -142,7 +142,7 @@ class _TrackingFailureConverter(temporalio.converter.DefaultFailureConverter):
 @workflow.defn
 class ExternalHandleSignalWithStartWorkflowCaller:
     @workflow.run
-    async def run(self, task_queue: str) -> str:
+    async def run(self, task_queue: str | None) -> str:
         started_handle = await workflow.signal_with_start_workflow(
             "test-workflow",
             "workflow-input",
@@ -164,6 +164,7 @@ def test_signal_with_start_serialization_context() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
     )
     operation_info = workflow_service.__nexus_operation_registry__[
         (
@@ -460,12 +461,11 @@ class _TracingWorkflowOutboundInterceptor(WorkflowOutboundInterceptor):
         )
         return await super().start_signal_with_start_workflow(request)
 
-    async def start_system_nexus_operation(
+    async def start_nexus_operation(
         self,
         input: StartNexusOperationInput[Any, Any],
     ) -> workflow.NexusOperationHandle[Any]:
-        interceptor_traces.append(("workflow.start_system_nexus_operation", input))
-        return await super().start_system_nexus_operation(input)
+        raise AssertionError("System Nexus must not enter ordinary Nexus interception")
 
 
 def _assert_stored_payloads_include(
@@ -480,20 +480,16 @@ def _assert_stored_payloads_include(
     assert expected_payload_data.issubset(stored_payload_data)
 
 
-def _assert_signal_with_start_workflow_interceptor_trace() -> None:
-    assert len(interceptor_traces) == 2
+def _assert_signal_with_start_workflow_interceptor_trace(task_queue: str) -> None:
+    assert len(interceptor_traces) == 1
     trace_name, trace_value = interceptor_traces.pop(0)
     assert trace_name == "workflow.start_signal_with_start_workflow"
     request = cast(workflow_service_models.SignalWithStartWorkflowRequest, trace_value)
     assert request.id == "system-nexus-workflow-id"
     assert request.signal == "test-signal"
     assert request.workflow == "test-workflow"
+    assert request.task_queue == task_queue
     assert request.headers == {"interceptor-header": "value"}
-    trace_name, trace_value = interceptor_traces.pop()
-    assert trace_name == "workflow.start_system_nexus_operation"
-    system_input = cast(StartNexusOperationInput[Any, Any], trace_value)
-    assert system_input.input is request
-    assert system_input.headers is None
 
 
 class _MarkingPayloadVisitor(VisitorFunctions):
@@ -578,6 +574,7 @@ async def test_nexus_payload_serializer_decodes_system_input(
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
         headers={"test-header": "header-value"},
         versioning_override=versioning_override,
     )
@@ -614,6 +611,7 @@ async def test_nexus_payload_serializer_codec_skips_outer_envelope() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
     )
     payload = nexus_system._get_payload_converter(
         data_converter.payload_converter,
@@ -1066,8 +1064,10 @@ async def test_system_nexus_storage_routes_concurrent_destinations(
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.
 @pytest.mark.requires_local_server
+@pytest.mark.parametrize("use_default_task_queue", [False, True])
 async def test_external_workflow_handle_signal_with_start_workflow_uses_system_nexus(
     env: WorkflowEnvironment,
+    use_default_task_queue: bool,
 ):
     if env.supports_time_skipping_v1:
         pytest.skip("Nexus tests don't work with the Java test server")
@@ -1099,7 +1099,7 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
     async with caller_worker:
         result = await caller_client.execute_workflow(
             ExternalHandleSignalWithStartWorkflowCaller.run,
-            args=[handler_task_queue],
+            args=[None if use_default_task_queue else handler_task_queue],
             id=str(uuid.uuid4()),
             task_queue=caller_task_queue,
             execution_timeout=timedelta(seconds=5),
@@ -1117,7 +1117,9 @@ async def test_external_workflow_handle_signal_with_start_workflow_uses_system_n
             b'"details-value"',
         },
     )
-    _assert_signal_with_start_workflow_interceptor_trace()
+    _assert_signal_with_start_workflow_interceptor_trace(
+        caller_task_queue if use_default_task_queue else handler_task_queue
+    )
 
 
 # Cloud namespaces created by CI do not have the System Nexus dynamic config.

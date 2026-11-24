@@ -28,7 +28,6 @@ from collections.abc import (
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import IntEnum
 from typing import (
     Any,
     Generic,
@@ -66,6 +65,11 @@ from temporalio.nexus.system.workflow_service._system_nexus_interceptor import (
 )
 from temporalio.service import __version__
 
+from .._workflow_context import (
+    _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS,
+    _workflow_flag_scope,
+    _WorkflowLogicFlag,
+)
 from ..api.failure.v1.message_pb2 import Failure
 from ..workflow._event_groups import (
     _capture_event_group_markers,
@@ -477,6 +481,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
     def activate(
         self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
     ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
+        with _workflow_flag_scope(runtime=self):
+            return self._activate(act)
+
+    def _activate(
+        self, act: temporalio.bridge.proto.workflow_activation.WorkflowActivation
+    ) -> temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion:
         # Reset current completion, time, and whether replaying
         self._current_completion = (
             temporalio.bridge.proto.workflow_completion.WorkflowActivationCompletion()
@@ -503,6 +513,9 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         self._single_batch_activation = self._workflow_logic_flag_enabled(
             _WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH
         )
+        # Check this flag before queries can arrive,
+        # even when no input needs decoding.
+        self._workflow_logic_flag_enabled(_WorkflowLogicFlag.DECODE_DATETIME_PROXIES)
         activation_err: Exception | None = None
         try:
             # Split into job sets with patches, then signals + updates, then
@@ -2353,16 +2366,6 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         )
         return handle
 
-    async def _intercept_system_nexus_operation(
-        self, input: StartNexusOperationInput[Any, OutputT]
-    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        return await self._outbound.start_system_nexus_operation(input)
-
-    async def _schedule_system_nexus_operation(
-        self, input: StartNexusOperationInput[Any, OutputT]
-    ) -> _NexusOperationHandle[OutputT]:
-        return await self._outbound_start_nexus_operation(input)
-
     #### Miscellaneous helpers ####
     # These are in alphabetical order.
 
@@ -3430,15 +3433,10 @@ class _WorkflowOutboundImpl(
     ) -> _NexusOperationHandle[OutputT]:
         return await self._instance._outbound_start_nexus_operation(input)
 
-    async def _intercept_system_nexus_operation(
-        self, input: StartNexusOperationInput[InputT, OutputT]
-    ) -> temporalio.workflow.NexusOperationHandle[OutputT]:
-        return await self._instance._intercept_system_nexus_operation(input)
-
-    async def start_system_nexus_operation(
+    async def _schedule_system_nexus_operation(
         self, input: StartNexusOperationInput[Any, OutputT]
     ) -> _NexusOperationHandle[OutputT]:
-        return await self._instance._schedule_system_nexus_operation(input)
+        return await self._instance._outbound_start_nexus_operation(input)
 
     def start_local_activity(
         self, input: StartLocalActivityInput
@@ -4277,13 +4275,3 @@ finishes, then you can disable this warning via the signal handler decorator:
             [{"name": name, "count": count} for name, count in names.most_common()]
         )
     )
-
-
-class _WorkflowLogicFlag(IntEnum):
-    """Flags that may be set on task/activation completion to differentiate new from old workflow behavior."""
-
-    RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
-    PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
-
-
-_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()

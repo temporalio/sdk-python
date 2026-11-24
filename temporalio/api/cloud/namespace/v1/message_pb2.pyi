@@ -639,6 +639,108 @@ class FairnessSpec(google.protobuf.message.Message):
 global___FairnessSpec = FairnessSpec
 
 @typing.final
+class EncryptionValidationSpec(google.protobuf.message.Message):
+    """temporal:versioning:min_version=v0.23.0"""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _EncryptionValidationMode:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _EncryptionValidationModeEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            EncryptionValidationSpec._EncryptionValidationMode.ValueType
+        ],
+        builtins.type,
+    ):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        ENCRYPTION_VALIDATION_MODE_UNSPECIFIED: (
+            EncryptionValidationSpec._EncryptionValidationMode.ValueType
+        )  # 0
+        ENCRYPTION_VALIDATION_MODE_DISABLED: (
+            EncryptionValidationSpec._EncryptionValidationMode.ValueType
+        )  # 1
+        """Disables encryption validation."""
+        ENCRYPTION_VALIDATION_MODE_WARN: (
+            EncryptionValidationSpec._EncryptionValidationMode.ValueType
+        )  # 2
+        """Allows requests with unencrypted payloads, but emits warning metrics when validation fails."""
+        ENCRYPTION_VALIDATION_MODE_DENY: (
+            EncryptionValidationSpec._EncryptionValidationMode.ValueType
+        )  # 3
+        """Rejects requests with unencrypted payloads when validation fails."""
+
+    class EncryptionValidationMode(
+        _EncryptionValidationMode, metaclass=_EncryptionValidationModeEnumTypeWrapper
+    ): ...
+    ENCRYPTION_VALIDATION_MODE_UNSPECIFIED: (
+        EncryptionValidationSpec.EncryptionValidationMode.ValueType
+    )  # 0
+    ENCRYPTION_VALIDATION_MODE_DISABLED: (
+        EncryptionValidationSpec.EncryptionValidationMode.ValueType
+    )  # 1
+    """Disables encryption validation."""
+    ENCRYPTION_VALIDATION_MODE_WARN: (
+        EncryptionValidationSpec.EncryptionValidationMode.ValueType
+    )  # 2
+    """Allows requests with unencrypted payloads, but emits warning metrics when validation fails."""
+    ENCRYPTION_VALIDATION_MODE_DENY: (
+        EncryptionValidationSpec.EncryptionValidationMode.ValueType
+    )  # 3
+    """Rejects requests with unencrypted payloads when validation fails."""
+
+    MODE_FIELD_NUMBER: builtins.int
+    METADATA_KEY_FIELD_NUMBER: builtins.int
+    METADATA_VALUES_FIELD_NUMBER: builtins.int
+    INSPECT_HEADER_FIELD_NUMBER: builtins.int
+    INSPECT_FAILURE_FIELD_NUMBER: builtins.int
+    mode: global___EncryptionValidationSpec.EncryptionValidationMode.ValueType
+    """The payload encryption validation mode for this namespace."""
+    metadata_key: builtins.str
+    """(Optional) The payload metadata key used to identify encrypted payloads.
+    Default value is "encoding" if omitted.
+    """
+    inspect_header: builtins.bool
+    """Whether workflow headers should be inspected for encryption validation."""
+    inspect_failure: builtins.bool
+    """Whether to inspect the message and stack_trace fields for Failure messages."""
+    @property
+    def metadata_values(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """(Optional) The payload metadata values used to identify encrypted payloads.
+        Default value is ["binary/encrypted"] if omitted.
+        """
+
+    def __init__(
+        self,
+        *,
+        mode: global___EncryptionValidationSpec.EncryptionValidationMode.ValueType = ...,
+        metadata_key: builtins.str = ...,
+        metadata_values: collections.abc.Iterable[builtins.str] | None = ...,
+        inspect_header: builtins.bool = ...,
+        inspect_failure: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "inspect_failure",
+            b"inspect_failure",
+            "inspect_header",
+            b"inspect_header",
+            "metadata_key",
+            b"metadata_key",
+            "metadata_values",
+            b"metadata_values",
+            "mode",
+            b"mode",
+        ],
+    ) -> None: ...
+
+global___EncryptionValidationSpec = EncryptionValidationSpec
+
+@typing.final
 class NamespaceSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -730,6 +832,8 @@ class NamespaceSpec(google.protobuf.message.Message):
     CAPACITY_SPEC_FIELD_NUMBER: builtins.int
     REPLICAS_FIELD_NUMBER: builtins.int
     FAIRNESS_FIELD_NUMBER: builtins.int
+    ENCRYPTION_VALIDATION_FIELD_NUMBER: builtins.int
+    DESCRIPTION_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name to use for the namespace.
     This will create a namespace that's available at '<name>.<account>.tmprl.cloud:7233'.
@@ -739,6 +843,12 @@ class NamespaceSpec(google.protobuf.message.Message):
     """The number of days the workflows data will be retained for.
     Changes to the retention period may impact your storage costs.
     Any changes to the retention period will be applied to all new running workflows.
+    """
+    description: builtins.str
+    """The description is a human-readable description of the namespace purpose.
+    Must be at most 255 printable ASCII characters plus whitespace.
+    Optional, default is empty.
+    temporal:versioning:min_version=v0.21.0
     """
     @property
     def regions(
@@ -855,6 +965,13 @@ class NamespaceSpec(google.protobuf.message.Message):
         temporal:versioning:min_version=v0.14.0
         """
 
+    @property
+    def encryption_validation(self) -> global___EncryptionValidationSpec:
+        """The payload encryption validation configuration for the namespace.
+        If unspecified, payload encryption validation will be disabled.
+        temporal:versioning:min_version=v0.23.0
+        """
+
     def __init__(
         self,
         *,
@@ -876,6 +993,8 @@ class NamespaceSpec(google.protobuf.message.Message):
         capacity_spec: global___CapacitySpec | None = ...,
         replicas: collections.abc.Iterable[global___ReplicaSpec] | None = ...,
         fairness: global___FairnessSpec | None = ...,
+        encryption_validation: global___EncryptionValidationSpec | None = ...,
+        description: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -886,6 +1005,8 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"capacity_spec",
             "codec_server",
             b"codec_server",
+            "encryption_validation",
+            b"encryption_validation",
             "fairness",
             b"fairness",
             "high_availability",
@@ -909,6 +1030,10 @@ class NamespaceSpec(google.protobuf.message.Message):
             b"connectivity_rule_ids",
             "custom_search_attributes",
             b"custom_search_attributes",
+            "description",
+            b"description",
+            "encryption_validation",
+            b"encryption_validation",
             "fairness",
             b"fairness",
             "high_availability",
@@ -1118,6 +1243,7 @@ class Namespace(google.protobuf.message.Message):
     TAGS_FIELD_NUMBER: builtins.int
     CAPACITY_FIELD_NUMBER: builtins.int
     REPLICAS_FIELD_NUMBER: builtins.int
+    PROJECT_ID_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """The namespace identifier."""
     resource_version: builtins.str
@@ -1139,6 +1265,8 @@ class Namespace(google.protobuf.message.Message):
     """The id of the async operation that is creating/updating/deleting the namespace, if any."""
     active_region: builtins.str
     """The currently active region for the namespace."""
+    project_id: builtins.str
+    """The id of the project this namespace belongs to."""
     @property
     def spec(self) -> global___NamespaceSpec:
         """The namespace specification."""
@@ -1236,6 +1364,7 @@ class Namespace(google.protobuf.message.Message):
         tags: collections.abc.Mapping[builtins.str, builtins.str] | None = ...,
         capacity: global___Capacity | None = ...,
         replicas: collections.abc.Iterable[global___Replica] | None = ...,
+        project_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -1277,6 +1406,8 @@ class Namespace(google.protobuf.message.Message):
             b"namespace",
             "private_connectivities",
             b"private_connectivities",
+            "project_id",
+            b"project_id",
             "region_status",
             b"region_status",
             "replicas",
@@ -1295,6 +1426,197 @@ class Namespace(google.protobuf.message.Message):
     ) -> None: ...
 
 global___Namespace = Namespace
+
+@typing.final
+class CallerRateLimit(google.protobuf.message.Message):
+    """The caller rate limit resource.
+    A caller rate limit sets a request per second limit for a caller making requests to a target namespace.
+    The 'target namespace' is the namespace being protected.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    SPEC_FIELD_NUMBER: builtins.int
+    STATE_FIELD_NUMBER: builtins.int
+    ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
+    CREATED_TIME_FIELD_NUMBER: builtins.int
+    LAST_MODIFIED_TIME_FIELD_NUMBER: builtins.int
+    NAMESPACE_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The id of the caller rate limit. This is generated by the server and is immutable."""
+    resource_version: builtins.str
+    """The current version of the caller rate limit specification.
+    The next update or delete operations must include this version.
+    """
+    state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
+    """The current state of the caller rate limit."""
+    async_operation_id: builtins.str
+    """The id of any ongoing operation that is creating, updating, or deleting the caller rate limit."""
+    namespace: builtins.str
+    """The target namespace. This is immutable."""
+    @property
+    def spec(self) -> global___CallerRateLimitSpec:
+        """The caller rate limit specification."""
+
+    @property
+    def created_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The date and time when the caller rate limit was created."""
+
+    @property
+    def last_modified_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
+        """The date and time when the caller rate limit was last modified."""
+
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        resource_version: builtins.str = ...,
+        spec: global___CallerRateLimitSpec | None = ...,
+        state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
+        async_operation_id: builtins.str = ...,
+        created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        namespace: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "created_time",
+            b"created_time",
+            "last_modified_time",
+            b"last_modified_time",
+            "spec",
+            b"spec",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "async_operation_id",
+            b"async_operation_id",
+            "created_time",
+            b"created_time",
+            "id",
+            b"id",
+            "last_modified_time",
+            b"last_modified_time",
+            "namespace",
+            b"namespace",
+            "resource_version",
+            b"resource_version",
+            "spec",
+            b"spec",
+            "state",
+            b"state",
+        ],
+    ) -> None: ...
+
+global___CallerRateLimit = CallerRateLimit
+
+@typing.final
+class CallerRateLimitSpec(google.protobuf.message.Message):
+    """The specification for a caller rate limit."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_DEFAULT_FIELD_NUMBER: builtins.int
+    NAMESPACE_LIMIT_FIELD_NUMBER: builtins.int
+    @property
+    def namespace_default(self) -> global___NamespaceDefaultCallerRateLimit:
+        """The default rate limit for namespace callers that do not match a specific rule.
+        The target namespace can have at most one namespace default limit.
+        A default rate limit is not required, and unmatched namespaces will not have a caller rate limit.
+        """
+
+    @property
+    def namespace_limit(self) -> global___NamespaceCallerRateLimit:
+        """A rate limit rule that matches a specific caller namespace.
+        The target namespace can have at most one matching rule for each caller namespace.
+        """
+
+    def __init__(
+        self,
+        *,
+        namespace_default: global___NamespaceDefaultCallerRateLimit | None = ...,
+        namespace_limit: global___NamespaceCallerRateLimit | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "namespace_default",
+            b"namespace_default",
+            "namespace_limit",
+            b"namespace_limit",
+            "rule",
+            b"rule",
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "namespace_default",
+            b"namespace_default",
+            "namespace_limit",
+            b"namespace_limit",
+            "rule",
+            b"rule",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing.Literal["rule", b"rule"]
+    ) -> typing.Literal["namespace_default", "namespace_limit"] | None: ...
+
+global___CallerRateLimitSpec = CallerRateLimitSpec
+
+@typing.final
+class NamespaceCallerRateLimit(google.protobuf.message.Message):
+    """The limit for a specific calling namespace."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    NAMESPACE_ID_FIELD_NUMBER: builtins.int
+    RPS_FIELD_NUMBER: builtins.int
+    namespace_id: builtins.str
+    """The calling namespace to match exactly.
+    Required. Immutable.
+    """
+    rps: builtins.float
+    """The number of requests per second that are allowed.
+    Must be non-negative and finite. A value of 0 denies all traffic from this caller.
+    """
+    def __init__(
+        self,
+        *,
+        namespace_id: builtins.str = ...,
+        rps: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["namespace_id", b"namespace_id", "rps", b"rps"]
+    ) -> None: ...
+
+global___NamespaceCallerRateLimit = NamespaceCallerRateLimit
+
+@typing.final
+class NamespaceDefaultCallerRateLimit(google.protobuf.message.Message):
+    """The default limit for calling namespaces."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RPS_FIELD_NUMBER: builtins.int
+    rps: builtins.float
+    """The number of requests per second that are allowed.
+    Must be non-negative and finite. A value of 0 denies all traffic.
+    """
+    def __init__(
+        self,
+        *,
+        rps: builtins.float = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["rps", b"rps"]) -> None: ...
+
+global___NamespaceDefaultCallerRateLimit = NamespaceDefaultCallerRateLimit
 
 @typing.final
 class NamespaceRegionStatus(google.protobuf.message.Message):
@@ -1378,10 +1700,32 @@ global___NamespaceRegionStatus = NamespaceRegionStatus
 class ExportSinkSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
+    @typing.final
+    class SinkFilter(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        DISABLE_STANDALONE_ACTIVITY_EXPORT_FIELD_NUMBER: builtins.int
+        disable_standalone_activity_export: builtins.bool
+        """Whether to disable export of standalone activity events."""
+        def __init__(
+            self,
+            *,
+            disable_standalone_activity_export: builtins.bool = ...,
+        ) -> None: ...
+        def ClearField(
+            self,
+            field_name: typing.Literal[
+                "disable_standalone_activity_export",
+                b"disable_standalone_activity_export",
+            ],
+        ) -> None: ...
+
     NAME_FIELD_NUMBER: builtins.int
     ENABLED_FIELD_NUMBER: builtins.int
     S3_FIELD_NUMBER: builtins.int
     GCS_FIELD_NUMBER: builtins.int
+    AZURE_BLOB_FIELD_NUMBER: builtins.int
+    FILTER_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The unique name of the export sink, it can't be changed once set."""
     enabled: builtins.bool
@@ -1392,8 +1736,18 @@ class ExportSinkSpec(google.protobuf.message.Message):
 
     @property
     def gcs(self) -> temporalio.api.cloud.sink.v1.message_pb2.GCSSpec:
-        """This is a feature under development. We will allow GCS sink support for GCP Namespaces.
-        The GCS configuration details when destination_type is GCS.
+        """The GCS configuration details when destination_type is GCS."""
+
+    @property
+    def azure_blob(self) -> temporalio.api.cloud.sink.v1.message_pb2.AzureBlobSpec:
+        """The Azure Blob configuration details when destination_type is Azure Blob.
+        temporal:versioning:min_version=v0.19.1
+        """
+
+    @property
+    def filter(self) -> global___ExportSinkSpec.SinkFilter:
+        """The filter configuration for controlling which events are exported.
+        temporal:versioning:min_version=v0.25.0
         """
 
     def __init__(
@@ -1403,14 +1757,30 @@ class ExportSinkSpec(google.protobuf.message.Message):
         enabled: builtins.bool = ...,
         s3: temporalio.api.cloud.sink.v1.message_pb2.S3Spec | None = ...,
         gcs: temporalio.api.cloud.sink.v1.message_pb2.GCSSpec | None = ...,
+        azure_blob: temporalio.api.cloud.sink.v1.message_pb2.AzureBlobSpec | None = ...,
+        filter: global___ExportSinkSpec.SinkFilter | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["gcs", b"gcs", "s3", b"s3"]
+        self,
+        field_name: typing.Literal[
+            "azure_blob", b"azure_blob", "filter", b"filter", "gcs", b"gcs", "s3", b"s3"
+        ],
     ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing.Literal[
-            "enabled", b"enabled", "gcs", b"gcs", "name", b"name", "s3", b"s3"
+            "azure_blob",
+            b"azure_blob",
+            "enabled",
+            b"enabled",
+            "filter",
+            b"filter",
+            "gcs",
+            b"gcs",
+            "name",
+            b"name",
+            "s3",
+            b"s3",
         ],
     ) -> None: ...
 
@@ -1670,9 +2040,7 @@ class NamespaceCapacityInfo(google.protobuf.message.Message):
     namespace: builtins.str
     """The namespace identifier."""
     has_legacy_limits: builtins.bool
-    """Whether the namespace's APS limit was set by Temporal Support.
-    When true, adjusting the namespace's capacity will reset this limit.
-    """
+    """Whether the namespace's APS limit was set by Temporal Support."""
     @property
     def current_capacity(self) -> global___Capacity:
         """The current capacity of the namespace.

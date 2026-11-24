@@ -30,6 +30,7 @@ from temporalio.common import (
     WorkerDeploymentVersion,
 )
 
+from .._workflow_context import _WorkflowLogicFlag
 from ._activity import SharedStateManager, _ActivityWorker
 from ._interceptor import Interceptor
 from ._nexus import _NexusWorker
@@ -43,7 +44,6 @@ from ._workflow_instance import (
     PatchActivationInput,
     UnsandboxedWorkflowRunner,
     WorkflowRunner,
-    _WorkflowLogicFlag,
 )
 from .workflow_sandbox import SandboxedWorkflowRunner
 

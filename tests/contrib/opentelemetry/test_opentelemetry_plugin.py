@@ -14,8 +14,8 @@ from opentelemetry.trace import (
     get_tracer,
 )
 
+import temporalio._workflow_context
 import temporalio.contrib.opentelemetry.workflow
-import temporalio.worker._workflow_instance
 from temporalio import activity, nexus, workflow
 from temporalio.api.common.v1 import WorkflowExecution
 from temporalio.api.enums.v1 import EventType, ResetReapplyType
@@ -846,7 +846,7 @@ async def test_otel_tracing_reset_reapplied_update_span_id(
         max_cached_workflows=0,
     )
     worker._set_default_workflow_logic_flag(
-        temporalio.worker._workflow_instance._WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH,
+        temporalio._workflow_context._WorkflowLogicFlag.PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH,
         enabled=True,
     )
     async with worker:

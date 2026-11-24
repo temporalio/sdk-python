@@ -378,7 +378,8 @@ class WorkflowExecutionExtendedInfo(google.protobuf.message.Message):
     def time_skipping_info(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingInfo:
-        """Information about time skipping of the workflow execution.
+        """Experimental.
+        Information about time skipping of the workflow execution.
         If the execution has never enabled time skipping, it will be nil.
         """
 
@@ -1996,7 +1997,8 @@ class WorkflowExecutionOptions(google.protobuf.message.Message):
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """The time-skipping configuration for this workflow execution.
+        """Experimental.
+        The time-skipping configuration for this workflow execution.
         When `fast_forward` is set, time will be fast-forwarded to a future point relative
         to the current workflow timestamp. Each call takes effect, even if
         `fast_forward` is set to the same duration, since the target time is recalculated
