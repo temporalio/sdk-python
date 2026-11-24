@@ -93,7 +93,7 @@ class _Writer:
     """A generated Producer, with what a Store tells Producers and attempts apart by."""
 
     producer: Producer
-    ids: tuple[str, ...]
+    ids: tuple[str | int, ...]
     """The kind and each id of the Producer."""
     rank: int
     """The place of the attempt among the attempts of the Producer."""
@@ -104,14 +104,20 @@ def _writer(rng: random.Random, same: _Writer | None = None) -> _Writer:
     producer = Producer()
     if same:
         producer.CopyFrom(same.producer)
-    name = same.ids[0] if same else rng.choice(list(Producer.DESCRIPTOR.fields_by_name))
+    name = (
+        str(same.ids[0])
+        if same
+        else rng.choice(list(Producer.DESCRIPTOR.fields_by_name))
+    )
     kind = getattr(producer, name)
     kind.SetInParent()
-    ids = [name]
+    ids: list[str | int] = [name]
     for id_field in kind.DESCRIPTOR.fields:
-        if id_field.type == id_field.TYPE_STRING:
+        # A number id, such as the scheduled event id of an Activity, can be zero.
+        values = {id_field.TYPE_STRING: "aab", id_field.TYPE_INT64: [0, 0, 5]}
+        if id_field.type in values:
             if not same:
-                setattr(kind, id_field.name, rng.choice("aab"))
+                setattr(kind, id_field.name, rng.choice(values[id_field.type]))
             ids.append(getattr(kind, id_field.name))
     rank = 0
     if attempt := kind.DESCRIPTOR.fields_by_name.get("attempt"):

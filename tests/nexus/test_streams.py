@@ -463,6 +463,8 @@ class _WriterInfo:
     time: datetime
     """The scheduled time of an Activity attempt, or the started time of a task."""
     event_id: int
+    """The started event id of the task of a Local Activity, or the scheduled event id
+    of an Activity of a Workflow, which is zero when SDK Core couldn't read it."""
 
 
 def _writer_info(rng: random.Random) -> _WriterInfo:
@@ -470,15 +472,18 @@ def _writer_info(rng: random.Random) -> _WriterInfo:
         return "".join(rng.choice("ab:/ '\"é") for _ in range(rng.randrange(1, 5)))
 
     kinds = ["workflow", "local_activity", "workflow_activity", "standalone_activity"]
+    kind = rng.choice(kinds)
     return _WriterInfo(
-        kind=rng.choice(kinds),
+        kind=kind,
         namespace=text(),
         workflow_id=text(),
         run_id=text(),
         activity_id=text(),
         attempt=rng.randrange(1, 9),
         time=datetime.fromtimestamp(rng.randrange(10**9), timezone.utc),
-        event_id=rng.randrange(3, 99),
+        event_id=rng.choice([0, rng.randrange(3, 99)])
+        if kind == "workflow_activity"
+        else rng.randrange(3, 99),
     )
 
 
@@ -509,6 +514,9 @@ def _default_producer(writer: _WriterInfo) -> Any:
         )
         if writer.kind == "local_activity"
         else None,
+        _scheduled_event_id=writer.event_id
+        if writer.kind == "workflow_activity"
+        else 0,
     )
     producer = activity.run(current_producer)
     # The default of a write in an Activity is that Producer, and it reads no client.
@@ -535,6 +543,8 @@ def _expected_producer(writer: _WriterInfo) -> Producer:
         task.started_time.CopyFrom(time)
     else:
         kind.attempt.attempt_scheduled_time.CopyFrom(time)
+    if writer.kind == "workflow_activity":
+        kind.scheduled_event_id = writer.event_id
     return producer
 
 

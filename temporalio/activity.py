@@ -181,6 +181,11 @@ class Info:
         This API is experimental and unstable.
     """
 
+    _scheduled_event_id: int = 0
+    """ID of the ``ActivityTaskScheduled`` event of an Activity that a Workflow scheduled, for
+    the Producer of its Stream writes. 0 for other Activities, and when SDK Core couldn't read
+    it from the task token."""
+
     @property
     def in_workflow(self) -> bool:
         """Was this activity started by a workflow?"""
