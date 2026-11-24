@@ -18,8 +18,11 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class StreamRef(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A reference to one Stream, which code passes to other code as data. Only an SDK uses this
-    message. A request to a Store or to the server has the `id` alone.
+    A reference to one Stream, which code passes to other code as data. Callers treat the `id` as
+    opaque. An id is never used for a second Stream while the Store remembers the first one, so a
+    create for a closed or expired Stream fails. A Store can forget an expired Stream after a time
+    of its choice, and a create for its id succeeds after that. Every SDK encodes a ref in a
+    Payload with this message, so a ref that one SDK writes decodes in another.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -30,7 +33,8 @@ class StreamRef(google.protobuf.message.Message):
     store: builtins.str
     """The name under which the client and Worker config registered the Store of this Stream. An
     SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
-    the Store from its config.
+    the Store from its config. Only an SDK sets and reads this field. The server and a Store
+    ignore it.
     """
     def __init__(
         self,
@@ -240,7 +244,10 @@ class LocalActivityProducer(google.protobuf.message.Message):
     run_id: builtins.str
     """Required."""
     activity_id: builtins.str
-    """Required."""
+    """Required. The id that the SDK gives the call, because a Local Activity has no scheduled
+    event. Two Local Activities of one run must not share it, or the Store takes them as one
+    Producer. Each SDK makes it from a counter of its own, unless the user sets it.
+    """
     @property
     def attempt(self) -> global___LocalActivityAttempt:
         """Required."""
@@ -287,6 +294,7 @@ class WorkflowActivityProducer(google.protobuf.message.Message):
     WORKFLOW_ID_FIELD_NUMBER: builtins.int
     RUN_ID_FIELD_NUMBER: builtins.int
     ACTIVITY_ID_FIELD_NUMBER: builtins.int
+    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
     ATTEMPT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     """Required. The namespace of the Workflow that scheduled the Activity."""
@@ -295,8 +303,11 @@ class WorkflowActivityProducer(google.protobuf.message.Message):
     run_id: builtins.str
     """Required."""
     activity_id: builtins.str
-    """Required. A run can use an Activity id again after the first Activity ended. The second
-    Activity is then a later attempt of the same Producer.
+    """Required."""
+    scheduled_event_id: builtins.int
+    """The id of the `ActivityTaskScheduled` event of the Activity in the History of its run. A run
+    can use an Activity id again after the first Activity ended, and this id separates the two
+    Activities, so they are separate Producers. It's zero when the SDK doesn't have it.
     """
     @property
     def attempt(self) -> global___ActivityAttempt:
@@ -309,6 +320,7 @@ class WorkflowActivityProducer(google.protobuf.message.Message):
         workflow_id: builtins.str = ...,
         run_id: builtins.str = ...,
         activity_id: builtins.str = ...,
+        scheduled_event_id: builtins.int = ...,
         attempt: global___ActivityAttempt | None = ...,
     ) -> None: ...
     def HasField(
@@ -325,6 +337,8 @@ class WorkflowActivityProducer(google.protobuf.message.Message):
             b"namespace",
             "run_id",
             b"run_id",
+            "scheduled_event_id",
+            b"scheduled_event_id",
             "workflow_id",
             b"workflow_id",
         ],
