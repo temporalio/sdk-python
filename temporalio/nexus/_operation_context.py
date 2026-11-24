@@ -30,6 +30,7 @@ from nexusrpc.handler import (
     OperationTaskCancellation,
     StartOperationContext,
 )
+from typing_extensions import override
 
 import temporalio.api.common.v1
 import temporalio.api.nexus.v1
@@ -114,25 +115,27 @@ _temporal_operation_signal_slot: ContextVar[_SignalSlot | None] = ContextVar(
 )
 
 
-class OperationCancellationToken:
-    """Observe cancellation of the current Nexus handler invocation.
+class OperationTaskCancellationToken(OperationTaskCancellation):
+    """Read-only cancellation signal for the current Nexus handler task.
 
-    A request to cancel the Nexus operation itself is delivered separately to the
-    handler's cancel method. Get this token from :py:attr:`Info.cancellation_token`.
+    Get this token from :py:attr:`Info.cancellation_token`.
     """
 
     def __init__(self, task_cancellation: OperationTaskCancellation) -> None:
         """Initialize the token. Obtain one from the operation info."""
         self.__task_cancellation = task_cancellation
 
+    @override
     def is_cancelled(self) -> bool:
         """Return whether cancellation of the handler invocation was requested."""
         return self.__task_cancellation.is_cancelled()
 
+    @override
     def cancellation_reason(self) -> str | None:
         """Return the reason for cancellation, if available."""
         return self.__task_cancellation.cancellation_reason()
 
+    @override
     async def wait_until_cancelled(self) -> None:
         """Wait for cancellation of this invocation.
 
@@ -141,6 +144,7 @@ class OperationCancellationToken:
         """
         await self.__task_cancellation.wait_until_cancelled()
 
+    @override
     def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
         """Return whether cancellation occurred within the given timeout in seconds."""
         return self.__task_cancellation.wait_until_cancelled_sync(timeout)
@@ -174,8 +178,8 @@ class Info:
     Cancel invocations have no start request ID.
     """
 
-    cancellation_token: OperationCancellationToken
-    """Read-only token for observing cancellation of this handler invocation."""
+    cancellation_token: OperationTaskCancellationToken
+    """Read-only token for observing cancellation of this handler task."""
 
     @classmethod
     def _from_operation_context(
@@ -197,7 +201,9 @@ class Info:
                 if isinstance(context, StartOperationContext)
                 else None
             ),
-            cancellation_token=OperationCancellationToken(context.task_cancellation),
+            cancellation_token=OperationTaskCancellationToken(
+                context.task_cancellation
+            ),
         )
 
 

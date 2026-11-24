@@ -1580,7 +1580,7 @@ async def test_temporal_operation_observes_invocation_timeout(
     if env.supports_time_skipping_v1:
         pytest.skip("Standalone Nexus Operation tests don't work with time skipping")
 
-    observed: asyncio.Future[nexus.OperationCancellationToken] = (
+    observed: asyncio.Future[nexus.OperationTaskCancellationToken] = (
         asyncio.get_running_loop().create_future()
     )
 
@@ -1625,8 +1625,9 @@ async def test_temporal_operation_observes_invocation_timeout(
                 schedule_to_close_timeout=timedelta(seconds=3),
             )
         assert isinstance(exc_info.value.__cause__, temporalio.exceptions.TimeoutError)
-        token: nexus.OperationCancellationToken = await asyncio.wait_for(observed, 5)
+        token = await asyncio.wait_for(observed, 5)
         assert token.cancellation_reason() == "TIMED_OUT"
+        assert isinstance(token, OperationTaskCancellation)
         assert not hasattr(token, "cancel")
 
 
