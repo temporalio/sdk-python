@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from google.protobuf.duration_pb2 import Duration
-from google.protobuf.empty_pb2 import Empty
 from google.protobuf.message import Message
 
 import temporalio.api.common.v1
@@ -65,7 +64,6 @@ from temporalio.bridge.proto.workflow_commands import (
     CompleteWorkflowExecution,
     ReadStream,
     RequestCancelLocalActivity,
-    RequestCancelStreamRead,
     WorkflowCommand,
 )
 from temporalio.bridge.proto.workflow_completion import (
@@ -768,8 +766,6 @@ async def _reads_script(
     assert not completion.successful.commands
 
     reads: dict[int, _OpenRead] = {}
-    # The reader of each read whose cancel job came before its cancel, by seq
-    early: dict[int, int] = {}
     # The offset that each reader is at
     positions: list[int] = []
     outcomes: list[list[Any]] = []
@@ -800,13 +796,8 @@ async def _reads_script(
         )
         commands.append(WorkflowCommand(read_stream=read))
 
-    def cancel(seq: int) -> WorkflowCommand:
-        command = RequestCancelStreamRead(seq=seq)
-        return WorkflowCommand(request_cancel_stream_read=command)
-
     for step in range(rng.randrange(2, 7)):
-        # Each read gets one job, also a cancelled one, whose job has a cancel or the result
-        # that came before it. A replay with legacy chunking gives a cancel job before the cancel.
+        # Each read gets one job, also one whose reader was cancelled.
         jobs: list[ResolveStreamRead] = []
         for seq, read in reads.items():
             if rng.random() >= 0.6:
@@ -830,14 +821,9 @@ async def _reads_script(
             if rng.random() < 0.15:
                 not_found = StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND
                 job = ResolveStreamRead(seq=seq, failed=core_failure(not_found))
-            elif rng.random() < (0.7 if read.cancelled else 0.2 * replaying):
-                job = ResolveStreamRead(seq=seq, cancelled=Empty())
             jobs.append(job)
         rng.shuffle(jobs)
-        waiting = sorted(
-            [read.call for read in reads.values() if not read.cancelled]
-            + list(early.values())
-        )
+        waiting = sorted(read.call for read in reads.values() if not read.cancelled)
         cancels = [call for call in waiting if rng.random() < 0.25]
         starts: list[int] = []
         for _ in range(rng.randrange(3)):
@@ -870,10 +856,6 @@ async def _reads_script(
                 # A cancelled reader no longer waits, so its job is dropped, whatever it is.
                 if read.cancelled:
                     continue
-                # A cancel job doesn't end the wait of a reader. Only its cancel does.
-                if job.HasField("cancelled"):
-                    early[job.seq] = read.call
-                    continue
                 got.append((read.call, job))
                 bodies = [converter.from_payload(r.body) for r in job.page.records]
                 typed = calls[read.call].body_type is int
@@ -884,18 +866,12 @@ async def _reads_script(
                 call_read(call, commands)
             for call in cancels:
                 outcomes[call].append("cancelled")
-                if any(of == call for of, _ in got):
-                    # A cancel wins over a job that came for the reader in this
-                    # activation, and a read that has its job gets no cancel command.
-                    got[:] = [(of, job) for of, job in got if of != call]
-                    continue
-                for seq, read in reads.items():
-                    if read.call == call and not read.cancelled:
+                # A cancel wins over a job that came for the reader in this activation.
+                got[:] = [(of, job) for of, job in got if of != call]
+                # No command cancels a read.
+                for read in reads.values():
+                    if read.call == call:
                         read.cancelled = True
-                        commands.append(cancel(seq))
-                for seq in [seq for seq, of in early.items() if of == call]:
-                    del early[seq]
-                    commands.append(cancel(seq))
 
         for part in (apply_jobs, run_handler) if flags else (run_handler, apply_jobs):
             part()
