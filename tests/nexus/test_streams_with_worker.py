@@ -1212,6 +1212,36 @@ async def test_a_workflow_read_waits_on_a_quiet_stream_across_read_limits(
     assert (await run(client, options)).result == [1, 2]
 
 
+async def test_a_workflow_read_with_no_wait_outlives_the_read_limit(
+    client: Client,
+) -> None:
+    store, hold = FaultStore(), Hold()
+    stream = await stream_client(client, store).create_stream(id="slow", body_type=int)
+    await stream.append(1, 2, 3)
+    store.faults["read_records"].append(hold)
+
+    async def release(handle: Any, _worker: Any) -> None:
+        async def task_completed() -> None:
+            history = await handle.fetch_history()
+            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            assert _events(history, completed)
+
+        # The task completes at its read limit, and the Store still holds the read.
+        await assert_eventually(task_completed)
+        hold.release()
+        await handle.signal(_ReadOnceWorkflow.go_on)
+
+    options = RunOptions(
+        _ReadOnceWorkflow,
+        ["slow"],
+        task_timeout=timedelta(seconds=2),
+        during=release,
+        replay=True,
+    )
+    assert (await run(stream_client(client, store), options)).result == [1, 2, 3]
+    assert not hold.cancelled.is_set()
+
+
 @dataclasses.dataclass
 class _Turn:
     text: str

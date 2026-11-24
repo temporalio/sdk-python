@@ -349,11 +349,12 @@ class Worker:
                 feel the default should be changed.
                 WARNING: This setting is experimental.
             stream_read_time: How long the Stream reads of a Workflow Task can
-                wait, from the start of the task. At that limit, a read with no
-                answer gives a page with no Record. Defaults to half the Workflow
-                Task timeout. The limit is always before the heartbeat of the task,
-                so a read alone never makes the Worker send a heartbeat. Appends
-                and closes have no such limit.
+                wait, from the start of the task. At that limit, a read with a wait
+                gives a page with no Record, and a read with no wait goes on
+                without holding the task until the Store answers. Defaults to half
+                the Workflow Task timeout. The limit is always before the heartbeat
+                of the task, so a read alone never makes the Worker send a
+                heartbeat. Appends and closes have no such limit.
                 WARNING: This setting is experimental.
 
         """
