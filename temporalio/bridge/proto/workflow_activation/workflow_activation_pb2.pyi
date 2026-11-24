@@ -67,11 +67,10 @@ class WorkflowActivation(google.protobuf.message.Message):
      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
      normally would have when executing.
-    * The results of Stream calls go after the local activity resolutions, since a replay scans
-     ahead for their marker too. The appends come first, then the closes, and then the reads, each
-     kind by `seq`. A replay that gives the results of several activations in one keeps the order
-     of those activations among the results of Stream calls, and gives them after each local
-     activity resolution.
+    * The results of Stream calls go after the local activity resolutions, because a replay also
+     scans ahead for their ledger. Appends go first, then closes, then reads, and each kind is in
+     `seq` order. When a replay gives the results of several activations in one, the Stream results
+     keep the order of those activations, after all local activity resolutions.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
@@ -1689,8 +1688,8 @@ global___RemoveFromCache = RemoveFromCache
 @typing.final
 class ResolveStreamRead(google.protobuf.message.Message):
     """The result of a `ReadStream`. A read gets at most one, and a read that lang cancelled gets one
-    too. It gets none only in the four cases that `ReadStream` lists. What `ResolveStreamAppend`
-    says of its activation holds for it.
+    too. It gets none only in the four cases that `ReadStream` lists. The activation rules of
+    `ResolveStreamAppend` apply to it too.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1762,9 +1761,14 @@ class StreamPage(google.protobuf.message.Message):
 
     RECORDS_FIELD_NUMBER: builtins.int
     DONE_FIELD_NUMBER: builtins.int
+    LAST_OFFSET_FIELD_NUMBER: builtins.int
     done: builtins.bool
     """True if the Stream is closed and has no Record after this page. It's false if the page has
     no Record because none came within the `wait` of the read.
+    """
+    last_offset: builtins.bytes
+    """The offset where the page ends, as the Store gave it. The next read can pass it as its
+    `from_offset`. It's set also for a page with no Record.
     """
     @property
     def records(
@@ -1785,30 +1789,34 @@ class StreamPage(google.protobuf.message.Message):
         ]
         | None = ...,
         done: builtins.bool = ...,
+        last_offset: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["done", b"done", "records", b"records"]
+        self,
+        field_name: typing.Literal[
+            "done", b"done", "last_offset", b"last_offset", "records", b"records"
+        ],
     ) -> None: ...
 
 global___StreamPage = StreamPage
 
 @typing.final
 class ResolveStreamAppend(google.protobuf.message.Message):
-    """The result of an `AppendToStream`. Core gives each result in the next activation after it comes,
-    so each result can cost an activation.
+    """The result of an `AppendToStream`. Core gives each result in the next activation after the
+    Store answers, so each result can cost an activation.
 
-    A replay gives a result in the activation in which the first run gave it only if History has
-    the flag that turns workflow task chunking off. Without that flag a replay gives the results of
-    a task in the order of the first run, and it gives a result in another activation in two cases:
+    A replay gives each result in the same activation as the first run only if History has the flag
+    that turns workflow task chunking off. Without the flag, a replay keeps the order of the results
+    of a task, but it can give a result in another activation in two cases.
     * A Workflow Task completes with no command, and the first activation of the next task has a
       result. A replay takes the two tasks as one, and can give the results of the first two
       activations of the second task in one.
-    * A Workflow Task starts with an Update that Workflow code rejects, which leaves no event. A
-      replay with no job to give then gives the results of History in the order of the first run,
-      up to the first one whose call Workflow code hasn't made, in one activation.
-    A task with only Stream calls replays in the activations of the same task with Local
-    Activities. In a task with both, a result waits for each result of the other kind that the
-    first run gave before it, so its activations can differ from those of Local Activities alone.
+    * A Workflow Task starts with an Update that Workflow code rejects, which leaves no event. When
+      such a replay has no other job to give, it gives the results of History in one activation, in
+      the order of the first run, up to the first one whose call Workflow code hasn't made yet.
+    A task with only Stream calls replays in the same activations as a task with only Local
+    Activities. In a task with both, a result waits for each result of the other kind that the first
+    run gave before it, so its activations can differ from those of Local Activities alone.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1822,12 +1830,12 @@ class ResolveStreamAppend(google.protobuf.message.Message):
     def appended(self) -> global___StreamAppended: ...
     @property
     def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """The failure of the append, with these parts:
-        * an `ApplicationFailureInfo` whose type is `stream_` and the reason of the Stream error
-          in snake case, such as `stream_closed`, and whose `non_retryable` is set
-        * in its details, one `binary/protobuf` payload of a
-          `temporalio.api.stream.v1.StreamErrorDetails`
-        * a message of at most 4096 bytes
+        """The failure of the append. It has these parts.
+        * An `ApplicationFailureInfo` whose type is `stream_` plus the reason of the Stream error
+          in snake case, such as `stream_closed`. Its `non_retryable` is set.
+        * In its details, one `binary/protobuf` payload of a
+          `temporalio.api.stream.v1.StreamErrorDetails`.
+        * A message of at most 4096 bytes.
         """
 
     def __init__(
@@ -1887,7 +1895,7 @@ global___StreamAppended = StreamAppended
 
 @typing.final
 class ResolveStreamClose(google.protobuf.message.Message):
-    """The result of a `CloseStream`. What `ResolveStreamAppend` says of its activation holds for it."""
+    """The result of a `CloseStream`. The activation rules of `ResolveStreamAppend` apply to it too."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1897,8 +1905,8 @@ class ResolveStreamClose(google.protobuf.message.Message):
     """The `seq` of the `CloseStream`."""
     @property
     def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """Unset if the Stream is closed, even if it was already closed before. If set, it has the parts
-        of the `failed` of a `ResolveStreamAppend`.
+        """Unset if the Stream is closed, also when it was already closed. When set, it has the same
+        parts as the `failed` of a `ResolveStreamAppend`.
         """
 
     def __init__(
