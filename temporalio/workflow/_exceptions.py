@@ -9,6 +9,7 @@ import temporalio.exceptions
 __all__ = [
     "NondeterminismError",
     "ReadOnlyContextError",
+    "StreamReplayError",
     "VersioningIntent",
     "ContinueAsNewVersioningBehavior",
 ]
@@ -21,6 +22,18 @@ class NondeterminismError(temporalio.exceptions.TemporalError):
         """Initialize a nondeterminism error."""
         super().__init__(message)
         self.message = message
+
+
+class StreamReplayError(temporalio.exceptions.TemporalError):
+    """Error of a Workflow replay whose Stream Store no longer has the Records of
+    a read as the first run read them.
+
+    SDK Core fails the Workflow Task with it. A Worker or a Workflow that has this
+    class in its failure exception types fails the Workflow instead.
+
+    .. warning::
+        This API is experimental and subject to change.
+    """
 
 
 class ReadOnlyContextError(temporalio.exceptions.TemporalError):

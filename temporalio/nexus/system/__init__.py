@@ -20,6 +20,7 @@ from temporalio.bridge._visitor_functions import VisitorFunctions
 from temporalio.converter import BinaryProtoPayloadConverter, CompositePayloadConverter
 from temporalio.converter._payload_converter import (
     _TemporalTransferTypePayloadConverter,
+    _typed_decode_types,
 )
 
 TEMPORAL_SYSTEM_ENDPOINT = "__temporal_system"
@@ -194,3 +195,12 @@ __all__ = [
     "TEMPORAL_SYSTEM_ENDPOINT",
     "is_system_endpoint",
 ]
+
+# `temporalio.workflow` and the generated Workflow modules of a system service import each
+# other. It's loaded here last, so that any of those modules can be the first import.
+import temporalio.workflow  # noqa: E402  # pyright: ignore[reportUnusedImport]
+from temporalio.nexus.system.stream_service.models import StreamRef  # noqa: E402
+
+# Workflow code can decode a `StreamRef` only on an SDK with this rule, so the rule can't
+# change a replay. Any import of the generated class runs this module first.
+_typed_decode_types.add(StreamRef)

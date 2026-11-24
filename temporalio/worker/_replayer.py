@@ -32,6 +32,7 @@ from ._workflow_instance import (
     UnsandboxedWorkflowRunner,
     WorkflowRunner,
 )
+from ._workflow_streams import _bridge_streams
 from .workflow_sandbox import SandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -58,6 +59,7 @@ class Replayer:
         runtime: temporalio.runtime.Runtime | None = None,
         disable_safe_workflow_eviction: bool = False,
         header_codec_behavior: HeaderCodecBehavior = HeaderCodecBehavior.NO_CODEC,
+        stream_config: temporalio.client.StreamConfig | None = None,
     ) -> None:
         """Create a replayer to replay workflows from history.
 
@@ -70,6 +72,12 @@ class Replayer:
         will default to a new thread pool executor with no max_workers set that
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
+
+        ``stream_config`` is the Stream config of the client that the worker
+        used. A replay takes the result of each append, close, create and
+        describe of a Stream from history, so it calls no Store for them. It
+        reads the Records of each Stream read again from the Store, and fails if
+        the Store no longer has them.
         """
         self._config = ReplayerConfig(
             workflows=list(workflows),
@@ -88,6 +96,7 @@ class Replayer:
             runtime=runtime,
             disable_safe_workflow_eviction=disable_safe_workflow_eviction,
             header_codec_behavior=header_codec_behavior,
+            stream_config=stream_config,
         )
         self._initial_config = self._config.copy()
         self._default_workflow_logic_flags = set(_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS)
@@ -253,6 +262,7 @@ class Replayer:
                 self._config.get("data_converter")
                 or temporalio.converter.DataConverter.default
             )
+            stream_config = self._config.get("stream_config")
             workflow_worker = _WorkflowWorker(
                 bridge_worker=lambda: bridge_worker,
                 namespace=self._config.get("namespace", "ReplayNamespace"),
@@ -281,6 +291,7 @@ class Replayer:
                 ),
                 should_enforce_versioning_behavior=False,
                 assert_local_activity_valid=lambda a: None,
+                stream_config=lambda: stream_config,
                 encode_headers=self._config.get(
                     "header_codec_behavior", HeaderCodecBehavior.NO_CODEC
                 )
@@ -309,6 +320,10 @@ class Replayer:
                     # per workflow type
                     nondeterminism_as_workflow_fail=workflow_worker.nondeterminism_as_workflow_fail(),
                     nondeterminism_as_workflow_fail_for_types=workflow_worker.nondeterminism_as_workflow_fail_for_types(),
+                    stream_replay_as_workflow_fail=workflow_worker.stream_replay_as_workflow_fail(),
+                    stream_replay_as_workflow_fail_for_types=(
+                        workflow_worker.stream_replay_as_workflow_fail_for_types()
+                    ),
                     # All values below are ignored but required by Core
                     max_cached_workflows=2,
                     tuner=temporalio.bridge.worker.TunerHolder(
@@ -358,6 +373,7 @@ class Replayer:
                         (plugin.name(), plugin.version()) for plugin in self.plugins
                     ],
                     storage_drivers=storage_driver_types,
+                    streams=_bridge_streams(lambda: stream_config, None),
                 ),
             )
             bridge_worker_scope = bridge_worker
@@ -437,6 +453,7 @@ class ReplayerConfig(TypedDict, total=False):
     runtime: temporalio.runtime.Runtime | None
     disable_safe_workflow_eviction: bool
     header_codec_behavior: HeaderCodecBehavior
+    stream_config: temporalio.client.StreamConfig | None
 
 
 @dataclass(frozen=True)

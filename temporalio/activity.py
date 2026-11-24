@@ -92,6 +92,24 @@ def defn(
 
 
 @dataclass(frozen=True)
+class WorkflowTaskAttempt:
+    """One attempt of a Workflow Task.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    started_event_id: int
+    """ID of the task's ``WorkflowTaskStarted`` event."""
+
+    attempt: int
+    """Attempt of the task."""
+
+    started_time: datetime | None
+    """When the server started the task. None if the server did not send it."""
+
+
+@dataclass(frozen=True)
 class Info:
     """Information about the running activity.
 
@@ -154,6 +172,19 @@ class Info:
     .. warning::
         This API is experimental and unstable.
     """
+
+    workflow_task: WorkflowTaskAttempt | None = None
+    """For a Local Activity, the Workflow Task in which the Worker dispatched this execution.
+    None for other Activities.
+
+    .. warning::
+        This API is experimental and unstable.
+    """
+
+    _scheduled_event_id: int = 0
+    """ID of the ``ActivityTaskScheduled`` event of an Activity that a Workflow scheduled, for
+    the Producer of its Stream writes. 0 for other Activities, and when SDK Core couldn't read
+    it from the task token."""
 
     @property
     def in_workflow(self) -> bool:

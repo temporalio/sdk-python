@@ -23,21 +23,38 @@ from temporalio.bridge.proto.workflow_completion.workflow_completion_pb2 import 
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 
 
-def discover_system_nexus_roots() -> list[Descriptor]:
-    module_path = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
-    spec = spec_from_file_location(
-        "temporalio_nexus_system_workflow_service",
-        module_path / "__init__.py",
-        submodule_search_locations=[str(module_path)],
-    )
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load generated system service from {module_path}")
-    module = module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+def discover_system_nexus_services() -> list[type]:
+    services: list[type] = []
+    system_dir = base_dir / "temporalio" / "nexus" / "system"
+    for module_path in sorted(path.parent for path in system_dir.glob("*/services.py")):
+        spec = spec_from_file_location(
+            f"temporalio_nexus_system_{module_path.name}",
+            module_path / "__init__.py",
+            submodule_search_locations=[str(module_path)],
+        )
+        if spec is None or spec.loader is None:
+            raise RuntimeError(
+                f"Cannot load generated system service from {module_path}"
+            )
+        module = module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        services.extend(
+            value
+            for value in vars(module.services).values()
+            if isinstance(value, type) and nexusrpc.get_service_definition(value)
+        )
+    return services
 
+
+def discover_system_nexus_roots() -> list[Descriptor]:
     roots: list[Descriptor] = []
-    for annotation in get_type_hints(module._services.WorkflowService).values():
+    annotations = [
+        annotation
+        for service in discover_system_nexus_services()
+        for annotation in get_type_hints(service).values()
+    ]
+    for annotation in annotations:
         if get_origin(annotation) is not nexusrpc.Operation:
             continue
         for operation_type in get_args(annotation):

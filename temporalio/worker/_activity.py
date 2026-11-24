@@ -700,6 +700,16 @@ class _ActivityWorker:
             if not started_by_workflow
             else None,
             nexus_serialization_context=nexus_context,
+            workflow_task=temporalio.activity.WorkflowTaskAttempt(
+                started_event_id=start.workflow_task.started_event_id,
+                attempt=start.workflow_task.attempt,
+                started_time=_proto_to_datetime(start.workflow_task.started_time)
+                if start.workflow_task.HasField("started_time")
+                else None,
+            )
+            if start.HasField("workflow_task")
+            else None,
+            _scheduled_event_id=start.scheduled_event_id,
         )
 
         if self._encode_headers:
