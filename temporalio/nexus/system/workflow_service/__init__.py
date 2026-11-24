@@ -27,17 +27,24 @@ _SerializationContextFactory = collections.abc.Callable[
 ]
 
 
+_StorageTargetFactory = collections.abc.Callable[
+    [_InputT], temporalio.converter.StorageDriverWorkflowInfo
+]
+
+
 class _NexusOperationInfo(typing.Generic[_InputT, _OutputT]):
     def __init__(
         self,
         *,
         operation: nexusrpc.Operation[_InputT, _OutputT],
         serialization_context: _SerializationContextFactory[_InputT] | None = None,
+        storage_target: _StorageTargetFactory[_InputT] | None = None,
     ) -> None:
         self.operation: nexusrpc.Operation[_InputT, _OutputT] = operation
         self.serialization_context: _SerializationContextFactory[_InputT] | None = (
             serialization_context
         )
+        self.storage_target: _StorageTargetFactory[_InputT] | None = storage_target
 
 
 __nexus_operation_registry__: dict[
@@ -49,5 +56,6 @@ __nexus_operation_registry__: dict[
     ): _NexusOperationInfo(
         operation=_services.WorkflowService.signal_with_start_workflow,
         serialization_context=_support.signal_with_start_workflow_serialization_context,
+        storage_target=_support.signal_with_start_workflow_storage_target,
     ),
 }
