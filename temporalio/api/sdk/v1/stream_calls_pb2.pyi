@@ -61,8 +61,14 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
         REF_FIELD_NUMBER: builtins.int
         APPENDED_FIELD_NUMBER: builtins.int
         FAILURE_FIELD_NUMBER: builtins.int
+        ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
         seq: builtins.int
         """The sequence number that the SDK gave the append."""
+        activation_index: builtins.int
+        """The index of the activation of this Workflow Task in which Workflow code got the result,
+        from 0. A replay gives the result in the activation with this index. A Local Activity marker
+        has the same index for a result in the same activation.
+        """
         @property
         def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
         @property
@@ -76,6 +82,7 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
             ref: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
             appended: global___WorkflowTaskStreamCalls.AppendOffsets | None = ...,
             failure: global___WorkflowTaskStreamCalls.CallFailure | None = ...,
+            activation_index: builtins.int = ...,
         ) -> None: ...
         def HasField(
             self,
@@ -93,6 +100,8 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
         def ClearField(
             self,
             field_name: typing.Literal[
+                "activation_index",
+                b"activation_index",
                 "appended",
                 b"appended",
                 "failure",
@@ -140,7 +149,10 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
 
         SEQ_FIELD_NUMBER: builtins.int
         FAILURE_FIELD_NUMBER: builtins.int
+        ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
         seq: builtins.int
+        activation_index: builtins.int
+        """The activation that gave the result, as `activation_index` of `AppendResult`."""
         @property
         def failure(self) -> global___WorkflowTaskStreamCalls.CallFailure:
             """Unset if the Stream is closed."""
@@ -150,12 +162,21 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
             *,
             seq: builtins.int = ...,
             failure: global___WorkflowTaskStreamCalls.CallFailure | None = ...,
+            activation_index: builtins.int = ...,
         ) -> None: ...
         def HasField(
             self, field_name: typing.Literal["failure", b"failure"]
         ) -> builtins.bool: ...
         def ClearField(
-            self, field_name: typing.Literal["failure", b"failure", "seq", b"seq"]
+            self,
+            field_name: typing.Literal[
+                "activation_index",
+                b"activation_index",
+                "failure",
+                b"failure",
+                "seq",
+                b"seq",
+            ],
         ) -> None: ...
 
     @typing.final
@@ -169,6 +190,7 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
         FROM_OFFSET_FIELD_NUMBER: builtins.int
         PAGE_FIELD_NUMBER: builtins.int
         FAILURE_FIELD_NUMBER: builtins.int
+        ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
         seq: builtins.int
         """The sequence number that the SDK gave the read."""
         from_offset: builtins.bytes
@@ -176,6 +198,8 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
         (-- api-linter: core::0140::prepositions=disabled
             aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
         """
+        activation_index: builtins.int
+        """The activation that gave the result, as `activation_index` of `AppendResult`."""
         @property
         def ref(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
         @property
@@ -190,6 +214,7 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
             from_offset: builtins.bytes = ...,
             page: global___WorkflowTaskStreamCalls.ReadPage | None = ...,
             failure: global___WorkflowTaskStreamCalls.CallFailure | None = ...,
+            activation_index: builtins.int = ...,
         ) -> None: ...
         def HasField(
             self,
@@ -207,6 +232,8 @@ class WorkflowTaskStreamCalls(google.protobuf.message.Message):
         def ClearField(
             self,
             field_name: typing.Literal[
+                "activation_index",
+                b"activation_index",
                 "failure",
                 b"failure",
                 "from_offset",

@@ -25,6 +25,7 @@ import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
+import temporalio.api.stream.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -105,6 +106,9 @@ class WorkflowCommand(google.protobuf.message.Message):
     UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
     SCHEDULE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
+    READ_STREAM_FIELD_NUMBER: builtins.int
+    APPEND_TO_STREAM_FIELD_NUMBER: builtins.int
+    CLOSE_STREAM_FIELD_NUMBER: builtins.int
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """User metadata that may or may not be persisted into history depending on the command type.
@@ -181,6 +185,12 @@ class WorkflowCommand(google.protobuf.message.Message):
     def request_cancel_nexus_operation(
         self,
     ) -> global___RequestCancelNexusOperation: ...
+    @property
+    def read_stream(self) -> global___ReadStream: ...
+    @property
+    def append_to_stream(self) -> global___AppendToStream: ...
+    @property
+    def close_stream(self) -> global___CloseStream: ...
     def __init__(
         self,
         *,
@@ -219,10 +229,15 @@ class WorkflowCommand(google.protobuf.message.Message):
         schedule_nexus_operation: global___ScheduleNexusOperation | None = ...,
         request_cancel_nexus_operation: global___RequestCancelNexusOperation
         | None = ...,
+        read_stream: global___ReadStream | None = ...,
+        append_to_stream: global___AppendToStream | None = ...,
+        close_stream: global___CloseStream | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
+            "append_to_stream",
+            b"append_to_stream",
             "cancel_child_workflow_execution",
             b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
@@ -231,6 +246,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
+            "close_stream",
+            b"close_stream",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -239,6 +256,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"fail_workflow_execution",
             "modify_workflow_properties",
             b"modify_workflow_properties",
+            "read_stream",
+            b"read_stream",
             "request_cancel_activity",
             b"request_cancel_activity",
             "request_cancel_external_workflow_execution",
@@ -276,6 +295,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     def ClearField(
         self,
         field_name: typing.Literal[
+            "append_to_stream",
+            b"append_to_stream",
             "cancel_child_workflow_execution",
             b"cancel_child_workflow_execution",
             "cancel_signal_workflow",
@@ -284,6 +305,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
+            "close_stream",
+            b"close_stream",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -294,6 +317,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"fail_workflow_execution",
             "modify_workflow_properties",
             b"modify_workflow_properties",
+            "read_stream",
+            b"read_stream",
             "request_cancel_activity",
             b"request_cancel_activity",
             "request_cancel_external_workflow_execution",
@@ -354,6 +379,9 @@ class WorkflowCommand(google.protobuf.message.Message):
             "update_response",
             "schedule_nexus_operation",
             "request_cancel_nexus_operation",
+            "read_stream",
+            "append_to_stream",
+            "close_stream",
         ]
         | None
     ): ...
@@ -1931,3 +1959,190 @@ class RequestCancelNexusOperation(google.protobuf.message.Message):
     def ClearField(self, field_name: typing.Literal["seq", b"seq"]) -> None: ...
 
 global___RequestCancelNexusOperation = RequestCancelNexusOperation
+
+@typing.final
+class AppendToStream(google.protobuf.message.Message):
+    """Appends Records to a Stream as the Workflow's Producer. Core calls the Store while the Workflow
+    Task is open, and sends the result in a `ResolveStreamAppend` job. As for a Local Activity, Core
+    keeps the task open while an append runs. An append has no event, so History keeps its result in
+    the `stream_calls` of the `sdk_metadata` of the task's completion.
+
+    An append is at-least-once. If History has no result of it, a later attempt of the Workflow Task
+    writes the batch again.
+
+    No command cancels an append, so lang must accept the job of an append that nothing awaits.
+    Core drops an append that has no result when lang sends the Workflow's last command.
+
+    Core sends the appends and the closes of one Stream to the Store one at a time, in the order of
+    their commands.
+
+    A bad `seq` or `stream`, or a Store that the Worker has no runtime for, fails the Workflow Task.
+    So does a Store that is still unavailable at the task's heartbeat. The failure message then
+    starts with `StreamStoreUnavailable:`. An empty batch, or one over the limits of its Store,
+    gives lang a `failed` job.
+
+    A replay compares the `seq` and the `stream` of the command with History, not the `bodies`.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    BODIES_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number for appends, starting at 1."""
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    @property
+    def bodies(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        temporalio.api.common.v1.message_pb2.Payload
+    ]: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        bodies: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["stream", b"stream"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "bodies", b"bodies", "seq", b"seq", "stream", b"stream"
+        ],
+    ) -> None: ...
+
+global___AppendToStream = AppendToStream
+
+@typing.final
+class CloseStream(google.protobuf.message.Message):
+    """Closes a Stream. The Workflow Task of the command records only the intent to close. Core closes
+    the Stream once History has that task, so a task that fails closes nothing, and its retry can
+    still append. The result comes in a `ResolveStreamClose` job of a later task.
+
+    An append that lang sends in the same task is written before the close.
+
+    The rules of `AppendToStream` about cancellation, the Workflow's last command, task failures and
+    replay apply to a close too. So Workflow code that needs its close must await the result before
+    its last command.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number for closes, starting at 1."""
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["stream", b"stream"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self, field_name: typing.Literal["seq", b"seq", "stream", b"stream"]
+    ) -> None: ...
+
+global___CloseStream = CloseStream
+
+@typing.final
+class ReadStream(google.protobuf.message.Message):
+    """Reads one page of a Stream, which has the Records after `from_offset`. The result comes in one
+    `ResolveStreamRead` job, by the activation rules of `ResolveStreamAppend`. To read on, lang sends
+    a new `ReadStream` from the `last_offset` of the page.
+
+    A read has a time limit in each Workflow Task (`StreamSettings::read_time`), which is always
+    before the heartbeat of the task. So a read alone never keeps a task open with heartbeats. At
+    the limit, a read with no answer gives a page with no Record whose `last_offset` is its
+    `from_offset`. It fails with `STREAM_ERROR_REASON_STORE_UNAVAILABLE` only if its last try failed
+    or got no answer.
+
+    Core keeps the Workflow Task while a read has no answer, as for an append, with one difference.
+    A command or a message for the server doesn't wait for a read. Core then completes the task and
+    asks for a new one, and the page comes in a later task.
+
+    No command cancels a read, so lang must accept the job of a read that nothing awaits. Core drops
+    a read that has no result when lang sends the Workflow's last command.
+
+    History keeps the offsets, the count and a digest of each page, not its Records. A replay reads
+    the page from the Store again, and fails if the Records are gone or differ. That includes the
+    replay for a query of a closed Workflow.
+
+    One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the next
+    task.
+
+    A negative `wait`, `max_records` or `max_bytes`, or a `from_offset` over 1024 bytes, fails the
+    Workflow Task, as the cases of `AppendToStream` do. A replay compares the `seq`, the `stream`
+    and the `from_offset` of the command with History.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_FIELD_NUMBER: builtins.int
+    FROM_OFFSET_FIELD_NUMBER: builtins.int
+    WAIT_FIELD_NUMBER: builtins.int
+    MAX_RECORDS_FIELD_NUMBER: builtins.int
+    MAX_BYTES_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    """Lang's incremental sequence number for reads, starting at 1."""
+    from_offset: builtins.bytes
+    """The page has the Records after this offset. If it's empty, the page starts at the beginning
+    of the Stream.
+    """
+    max_records: builtins.int
+    """The maximum number of Records in the page, which is 256 if this is zero."""
+    max_bytes: builtins.int
+    """The maximum size of the Records in the page, which is 4 MiB if this is zero. Core asks the
+    Store for at most 16 MiB. One larger Record still comes as a page.
+    """
+    @property
+    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    @property
+    def wait(self) -> google.protobuf.duration_pb2.Duration:
+        """How long the read waits for a Record if the Stream has none after `from_offset`. If it's
+        unset, the read doesn't wait.
+        """
+
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        from_offset: builtins.bytes = ...,
+        wait: google.protobuf.duration_pb2.Duration | None = ...,
+        max_records: builtins.int = ...,
+        max_bytes: builtins.int = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["stream", b"stream", "wait", b"wait"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "from_offset",
+            b"from_offset",
+            "max_bytes",
+            b"max_bytes",
+            "max_records",
+            b"max_records",
+            "seq",
+            b"seq",
+            "stream",
+            b"stream",
+            "wait",
+            b"wait",
+        ],
+    ) -> None: ...
+
+global___ReadStream = ReadStream

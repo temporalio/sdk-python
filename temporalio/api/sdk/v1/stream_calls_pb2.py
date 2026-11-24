@@ -21,7 +21,7 @@ from temporalio.api.stream.v1 import (
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n&temporal/api/sdk/v1/stream_calls.proto\x12\x13temporal.api.sdk.v1\x1a"temporal/api/enums/v1/stream.proto\x1a$temporal/api/stream/v1/message.proto"\x85\n\n\x17WorkflowTaskStreamCalls\x12O\n\rclose_intents\x18\x01 \x03(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CloseIntent\x12Q\n\x0e\x61ppend_results\x18\x02 \x03(\x0b\x32\x39.temporal.api.sdk.v1.WorkflowTaskStreamCalls.AppendResult\x12O\n\rclose_results\x18\x03 \x03(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CloseResult\x12M\n\x0cread_results\x18\x04 \x03(\x0b\x32\x37.temporal.api.sdk.v1.WorkflowTaskStreamCalls.ReadResult\x1aJ\n\x0b\x43loseIntent\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x1a\xf2\x01\n\x0c\x41ppendResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12N\n\x08\x61ppended\x18\x03 \x01(\x0b\x32:.temporal.api.sdk.v1.WorkflowTaskStreamCalls.AppendOffsetsH\x00\x12K\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailureH\x00\x42\x08\n\x06result\x1a:\n\rAppendOffsets\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x1a\x65\n\x0b\x43loseResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12I\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailure\x1a\xfc\x01\n\nReadResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x0c\x12\x45\n\x04page\x18\x04 \x01(\x0b\x32\x35.temporal.api.sdk.v1.WorkflowTaskStreamCalls.ReadPageH\x00\x12K\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailureH\x00\x42\x08\n\x06result\x1ai\n\x08ReadPage\x12\x14\n\x0crecord_count\x18\x01 \x01(\x05\x12\x0c\n\x04\x64one\x18\x02 \x01(\x08\x12\x0e\n\x06\x64igest\x18\x03 \x01(\x0c\x12\x14\n\x0crecord_bytes\x18\x04 \x01(\x03\x12\x13\n\x0blast_offset\x18\x05 \x01(\x0c\x1aX\n\x0b\x43\x61llFailure\x12\x38\n\x06reason\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.StreamErrorReason\x12\x0f\n\x07message\x18\x02 \x01(\tB~\n\x16io.temporal.api.sdk.v1B\x10StreamCallsProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
+    b'\n&temporal/api/sdk/v1/stream_calls.proto\x12\x13temporal.api.sdk.v1\x1a"temporal/api/enums/v1/stream.proto\x1a$temporal/api/stream/v1/message.proto"\xd3\n\n\x17WorkflowTaskStreamCalls\x12O\n\rclose_intents\x18\x01 \x03(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CloseIntent\x12Q\n\x0e\x61ppend_results\x18\x02 \x03(\x0b\x32\x39.temporal.api.sdk.v1.WorkflowTaskStreamCalls.AppendResult\x12O\n\rclose_results\x18\x03 \x03(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CloseResult\x12M\n\x0cread_results\x18\x04 \x03(\x0b\x32\x37.temporal.api.sdk.v1.WorkflowTaskStreamCalls.ReadResult\x1aJ\n\x0b\x43loseIntent\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x1a\x8c\x02\n\x0c\x41ppendResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12N\n\x08\x61ppended\x18\x03 \x01(\x0b\x32:.temporal.api.sdk.v1.WorkflowTaskStreamCalls.AppendOffsetsH\x00\x12K\n\x07\x66\x61ilure\x18\x04 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailureH\x00\x12\x18\n\x10\x61\x63tivation_index\x18\x05 \x01(\x05\x42\x08\n\x06result\x1a:\n\rAppendOffsets\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c\x1a\x7f\n\x0b\x43loseResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12I\n\x07\x66\x61ilure\x18\x02 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailure\x12\x18\n\x10\x61\x63tivation_index\x18\x03 \x01(\x05\x1a\x96\x02\n\nReadResult\x12\x0b\n\x03seq\x18\x01 \x01(\x05\x12.\n\x03ref\x18\x02 \x01(\x0b\x32!.temporal.api.stream.v1.StreamRef\x12\x13\n\x0b\x66rom_offset\x18\x03 \x01(\x0c\x12\x45\n\x04page\x18\x04 \x01(\x0b\x32\x35.temporal.api.sdk.v1.WorkflowTaskStreamCalls.ReadPageH\x00\x12K\n\x07\x66\x61ilure\x18\x05 \x01(\x0b\x32\x38.temporal.api.sdk.v1.WorkflowTaskStreamCalls.CallFailureH\x00\x12\x18\n\x10\x61\x63tivation_index\x18\x06 \x01(\x05\x42\x08\n\x06result\x1ai\n\x08ReadPage\x12\x14\n\x0crecord_count\x18\x01 \x01(\x05\x12\x0c\n\x04\x64one\x18\x02 \x01(\x08\x12\x0e\n\x06\x64igest\x18\x03 \x01(\x0c\x12\x14\n\x0crecord_bytes\x18\x04 \x01(\x03\x12\x13\n\x0blast_offset\x18\x05 \x01(\x0c\x1aX\n\x0b\x43\x61llFailure\x12\x38\n\x06reason\x18\x01 \x01(\x0e\x32(.temporal.api.enums.v1.StreamErrorReason\x12\x0f\n\x07message\x18\x02 \x01(\tB~\n\x16io.temporal.api.sdk.v1B\x10StreamCallsProtoP\x01Z\x1dgo.temporal.io/api/sdk/v1;sdk\xaa\x02\x15Temporalio.Api.Sdk.V1\xea\x02\x18Temporalio::Api::Sdk::V1b\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -30,19 +30,19 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\026io.temporal.api.sdk.v1B\020StreamCallsProtoP\001Z\035go.temporal.io/api/sdk/v1;sdk\252\002\025Temporalio.Api.Sdk.V1\352\002\030Temporalio::Api::Sdk::V1"
     _WORKFLOWTASKSTREAMCALLS._serialized_start = 138
-    _WORKFLOWTASKSTREAMCALLS._serialized_end = 1423
+    _WORKFLOWTASKSTREAMCALLS._serialized_end = 1501
     _WORKFLOWTASKSTREAMCALLS_CLOSEINTENT._serialized_start = 489
     _WORKFLOWTASKSTREAMCALLS_CLOSEINTENT._serialized_end = 563
     _WORKFLOWTASKSTREAMCALLS_APPENDRESULT._serialized_start = 566
-    _WORKFLOWTASKSTREAMCALLS_APPENDRESULT._serialized_end = 808
-    _WORKFLOWTASKSTREAMCALLS_APPENDOFFSETS._serialized_start = 810
-    _WORKFLOWTASKSTREAMCALLS_APPENDOFFSETS._serialized_end = 868
-    _WORKFLOWTASKSTREAMCALLS_CLOSERESULT._serialized_start = 870
-    _WORKFLOWTASKSTREAMCALLS_CLOSERESULT._serialized_end = 971
-    _WORKFLOWTASKSTREAMCALLS_READRESULT._serialized_start = 974
-    _WORKFLOWTASKSTREAMCALLS_READRESULT._serialized_end = 1226
-    _WORKFLOWTASKSTREAMCALLS_READPAGE._serialized_start = 1228
-    _WORKFLOWTASKSTREAMCALLS_READPAGE._serialized_end = 1333
-    _WORKFLOWTASKSTREAMCALLS_CALLFAILURE._serialized_start = 1335
-    _WORKFLOWTASKSTREAMCALLS_CALLFAILURE._serialized_end = 1423
+    _WORKFLOWTASKSTREAMCALLS_APPENDRESULT._serialized_end = 834
+    _WORKFLOWTASKSTREAMCALLS_APPENDOFFSETS._serialized_start = 836
+    _WORKFLOWTASKSTREAMCALLS_APPENDOFFSETS._serialized_end = 894
+    _WORKFLOWTASKSTREAMCALLS_CLOSERESULT._serialized_start = 896
+    _WORKFLOWTASKSTREAMCALLS_CLOSERESULT._serialized_end = 1023
+    _WORKFLOWTASKSTREAMCALLS_READRESULT._serialized_start = 1026
+    _WORKFLOWTASKSTREAMCALLS_READRESULT._serialized_end = 1304
+    _WORKFLOWTASKSTREAMCALLS_READPAGE._serialized_start = 1306
+    _WORKFLOWTASKSTREAMCALLS_READPAGE._serialized_end = 1411
+    _WORKFLOWTASKSTREAMCALLS_CALLFAILURE._serialized_start = 1413
+    _WORKFLOWTASKSTREAMCALLS_CALLFAILURE._serialized_end = 1501
 # @@protoc_insertion_point(module_scope)
