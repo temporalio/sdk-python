@@ -13,11 +13,10 @@ import temporalio.nexus.system
 if typing.TYPE_CHECKING:
     import temporalio.client
 
-import temporalio.nexus.system._support as _support
-
 from .._resource_context_manager import resource_context_manager
 from ..models import (
     CreateStreamRequest,
+    CreateStreamResult,
     StreamIdConflictPolicy,
     StreamRef,
 )
@@ -101,16 +100,19 @@ class StreamServiceClientExtension(abc.ABC):
             endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
         )
         handle = await nexus_client.start_operation(
-            operation=StreamService.create_stream,
+            operation="CreateStream",
             arg=request,
             id=f"{_uuid.uuid4()}",
+            result_type=CreateStreamResult[body_type],
             rpc_metadata=rpc_metadata or {},
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
+        if result.ref is None:
+            raise RuntimeError("CreateStream answered without `ref`")
         resource = Stream[body_type](
             nexus_client,
-            ref=request.ref,
+            ref=result.ref,
             created=result.created or None,
         )
         return resource
@@ -161,14 +163,13 @@ class StreamServiceClientExtension(abc.ABC):
         """
         if body_type is None:
             body_type = typing.Any
-        ref = StreamRef[body_type](
+        stream_ref = StreamRef(
             id=id,
             store=store,
         )
         request = CreateStreamRequest(
-            ref=ref,
+            stream_ref=stream_ref,
             id_conflict_policy=id_conflict_policy,
-            request_id=_support.request_id(),
         )
         return await self._stream_service_create_stream(
             request, body_type, rpc_metadata=rpc_metadata, rpc_timeout=rpc_timeout

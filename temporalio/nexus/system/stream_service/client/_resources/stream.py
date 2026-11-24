@@ -86,7 +86,6 @@ class Stream(typing.Generic[BodyT]):
                 else producer
             ),
             records=[AppendRecord(body=value) for value in records],
-            request_id=_support.append_request_id(),
         )
         handle = await self._nexus_client.start_operation(
             operation=StreamService.append_records,

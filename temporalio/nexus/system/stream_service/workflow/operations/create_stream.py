@@ -5,7 +5,6 @@ from __future__ import annotations
 import typing
 
 import temporalio.nexus.system
-import temporalio.nexus.system._support as _support
 import temporalio.workflow
 
 from ..._resource_context_manager import resource_context_manager
@@ -31,11 +30,13 @@ async def _create_stream(
     handle = await nexus_client.start_operation(
         operation="CreateStream",
         input=request,
-        output_type=CreateStreamResult,
+        output_type=CreateStreamResult[body_type],
     )
     result = await handle
+    if result.ref is None:
+        raise RuntimeError("CreateStream answered without `ref`")
     return Stream[body_type](
-        ref=request.ref,
+        ref=result.ref,
         created=result.created or None,
     )
 
@@ -79,13 +80,12 @@ async def create_stream(
     """
     if body_type is None:
         body_type = typing.Any
-    ref = StreamRef[body_type](
+    stream_ref = StreamRef(
         id=id,
         store=store,
     )
     request = CreateStreamRequest(
-        ref=ref,
+        stream_ref=stream_ref,
         id_conflict_policy=id_conflict_policy,
-        request_id=_support.request_id(),
     )
     return await _create_stream(request, body_type)
