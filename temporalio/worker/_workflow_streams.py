@@ -49,9 +49,6 @@ _STORE_CALL_ACTIVITY = "__temporal_stream_store_call"
 class _Read:
     """The read of one ``read_page`` call."""
 
-    after: bytes
-    """The offset that the read started from."""
-
     waiter: asyncio.Future[Any]
     """Gets the page of the call."""
 
@@ -139,7 +136,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 )
             )
             result = instance.create_future()
-            self._reads[read_seq] = _Read(request.from_offset, result, result_type)
+            self._reads[read_seq] = _Read(result, result_type)
         else:
             # The Local Activity picks the Store of a ref with no Store name. A replay
             # has its result, so a replay asks no selector for it. Each run of a chain
@@ -198,10 +195,9 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         if job.HasField("failed"):
             read.waiter.set_exception(self._error(job.failed))
             return
-        records = job.page.records
         page = proto.ReadRecordsResponse(
-            records=records,
-            last_offset=records[-1].offset if records else read.after,
+            records=job.page.records,
+            last_offset=job.page.last_offset,
             done=job.page.done,
         )
         # A body that the converter refuses fails the Workflow Task, as a result of a
