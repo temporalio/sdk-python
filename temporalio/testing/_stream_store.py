@@ -107,18 +107,20 @@ class MemoryStreamStore(StreamStore):
         """See base class."""
         return self._name
 
-    async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
+    async def create_stream(
+        self, request: CreateStreamRequest, *, request_id: str
+    ) -> CreateStreamResponse:
         """See base class."""
         return CreateStreamResponse.FromString(
-            await self._call("CreateStream", request)
+            await self._call("CreateStream", request, request_id)
         )
 
     async def append_records(
-        self, request: AppendRecordsRequest
+        self, request: AppendRecordsRequest, *, request_id: str
     ) -> AppendRecordsResponse:
         """See base class."""
         return AppendRecordsResponse.FromString(
-            await self._call("AppendRecords", request)
+            await self._call("AppendRecords", request, request_id)
         )
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
@@ -138,11 +140,18 @@ class MemoryStreamStore(StreamStore):
         )
 
     async def _call(
-        self, operation: str, request: google.protobuf.message.Message
+        self,
+        operation: str,
+        request: google.protobuf.message.Message,
+        request_id: str | None = None,
     ) -> bytes:
         runtime = self._runtime or temporalio.runtime.Runtime.default()
         return await temporalio.bridge.streams.call_stream_store(
-            runtime._core_runtime, self._caller, operation, request.SerializeToString()
+            runtime._core_runtime,
+            self._caller,
+            operation,
+            request.SerializeToString(),
+            request_id,
         )
 
 
@@ -205,46 +214,47 @@ class _MemoryStreams(StreamStore):
     def name(self) -> str:
         return self._name
 
-    async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
-        if request.stream_id not in self._streams:
-            self._streams[request.stream_id] = _Stream(
-                request.request_id, self._idle_expiry()
-            )
-            return CreateStreamResponse(created=True)
-        stream = self._stream(request.stream_id)
+    async def create_stream(
+        self, request: CreateStreamRequest, *, request_id: str
+    ) -> CreateStreamResponse:
+        stream_id = request.stream_ref.id
+        if stream_id not in self._streams:
+            self._streams[stream_id] = _Stream(request_id, self._idle_expiry())
+            return CreateStreamResponse(ref=request.stream_ref, created=True)
+        stream = self._stream(stream_id)
         if stream.closed:
             raise StreamError(
-                f"The Stream '{request.stream_id}' is closed",
+                f"The Stream '{stream_id}' is closed",
                 reason=StreamErrorReason.STREAM_ERROR_REASON_CLOSED,
             )
         # An empty request id identifies no create, so it never matches.
-        if request.request_id and request.request_id == stream.request_id:
-            return CreateStreamResponse(created=True)
+        if request_id and request_id == stream.request_id:
+            return CreateStreamResponse(ref=request.stream_ref, created=True)
         use_existing = StreamIdConflictPolicy.STREAM_ID_CONFLICT_POLICY_USE_EXISTING
         if request.id_conflict_policy == use_existing:
-            return CreateStreamResponse(created=False)
+            return CreateStreamResponse(ref=request.stream_ref, created=False)
         raise StreamError(
-            f"The Stream '{request.stream_id}' already exists",
+            f"The Stream '{stream_id}' already exists",
             reason=StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS,
         )
 
     async def append_records(
-        self, request: AppendRecordsRequest
+        self, request: AppendRecordsRequest, *, request_id: str
     ) -> AppendRecordsResponse:
-        stream = self._stream(request.stream_id)
+        stream = self._stream(request.ref.id)
         key, attempt = _producer_key(request.producer), _attempt(request.producer)
         writer = stream.writers.get(key)
         if writer is None:
             writer = _Writer(collections.deque(maxlen=self._resend_window))
-        if request.request_id:
+        if request_id:
             for batch in writer.window:
-                if (batch.attempt, batch.request_id) == (attempt, request.request_id):
+                if (batch.attempt, batch.request_id) == (attempt, request_id):
                     return batch.response
         if self._fence and attempt < writer.newest:
-            raise _fenced(request.stream_id)
+            raise _fenced(request.ref.id)
         if stream.closed:
             raise StreamError(
-                f"The Stream '{request.stream_id}' is closed",
+                f"The Stream '{request.ref.id}' is closed",
                 reason=StreamErrorReason.STREAM_ERROR_REASON_CLOSED,
             )
         first = len(stream.records) + 1
@@ -260,18 +270,18 @@ class _MemoryStreams(StreamStore):
             first_offset=first.to_bytes(8, "big"), last_offset=stream.last_offset
         )
         writer.newest = attempt
-        writer.window.append(_Batch(attempt, request.request_id, response))
+        writer.window.append(_Batch(attempt, request_id, response))
         stream.writers[key] = writer
         stream.expires_at = self._idle_expiry()
         self._notify(stream)
         return response
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
-        stream = self._stream(request.stream_id)
+        stream = self._stream(request.ref.id)
         if request.from_offset > stream.last_offset:
             raise StreamError(
                 f"The from_offset of the read is past the newest offset of the "
-                f"Stream '{request.stream_id}'",
+                f"Stream '{request.ref.id}'",
                 reason=StreamErrorReason.STREAM_ERROR_REASON_OFFSET_TOO_HIGH,
             )
         start = bisect.bisect_right(
@@ -295,12 +305,12 @@ class _MemoryStreams(StreamStore):
         )
 
     async def close_stream(self, request: CloseStreamRequest) -> CloseStreamResponse:
-        stream = self._stream(request.stream_id)
+        stream = self._stream(request.ref.id)
         if stream.closed:
             return CloseStreamResponse()
         writer = stream.writers.get(_producer_key(request.producer))
         if self._fence and writer and _attempt(request.producer) < writer.newest:
-            raise _fenced(request.stream_id)
+            raise _fenced(request.ref.id)
         stream.closed = True
         stream.expires_at = self._now() + self._retention.total_seconds()
         self._notify(stream)
@@ -309,7 +319,7 @@ class _MemoryStreams(StreamStore):
     async def describe_stream(
         self, request: DescribeStreamRequest
     ) -> DescribeStreamResponse:
-        stream = self._stream(request.stream_id)
+        stream = self._stream(request.ref.id)
         return DescribeStreamResponse(
             status=StreamStatus.STREAM_STATUS_CLOSED
             if stream.closed

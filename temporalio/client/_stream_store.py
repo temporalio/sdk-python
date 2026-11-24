@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -21,6 +22,7 @@ import temporalio.bridge.streams
 import temporalio.client
 import temporalio.nexus.system._support
 from temporalio.api.enums.v1 import StreamErrorReason
+from temporalio.api.stream.v1 import StreamRef
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     AppendRecordsResponse,
@@ -40,7 +42,7 @@ from temporalio.converter import (
 )
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 from temporalio.exceptions import StreamError
-from temporalio.nexus.system.stream_service import StreamRef, StreamService, models
+from temporalio.nexus.system.stream_service import StreamService
 
 logger = logging.getLogger(__name__)
 
@@ -57,8 +59,14 @@ class StreamStore(ABC):
     message of its operation and returns its response message, both from
     :py:mod:`temporalio.api.streamservice.v1`. A :py:class:`StreamConfig` registers
     a Store under its :py:meth:`name`, and the SDK sends each Stream call to the
-    Store of the call's ``StreamRef``. A request has the id of its Stream and never
-    a Store name, and no response has one.
+    Store of the call's ``StreamRef``. Each request has that ref. Only the SDK
+    reads the ``store`` of a ref, and a Store ignores it.
+
+    A create and an append also take a ``request_id``, which is the same on each
+    try of one call. The SDK makes one for each call of client or Activity code,
+    and SDK Core makes one for each append of Workflow code. A create of Workflow
+    code has the first run id of its Workflow chain, so the create of a later run
+    of the chain is a retry of the create that made the Stream.
 
     These docs use the following terms. A batch is the Records of one append. A
     Producer is one writer of a Stream, which is a Workflow run, an Activity, a
@@ -95,6 +103,8 @@ class StreamStore(ABC):
 
     * A create for an id with no Stream makes the Stream and returns ``created``
       true.
+    * A create returns the ref as the request had it. The SDK sets the ``store``
+      of that ref to the name of the Store before the caller gets it.
     * A create with the ``request_id`` of the create that made the Stream is a
       retry of it. A create with an empty ``request_id`` is never a retry.
     * A Store checks a create for an id that has a Stream in this order, and the
@@ -190,7 +200,8 @@ class StreamStore(ABC):
     * For every call of client or Activity code, and for a create or a describe
       of Workflow code, the SDK checks the request of an append as SDK Core
       does for one of Workflow code, and no other request. It only checks that
-      a response is the response message of the operation. It sends one request
+      a response is the response message of the operation, and that the ref of
+      a create's response has the Stream id of the request. It sends one request
       for each call and tries nothing again, so a Store that needs more checks
       runs them itself. Such a Store then checks the appends, closes and reads
       of Workflow code a second time.
@@ -215,17 +226,24 @@ class StreamStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
+    async def create_stream(
+        self, request: CreateStreamRequest, *, request_id: str
+    ) -> CreateStreamResponse:
         """Create a Stream, or return the open one that already exists if the
         conflict policy of the request allows it.
+
+        Each try of one create has the same ``request_id``.
         """
         raise NotImplementedError
 
     @abstractmethod
     async def append_records(
-        self, request: AppendRecordsRequest
+        self, request: AppendRecordsRequest, *, request_id: str
     ) -> AppendRecordsResponse:
-        """Append one batch from one Producer."""
+        """Append one batch from one Producer.
+
+        Each try of one append has the same ``request_id``.
+        """
         raise NotImplementedError
 
     @abstractmethod
@@ -276,9 +294,6 @@ class StreamConfig:
     :py:attr:`max_batch_bytes` and :py:attr:`max_batch_records` before its Store
     gets it, and refuses one over a limit with
     ``STREAM_ERROR_REASON_TOO_LARGE``.
-
-    A client interceptor that changes the ``StreamRef`` of a request must change it
-    in place, since a created Stream keeps the ref object of the request.
 
     For the Stream calls of Workflow code:
 
@@ -392,12 +407,12 @@ class StreamConfig:
 
     def _store_for(
         self,
-        ref: StreamRef[Any],
+        ref: StreamRef,
         target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None,
         namespace: str,
     ) -> StreamStore:
-        """Return the Store of a call on ``ref``, raising :class:`ValueError` if
-        there is none.
+        """Return the Store of a call on ``ref``, the ref of the call's request,
+        raising :class:`ValueError` if there is none.
         """
         if ref.store:
             return self._store(ref.store)
@@ -415,6 +430,22 @@ class StreamConfig:
     def _limits(self) -> tuple[int, int, int]:
         """Return the three limits, in the order in which the bridge takes them."""
         return self.max_record_bytes, self.max_batch_bytes, self.max_batch_records
+
+
+def _request_ref(request: google.protobuf.message.Message) -> StreamRef:
+    """Return the ref of a Stream request, which is ``stream_ref`` in a create."""
+    if isinstance(request, CreateStreamRequest):
+        return request.stream_ref
+    assert isinstance(
+        request,
+        (
+            AppendRecordsRequest,
+            ReadRecordsRequest,
+            CloseStreamRequest,
+            DescribeStreamRequest,
+        ),
+    )
+    return request.ref
 
 
 def _operation(
@@ -435,9 +466,13 @@ def _operation(
 
 
 async def _call_method(
-    store: StreamStore, operation: str, request: google.protobuf.message.Message
+    store: StreamStore,
+    operation: str,
+    request: google.protobuf.message.Message,
+    request_id: str | None,
 ) -> google.protobuf.message.Message:
-    """Call the method of ``store`` for a Stream operation.
+    """Call the method of ``store`` for a Stream operation. ``request_id`` is that
+    of a create or an append, and ``None`` for the other operations.
 
     Raises:
         StreamError: The Store refused the call. The reason is
@@ -446,8 +481,12 @@ async def _call_method(
             returned something else than the response message of the operation.
     """
     method, _, response_type = _operation(operation)
+    call = getattr(store, method)
     try:
-        response = await getattr(store, method)(request)
+        if request_id is None:
+            response = await call(request)
+        else:
+            response = await call(request, request_id=request_id)
     except StreamError:
         raise
     except Exception as err:
@@ -471,14 +510,22 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
     codec: PayloadCodec | None,
     operation: str,
     request: google.protobuf.message.Message,
+    request_id: str | None,
     timeout: timedelta | None = None,
 ) -> google.protobuf.message.Message:
     """Call a Store for client code, which is :py:func:`_call_method` with the
-    payload codec, the check of an append and a timeout.
+    payload codec, the check of an append, the Store of a created Stream and a
+    timeout.
 
     The codec gets each body of an append and each Record of a read alone, with no
     serialization context, since the reader of a Record can be any code. ``limits``
-    are those of the Stream config, from :py:meth:`StreamConfig._limits`.
+    are those of the Stream config, from :py:meth:`StreamConfig._limits`. The ref
+    of a create's response gets the name of ``store``.
+
+    Raises:
+        StreamError: The call failed. The reason is
+            ``STREAM_ERROR_REASON_STORE_CORRUPT`` for a create's response whose ref
+            doesn't have the Stream id of the request.
     """
     if codec and isinstance(request, AppendRecordsRequest):
         for appended in request.records:
@@ -491,7 +538,7 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
     try:
         # A timeout of zero is no timeout, as for an RPC of the client.
         async with asyncio.timeout(timeout.total_seconds() if timeout else None):
-            response = await _call_method(store, operation, request)
+            response = await _call_method(store, operation, request, request_id)
     except TimeoutError as err:
         raise StreamError(
             f"The Stream Store '{store.name()}' didn't answer the {operation} call "
@@ -502,6 +549,17 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
         for record in response.records:
             [body] = await codec.decode([record.body])
             record.body.CopyFrom(body)
+    if isinstance(response, CreateStreamResponse):
+        assert isinstance(request, CreateStreamRequest)
+        if response.ref.id != request.stream_ref.id:
+            raise StreamError(
+                f"The Stream Store '{store.name()}' answered the {operation} call "
+                "without the Stream id of the request",
+                reason=StreamErrorReason.STREAM_ERROR_REASON_STORE_CORRUPT,
+            )
+        # Each later call of the created Stream goes to this Store, whatever the
+        # selector picks then.
+        response.ref.store = store.name()
     return response
 
 
@@ -530,22 +588,25 @@ async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]
         raise ValueError(
             "Client has no stream_config, which every Stream call requires."
         )
-    request = input.arg
-    store = stream_config._store_for(request.ref, _activity_target(), client.namespace)
-    if isinstance(request, models.CreateStreamRequest):
-        # The created Stream takes the ref of its request.
-        request.ref.store = store.name()
     data_converter = client.data_converter
     converters = (
         data_converter.payload_converter,
         data_converter.failure_converter,
     )
+    request = temporalio.nexus.system._support.model_to_proto(input.arg, *converters)
+    store = stream_config._store_for(
+        _request_ref(request), _activity_target(), client.namespace
+    )
+    request_id = None
+    if isinstance(request, (CreateStreamRequest, AppendRecordsRequest)):
+        request_id = str(uuid.uuid4())
     response = await _call_store(
         store,
         stream_config._limits(),
         data_converter.payload_codec,
         input.operation,
-        temporalio.nexus.system._support.model_to_proto(request, *converters),
+        request,
+        request_id,
         input.rpc_timeout,
     )
     # Each generated Stream call gives its result type.
@@ -582,13 +643,15 @@ class _StoreCaller:  # pyright: ignore[reportUnusedClass]
         self,
         operation: str,
         request: bytes,
+        request_id: str | None,
         on_task: Callable[[asyncio.Task[Any]], None],
     ) -> bytes:
         """Call the Store for a Stream operation and return its encoded response.
 
-        ``on_task`` gets the task of this call, so that the bridge can cancel it.
-        It raises :py:class:`asyncio.CancelledError` if the bridge has already
-        dropped the call.
+        ``request_id`` is that of a create or an append, and ``None`` for the other
+        operations. ``on_task`` gets the task of this call, so that the bridge can
+        cancel it. It raises :py:class:`asyncio.CancelledError` if the bridge has
+        already dropped the call.
         """
         task = asyncio.current_task()
         assert task
@@ -596,7 +659,7 @@ class _StoreCaller:  # pyright: ignore[reportUnusedClass]
         _, request_type, _ = _operation(operation)
         try:
             response = await _call_method(
-                self._store(), operation, request_type.FromString(request)
+                self._store(), operation, request_type.FromString(request), request_id
             )
         except StreamError as err:
             unavailable = StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE

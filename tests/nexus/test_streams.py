@@ -33,6 +33,7 @@ from temporalio.api.stream.v1 import (
     Producer,
     StreamErrorDetails,
 )
+from temporalio.api.stream.v1 import StreamRef as RefProto
 from temporalio.client import (
     Client,
     NexusOperationHandle,
@@ -87,7 +88,9 @@ class _Interceptor(temporalio.client.Interceptor):
 
 
 class _RecordingOutbound(temporalio.client.OutboundInterceptor):
-    """Logs the Store name of each Stream request before and after its call."""
+    """Logs the Store name of the ref of each Stream request before and after its
+    call.
+    """
 
     def __init__(
         self,
@@ -100,11 +103,12 @@ class _RecordingOutbound(temporalio.client.OutboundInterceptor):
     async def start_nexus_operation(
         self, input: temporalio.client.StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
-        before = input.arg.ref.store
+        ref = getattr(input.arg, "stream_ref", None) or input.arg.ref
+        before = ref.store
         try:
             return await self.next.start_nexus_operation(input)
         finally:
-            self._stores.append((before, input.arg.ref.store))
+            self._stores.append((before, ref.store))
 
 
 def _producer_proto(producer: Any) -> Producer:
@@ -181,7 +185,7 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                         bodies = [rng.randrange(100) for _ in range(rng.randrange(3))]
                         call = stream.append(*bodies)
                         expected = proto.AppendRecordsRequest(
-                            stream_id=stream.ref.id,
+                            ref=RefProto(id=stream.ref.id, store=ref_store),
                             producer=producers[in_activity],
                             records=[
                                 AppendRecord(body=to_payload(body)) for body in bodies
@@ -189,11 +193,14 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                         )
                     case "describe":
                         call = stream.describe()
-                        expected = proto.DescribeStreamRequest(stream_id=stream.ref.id)
+                        expected = proto.DescribeStreamRequest(
+                            ref=RefProto(id=stream.ref.id, store=ref_store)
+                        )
                     case _:
                         call = stream.close()
                         expected = proto.CloseStreamRequest(
-                            stream_id=stream.ref.id, producer=producers[in_activity]
+                            ref=RefProto(id=stream.ref.id, store=ref_store),
+                            producer=producers[in_activity],
                         )
             else:
                 store = next((s for s in stores if s.name() == ref_store), None)
@@ -202,6 +209,7 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                 elif ref_store is None:
                     store = stores[0]
                 ref = StreamRef[int](id=stream_id, store=ref_store)
+                ref_proto = RefProto(id=stream_id, store=ref_store or "")
                 match operation:
                     case "create":
                         policy = rng.choice(list(StreamIdConflictPolicy.values()))
@@ -214,11 +222,11 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                             body_type=int,
                         )
                         expected = proto.CreateStreamRequest(
-                            stream_id=stream_id, id_conflict_policy=policy
+                            stream_ref=ref_proto, id_conflict_policy=policy
                         )
                     case "read":
                         expected = proto.ReadRecordsRequest(
-                            stream_id=stream_id,
+                            ref=ref_proto,
                             from_offset=rng.randbytes(rng.randrange(3)),
                             max_records=rng.choice([0, 1, 2**31 - 1]),
                             max_bytes=rng.choice([0, 1, 2**62]),
@@ -234,7 +242,7 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                         )
                     case _:
                         call = client.get_stream(ref).describe()
-                        expected = proto.DescribeStreamRequest(stream_id=stream_id)
+                        expected = proto.DescribeStreamRequest(ref=ref_proto)
             logs = [list(s.requests) for s in stores]
             del selects[:], ref_stores[:]
 
@@ -263,19 +271,18 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
             for other, log in zip(stores, logs):
                 if other is not store:
                     assert other.requests == log
-            [request] = store.requests[len(logs[stores.index(store)]) :]
+            [(request, request_id)] = store.calls[len(logs[stores.index(store)]) :]
             if isinstance(
                 request, (proto.CreateStreamRequest, proto.AppendRecordsRequest)
             ):
-                assert request.request_id and request.request_id not in request_ids
-                request_ids.add(request.request_id)
-                request.request_id = ""
+                assert request_id and request_id not in request_ids
+                request_ids.add(request_id)
+            else:
+                assert request_id is None
             assert request == expected
             assert not service_client.mock_calls
-            # An interceptor sees the ref as the caller wrote it, and the Store's name in
-            # it after a create.
-            after = store.name() if operation == "create" else ref_store
-            assert ref_stores == [(ref_store, after)]
+            # An interceptor sees the ref as the caller wrote it, also after the call.
+            assert ref_stores == [(ref_store, ref_store)]
             target = None
             if in_activity:
                 target = StorageDriverActivityInfo(

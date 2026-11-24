@@ -37,6 +37,7 @@ from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.api.stream.v1 import StreamRecord, StreamRef
 from temporalio.api.streamservice.v1 import (
     CreateStreamRequest,
+    CreateStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
 )
@@ -383,9 +384,9 @@ class _RecordingOutbound(temporalio.worker.WorkflowOutboundInterceptor):
         _Script.local_activities.append(input.activity)
         return super().start_local_activity(input)
 
-    async def start_create_stream(self, request: Any) -> Any:
+    async def start_create_stream(self, request: Any, output_type: Any = None) -> Any:
         _Script.intercepted.append(("create", request))
-        return await super().start_create_stream(request)
+        return await super().start_create_stream(request, output_type)
 
     async def start_append_records(self, request: Any) -> Any:
         _Script.intercepted.append(("append", request))
@@ -434,16 +435,20 @@ def _plan(
         if refused:
             job.resolve_stream_close.failed.CopyFrom(refused)
     else:
-        request: Message = DescribeStreamRequest(stream_id=call.stream)
+        request: Message = DescribeStreamRequest(ref=stream)
+        request_id = None
         described = DescribeStreamResponse(
             status=StreamStatus.STREAM_STATUS_OPEN, last_offset=b"last%d" % seq
         )
-        answer: Any = described.SerializeToString()
+        answer: Message = described
         outcome = (described.status, described.last_offset)
         if call.operation == "create":
             # Each create of a run chain has the first run id as its request id.
-            request = CreateStreamRequest(stream_id=call.stream, request_id="first-run")
-            answer = {"store": history_store, "created": seq % 2 == 0}
+            request, request_id = CreateStreamRequest(stream_ref=stream), "first-run"
+            answer = CreateStreamResponse(
+                ref=StreamRef(id=call.stream, store=history_store),
+                created=seq % 2 == 0,
+            )
             outcome = (history_store, seq % 2 == 0 or None)
         activity = command.schedule_local_activity
         activity.seq = seq
@@ -451,7 +456,7 @@ def _plan(
         activity.activity_type = _STORE_CALL
         operation = request.DESCRIPTOR.name.removesuffix("Request")
         activity.arguments.extend(
-            converter.to_payloads([store, operation, request.SerializeToString()])
+            converter.to_payloads([operation, request.SerializeToString(), request_id])
         )
         activity.schedule_to_close_timeout.FromSeconds(5)
         temporalio.common.RetryPolicy(maximum_attempts=1).apply_to_proto(
@@ -486,7 +491,9 @@ def _plan(
                 )
             )
         else:
-            result.completed.result.CopyFrom(converter.to_payload(answer))
+            result.completed.result.CopyFrom(
+                converter.to_payload(answer.SerializeToString())
+            )
     if call.cancel:
         outcome = "cancelled"
     elif call.refusal is not None:
@@ -625,7 +632,7 @@ async def _calls_script(rng: random.Random) -> None:
         assert not instance._streams._appends and not instance._streams._closes
         assert selects == expected_selects
         # An interceptor sees each call in the method of its operation, and the ref of
-        # a create has the Store name of History once the create has its result.
+        # a create as Workflow code wrote it, also after its result.
         assert [operation for operation, _ in _Script.intercepted] == [
             call.operation for call in calls
         ]
@@ -635,8 +642,8 @@ async def _calls_script(rng: random.Random) -> None:
         ]
         assert _Script.local_activities == [_STORE_CALL] * len(store_calls)
         for call, (_, request) in zip(calls, _Script.intercepted):
-            if call.operation == "create" and call.stream in created:
-                assert request.ref.store == created[call.stream]
+            if call.operation == "create":
+                assert request.stream_ref.store == call.store
     # An eviction ends each task of the instance, also the task of a call that waits.
     evict = WorkflowActivationJob(remove_from_cache=RemoveFromCache())
     assert (await _activate(instance, evict)).HasField("successful")

@@ -168,21 +168,30 @@ class FaultStore(StreamStore):
 
     def __init__(self, name: str = "memory", **options: Any) -> None:
         self.memory = MemoryStreamStore(name=name, **options)
-        self.requests: list[Any] = []
+        self.calls: list[tuple[Any, str | None]] = []
+        """Each request, with its request id, which is ``None`` for a read, a close
+        and a describe."""
         self.faults: dict[str, collections.deque[Fault]] = collections.defaultdict(
             collections.deque
         )
 
+    @property
+    def requests(self) -> list[Any]:
+        """Each request of :py:attr:`calls`."""
+        return [request for request, _ in self.calls]
+
     def name(self) -> str:
         return self.memory.name()
 
-    async def create_stream(self, request: CreateStreamRequest) -> CreateStreamResponse:
-        return await self._call("create_stream", request)
+    async def create_stream(
+        self, request: CreateStreamRequest, *, request_id: str
+    ) -> CreateStreamResponse:
+        return await self._call("create_stream", request, request_id)
 
     async def append_records(
-        self, request: AppendRecordsRequest
+        self, request: AppendRecordsRequest, *, request_id: str
     ) -> AppendRecordsResponse:
-        return await self._call("append_records", request)
+        return await self._call("append_records", request, request_id)
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
         return await self._call("read_records", request)
@@ -195,11 +204,15 @@ class FaultStore(StreamStore):
     ) -> DescribeStreamResponse:
         return await self._call("describe_stream", request)
 
-    async def _call(self, method: str, request: Message) -> Any:
-        self.requests.append(request)
+    async def _call(
+        self, method: str, request: Message, request_id: str | None = None
+    ) -> Any:
+        self.calls.append((request, request_id))
 
         async def call() -> Any:
-            return await getattr(self.memory, method)(request)
+            if request_id is None:
+                return await getattr(self.memory, method)(request)
+            return await getattr(self.memory, method)(request, request_id=request_id)
 
         if self.faults[method]:
             return await self.faults[method].popleft()(call)

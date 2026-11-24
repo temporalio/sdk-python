@@ -15,8 +15,8 @@ use temporalio_streams::proto::{
 };
 use temporalio_streams::record::StoreLimits;
 use temporalio_streams::{
-    AppendError, CloseError, CreateError, DescribeError, ReadError, Reason, StreamError,
-    StreamRuntime, StreamStore, WireReason,
+    AppendError, CloseError, CreateError, DescribeError, ReadError, StreamError, StreamRuntime,
+    StreamStore, WireReason,
 };
 
 use crate::runtime;
@@ -90,11 +90,14 @@ impl Drop for CallGuard<'_> {
 }
 
 impl PythonStore {
+    /// Calls the Store. `request_id` is that of a create or an append, and `None` for the other
+    /// operations. Core doesn't catch a panic of a Store, so every failure here is an error.
     async fn call<Request, Response, R>(
         &self,
         operation: &'static str,
         request: Request,
-    ) -> Result<Response, StreamError<Reason<R>>>
+        request_id: Option<String>,
+    ) -> Result<Response, StreamError<R>>
     where
         Request: Message,
         Response: Message + Default,
@@ -110,20 +113,21 @@ impl PythonStore {
             state: state.clone(),
             task_locals,
         };
-        let called = Python::attach(|py| {
+        let called = Python::try_attach(|py| {
             let on_task = OnTask {
                 state: state.clone(),
             };
             let request = PyBytes::new(py, &request.encode_to_vec());
-            let coroutine =
-                (self.caller.bind(py)).call_method1("call", (operation, request, on_task))?;
+            let arguments = (operation, request, request_id, on_task);
+            let coroutine = (self.caller.bind(py)).call_method1("call", arguments)?;
             pyo3_async_runtimes::into_future_with_locals(task_locals, coroutine)
         });
         let answer = match called {
-            Ok(answer) => answer.await,
-            Err(err) => Err(err),
+            Some(Ok(answer)) => answer.await,
+            Some(Err(err)) => Err(err),
+            None => return Err(interpreter_gone(operation)),
         };
-        Python::attach(|py| {
+        let done = Python::try_attach(|py| {
             let _task = std::mem::replace(&mut *lock(&state), CallState::Done);
             match answer {
                 Ok(response) => (response.bind(py).cast::<PyBytes>().ok())
@@ -136,13 +140,21 @@ impl PythonStore {
                     }),
                 Err(err) => Err(store_error(py, err)),
             }
-        })
+        });
+        done.unwrap_or_else(|| Err(interpreter_gone(operation)))
     }
+}
+
+/// Returns the error of a call that can't reach Python, since the interpreter is shutting down.
+fn interpreter_gone<R: WireReason>(operation: &str) -> StreamError<R> {
+    StreamError::store_unavailable(format!(
+        "The Python interpreter is shutting down, so the Store can't take the {operation} call"
+    ))
 }
 
 /// Returns the error of an operation for the exception of a Store. A `StreamError` is a refusal
 /// with its reason, and any other exception is an outage, which the caller can try again.
-fn store_error<R: WireReason>(py: Python<'_>, err: PyErr) -> StreamError<Reason<R>> {
+fn store_error<R: WireReason>(py: Python<'_>, err: PyErr) -> StreamError<R> {
     let refusal = || -> PyResult<Option<(i32, String)>> {
         let value = err.value(py);
         if !value.is_instance(stream_error_type(py)?)? {
@@ -166,50 +178,55 @@ impl StreamStore for PythonStore {
     fn create_stream(
         &self,
         request: CreateStreamRequest,
+        request_id: String,
     ) -> BoxFuture<'_, Result<CreateStreamResponse, CreateError>> {
-        Box::pin(self.call("CreateStream", request))
+        Box::pin(self.call("CreateStream", request, Some(request_id)))
     }
 
     fn append_records(
         &self,
         request: AppendRecordsRequest,
+        request_id: String,
     ) -> BoxFuture<'_, Result<AppendRecordsResponse, AppendError>> {
-        Box::pin(self.call("AppendRecords", request))
+        Box::pin(self.call("AppendRecords", request, Some(request_id)))
     }
 
     fn read_records(
         &self,
         request: ReadRecordsRequest,
     ) -> BoxFuture<'_, Result<ReadRecordsResponse, ReadError>> {
-        Box::pin(self.call("ReadRecords", request))
+        Box::pin(self.call("ReadRecords", request, None))
     }
 
     fn close_stream(
         &self,
         request: CloseStreamRequest,
     ) -> BoxFuture<'_, Result<CloseStreamResponse, CloseError>> {
-        Box::pin(self.call("CloseStream", request))
+        Box::pin(self.call("CloseStream", request, None))
     }
 
     fn describe_stream(
         &self,
         request: DescribeStreamRequest,
     ) -> BoxFuture<'_, Result<DescribeStreamResponse, DescribeError>> {
-        Box::pin(self.call("DescribeStream", request))
+        Box::pin(self.call("DescribeStream", request, None))
     }
 }
 
 /// Calls the Python Store of `caller` for one Stream operation through a `StreamRuntime`, which
-/// checks the request and the response. The awaitable raises `StreamError` for a failed call. The
+/// checks the request and the response. A create and an append need their `request_id`, which
+/// the other operations don't take. The awaitable raises `StreamError` for a failed call. The
 /// runtime has no limit of a batch, since the SDK that calls the Store has those in its Stream
 /// config.
 #[pyfunction]
+#[pyo3(signature = (runtime_ref, caller, operation, request, request_id=None))]
 pub fn call_stream_store<'p>(
     py: Python<'p>,
     runtime_ref: &runtime::RuntimeRef,
     caller: Py<PyAny>,
     operation: &str,
     request: &Bound<'_, PyBytes>,
+    request_id: Option<String>,
 ) -> PyResult<Bound<'p, PyAny>> {
     let task_locals = pyo3_async_runtimes::TaskLocals::with_running_loop(py)?.copy_context(py)?;
     let store = PythonStore {
@@ -217,12 +234,17 @@ pub fn call_stream_store<'p>(
         event_loop_task_locals: Arc::new(OnceLock::from(task_locals)),
     };
     let stream_runtime = StreamRuntime::new(Arc::new(store), StoreLimits::UNBOUNDED);
+    let with_request_id = || {
+        request_id
+            .clone()
+            .ok_or_else(|| PyValueError::new_err(format!("A {operation} call needs a request id")))
+    };
     macro_rules! run {
-        ($method:ident) => {{
-            let request = Message::decode(request.as_bytes())
+        (|$request:ident| $call:expr) => {{
+            let $request = Message::decode(request.as_bytes())
                 .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
             runtime_ref.runtime.future_into_py(py, async move {
-                let response = stream_runtime.$method(request).await;
+                let response = $call.await;
                 response
                     .map(|response| response.encode_to_vec())
                     .map_err(|err| stream_error(err.reason.into(), err.message))
@@ -230,11 +252,17 @@ pub fn call_stream_store<'p>(
         }};
     }
     match operation {
-        "CreateStream" => run!(create_stream),
-        "AppendRecords" => run!(append_records),
-        "ReadRecords" => run!(read_records),
-        "CloseStream" => run!(close_stream),
-        "DescribeStream" => run!(describe_stream),
+        "CreateStream" => {
+            let request_id = with_request_id()?;
+            run!(|decoded| stream_runtime.create_stream(decoded, request_id))
+        }
+        "AppendRecords" => {
+            let request_id = with_request_id()?;
+            run!(|decoded| stream_runtime.append_records(decoded, request_id))
+        }
+        "ReadRecords" => run!(|decoded| stream_runtime.read_records(decoded)),
+        "CloseStream" => run!(|decoded| stream_runtime.close_stream(decoded)),
+        "DescribeStream" => run!(|decoded| stream_runtime.describe_stream(decoded)),
         _ => Err(PyValueError::new_err(format!(
             "Unknown Stream operation: {operation}"
         ))),
@@ -297,7 +325,7 @@ pub fn check_stream_append(
     let request = Message::decode(request.as_bytes())
         .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
     store_limits(limits)?
-        .check_append(&request)
+        .validate_append(&request)
         .map_err(|err| stream_error(err.reason.into(), err.message))
 }
 
