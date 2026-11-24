@@ -15,10 +15,12 @@ from google.protobuf.message import Message
 from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType, StreamErrorReason, TaskQueueType
 from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
+from temporalio.api.stream.v1 import StreamRef as RefProto
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     CloseStreamResponse,
     CreateStreamRequest,
+    CreateStreamResponse,
     ReadRecordsRequest,
 )
 from temporalio.api.taskqueue.v1 import TaskQueue
@@ -117,7 +119,8 @@ class _CallsWorkflow:
 
 def _writes(store: FaultStore) -> list[Message]:
     """Return each request of a Store but its reads, which Core pages in its own way,
-    without what differs between two writers of the same call.
+    without what differs between two writers of the same call. That is the Producer,
+    and the Store name of the ref, which Workflow code fills in for a ref with none.
     """
     writes: list[Message] = []
     for request in store.requests:
@@ -125,9 +128,10 @@ def _writes(store: FaultStore) -> list[Message]:
             continue
         copy = type(request)()
         copy.CopyFrom(request)
-        for name in ("producer", "request_id"):
-            if name in copy.DESCRIPTOR.fields_by_name:
-                copy.ClearField(name)
+        if "producer" in copy.DESCRIPTOR.fields_by_name:
+            copy.ClearField("producer")
+        ref = copy.stream_ref if isinstance(copy, CreateStreamRequest) else copy.ref
+        ref.ClearField("store")
         writes.append(copy)
     return writes
 
@@ -168,8 +172,8 @@ async def test_workflow_code_and_a_client_get_the_same_answers(client: Client) -
             assert ran.result == from_client
             assert _writes(for_workflow) == _writes(for_client)
             appends = [
-                request.request_id
-                for request in for_workflow.requests
+                request_id
+                for request, request_id in for_workflow.calls
                 if isinstance(request, AppendRecordsRequest)
             ]
             assert all(appends) and len(set(appends)) == len(appends)
@@ -234,7 +238,9 @@ async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
     assert ran.result == _digest(expected)
     # The Store has each body as the codec gave it with no context, and the storage of
     # the Worker has none of them.
-    stored = await store.memory.read_records(ReadRecordsRequest(stream_id="bodies"))
+    stored = await store.memory.read_records(
+        ReadRecordsRequest(ref=RefProto(id="bodies"))
+    )
     assert [dict(record.body.metadata) for record in stored.records] == [
         {"encoding": b"test/wrapped", "context": b"NoneType"}
     ] * len(expected)
@@ -245,6 +251,16 @@ async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
 
 def _events(history: Any, event_type: EventType.ValueType) -> list[Any]:
     return [event for event in history.events if event.event_type == event_type]
+
+
+def _stream_calls(history: Any) -> list[bytes]:
+    """Return the Stream calls that Core keeps on each completed Workflow Task."""
+    completed = _events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
+    calls = [
+        event.workflow_task_completed_event_attributes.sdk_metadata.core_stream_calls
+        for event in completed
+    ]
+    return [call for call in calls if call]
 
 
 async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> None:
@@ -264,10 +280,9 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
         )
         return (await run(client, run_options)).result
 
-    def append_requests() -> list[AppendRecordsRequest]:
-        requests = [r for r in store.requests if isinstance(r, AppendRecordsRequest)]
-        del store.requests[:]
-        return requests
+    def append_request_ids() -> list[str | None]:
+        calls, store.calls = store.calls, []
+        return [i for r, i in calls if isinstance(r, AppendRecordsRequest)]
 
     # Core tries an append again in an outage of the Store, with one request id, so the
     # Store writes it once. Workflow code gets no error, and History has no failure.
@@ -282,15 +297,15 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
             ran = await run(client, RunOptions(_CallsWorkflow, [[append]]))
             offset = (at + 1).to_bytes(8, "big").hex()
             assert ran.result == [[offset, offset]]
-            requests = append_requests()
-            assert len(requests) == len(faults) + 1
-            assert len({request.request_id for request in requests}) == 1
+            request_ids = append_request_ids()
+            assert len(request_ids) == len(faults) + 1
+            assert len(set(request_ids)) == 1
             assert not _events(ran.history, EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED)
     # A client and an Activity get the outage as the error of their call.
     for path in ("client", "activity"):
         appends.append(raises(ConnectionError("The connection is gone")))
         [[error, reason, _]] = await answers_on(path, [append])
-        assert (error, reason, len(append_requests())) == ("error", unavailable, 1)
+        assert (error, reason, len(append_request_ids())) == ("error", unavailable, 1)
 
     # An answer of the wrong message fails the call, and nothing tries it again.
     corrupt = StreamErrorReason.STREAM_ERROR_REASON_STORE_CORRUPT
@@ -298,7 +313,13 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
         with failure_note(path):
             appends.append(answers(CloseStreamResponse()))
             [[error, reason, _]] = await answers_on(path, [append])
-            assert (error, reason, len(append_requests())) == ("error", corrupt, 1)
+            assert (error, reason, len(append_request_ids())) == ("error", corrupt, 1)
+            # So does a create that the Store answers with the ref of another Stream.
+            other = CreateStreamResponse(ref=RefProto(id="other"), created=True)
+            store.faults["create_stream"].append(answers(other))
+            create = ["create", f"answered for another Stream in {path}"]
+            [[error, reason, _]] = await answers_on(path, [create])
+            assert (error, reason) == ("error", corrupt)
 
     # A refusal is the same error for a client, an Activity and Workflow code. Workflow
     # code gets it again in each task that replays the call.
@@ -394,6 +415,7 @@ async def test_a_stream_call_with_no_store_fails_the_workflow_task(
             # has nothing of the call.
             assert isinstance(ran.result, WorkflowFailureError)
             assert not _events(ran.history, EventType.EVENT_TYPE_MARKER_RECORDED)
+            assert not _stream_calls(ran.history)
 
 
 @workflow.defn
@@ -436,7 +458,7 @@ async def test_a_close_of_workflow_code_closes_the_stream(client: Client) -> Non
             ran = await run(stream_client(client, store), options)
             assert (ran.result is None) == (how in ("async with", "return"))
             page = await store.memory.read_records(
-                ReadRecordsRequest(stream_id=stream_id)
+                ReadRecordsRequest(ref=RefProto(id=stream_id))
             )
             assert (len(page.records), page.done) == (1, True)
 
@@ -511,6 +533,17 @@ class _SwapWorkflow:
         return created.ref.store
 
 
+def _calls(store: FaultStore) -> list[tuple[str, str]]:
+    """Return the request type and the Stream id of each call of a Store."""
+    return [
+        (
+            type(r).__name__,
+            r.stream_ref.id if isinstance(r, CreateStreamRequest) else r.ref.id,
+        )
+        for r in store.requests
+    ]
+
+
 # On a server with worker commands, a lone Worker polls in a loop after a new client. Marked as
 # `test_workflow_replace_worker_client` and `test_nexus_client_updates_when_worker_client_changes`.
 @pytest.mark.requires_local_server
@@ -566,14 +599,10 @@ async def test_a_worker_uses_the_stream_config_of_its_new_client(
             # The created Stream stays on its Store. A ref with no Store name goes to the
             # Store that the new selector picks, in Workflow code as in an Activity.
             assert (await run(before, options)).result == "first"
-            assert [(type(r).__name__, r.stream_id) for r in first.requests] == [
-                ("CreateStreamRequest", "own"),
-            ]
+            assert _calls(first) == [("CreateStreamRequest", "own")]
             # After the swap, Core calls the Store objects of the new client.
-            assert [(type(r).__name__, r.stream_id) for r in new_first.requests] == [
-                ("AppendRecordsRequest", "own"),
-            ]
-            assert [(type(r).__name__, r.stream_id) for r in new_second.requests] == [
+            assert _calls(new_first) == [("AppendRecordsRequest", "own")]
+            assert _calls(new_second) == [
                 ("CreateStreamRequest", "shared"),
                 ("AppendRecordsRequest", "shared"),
                 ("AppendRecordsRequest", "shared"),
@@ -656,7 +685,7 @@ async def test_an_append_over_a_limit_of_the_config_never_reaches_the_store(
                 len(request.records)
                 for request in store.requests
                 if isinstance(request, AppendRecordsRequest)
-                and request.stream_id != f"large {seed}"
+                and request.ref.id != f"large {seed}"
             ] == [len(sizes) for sizes, fits in batches if fits] * 2
 
 
@@ -683,8 +712,8 @@ async def test_a_create_in_a_later_run_of_the_chain_is_the_same_create(
     )
     # Each run makes its create twice, and the Store takes all four for one create.
     assert ran.result is True
-    creates = [r for r in store.requests if isinstance(r, CreateStreamRequest)]
-    assert len(creates) == 4 and len({create.request_id for create in creates}) == 1
+    creates = [i for r, i in store.calls if isinstance(r, CreateStreamRequest)]
+    assert len(creates) == 4 and len(set(creates)) == 1
 
 
 _handled: dict[int, asyncio.Event] = {}
@@ -1076,8 +1105,7 @@ async def test_a_replay_reads_its_python_stores(client: Client) -> None:
 
             async def lose_the_records(handle: Any, _worker: Any) -> None:
                 async def has_read() -> None:
-                    history = await handle.fetch_history()
-                    assert _events(history, EventType.EVENT_TYPE_MARKER_RECORDED)
+                    assert _stream_calls(await handle.fetch_history())
 
                 await assert_eventually(has_read)
                 store.memory = MemoryStreamStore()
@@ -1130,7 +1158,7 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
     ]
     for limits, expected in cases:
         with failure_note(f"limits {limits}"):
-            del store.requests[:]
+            store.calls.clear()
             options = RunOptions(
                 _ReadAllWorkflow,
                 ["paged", limits],

@@ -31,11 +31,11 @@ from temporalio.client._stream_store import (
     StreamStore,
     _call_store,
     _operation,
+    _request_ref,
     _StoreCaller,
 )
 from temporalio.converter import StorageDriverWorkflowInfo
 from temporalio.exceptions import StreamError
-from temporalio.nexus.system.stream_service import StreamRef
 
 from ._interceptor import StartLocalActivityInput, StartNexusOperationInput
 
@@ -104,7 +104,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         # The seq of the call's read, or 0 for another operation
         read_seq = 0
         if isinstance(request, proto.AppendRecordsRequest):
-            stream = self._stream(model.ref)
+            stream = self._stream(request.ref)
             seq = instance._next_seq("stream_append")
             append = instance._add_command().append_to_stream
             append.seq = seq
@@ -112,7 +112,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             append.bodies.extend(record.body for record in request.records)
             result = self._appends[seq] = instance.create_future()
         elif isinstance(request, proto.CloseStreamRequest):
-            stream = self._stream(model.ref)
+            stream = self._stream(request.ref)
             seq = instance._next_seq("stream_close")
             close = instance._add_command().close_stream
             close.seq = seq
@@ -126,7 +126,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                     "Cannot read a Stream with no body type. Give get_stream a "
                     "body_type, or a StreamRef with a type argument."
                 )
-            stream = self._stream(model.ref)
+            stream = self._stream(request.ref)
             read_seq = instance._next_seq("stream_read")
             instance._add_command().read_stream.CopyFrom(
                 temporalio.bridge.proto.workflow_commands.ReadStream(
@@ -142,10 +142,13 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             self._reads[read_seq] = _Read(request.from_offset, result, result_type)
         else:
             # The Local Activity picks the Store of a ref with no Store name. A replay
-            # has its result, so a replay asks no selector for it.
-            result = self._schedule_store_call(
-                operation, model.ref.store or "", request
-            )
+            # has its result, so a replay asks no selector for it. Each run of a chain
+            # sends the same id, so a Store answers the create of a later run as the
+            # create that made the Stream.
+            request_id = None
+            if isinstance(request, proto.CreateStreamRequest):
+                request_id = instance._info.first_execution_run_id
+            result = self._schedule_store_call(operation, request, request_id)
 
         async def call() -> OutputT:
             # `asyncio.wait` ends at a cancel of this task. `await result` would pass the
@@ -154,7 +157,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             if isinstance(request, proto.ReadRecordsRequest):
                 return result.result()
             return temporalio.nexus.system._support.model_from_proto(
-                self._response(operation, model, request, result),
+                self._response(operation, request, result),
                 result_type,
                 *converters,
             )
@@ -239,7 +242,10 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         )
 
     def _schedule_store_call(
-        self, operation: str, store: str, request: google.protobuf.message.Message
+        self,
+        operation: str,
+        request: google.protobuf.message.Message,
+        request_id: str | None,
     ) -> asyncio.Future[Any]:
         """Schedule the SDK's Local Activity for a create or a describe."""
         instance = self._instance
@@ -255,7 +261,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         activity = instance._outbound.start_local_activity(
             StartLocalActivityInput(
                 activity=_STORE_CALL_ACTIVITY,
-                args=(store, operation, request.SerializeToString()),
+                args=(operation, request.SerializeToString(), request_id),
                 activity_id=None,
                 # A call that hangs ends before the heartbeat of the Workflow Task, and an
                 # outage fails the task immediately, so neither writes into History.
@@ -278,7 +284,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
     def _response(
         self,
         operation: str,
-        model: Any,
         request: google.protobuf.message.Message,
         result: asyncio.Future[Any],
     ) -> google.protobuf.message.Message:
@@ -308,20 +313,21 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 outage.__cause__ = err
                 raise self._fail_task(outage)
             raise error from err
+        # The ref of a create has the Store name of History, so a replay gives the same
+        # ref under any Stream config.
         if isinstance(request, proto.CreateStreamRequest):
-            # The created Stream takes the ref of its request. The name is the one in
-            # History, so a replay gives the same ref under any Stream config.
-            model.ref.store = answer["store"]
-            return proto.CreateStreamResponse(created=answer["created"])
+            return proto.CreateStreamResponse.FromString(answer)
         return proto.DescribeStreamResponse.FromString(answer)
 
-    def _stream(self, ref: StreamRef[Any]) -> temporalio.api.stream.v1.StreamRef:
+    def _stream(
+        self, ref: temporalio.api.stream.v1.StreamRef
+    ) -> temporalio.api.stream.v1.StreamRef:
         """Return the ref of a command, with the name of the Store that SDK Core calls.
 
         A ref with no Store name gets the Store that the config of the Worker's
         client picks, and an empty name if that client has no Stream config.
         """
-        store = ref.store or ""
+        store = ref.store
         config = self._stream_config()
         if config and not store:
             info = self._instance._info
@@ -373,14 +379,13 @@ class _StreamCall(temporalio.workflow.NexusOperationHandle[OutputT]):
 
 @temporalio.activity.defn(name=_STORE_CALL_ACTIVITY)
 async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
-    store: str, operation: str, request: bytes
-) -> Any:
+    operation: str, request: bytes, request_id: str | None
+) -> bytes:
     """Call a Stream Store of the Worker's client for a create or a describe of
-    Workflow code. ``store`` is the Store name of the call's ref, or empty.
+    Workflow code. ``request_id`` is that of a create, and ``None`` for a describe.
 
-    Returns the name of the Store that it called and ``created`` for a create, so
-    that History has the Store of the created Stream, and the encoded response for
-    a describe.
+    Returns the encoded response. The ref of a create's response has the name of
+    the Store that it called, so History has the Store of the created Stream.
     """
     info = temporalio.activity.info()
     if not info.is_local or operation not in ("CreateStream", "DescribeStream"):
@@ -403,9 +408,7 @@ async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
         namespace=info.namespace,
     )
     picked = stream_config._store_for(
-        StreamRef(id=stream_request.stream_id, store=store or None),
-        target,
-        client.namespace,
+        _request_ref(stream_request), target, client.namespace
     )
     response = await _call_store(
         picked,
@@ -413,9 +416,8 @@ async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
         client.data_converter.payload_codec,
         operation,
         stream_request,
+        request_id,
     )
-    if isinstance(response, proto.CreateStreamResponse):
-        return {"store": picked.name(), "created": response.created}
     return response.SerializeToString()
 
 

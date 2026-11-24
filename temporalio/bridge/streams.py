@@ -21,10 +21,14 @@ class StoreCaller(Protocol):
         self,
         operation: str,
         request: bytes,
+        request_id: str | None,
         on_task: Callable[[asyncio.Task[Any]], None],
     ) -> bytes:
         """Call the Store for a Stream operation with its encoded request, and
         return its encoded response.
+
+        ``request_id`` is that of a create or an append, and ``None`` for the
+        other operations.
         """
         ...
 
@@ -46,12 +50,16 @@ async def call_stream_store(
     caller: StoreCaller,
     operation: str,
     request: bytes,
+    request_id: str | None = None,
 ) -> bytes:
     """Call a Stream Store through the Stream runtime of SDK Core, which checks
     the request and the response.
+
+    A create and an append need their ``request_id``, and the other operations
+    take none.
     """
     return await temporalio.bridge.temporal_sdk_bridge.call_stream_store(
-        runtime._ref, caller, operation, request
+        runtime._ref, caller, operation, request, request_id
     )
 
 
