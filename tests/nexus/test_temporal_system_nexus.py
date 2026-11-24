@@ -191,6 +191,7 @@ def test_signal_with_start_storage_target() -> None:
         task_queue="target-task-queue",
         signal="test-signal",
         namespace="target-namespace",
+        id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
     )
     target = nexus_system._get_storage_target(
         "temporal.api.workflowservice.v1.WorkflowService",
@@ -226,6 +227,7 @@ def test_system_nexus_store_context(
         task_queue="target-queue",
         signal="append",
         namespace="target-namespace",
+        id_reuse_policy=temporalio.common.WorkflowIDReusePolicy.ALLOW_DUPLICATE,
     )
     instance = SimpleNamespace(
         _info=SimpleNamespace(
