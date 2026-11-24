@@ -1,7 +1,6 @@
 import collections.abc
 import dataclasses
 import typing
-import uuid
 from datetime import datetime, timedelta
 
 import google.protobuf.duration_pb2
@@ -26,7 +25,6 @@ if typing.TYPE_CHECKING:
         ReadRecordsRequest,
         ReadRecordsResponse,
         StreamRecord,
-        StreamRef,
         Timestamp,
     )
 
@@ -72,25 +70,6 @@ def model_from_proto(
         )
     ):
         return converter.from_transfer_type(proto, model_type)
-
-
-def request_id() -> str:
-    from temporalio.workflow import in_workflow, info
-
-    # Each run of a chain sends the same id, so a Store answers the create of a later run
-    # as the create that made the Stream.
-    if in_workflow():
-        return info().first_execution_run_id
-    return str(uuid.uuid4())
-
-
-def append_request_id() -> str | None:
-    from temporalio.workflow import in_workflow
-
-    # Core makes the request id of an append of Workflow code.
-    if in_workflow():
-        return None
-    return str(uuid.uuid4())
 
 
 def default_producer(
@@ -198,16 +177,6 @@ def _timestamp(time: datetime) -> "Timestamp":
     proto = google.protobuf.timestamp_pb2.Timestamp()
     proto.FromDatetime(time)
     return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
-
-
-def stream_ref_to_id(ref: "StreamRef[typing.Any]") -> str:
-    return ref.id
-
-
-def stream_ref_from_id(
-    id: str, ref_type: "type[StreamRef[_BodyT]]"
-) -> "StreamRef[_BodyT]":
-    return ref_type(id=id)
 
 
 def next_read_request(
