@@ -77,6 +77,12 @@ class WorkflowActivation(google.protobuf.message.Message):
     (which must be stable based on lang implementation or convention), rather than the order jobs are
     processed.
 
+    A successful activation completion for queries attached to a workflow task must include a query
+    response. Core holds local activity results for the next task as soon as it dispatches these
+    queries, since sending their responses completes the current task.
+
+    Workflow tasks with no activation jobs are handled internally by Core, without activating lang.
+
     ## Evictions
 
     Evictions appear as an activations that contains only a `remove_from_cache` job. Such activations
