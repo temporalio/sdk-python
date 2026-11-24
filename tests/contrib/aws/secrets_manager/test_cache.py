@@ -444,7 +444,7 @@ async def test_client_cert_traditional_key_format():
     )
 
 
-async def test_client_cert_key_mismatch_keeps_previous_pair():
+async def test_client_cert_key_mismatch_keeps_previous_pair_until_rotated():
     pair1, pair2 = new_cert_key("pair1"), new_cert_key("pair2")
     fetcher = FakeFetcher()
     fetcher.set("cert", pair1.cert, "v1")
@@ -467,6 +467,14 @@ async def test_client_cert_key_mismatch_keeps_previous_pair():
     assert [
         a["failure_reason"] for n, _, a in metrics.updates() if n == METRIC_FETCH_FAILED
     ] == ["invalid_response"]
+
+    # Once the key is updated too, the next retry picks up the new pair
+    fetcher.set("key", pair2.key, "v2")
+    clock.t += FAILED_REFRESH_RETRY_INTERVAL_SECONDS
+    assert await cache.get(cache.client_cert, metrics.telemetry) == (
+        pair2.cert,
+        pair2.key,
+    )
 
 
 async def test_client_cert_invalid_key_error_omits_key():
