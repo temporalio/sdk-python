@@ -19,16 +19,12 @@ def current_producer() -> Producer:
     An append or a close of that attempt sends it by default. Code that stores
     it, such as in heartbeat details, gets it back from :py:func:`as_producer`.
 
-    The Producer of an Activity of a Workflow has the Activity id, which is the
-    sequence number of the Activity in the run unless the Workflow set one, and
-    the id of the Activity's ``ActivityTaskScheduled`` event. A run can use an
-    Activity id again after the first Activity with it has ended. The second
-    Activity is then a separate Producer, since its scheduled event is another
-    one.
-
-    A Local Activity whose retry waits longer than its ``local_retry_threshold``
-    runs again under a new sequence number. Each such retry then writes as a new
-    Producer, unless the Workflow set ``activity_id``.
+    The Producer of an Activity of a Workflow has the Activity id and the id of
+    its ``ActivityTaskScheduled`` event. So a later Activity of the run that uses
+    the same Activity id is a separate Producer. A Local Activity whose retry
+    waits longer than its ``local_retry_threshold`` runs under a new sequence
+    number, and then writes as a new Producer unless the Workflow set
+    ``activity_id``.
 
     Raises:
         RuntimeError: The caller isn't an Activity.

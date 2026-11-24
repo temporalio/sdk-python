@@ -25,25 +25,20 @@ class BufferedAppender(Generic[BodyT]):
     Use it in code that appends often, such as an Activity that streams model
     tokens. :py:meth:`append` returns immediately and does no I/O. The appender
     writes the buffered Records as one batch, at most ``max_delay`` after the
-    first of them. One write runs at a time. Records appended during a write
-    wait for the next batch, and they keep their order.
+    first of them. One write runs at a time, and the Records keep their order.
 
-    Use it in ``async with``, which writes the remaining Records at the end of
-    the block, or await :py:meth:`flush` before the code that appends ends.
-    Otherwise the appender writes the Records that it still holds up to
-    ``max_delay`` later. For an Activity that has ended, that write still has the
-    Producer of its attempt, it can come after a write of the next attempt, and
-    nobody gets its error.
+    Use it in ``async with``, or await :py:meth:`flush` before the code that
+    appends ends. Otherwise the last Records are written up to ``max_delay``
+    later, and nobody gets the error of that write. For an Activity that has
+    ended, that write can come after a write of the next attempt.
 
-    ``await flush()`` is the backpressure point. If code appends faster than the
-    Store takes Records, the buffer grows with no bound, unless that code awaits
-    ``flush()`` from time to time.
+    ``await flush()`` is the backpressure point. The buffer has no bound, so code
+    that appends faster than the Store takes Records must await it from time to
+    time.
 
     After a batch fails, the appender writes nothing more, so a reader sees no
     gap. Each later :py:meth:`append` and :py:meth:`flush` raises the error of
-    that batch. If the write of the batch was cancelled, they raise
-    :exc:`RuntimeError`, and only a ``flush`` that waited for that write gets
-    the cancel.
+    that batch, or :exc:`RuntimeError` if the write was cancelled.
 
     The appender is for client and Activity code. Workflow code passes its
     Records to one ``append`` call of its Stream.
