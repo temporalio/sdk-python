@@ -72,7 +72,6 @@ class Stream(typing.Generic[BodyT]):
             ref=self.ref,
             records=[AppendRecord(body=value) for value in records],
             producer=_support.workflow_producer(),
-            request_id=_support.append_request_id(),
         )
         handle = await _append_records(request)
         return await handle

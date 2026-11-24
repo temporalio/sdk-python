@@ -68,7 +68,7 @@ class WorkflowActivation(google.protobuf.message.Message):
      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
      normally would have when executing.
     * The results of Stream calls go after the local activity resolutions, because a replay also
-     scans ahead for their marker. Appends go first, then closes, then reads, and each kind is in
+     scans ahead for their ledger. Appends go first, then closes, then reads, and each kind is in
      `seq` order. When a replay gives the results of several activations in one, the Stream results
      keep the order of those activations, after all local activity resolutions.
     * Queries always go last (and, in fact, always come in their own activation)
@@ -1761,9 +1761,14 @@ class StreamPage(google.protobuf.message.Message):
 
     RECORDS_FIELD_NUMBER: builtins.int
     DONE_FIELD_NUMBER: builtins.int
+    LAST_OFFSET_FIELD_NUMBER: builtins.int
     done: builtins.bool
     """True if the Stream is closed and has no Record after this page. It's false if the page has
     no Record because none came within the `wait` of the read.
+    """
+    last_offset: builtins.bytes
+    """The offset where the page ends, as the Store gave it. The next read can pass it as its
+    `from_offset`. It's set also for a page with no Record.
     """
     @property
     def records(
@@ -1784,9 +1789,13 @@ class StreamPage(google.protobuf.message.Message):
         ]
         | None = ...,
         done: builtins.bool = ...,
+        last_offset: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
-        self, field_name: typing.Literal["done", b"done", "records", b"records"]
+        self,
+        field_name: typing.Literal[
+            "done", b"done", "last_offset", b"last_offset", "records", b"records"
+        ],
     ) -> None: ...
 
 global___StreamPage = StreamPage

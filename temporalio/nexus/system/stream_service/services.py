@@ -29,7 +29,7 @@ class StreamService:
 
     create_stream: Operation[
         CreateStreamRequest[typing.Any],
-        CreateStreamResult,
+        CreateStreamResult[typing.Any],
     ] = Operation(name="CreateStream")
 
     append_records: Operation[
