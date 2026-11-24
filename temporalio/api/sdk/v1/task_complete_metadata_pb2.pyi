@@ -21,6 +21,7 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
     LANG_USED_FLAGS_FIELD_NUMBER: builtins.int
     SDK_NAME_FIELD_NUMBER: builtins.int
     SDK_VERSION_FIELD_NUMBER: builtins.int
+    CORE_STREAM_CALLS_FIELD_NUMBER: builtins.int
     sdk_name: builtins.str
     """Name of the SDK that processed the task. This is usually something like "temporal-go" and is
     usually the same as client-name gRPC header. This should only be set if its value changed
@@ -33,6 +34,10 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
     """Version of the SDK that processed the task. This is usually something like "1.20.0" and is
     usually the same as client-version gRPC header. This should only be set if its value changed
     since the last time recorded on the workflow (or be set on the first task).
+    """
+    core_stream_calls: builtins.bytes
+    """The Stream calls of this Workflow Task, in a format that SDK Core owns. A replay gives
+    Workflow code the same results from it.
     """
     @property
     def core_used_flags(
@@ -78,10 +83,13 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
         lang_used_flags: collections.abc.Iterable[builtins.int] | None = ...,
         sdk_name: builtins.str = ...,
         sdk_version: builtins.str = ...,
+        core_stream_calls: builtins.bytes = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing.Literal[
+            "core_stream_calls",
+            b"core_stream_calls",
             "core_used_flags",
             b"core_used_flags",
             "lang_used_flags",
