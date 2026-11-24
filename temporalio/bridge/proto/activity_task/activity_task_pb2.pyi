@@ -167,7 +167,6 @@ class Start(google.protobuf.message.Message):
     RUN_ID_FIELD_NUMBER: builtins.int
     PROPAGATED_NEXUS_SERIALIZATION_CONTEXT_FIELD_NUMBER: builtins.int
     WORKFLOW_TASK_FIELD_NUMBER: builtins.int
-    SCHEDULED_EVENT_ID_FIELD_NUMBER: builtins.int
     workflow_namespace: builtins.str
     """The namespace the workflow lives in"""
     workflow_type: builtins.str
@@ -183,10 +182,6 @@ class Start(google.protobuf.message.Message):
     """
     run_id: builtins.str
     """Run ID of this activity execution. Only set for standalone activities."""
-    scheduled_event_id: builtins.int
-    """For an activity that a workflow scheduled, the event id of its ActivityTaskScheduled event.
-    0 for a local activity, for a standalone activity, and when Core can't read it.
-    """
     @property
     def workflow_execution(
         self,
@@ -299,7 +294,6 @@ class Start(google.protobuf.message.Message):
         propagated_nexus_serialization_context: temporalio.api.nexus.v1.message_pb2.PropagatedSerializationContext
         | None = ...,
         workflow_task: global___WorkflowTaskAttempt | None = ...,
-        scheduled_event_id: builtins.int = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -359,8 +353,6 @@ class Start(google.protobuf.message.Message):
             b"run_id",
             "schedule_to_close_timeout",
             b"schedule_to_close_timeout",
-            "scheduled_event_id",
-            b"scheduled_event_id",
             "scheduled_time",
             b"scheduled_time",
             "start_to_close_timeout",

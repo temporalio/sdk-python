@@ -309,10 +309,11 @@ class ReadRecordsResponse(google.protobuf.message.Message):
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     DONE_FIELD_NUMBER: builtins.int
     last_offset: builtins.bytes
-    """The last position that the read covered. The next read passes it as `from_offset`. Every
-    Store can give it, as the offset of the last Record in this page, or as the `from_offset`
-    of the request for an empty page. A Store can also give a later offset that skips only
-    entries of its own that aren't Records, so the next read doesn't scan them again.
+    """The last position that the read covered. The next read passes it as `from_offset`. A Store
+    doesn't have to set it. If it's empty, that position is the offset of the last Record in
+    this page, or the `from_offset` of the request for an empty page. A Store can set a later
+    offset that skips only entries of its own that aren't Records, so the next read doesn't
+    scan them again.
     """
     done: builtins.bool
     """True when the Stream is closed and this page has its last Record. A read has no other sign
