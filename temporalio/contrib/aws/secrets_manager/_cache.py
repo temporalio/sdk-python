@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Generic, TypeVar, cast
 
+import temporalio.bridge.temporal_sdk_bridge
 from temporalio.contrib.aws.secrets_manager._fetch import (
     FETCH_TIMEOUT_SECONDS,
     Fetcher,
@@ -408,7 +409,9 @@ def _new_client_cert_entry(
 ) -> CacheEntry[tuple[bytes, bytes]]:
     """Entry for the client cert and key, which may be the same secret if bundled.
     Each secret's relevant PEM blocks are extracted, so a bundled secret can be
-    used as both.
+    used as both. A newly fetched pair that doesn't match (e.g. fetched partway
+    through rotating separate cert and key secrets) is treated as a failed
+    fetch, so the previous pair keeps being used.
     """
     refs = [_SecretRef(cert_id, SecretType.TLS_CLIENT_CERT)]
     if key_id != cert_id:
@@ -426,7 +429,20 @@ def _new_client_cert_entry(
             raise InvalidResponseError(
                 f'no PEM private key found in TLS client key secret "{key_id}"'
             )
-        return _pem_certs(cert_pem), key_match.group(0) + b"\n"
+        certs, key = _pem_certs(cert_pem), key_match.group(0) + b"\n"
+        try:
+            matches = temporalio.bridge.temporal_sdk_bridge.tls_client_key_matches_cert(
+                certs, key
+            )
+        except ValueError as err:
+            raise InvalidResponseError(
+                f'failed loading TLS client cert/key from AWS Secrets Manager secrets "{cert_id}" and "{key_id}": {err}'
+            ) from None
+        if not matches:
+            raise InvalidResponseError(
+                f'TLS client cert and key from AWS Secrets Manager secrets "{cert_id}" and "{key_id}" don\'t match'
+            )
+        return certs, key
 
     return CacheEntry(refs, parse)
 

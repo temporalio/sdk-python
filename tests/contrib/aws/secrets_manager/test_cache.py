@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 
 from temporalio.contrib.aws.secrets_manager._cache import (
     FAILED_REFRESH_RETRY_INTERVAL_SECONDS,
@@ -424,6 +425,66 @@ async def test_client_cert_separate(caplog: pytest.LogCaptureFixture):
     ]
 
 
+async def test_client_cert_traditional_key_format():
+    cert_key = new_cert_key()
+    key = serialization.load_pem_private_key(cert_key.key, None).private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.TraditionalOpenSSL,
+        serialization.NoEncryption(),
+    )
+    assert key.startswith(b"-----BEGIN EC PRIVATE KEY-----")
+    fetcher = FakeFetcher()
+    fetcher.set("cert", cert_key.cert, "v1")
+    fetcher.set("key", key, "v1")
+    cache, _ = _new_cache(fetcher, SecretIDs(client_cert="cert", client_key="key"))
+    assert cache.client_cert
+    assert await cache.get(cache.client_cert, MetricsRecorder().telemetry) == (
+        cert_key.cert,
+        key,
+    )
+
+
+async def test_client_cert_key_mismatch_keeps_previous_pair():
+    pair1, pair2 = new_cert_key("pair1"), new_cert_key("pair2")
+    fetcher = FakeFetcher()
+    fetcher.set("cert", pair1.cert, "v1")
+    fetcher.set("key", pair1.key, "v1")
+    cache, clock = _new_cache(fetcher, SecretIDs(client_cert="cert", client_key="key"))
+    assert cache.client_cert
+    metrics = MetricsRecorder()
+    assert await cache.get(cache.client_cert, metrics.telemetry) == (
+        pair1.cert,
+        pair1.key,
+    )
+    metrics.updates()
+    # Partway through rotating the separate secrets, only the cert is updated
+    fetcher.set("cert", pair2.cert, "v2")
+    clock.t += 300
+    assert await cache.get(cache.client_cert, metrics.telemetry) == (
+        pair1.cert,
+        pair1.key,
+    )
+    assert [
+        a["failure_reason"] for n, _, a in metrics.updates() if n == METRIC_FETCH_FAILED
+    ] == ["invalid_response"]
+
+
+async def test_client_cert_invalid_key_error_omits_key():
+    cert_key = new_cert_key()
+    # Passes the PEM block check, but isn't a valid key
+    key = b"-----BEGIN PRIVATE KEY-----\nc2VjcmV0LWtleS1tYXRlcmlhbA==\n-----END PRIVATE KEY-----\n"
+    fetcher = FakeFetcher()
+    fetcher.set("cert", cert_key.cert, "v1")
+    fetcher.set("key", key, "v1")
+    cache, _ = _new_cache(fetcher, SecretIDs(client_cert="cert", client_key="key"))
+    assert cache.client_cert
+    with pytest.raises(SecretFetchError) as exc_info:
+        await cache.get(cache.client_cert, MetricsRecorder().telemetry)
+    assert str(exc_info.value).endswith(
+        'failed loading TLS client cert/key from AWS Secrets Manager secrets "cert" and "key": unsupported or invalid cert or key'
+    )
+
+
 @pytest.mark.parametrize(
     "ids,values,error",
     [
@@ -436,6 +497,11 @@ async def test_client_cert_separate(caplog: pytest.LogCaptureFixture):
             SecretIDs(client_cert="cert", client_key="key"),
             {"cert": new_cert_key().cert, "key": b"not a key"},
             'no PEM private key found in TLS client key secret "key"',
+        ),
+        (
+            SecretIDs(client_cert="cert", client_key="key"),
+            {"cert": new_cert_key().cert, "key": new_cert_key().key},
+            'TLS client cert and key from AWS Secrets Manager secrets "cert" and "key" don\'t match',
         ),
         (
             SecretIDs(server_ca_cert="ca"),
