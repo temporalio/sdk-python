@@ -1346,6 +1346,15 @@ class LongSleepWorkflow:
         return self._started
 
 
+@workflow.defn
+class WaitForCancelWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        # A timer would not hold the Workflow open, because a time-skipping server can fire it
+        # at once. Only a cancel ends this wait.
+        await workflow.wait_condition(lambda: False)
+
+
 async def test_workflow_simple_cancel(client: Client):
     async with new_worker(client, LongSleepWorkflow) as worker:
         handle = await client.start_workflow(
@@ -1934,12 +1943,12 @@ class CancelChildWorkflow:
         if use_execute:
             self._task = asyncio.create_task(
                 workflow.execute_child_workflow(
-                    LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
+                    WaitForCancelWorkflow.run, id=f"{workflow.info().workflow_id}_child"
                 )
             )
         else:
             self._task = await workflow.start_child_workflow(
-                LongSleepWorkflow.run, id=f"{workflow.info().workflow_id}_child"
+                WaitForCancelWorkflow.run, id=f"{workflow.info().workflow_id}_child"
             )
         self._ready = True
         await self._task
@@ -1956,7 +1965,7 @@ class CancelChildWorkflow:
 
 @pytest.mark.parametrize("use_execute", [True, False])
 async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
-    async with new_worker(client, CancelChildWorkflow, LongSleepWorkflow) as worker:
+    async with new_worker(client, CancelChildWorkflow, WaitForCancelWorkflow) as worker:
         # Start workflow
         handle = await client.start_workflow(
             CancelChildWorkflow.run,
@@ -1966,7 +1975,12 @@ async def test_workflow_cancel_child_started(client: Client, use_execute: bool):
         )
 
         await assert_workflow_exists_eventually(
-            client, LongSleepWorkflow.run, f"{handle.id}_child"
+            client, WaitForCancelWorkflow.run, f"{handle.id}_child"
+        )
+        # The child can exist before the parent sees it start. A Signal in that same Workflow
+        # Task runs its handler before `run` resumes, so wait until the parent holds the child.
+        await assert_eq_eventually(
+            True, lambda: handle.query(CancelChildWorkflow.ready)
         )
         # Send cancel signal and wait on the handle
         await handle.signal(CancelChildWorkflow.cancel_child)
@@ -2298,7 +2312,7 @@ class MultiCancelWorkflow:
         async def child(id: str):
             nonlocal events
             try:
-                await workflow.execute_child_workflow(LongSleepWorkflow.run, id=id)
+                await workflow.execute_child_workflow(WaitForCancelWorkflow.run, id=id)
                 events.append("child success")
             except ChildWorkflowError as err:
                 if isinstance(err.cause, CancelledError):
@@ -2325,7 +2339,7 @@ class MultiCancelWorkflow:
 
 async def test_workflow_cancel_multi(client: Client):
     async with new_worker(
-        client, MultiCancelWorkflow, LongSleepWorkflow, activities=[wait_cancel]
+        client, MultiCancelWorkflow, WaitForCancelWorkflow, activities=[wait_cancel]
     ) as worker:
         results = await client.execute_workflow(
             MultiCancelWorkflow.run,
@@ -3526,9 +3540,9 @@ class ChildAlreadyStartedWorkflow:
     async def run(self) -> None:
         # Try to start it twice
         id = f"{workflow.info().workflow_id}_child"
-        await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+        await workflow.start_child_workflow(WaitForCancelWorkflow.run, id=id)
         try:
-            await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+            await workflow.start_child_workflow(WaitForCancelWorkflow.run, id=id)
         except WorkflowAlreadyStartedError:
             raise ApplicationError("Already started")
 
@@ -3540,7 +3554,7 @@ async def test_workflow_child_already_started(client: Client, env: WorkflowEnvir
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
     async with new_worker(
-        client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
+        client, ChildAlreadyStartedWorkflow, WaitForCancelWorkflow
     ) as worker:
         with pytest.raises(WorkflowFailureError) as err:
             await client.execute_workflow(
@@ -10641,7 +10655,7 @@ class UncancelShieldChildWorkflow:
         # Start a child workflow via execute (which internally uses shield loops)
         child_task = asyncio.create_task(
             workflow.execute_child_workflow(
-                LongSleepWorkflow.run,
+                WaitForCancelWorkflow.run,
                 id=f"{workflow.info().workflow_id}_child",
             )
         )
@@ -10677,7 +10691,7 @@ async def test_workflow_uncancel_shield_child_workflow(client: Client):
         async with new_worker(
             client,
             UncancelShieldChildWorkflow,
-            LongSleepWorkflow,
+            WaitForCancelWorkflow,
         ) as worker:
             handle = await client.start_workflow(
                 UncancelShieldChildWorkflow.run,
