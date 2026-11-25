@@ -2692,10 +2692,28 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 ),
             )
 
-        else:
-            return StorageDriverStoreContext(
-                namespace=self._info.namespace, target=current_wf
-            )
+        elif (
+            command_info.command_type
+            == COMMAND_TYPE.COMMAND_TYPE_SCHEDULE_NEXUS_OPERATION
+            and command_info.command_seq in self._pending_nexus_operations
+        ):
+            nexus_operation = self._pending_nexus_operations[command_info.command_seq]
+            if temporalio.nexus.system.is_system_endpoint(
+                nexus_operation._input.endpoint
+            ):
+                target = temporalio.nexus.system._get_storage_target(
+                    nexus_operation._input.service,
+                    nexus_operation._input.operation_name,
+                    nexus_operation._input.input,
+                )
+                if target is not None:
+                    return StorageDriverStoreContext(
+                        namespace=self._info.namespace, target=target
+                    )
+
+        return StorageDriverStoreContext(
+            namespace=self._info.namespace, target=current_wf
+        )
 
     def _instantiate_workflow_object(self) -> Any:
         if not self._workflow_input:
