@@ -31,9 +31,24 @@ PINNED_NAME = "pinned.test"
 
 def test_tls_config_verification_server_name_reaches_bridge():
     config = temporalio.service.TLSConfig(verification_server_name=PINNED_NAME)
-    assert config._to_bridge_config().verification_server_name == PINNED_NAME
+    assert config._to_bridge_config().verification_server_names == [PINNED_NAME]
     default = temporalio.service.TLSConfig()
-    assert default._to_bridge_config().verification_server_name is None
+    assert default._to_bridge_config().verification_server_names is None
+
+
+def test_tls_config_verification_server_name_sequence_reaches_bridge():
+    config = temporalio.service.TLSConfig(
+        verification_server_name=("wrong.test", PINNED_NAME)
+    )
+    assert config._to_bridge_config().verification_server_names == [
+        "wrong.test",
+        PINNED_NAME,
+    ]
+
+
+def test_tls_config_verification_server_name_rejects_empty_sequence():
+    with pytest.raises(ValueError, match="empty"):
+        temporalio.service.TLSConfig(verification_server_name=[])._to_bridge_config()
 
 
 async def test_tls_verification_server_name_requires_root_ca():
@@ -83,6 +98,47 @@ async def test_tls_verification_server_name_is_enforced(tls_server: _TlsServer):
         ),
     )
     assert not handshake.ok
+
+
+async def test_tls_verification_server_name_sequence_accepts_any_matching_name(
+    tls_server: _TlsServer,
+):
+    # The certificate carries only the second name; the first mismatch must not
+    # fail the handshake, and SNI still follows the dialed host.
+    handshake = await _handshake(
+        tls_server,
+        temporalio.service.TLSConfig(
+            server_root_ca_cert=tls_server.ca_pem,
+            verification_server_name=["wrong.test", PINNED_NAME],
+        ),
+    )
+    assert handshake.ok
+    assert handshake.sni == "localhost"
+
+
+async def test_tls_verification_server_name_sequence_rejects_when_none_match(
+    tls_server: _TlsServer,
+):
+    handshake = await _handshake(
+        tls_server,
+        temporalio.service.TLSConfig(
+            server_root_ca_cert=tls_server.ca_pem,
+            verification_server_name=["wrong.test", "other.test"],
+        ),
+    )
+    assert not handshake.ok
+
+
+async def test_tls_verification_server_name_sequence_requires_root_ca():
+    with pytest.raises(ValueError, match="server root CA cert"):
+        await temporalio.service.ServiceClient.connect(
+            temporalio.service.ConnectConfig(
+                target_host="localhost:1",
+                tls=temporalio.service.TLSConfig(
+                    verification_server_name=[PINNED_NAME]
+                ),
+            )
+        )
 
 
 @dataclass
