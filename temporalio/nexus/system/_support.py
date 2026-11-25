@@ -185,8 +185,9 @@ def _timestamp(time: datetime) -> "Timestamp":
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    # A read with no wait, or a wait of zero, ends at its first page with no Record.
-    if response.done or (not request.wait and not response.records):
+    # A Stream has no end that a read reports. A page with no Record says that no
+    # Record came within the wait, or at once with no wait, so the read stops there.
+    if not response.records:
         return None
     return dataclasses.replace(
         request, from_offset=response.last_offset or request.from_offset

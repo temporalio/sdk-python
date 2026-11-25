@@ -33,7 +33,6 @@ from temporalio.api.stream.v1 import (
     Producer,
     StreamErrorDetails,
 )
-from temporalio.api.stream.v1 import StreamRef as RefProto
 from temporalio.client import (
     Client,
     NexusOperationHandle,
@@ -180,28 +179,19 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                 # A created Stream stays on its Store, whatever the selector picks at this call.
                 stream, store = rng.choice(created)
                 ref_store = stream.ref.store
-                match rng.choice(["append", "describe", "close"]):
-                    case "append":
-                        bodies = [rng.randrange(100) for _ in range(rng.randrange(3))]
-                        call = stream.append(*bodies)
-                        expected = proto.AppendRecordsRequest(
-                            ref=RefProto(id=stream.ref.id, store=ref_store),
-                            producer=producers[in_activity],
-                            records=[
-                                AppendRecord(body=to_payload(body)) for body in bodies
-                            ],
-                        )
-                    case "describe":
-                        call = stream.describe()
-                        expected = proto.DescribeStreamRequest(
-                            ref=RefProto(id=stream.ref.id, store=ref_store)
-                        )
-                    case _:
-                        call = stream.close()
-                        expected = proto.CloseStreamRequest(
-                            ref=RefProto(id=stream.ref.id, store=ref_store),
-                            producer=producers[in_activity],
-                        )
+                if rng.random() < 0.5:
+                    bodies = [rng.randrange(100) for _ in range(rng.randrange(3))]
+                    call = stream.append(*bodies)
+                    expected = proto.AppendRecordsRequest(
+                        stream_id=stream.ref.id,
+                        producer=producers[in_activity],
+                        records=[
+                            AppendRecord(body=to_payload(body)) for body in bodies
+                        ],
+                    )
+                else:
+                    call = stream.describe()
+                    expected = proto.DescribeStreamRequest(stream_id=stream.ref.id)
             else:
                 store = next((s for s in stores if s.name() == ref_store), None)
                 if ref_store is None and has_selector:
@@ -209,7 +199,6 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                 elif ref_store is None:
                     store = stores[0]
                 ref = StreamRef[int](id=stream_id, store=ref_store)
-                ref_proto = RefProto(id=stream_id, store=ref_store or "")
                 match operation:
                     case "create":
                         policy = rng.choice(list(StreamIdConflictPolicy.values()))
@@ -222,11 +211,11 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                             body_type=int,
                         )
                         expected = proto.CreateStreamRequest(
-                            stream_ref=ref_proto, id_conflict_policy=policy
+                            stream_id=stream_id, id_conflict_policy=policy
                         )
                     case "read":
                         expected = proto.ReadRecordsRequest(
-                            ref=ref_proto,
+                            stream_id=stream_id,
                             from_offset=rng.randbytes(rng.randrange(3)),
                             max_records=rng.choice([0, 1, 2**31 - 1]),
                             max_bytes=rng.choice([0, 1, 2**62]),
@@ -242,7 +231,7 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                         )
                     case _:
                         call = client.get_stream(ref).describe()
-                        expected = proto.DescribeStreamRequest(ref=ref_proto)
+                        expected = proto.DescribeStreamRequest(stream_id=stream_id)
             logs = [list(s.requests) for s in stores]
             del selects[:], ref_stores[:]
 
@@ -357,84 +346,81 @@ class _FakeReads(temporalio.client.OutboundInterceptor):
     """Answers each read with the next page of a generated Stream."""
 
     def __init__(
-        self,
-        next: temporalio.client.OutboundInterceptor,
-        rng: random.Random,
-        records: int,
-        closed: bool,
+        self, next: temporalio.client.OutboundInterceptor, rng: random.Random
     ) -> None:
         super().__init__(next)
         self._rng = rng
-        self._records = records
-        self._closed = closed
-        self._requests = 0
+        self.records = 0
+        """The number of Records of the Stream, which a test can raise."""
+        self.starts: list[int] = []
+        """The Record after which each read started, in the order of the reads."""
 
     async def start_nexus_operation(
         self, input: temporalio.client.StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
         request: ReadRecordsRequest[int] = input.arg
-        # A read that goes on at an end, or that doesn't move on, would never stop.
-        self._requests += 1
-        assert self._requests <= self._records + 3
         start = int.from_bytes(request.from_offset or b"", "big")
-        # A Store answers with no Record only at the end of the Stream.
+        self.starts.append(start)
         size = self._rng.randrange(1, 4)
-        end = min(self._records, start + size)
+        # A read with a wait can see no Record come within its wait, also when more
+        # come later. With no wait, a Store answers with no Record only at the end.
+        if request.wait and self._rng.random() < 0.2:
+            size = 0
+        end = min(self.records, start + size)
         page = ReadRecordsResponse(
             records=[
                 StreamRecord(body=at, offset=at.to_bytes(8, "big"))
                 for at in range(start + 1, end + 1)
             ],
-            last_offset=end.to_bytes(8, "big") if end else None,
-            done=self._closed and end == self._records,
+            last_offset=request.from_offset or None,
         )
+        if page.records:
+            page.last_offset = page.records[-1].offset
         handle: NexusOperationHandle[Any] = NexusOperationHandle(Mock(), input.id)
         handle._known_outcome = page
         return handle
 
 
-async def test_a_polled_read_gives_each_record_once_in_order() -> None:
+async def test_a_read_gives_each_record_once_and_ends_at_a_page_with_no_record() -> (
+    None
+):
     for seed in range(300):
         with failure_note(f"seed {seed}"):
             await _read_script(random.Random(seed))
 
 
 async def _read_script(rng: random.Random) -> None:
-    records, closed = rng.randrange(12), rng.random() < 0.5
-    wait = rng.choice([None, timedelta(0), timedelta(seconds=5)])
-    client = Client(
-        Mock(spec=ServiceClient),
-        interceptors=[
-            _Interceptor(lambda next: _FakeReads(next, rng, records, closed))
-        ],
-    )
+    fake: list[_FakeReads] = []
+
+    def outbound(next: temporalio.client.OutboundInterceptor) -> _FakeReads:
+        fake.append(_FakeReads(next, rng))
+        return fake[0]
+
+    client = Client(Mock(spec=ServiceClient), interceptors=[_Interceptor(outbound)])
     stream = client.get_stream(StreamRef[int](id="s"))
-    # A Stream that stays open has no last page for a read that waits, so the loop
-    # of such a read stops at a Record.
-    waits_forever = bool(wait) and not closed
-    stop_at = rng.randrange(1, records + 1) if records else 0
+    [reads] = fake
+    wait = rng.choice([None, timedelta(0), timedelta(seconds=5)])
     got: list[int] = []
-    first = stream.read(wait=wait)
-    if stop_at:
-        async for record in first:
+    for _ in range(rng.randrange(1, 4)):
+        # More Records come after each read, and a reader picks up where it stopped.
+        reads.records += rng.randrange(6)
+        offset = got[-1].to_bytes(8, "big") if got else None
+        stop_at = rng.choice([None, *range(len(got) + 1, reads.records + 1)])
+        first_read = len(reads.starts)
+        async for record in stream.read(from_offset=offset, wait=wait):
             got.append(record.body)
             if len(got) == stop_at:
                 break
-    assert got == list(range(1, stop_at + 1))
-    if waits_forever:
-        assert first.next_request is not None
-        return
-    resumed = first.next_request
-    if resumed is not None:
-        rest = stream.read(
-            from_offset=resumed.from_offset,
-            max_records=resumed.max_records,
-            wait=resumed.wait,
-            max_bytes=resumed.max_bytes,
-        )
-        got.extend([record.body async for record in rest])
-        assert rest.next_request is None
-    assert got == list(range(1, records + 1))
+        assert got == list(range(1, len(got) + 1))
+        if stop_at is not None and len(got) == stop_at:
+            # The read stops at the caller's last Record, so no read starts after it.
+            assert all(start < stop_at for start in reads.starts[first_read:])
+        else:
+            # Each read stops at its first page with no Record, which a read with no
+            # wait gives only at the end.
+            assert reads.starts[-1] == len(got)
+            if not wait:
+                assert len(got) == reads.records
 
 
 @dataclasses.dataclass(frozen=True)

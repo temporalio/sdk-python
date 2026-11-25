@@ -16,7 +16,7 @@ from temporalio.nexus.system.stream_service import Producer
 def current_producer() -> Producer:
     """Return the Producer of the running attempt of an Activity.
 
-    An append or a close of that attempt sends it by default. Code that stores
+    An append of that attempt sends it by default. Code that stores
     it, such as in heartbeat details, gets it back from :py:func:`as_producer`.
 
     The Producer of an Activity of a Workflow has the Activity id and the id of

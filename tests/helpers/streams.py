@@ -19,8 +19,6 @@ from temporalio.api.stream.v1 import StreamErrorDetails
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     AppendRecordsResponse,
-    CloseStreamRequest,
-    CloseStreamResponse,
     CreateStreamRequest,
     CreateStreamResponse,
     DescribeStreamRequest,
@@ -169,8 +167,8 @@ class FaultStore(StreamStore):
     def __init__(self, name: str = "memory", **options: Any) -> None:
         self.memory = MemoryStreamStore(name=name, **options)
         self.calls: list[tuple[Any, str | None]] = []
-        """Each request, with its request id, which is ``None`` for a read, a close
-        and a describe."""
+        """Each request, with its request id, which is ``None`` for a read and a
+        describe."""
         self.faults: dict[str, collections.deque[Fault]] = collections.defaultdict(
             collections.deque
         )
@@ -195,9 +193,6 @@ class FaultStore(StreamStore):
 
     async def read_records(self, request: ReadRecordsRequest) -> ReadRecordsResponse:
         return await self._call("read_records", request)
-
-    async def close_stream(self, request: CloseStreamRequest) -> CloseStreamResponse:
-        return await self._call("close_stream", request)
 
     async def describe_stream(
         self, request: DescribeStreamRequest

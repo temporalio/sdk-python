@@ -25,14 +25,11 @@ from temporalio.api.stream.v1 import (
     LocalActivityAttempt,
     Producer,
     StreamRecord,
-    StreamRef,
     WorkflowTaskAttempt,
 )
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
     AppendRecordsResponse,
-    CloseStreamRequest,
-    CloseStreamResponse,
     CreateStreamRequest,
     CreateStreamResponse,
     DescribeStreamRequest,
@@ -50,7 +47,6 @@ from tests.helpers.streams import failure_note, run_with_virtual_clock
 
 _NOT_FOUND = StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND
 _EXPIRED = StreamErrorReason.STREAM_ERROR_REASON_EXPIRED
-_CLOSED = StreamErrorReason.STREAM_ERROR_REASON_CLOSED
 _FENCED = StreamErrorReason.STREAM_ERROR_REASON_FENCED
 
 # Attempts of each attempt message, earliest first. Where a later attempt wins by one field,
@@ -137,7 +133,6 @@ class _ModelBatch:
 @dataclass
 class _ModelStream:
     request_id: str
-    closed: bool = False
     records: list[StreamRecord] = field(default_factory=list)
     batches: list[_ModelBatch] = field(default_factory=list)
 
@@ -157,17 +152,15 @@ class _Model:
     streams: dict[str, _ModelStream] = field(default_factory=dict)
 
     def create(self, request: CreateStreamRequest, request_id: str) -> Any:
-        stream = self.streams.get(request.stream_ref.id)
+        stream = self.streams.get(request.stream_id)
         if stream is None:
-            self.streams[request.stream_ref.id] = _ModelStream(request_id)
-            return CreateStreamResponse(ref=request.stream_ref, created=True)
-        if stream.closed:
-            return _CLOSED
+            self.streams[request.stream_id] = _ModelStream(request_id)
+            return CreateStreamResponse(created=True)
         if request_id and request_id == stream.request_id:
-            return CreateStreamResponse(ref=request.stream_ref, created=True)
+            return CreateStreamResponse(created=True)
         use_existing = StreamIdConflictPolicy.STREAM_ID_CONFLICT_POLICY_USE_EXISTING
         if request.id_conflict_policy == use_existing:
-            return CreateStreamResponse(ref=request.stream_ref)
+            return CreateStreamResponse()
         return StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS
 
     def append(
@@ -176,7 +169,7 @@ class _Model:
         # SDK Core refuses a batch with no Record before the Store gets it.
         if not request.records:
             return StreamErrorReason.STREAM_ERROR_REASON_INVALID_ARGUMENT
-        stream = self.streams.get(request.ref.id)
+        stream = self.streams.get(request.stream_id)
         if stream is None:
             return _NOT_FOUND
         own = [batch for batch in stream.batches if batch.writer.ids == writer.ids]
@@ -188,8 +181,6 @@ class _Model:
                 return batch.response
         if self.fence and stream.fenced(writer):
             return _FENCED
-        if stream.closed:
-            return _CLOSED
         response = AppendRecordsResponse()
         for record in request.records:
             offset = (len(stream.records) + 1).to_bytes(8, "big")
@@ -201,17 +192,8 @@ class _Model:
         stream.batches.append(_ModelBatch(writer, request_id, response))
         return response
 
-    def close(self, request: CloseStreamRequest, writer: _Writer) -> Any:
-        stream = self.streams.get(request.ref.id)
-        if stream is None:
-            return _NOT_FOUND
-        if not stream.closed and self.fence and stream.fenced(writer):
-            return _FENCED
-        stream.closed = True
-        return CloseStreamResponse()
-
     def read(self, request: ReadRecordsRequest) -> Any:
-        stream = self.streams.get(request.ref.id)
+        stream = self.streams.get(request.stream_id)
         if stream is None:
             return _NOT_FOUND
         start = int.from_bytes(request.from_offset, "big")
@@ -221,12 +203,11 @@ class _Model:
         return ReadRecordsResponse(
             records=records,
             last_offset=records[-1].offset if records else request.from_offset,
-            done=stream.closed and start + len(records) == len(stream.records),
         )
 
 
-_OPERATIONS = ["create", "append", "again", "close", "read"]
-_WEIGHTS = [3, 10, 6, 1, 4]
+_OPERATIONS = ["create", "append", "again", "read"]
+_WEIGHTS = [3, 10, 6, 4]
 
 
 async def _answer(call: Awaitable[Message]) -> Any:
@@ -255,7 +236,7 @@ async def _store_script(rng: random.Random, runtime: Runtime | None) -> None:
     appends: list[tuple[AppendRecordsRequest, _Writer, str]] = []
     writers: list[_Writer] = []
     for step in range(50):
-        ref = StreamRef(id=rng.choice("xy"), store=rng.choice(["", "memory"]))
+        stream_id = rng.choice("xy")
         # Most writes come from another attempt of a Producer that the script already has.
         writer = _writer(
             rng, rng.choice(writers) if rng.random() < 0.7 * bool(writers) else None
@@ -265,7 +246,7 @@ async def _store_script(rng: random.Random, runtime: Runtime | None) -> None:
         match rng.choices(_OPERATIONS, _WEIGHTS)[0]:
             case "create":
                 request = CreateStreamRequest(
-                    stream_ref=ref,
+                    stream_id=stream_id,
                     id_conflict_policy=rng.choice(
                         list(StreamIdConflictPolicy.values())
                     ),
@@ -276,7 +257,9 @@ async def _store_script(rng: random.Random, runtime: Runtime | None) -> None:
                     store.create_stream(request, request_id=request_id)
                 )
             case "append" | "again" as op:
-                request = AppendRecordsRequest(ref=ref, producer=writer.producer)
+                request = AppendRecordsRequest(
+                    stream_id=stream_id, producer=writer.producer
+                )
                 request_id = rng.choice(["", "r1", "r2", "r3"])
                 if op == "again" and appends:
                     # A late or a repeated try has the Producer, the attempt and the
@@ -292,13 +275,9 @@ async def _store_script(rng: random.Random, runtime: Runtime | None) -> None:
                 answer = await _answer(
                     store.append_records(request, request_id=request_id)
                 )
-            case "close":
-                request = CloseStreamRequest(ref=ref, producer=writer.producer)
-                expected = model.close(request, writer)
-                answer = await _answer(store.close_stream(request))
             case _:
                 request = ReadRecordsRequest(
-                    ref=ref,
+                    stream_id=stream_id,
                     from_offset=rng.choice(
                         [b"", *(i.to_bytes(8, "big") for i in range(1, 9))]
                     ),
@@ -309,74 +288,64 @@ async def _store_script(rng: random.Random, runtime: Runtime | None) -> None:
         assert answer == expected, f"step {step}: {request}"
 
 
-def _streams(retention: int = 1, idle_ttl: int | None = None) -> _MemoryStreams:
+def _streams(retention: int = 1) -> _MemoryStreams:
     return _MemoryStreams(
-        "memory",
-        retention=timedelta(seconds=retention),
-        producer_idle_ttl=None if idle_ttl is None else timedelta(seconds=idle_ttl),
-        resend_window=1,
-        fence=False,
+        "memory", retention=timedelta(seconds=retention), resend_window=1, fence=False
     )
 
 
-_S = StreamRef(id="s")
+_S = "s"
 
 
 def _client_append() -> AppendRecordsRequest:
-    request = AppendRecordsRequest(ref=_S, records=[AppendRecord()])
+    request = AppendRecordsRequest(stream_id=_S, records=[AppendRecord()])
     request.producer.client.SetInParent()
     return request
 
 
-def _client_close() -> CloseStreamRequest:
-    request = CloseStreamRequest(ref=_S)
-    request.producer.client.SetInParent()
-    return request
-
-
-def test_a_stream_expires_after_its_retention_or_its_idle_ttl() -> None:
+def test_a_stream_expires_after_its_retention_from_its_create_or_last_write() -> None:
     async def script(rng: random.Random) -> None:
         loop = asyncio.get_running_loop()
-        retention, idle_ttl = rng.randrange(1, 50), rng.choice([None, 10, 30])
-        streams = _streams(retention, idle_ttl)
-        await streams.create_stream(CreateStreamRequest(stream_ref=_S), request_id="")
-        closed = False
-        expires_at = None if idle_ttl is None else loop.time() + idle_ttl
+        retention = rng.randrange(1, 50)
+        streams = _streams(retention)
+        await streams.create_stream(CreateStreamRequest(stream_id=_S), request_id="c")
+        expires_at = loop.time() + retention
+        # The window of the client Producer has its last batch, so an append with the
+        # request id of that batch is a resend, which writes nothing.
+        last_batch: str | None = None
         for step in range(12):
             await asyncio.sleep(rng.randrange(40))
-            expired = expires_at is not None and loop.time() >= expires_at
-            match rng.choice(
-                ["append", "append", "close", "read", "describe", "create"]
-            ):
+            expired = loop.time() >= expires_at
+            match rng.choice(["append", "append", "read", "describe", "create"]):
                 case "append":
-                    append = streams.append_records(_client_append(), request_id="")
+                    request_id = rng.choice(["", "r"])
+                    append = streams.append_records(
+                        _client_append(), request_id=request_id
+                    )
                     answer = await _answer(append)
-                    expected: Any = _CLOSED if closed else AppendRecordsResponse
-                    if not expired and not closed and idle_ttl is not None:
-                        expires_at = loop.time() + idle_ttl
-                case "close":
-                    answer = await _answer(streams.close_stream(_client_close()))
-                    expected = CloseStreamResponse
-                    if not expired and not closed:
-                        closed, expires_at = True, loop.time() + retention
+                    expected: Any = AppendRecordsResponse
+                    resend = bool(request_id) and request_id == last_batch
+                    if not expired and not resend:
+                        expires_at, last_batch = loop.time() + retention, request_id
                 case "read":
-                    read = ReadRecordsRequest(ref=_S)
+                    read = ReadRecordsRequest(stream_id=_S)
                     answer = await _answer(streams.read_records(read))
                     expected = ReadRecordsResponse
                 case "describe":
-                    describe = DescribeStreamRequest(ref=_S)
+                    describe = DescribeStreamRequest(stream_id=_S)
                     answer = await _answer(streams.describe_stream(describe))
                     expected = DescribeStreamResponse
                 case _:
-                    create = streams.create_stream(
-                        CreateStreamRequest(stream_ref=_S), request_id="other"
+                    use_existing = (
+                        StreamIdConflictPolicy.STREAM_ID_CONFLICT_POLICY_USE_EXISTING
                     )
-                    answer = await _answer(create)
-                    expected = (
-                        _CLOSED
-                        if closed
-                        else StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS
+                    create = CreateStreamRequest(
+                        stream_id=_S, id_conflict_policy=use_existing
                     )
+                    answer = await _answer(
+                        streams.create_stream(create, request_id=rng.choice("cd"))
+                    )
+                    expected = CreateStreamResponse
             if expired:
                 expected = _EXPIRED
             assert answer == expected or type(answer) is expected, (
@@ -391,15 +360,15 @@ def test_a_stream_expires_after_its_retention_or_its_idle_ttl() -> None:
 def test_a_read_waits_for_the_next_write_or_for_its_wait() -> None:
     async def script(rng: random.Random) -> None:
         loop = asyncio.get_running_loop()
-        streams = _streams()
-        await streams.create_stream(CreateStreamRequest(stream_ref=_S), request_id="")
+        streams = _streams(retention=100)
+        await streams.create_stream(CreateStreamRequest(stream_id=_S), request_id="")
         first = await streams.append_records(_client_append(), request_id="")
         wait, write_in = rng.sample(range(1, 60), 2)
-        write = rng.choice(["append", "close", None])
+        write = rng.random() < 0.5
         read = asyncio.ensure_future(
             streams.read_records(
                 ReadRecordsRequest(
-                    ref=_S,
+                    stream_id=_S,
                     from_offset=first.last_offset,
                     wait=Duration(seconds=wait),
                 )
@@ -408,16 +377,15 @@ def test_a_read_waits_for_the_next_write_or_for_its_wait() -> None:
         answered_at: list[float] = []
         read.add_done_callback(lambda _: answered_at.append(loop.time()))
         await asyncio.sleep(write_in)
-        if write == "append":
+        if write:
             await streams.append_records(_client_append(), request_id="")
-        elif write == "close":
-            await streams.close_stream(_client_close())
         page = await read
-        in_time = write is not None and write_in < wait
+        in_time = write and write_in < wait
         assert (
             answered_at == [float(write_in if in_time else wait)]
-            and len(page.records) == (in_time and write == "append")
-            and page.done == (in_time and write == "close")
+            and len(page.records) == in_time
+            and page.last_offset
+            == (page.records[-1].offset if in_time else first.last_offset)
         ), f"{page} at {answered_at}"
 
     for seed in range(200):
@@ -445,7 +413,7 @@ async def test_a_dropped_store_call_never_reaches_the_store() -> None:
     def on_task(_task: asyncio.Task[Any]) -> None:
         raise asyncio.CancelledError
 
-    request = DescribeStreamRequest(ref=_S).SerializeToString()
+    request = DescribeStreamRequest(stream_id=_S).SerializeToString()
     with pytest.raises(asyncio.CancelledError):
         await _StoreCaller(store).call("DescribeStream", request, None, on_task)
     assert not asked

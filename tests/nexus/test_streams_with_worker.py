@@ -309,14 +309,16 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
     appends = store.faults["append_records"]
     unavailable = StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE
 
-    async def answers_on(path: str, calls: list[list[Any]], **options: Any) -> Any:
+    async def answers_on(
+        path: str, calls: list[list[Any]], on: Client = client, **options: Any
+    ) -> Any:
         if path == "client":
-            return await _answers(client, calls)
+            return await _answers(on, calls)
         args = [calls, path == "activity"]
         run_options = RunOptions(
             _CallsWorkflow, args, activities=[_calls_activity], **options
         )
-        return (await run(client, run_options)).result
+        return (await run(on, run_options)).result
 
     def append_request_ids() -> list[str | None]:
         calls, store.calls = store.calls, []
@@ -378,6 +380,19 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
     for path in ("activity", "workflow"):
         with failure_note(path):
             assert await answers_on(path, calls, cached=False, replay=True) == refused
+
+    # When its Retention has passed since its last append, a Stream refuses each call
+    # as expired, on each path.
+    expiring = stream_client(client, FaultStore(retention=timedelta(seconds=2)))
+    stream = await expiring.create_stream(id="expires", body_type=int)
+    await stream.append(1)
+    await asyncio.sleep(2.5)
+    expired = StreamErrorReason.STREAM_ERROR_REASON_EXPIRED
+    calls = [["append", "expires", [2]], ["describe", "expires"], ["read", "expires"]]
+    for path in ("client", "activity", "workflow"):
+        with failure_note(f"expired, {path}"):
+            answered = await answers_on(path, calls, on=expiring, replay=True)
+            assert [answer[:2] for answer in answered] == [["error", expired]] * 3
 
     # An outage during a create fails the Workflow Task, also on a Worker that fails a
     # Workflow for any exception. The create runs in the next task, with the Store back.

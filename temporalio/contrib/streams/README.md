@@ -44,7 +44,7 @@ call of its Stream.
 ## A stored Producer
 
 Each write has its Producer, which is the writer with its attempt. `current_producer()` gives
-the Producer that an append or a close of the running Activity attempt sends by default. An
+the Producer that an append of the running Activity attempt sends by default. An
 Activity that stores it, such as in its heartbeat details, gets it back as a proto message, and
 `as_producer` turns that into a `Producer` again, which `append(..., producer=...)` takes.
 
@@ -53,6 +53,18 @@ Activity that stores it, such as in its heartbeat details, gets it back as a pro
 A read of a Stream from `get_stream(StreamRef(id=...))` raises `TypeError`, since such a ref has
 no body type. Pass `body_type=`, or a ref with a type argument such as `StreamRef[str](id=...)`.
 A Stream from `create_stream` reads any body with no type.
+
+A Stream has no end that a read reports, so a reader stops at the application's own last Record.
+`read()` stops at the first page with no Record. With no `wait` it reads to the newest Record, and
+with a `wait` it stops once no Record came within the wait. It reads a page only when the caller
+asks for the next Record, so a reader that stops at its last Record leaves no read open.
+
+In Workflow code, a read with no Record to give waits up to its `wait`, but at most to the read
+limit of its Workflow Task (the Worker option `stream_read_time`), and then gives a page with no
+Record. A read asks for a new Workflow Task only when the Stream has more Records for it, so a
+read of an idle Stream makes no task. A replay reads the Records again from the Store, so the
+Retention of the Stream must cover the life of the Workflow and the time in which it gets
+queries.
 
 In Workflow code, a read with no `max_records` gives at most 256 Records in a page, and a read
 with no `max_bytes` at most 4 MiB of them. A page has at most 16 MiB of Records, also for a larger

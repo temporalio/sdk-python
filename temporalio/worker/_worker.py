@@ -354,7 +354,7 @@ class Worker:
                 without holding the task until the Store answers. Defaults to half
                 the Workflow Task timeout. The limit is always before the heartbeat
                 of the task, so a read alone never makes the Worker send a
-                heartbeat. Appends and closes have no such limit.
+                heartbeat. Appends have no such limit.
                 WARNING: This setting is experimental.
 
         """
