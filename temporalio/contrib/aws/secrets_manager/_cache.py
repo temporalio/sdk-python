@@ -227,7 +227,11 @@ class SecretCache:
                     raise
 
         try:
-            value = await asyncio.wait_for(asyncio.wrap_future(fut), self.fetch_timeout)
+            # Not asyncio.wait_for, which on Python 3.11 swallows a cancellation
+            # that arrives just as the fetch finishes, so a cancelled caller
+            # could keep running
+            async with asyncio.timeout(self.fetch_timeout):
+                value = await asyncio.wrap_future(fut)
         except Exception as err:
             if can_use_stale:
                 record_lookup(LookupResult.MISS_WITH_FALLBACK)
