@@ -10842,3 +10842,70 @@ async def test_workflow_cancel_no_shielded_future_log(
     assert not any(
         "exception in shielded future" in record.message for record in caplog.records
     )
+
+
+@dataclass
+class _UndecodableResult:
+    value: int
+
+
+@activity.defn
+async def _return_plain_string() -> str:
+    return "not-a-dataclass"
+
+
+@workflow.defn
+class _ReturnPlainStringWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        return "not-a-dataclass"
+
+
+@workflow.defn
+class _UndecodableActivityResultWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_activity(
+            "_return_plain_string",
+            result_type=_UndecodableResult,
+            start_to_close_timeout=timedelta(seconds=10),
+        )
+
+
+@workflow.defn
+class _UndecodableChildResultWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.execute_child_workflow(
+            "_ReturnPlainStringWorkflow",
+            result_type=_UndecodableResult,
+        )
+
+
+async def test_workflow_result_decode_failure_names_source(client: Client):
+    async with new_worker(
+        client,
+        _UndecodableActivityResultWorkflow,
+        _UndecodableChildResultWorkflow,
+        _ReturnPlainStringWorkflow,
+        activities=[_return_plain_string],
+    ) as worker:
+        handle = await client.start_workflow(
+            _UndecodableActivityResultWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Failed decoding result of activity '_return_plain_string'",
+        )
+
+        handle = await client.start_workflow(
+            _UndecodableChildResultWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        await assert_task_fail_eventually(
+            handle,
+            message_contains="Failed decoding result of child workflow '_ReturnPlainStringWorkflow'",
+        )
