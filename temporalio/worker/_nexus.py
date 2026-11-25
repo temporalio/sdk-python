@@ -579,6 +579,7 @@ def _is_payload_validation_error(err: BaseException) -> TypeGuard[ApplicationErr
 class _NexusPayloadSerializer:
     data_converter: temporalio.converter.DataConverter
     payload: temporalio.api.common.v1.Payload
+    decoded: bool = False
 
     async def serialize(self, value: Any) -> nexusrpc.Content:  # type:ignore[reportUnusedParameter]
         raise NotImplementedError(
@@ -590,6 +591,8 @@ class _NexusPayloadSerializer:
         content: nexusrpc.Content,  # type:ignore[reportUnusedParameter]
         as_type: type[Any] | None = None,
     ) -> Any:
+        if self.decoded:
+            return self._convert_payload(self.payload, as_type)
         dc = self.data_converter
         # The visitor mutates in place, so work on a copy to leave the request
         # payload untouched.
@@ -636,6 +639,12 @@ class _NexusPayloadSerializer:
                 type=nexusrpc.HandlerErrorType.INTERNAL,
             ) from err
 
+        return self._convert_payload(payload, as_type)
+
+    def _convert_payload(
+        self, payload: temporalio.api.common.v1.Payload, as_type: type[Any] | None
+    ) -> Any:
+        dc = self.data_converter
         try:
             payload_converter = dc.payload_converter
             if temporalio.nexus.system._is_system_payload(payload):
@@ -799,8 +808,25 @@ class _NexusTaskCancellation(nexusrpc.handler.OperationTaskCancellation):
 class _NexusOperationHandlerForInterceptor(
     nexusrpc.handler.MiddlewareSafeOperationHandler
 ):
-    def __init__(self, next_interceptor: NexusOperationInboundInterceptor):
-        self._next_interceptor = next_interceptor
+    def __init__(
+        self,
+        interceptors: Sequence[Interceptor],
+        handler: nexusrpc.handler.MiddlewareSafeOperationHandler,
+    ):
+        self._interceptors = interceptors
+        self._handler = handler
+
+    def _interceptor_chain(
+        self, input_serializer: _NexusPayloadSerializer | None = None
+    ) -> NexusOperationInboundInterceptor:
+        return reduce(
+            lambda impl, _next: _next.intercept_nexus_operation(impl),
+            reversed(self._interceptors),
+            cast(
+                NexusOperationInboundInterceptor,
+                _NexusOperationInboundInterceptorImpl(self._handler, input_serializer),
+            ),
+        )
 
     async def start(
         self, ctx: nexusrpc.handler.StartOperationContext, input: Any
@@ -808,21 +834,31 @@ class _NexusOperationHandlerForInterceptor(
         nexusrpc.handler.StartOperationResultSync[Any]
         | nexusrpc.handler.StartOperationResultAsync
     ):
-        return await self._next_interceptor.execute_nexus_operation_start(
+        input_serializer = None
+        if isinstance(input, LazyValue):
+            input_serializer = cast(_NexusPayloadSerializer, input.serializer)
+            input = await input.consume(as_type=temporalio.common.RawValue)
+        inbound = self._interceptor_chain(input_serializer)
+        return await inbound.execute_nexus_operation_start(
             ExecuteNexusOperationStartInput(ctx, input)
         )
 
     async def cancel(
         self, ctx: nexusrpc.handler.CancelOperationContext, token: str
     ) -> None:
-        return await self._next_interceptor.execute_nexus_operation_cancel(
+        return await self._interceptor_chain().execute_nexus_operation_cancel(
             ExecuteNexusOperationCancelInput(ctx, token)
         )
 
 
 class _NexusOperationInboundInterceptorImpl(NexusOperationInboundInterceptor):
-    def __init__(self, handler: nexusrpc.handler.MiddlewareSafeOperationHandler):  # pyright: ignore[reportMissingSuperCall]
+    def __init__(  # pyright: ignore[reportMissingSuperCall]
+        self,
+        handler: nexusrpc.handler.MiddlewareSafeOperationHandler,
+        input_serializer: _NexusPayloadSerializer | None = None,
+    ):
         self._handler = handler
+        self._input_serializer = input_serializer
 
     async def execute_nexus_operation_start(
         self, input: ExecuteNexusOperationStartInput
@@ -830,7 +866,19 @@ class _NexusOperationInboundInterceptorImpl(NexusOperationInboundInterceptor):
         nexusrpc.handler.StartOperationResultSync[Any]
         | nexusrpc.handler.StartOperationResultAsync
     ):
-        return await self._handler.start(input.ctx, input.input)
+        value = input.input
+        if self._input_serializer is not None:
+            # Nexus handlers still expect LazyValue. Rewrap the interceptor's RawValue
+            # without repeating codec decoding or external storage retrieval.
+            value = LazyValue(
+                serializer=_NexusPayloadSerializer(
+                    data_converter=self._input_serializer.data_converter,
+                    payload=value.payload,
+                    decoded=True,
+                ),
+                headers={},
+            )
+        return await self._handler.start(input.ctx, value)
 
     async def execute_nexus_operation_cancel(
         self, input: ExecuteNexusOperationCancelInput
@@ -847,16 +895,7 @@ class _NexusMiddlewareForInterceptors(nexusrpc.handler.OperationHandlerMiddlewar
         ctx: nexusrpc.handler.OperationContext,
         next: nexusrpc.handler.MiddlewareSafeOperationHandler,
     ) -> nexusrpc.handler.MiddlewareSafeOperationHandler:
-        inbound = reduce(
-            lambda impl, _next: _next.intercept_nexus_operation(impl),
-            reversed(self._interceptors),
-            cast(
-                NexusOperationInboundInterceptor,
-                _NexusOperationInboundInterceptorImpl(next),
-            ),
-        )
-
-        return _NexusOperationHandlerForInterceptor(inbound)
+        return _NexusOperationHandlerForInterceptor(self._interceptors, next)
 
 
 _P = ParamSpec("_P")
