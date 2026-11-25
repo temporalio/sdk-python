@@ -1746,7 +1746,7 @@ class ExperimentalNexusServiceHandler:
 
 Register `ExperimentalNexusServiceHandler()` with the handler Worker to run this implementation. Custom cancel
 handlers receive their typed options. Use `nexus.info()` for invocation metadata and
-`nexus.info().task_cancellation` to observe cancellation of the current invocation. Worker Nexus inbound
+`nexus.task_cancellation()` to observe cancellation of the current invocation. Worker Nexus inbound
 interceptors can read incoming headers from `input.ctx.headers`.
 
 

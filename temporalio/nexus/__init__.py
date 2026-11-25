@@ -23,6 +23,7 @@ from ._operation_context import (
     is_worker_shutdown,
     logger,
     metric_meter,
+    task_cancellation,
     wait_for_worker_shutdown,
     wait_for_worker_shutdown_sync,
 )
@@ -52,6 +53,7 @@ __all__ = (
     "is_worker_shutdown",
     "logger",
     "metric_meter",
+    "task_cancellation",
     "wait_for_worker_shutdown",
     "wait_for_worker_shutdown_sync",
     "WorkflowHandle",

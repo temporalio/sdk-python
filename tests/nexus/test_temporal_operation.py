@@ -1590,7 +1590,7 @@ async def test_temporal_operation_observes_invocation_timeout(
         async def wait_for_cancellation(
             self, _client: nexus.TemporalNexusClient, _input: None
         ) -> nexus.TemporalOperationResult[None]:
-            token = nexus.info().task_cancellation
+            token = nexus.task_cancellation()
             assert not token.is_cancelled()
             assert token.cancellation_reason() is None
             assert not token.wait_until_cancelled_sync(timeout=0)
@@ -1601,9 +1601,7 @@ async def test_temporal_operation_observes_invocation_timeout(
             except asyncio.CancelledError:
                 assert token.is_cancelled()
                 assert token.wait_until_cancelled_sync(timeout=0)
-                assert (
-                    nexus.info().task_cancellation.cancellation_reason() == "TIMED_OUT"
-                )
+                assert nexus.task_cancellation().cancellation_reason() == "TIMED_OUT"
                 await asyncio.wait_for(waiter, timeout=1)
                 await asyncio.wait_for(token.wait_until_cancelled(), timeout=1)
                 observed.set_result(token)

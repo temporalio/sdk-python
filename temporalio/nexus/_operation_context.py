@@ -142,13 +142,6 @@ class Info:
     Cancel invocations have no start request ID.
     """
 
-    task_cancellation: OperationTaskCancellation
-    """Observes cancellation of this handler task.
-
-    Async handlers can also receive :py:class:`asyncio.CancelledError` at an await. The worker
-    records the cancellation reason before interrupting the handler.
-    """
-
     @classmethod
     def _from_operation_context(
         cls,
@@ -169,7 +162,6 @@ class Info:
                 if isinstance(context, StartOperationContext)
                 else None
             ),
-            task_cancellation=context.task_cancellation,
         )
 
 
@@ -181,6 +173,15 @@ def in_operation() -> bool:
 def info() -> Info:
     """Get the current Nexus operation information."""
     return _temporal_context().info()
+
+
+def task_cancellation() -> OperationTaskCancellation:
+    """Get the cancellation state of the current Nexus handler task.
+
+    Async handlers can also receive :py:class:`asyncio.CancelledError` at an await. The worker
+    records the cancellation reason before interrupting the handler.
+    """
+    return _temporal_context().nexus_context.task_cancellation
 
 
 def client() -> temporalio.client.Client:

@@ -707,19 +707,14 @@ class NexusInfoService:
     @sync_operation
     async def get_info(
         self, _ctx: StartOperationContext, _input: None
-    ) -> dict[str, str]:
-        info = nexus.info()
-        return {
-            "endpoint": info.endpoint,
-            "namespace": info.namespace,
-            "task_queue": info.task_queue,
-        }
+    ) -> dict[str, Any]:
+        return dataclasses.asdict(nexus.info())
 
 
 @workflow.defn
 class NexusInfoCallerWorkflow:
     @workflow.run
-    async def run(self, task_queue: str) -> dict[str, str]:
+    async def run(self, task_queue: str) -> dict[str, Any]:
         nexus_client = workflow.create_nexus_client(
             service=NexusInfoService,
             endpoint=make_nexus_endpoint_name(task_queue),
@@ -748,6 +743,8 @@ async def test_nexus_info_includes_namespace(client: Client, env: WorkflowEnviro
             assert result["endpoint"] == endpoint_name
         assert result["namespace"] == client.namespace
         assert result["task_queue"] == task_queue
+        assert result["service"] == "NexusInfoService"
+        assert result["operation"] == "get_info"
 
 
 async def test_workflow_run_operation_happy_path(
