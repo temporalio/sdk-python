@@ -31,7 +31,7 @@ from ._operation_handlers import (
 from ._token import WorkflowHandle
 from ._util import (
     get_callable_name,
-    get_temporal_operation_start_method_types,
+    get_temporal_operation_start_method_input_and_output_type_annotations,
     get_workflow_run_start_method_input_and_output_type_annotations,
     is_async_callable,
     set_operation_factory,
@@ -188,10 +188,14 @@ def temporal_operation(
 
     The method receives ``(self, client, input)``. Use :py:func:`temporalio.nexus.info` for invocation information.
 
-    Declare and return the payload type to complete the Nexus operation synchronously.
-    Declare :py:class:`TemporalOperationResult` with the payload type to return an
-    explicit synchronous result or an asynchronous operation token. A method with an
-    unspecified return type, such as ``Any`` or no annotation, must return an explicit result.
+    To complete synchronously with a direct return, annotate the method with the
+    payload type (for example, ``-> str``) and return the payload itself.
+
+    To return a :py:class:`TemporalOperationResult`, annotate the method with
+    ``TemporalOperationResult[PayloadType]``. The wrapper can hold either a
+    synchronous payload or an asynchronous operation token. A returned
+    ``TemporalOperationResult`` is used as is; any other value completes the
+    operation synchronously.
 
     Set dynamic=True to set a Nexus operation handler as a catch-all handler,
     which will handle any unknown operation that's dispatched to that Nexus service.
@@ -214,9 +218,10 @@ def temporal_operation(
                 f"{start} is not an `async def` method. "
                 "@temporal_operation must decorate an `async def` start method."
             )
-        input_type, output_type, returns_wrapper = (
-            get_temporal_operation_start_method_types(start)
-        )
+        (
+            input_type,
+            output_type,
+        ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
         if dynamic and input_type is not temporalio.common.RawValue:
             raise TypeError(
                 "A dynamic operation handler must accept temporalio.common.RawValue"
@@ -247,14 +252,9 @@ def temporal_operation(
                     input: InputT,
                 ) -> TemporalOperationResult[Any]:
                     result = await _start(client, input)
-                    if not returns_wrapper:
-                        return TemporalOperationResult.sync(result)
-                    if not isinstance(result, TemporalOperationResult):
-                        raise TypeError(
-                            f"@temporal_operation method {start} must return a "
-                            "TemporalOperationResult."
-                        )
-                    return result
+                    if isinstance(result, TemporalOperationResult):
+                        return result
+                    return TemporalOperationResult.sync(result)
 
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
             return _TemporalOperationHandler()

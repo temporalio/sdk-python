@@ -3,6 +3,7 @@ Test that operation_handler decorator results in operation definitions with the 
 and input/output types.
 """
 
+import sys
 import typing
 import warnings
 from dataclasses import dataclass
@@ -190,6 +191,9 @@ def test_safe_broader_parameter_annotations_preserve_input_type_without_warnings
         assert op.output_type == Output
 
 
+_TuplePayload = tuple[str, int]
+
+
 @pytest.mark.parametrize(
     ("annotation", "output_type"),
     [
@@ -197,6 +201,7 @@ def test_safe_broader_parameter_annotations_preserve_input_type_without_warnings
         (Any, None),
         (nexus.TemporalOperationResult, None),
         (nexus.TemporalOperationResult[None], type(None)),
+        (nexus.TemporalOperationResult[_TuplePayload], _TuplePayload),
     ],
 )
 async def test_temporal_operation_preserves_explicit_result_modes(
@@ -222,42 +227,88 @@ async def test_temporal_operation_preserves_explicit_result_modes(
     assert await handler.start_operation(client, None) is result
 
 
-async def test_temporal_operation_rejects_missing_explicit_result():
-    class Handler:
-        @nexus.temporal_operation
-        async def start(
-            self, _client: nexus.TemporalNexusClient, _input: None
-        ) -> nexus.TemporalOperationResult[None]:
-            return cast(nexus.TemporalOperationResult[None], cast(object, None))
-
-    handler = getattr(Handler.start, "__nexus_operation_factory__")(Handler())
-    client = cast(nexus.TemporalNexusClient, object())
-    with pytest.raises(TypeError, match="must return a TemporalOperationResult"):
-        await handler.start_operation(client, None)
-
-
+@pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
+)
 def test_temporal_operation_resolves_direct_payload_alias():
-    alias_type = getattr(typing, "TypeAliasType", None)
-    if alias_type is None:
-        pytest.skip("Native type aliases require Python 3.12")
+    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
+    aliases: dict[str, Any] = {}
+    exec("type Payload = str", aliases)
 
     class Handler:
         async def echo(self, _client: nexus.TemporalNexusClient, value: str) -> str:
             return value
 
-    Handler.echo.__annotations__["return"] = alias_type("Payload", str)
+    Handler.echo.__annotations__["return"] = aliases["Payload"]
     method = nexus.temporal_operation(Handler.echo)
     _, operation = get_operation_factory(method)
     assert operation is not None
     assert operation.output_type is str
 
 
-def test_temporal_operation_rejects_mixed_return_modes():
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        Output | None,
+        # On 3.11 this has the non-class origin typing.Union, unlike `Output | None`.
+        typing.Optional[Output],  # pyright: ignore[reportDeprecated]
+        typing.Literal["a", "b"],
+        tuple[str, int],
+    ],
+)
+async def test_temporal_operation_accepts_direct_payload_annotations(
+    annotation: Any,
+):
+    value = Output()
+
     class Handler:
-        async def start(
-            self, _client: nexus.TemporalNexusClient, _input: None
-        ) -> nexus.TemporalOperationResult[None] | None:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return value
+
+    Handler.start.__annotations__["return"] = annotation
+    method = nexus.temporal_operation(Handler.start)
+    op = nexusrpc.get_operation(method)
+    assert op
+    assert op.output_type == annotation
+    handler = getattr(method, "__nexus_operation_factory__")(Handler())
+    client = cast(nexus.TemporalNexusClient, object())
+    result = await handler.start_operation(client, None)
+    assert isinstance(result, nexus.TemporalOperationResult)
+    assert result.value is value
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        nexus.TemporalOperationResult[None] | None,
+        Output | nexus.TemporalOperationResult[Output],
+        nexusrpc.handler.StartOperationResultSync[Output],
+        nexusrpc.handler.StartOperationResultAsync,
+    ],
+)
+def test_temporal_operation_rejects_mixed_return_modes(annotation: Any):
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
             return None
 
+    Handler.start.__annotations__["return"] = annotation
     with pytest.raises(TypeError, match="must declare a payload type or"):
+        nexus.temporal_operation(Handler.start)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
+)
+def test_temporal_operation_rejects_cyclic_return_alias():
+    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
+    aliases: dict[str, Any] = {}
+    exec("type A = B\ntype B = A", aliases)
+
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return None
+
+    # Equivalent to annotating `-> A`, where A refers to B and B refers back to A.
+    Handler.start.__annotations__["return"] = aliases["A"]
+    with pytest.raises(TypeError, match="cyclic return type alias"):
         nexus.temporal_operation(Handler.start)

@@ -1,5 +1,5 @@
 import asyncio
-import typing
+import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1608,12 +1608,12 @@ class DirectResultCaller:
 
 
 @pytest.mark.parametrize("sync", [True, False])
+@pytest.mark.skipif(
+    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
+)
 async def test_temporal_operation_accepts_aliased_explicit_result(
     client: Client, env: WorkflowEnvironment, sync: bool
 ) -> None:
-    alias_type = getattr(typing, "TypeAliasType", None)
-    if alias_type is None:
-        pytest.skip("Native type aliases require Python 3.12")
     if env.supports_time_skipping_v1:
         pytest.skip("Standalone Nexus Operation tests don't work with time skipping")
 
@@ -1631,9 +1631,10 @@ async def test_temporal_operation_accepts_aliased_explicit_result(
                 EchoWorkflow.run, input, id=str(uuid.uuid4())
             )
 
-    Handler.echo.__annotations__["return"] = alias_type(
-        "Result", nexus.TemporalOperationResult[str]
-    )
+    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
+    aliases: dict[str, Any] = {"TemporalOperationResult": nexus.TemporalOperationResult}
+    exec("type Result = TemporalOperationResult[str]", aliases)
+    Handler.echo.__annotations__["return"] = aliases["Result"]
     setattr(Handler, "echo", nexus.temporal_operation(Handler.echo))
     handler = service_handler(service=AliasService)(Handler)
     task_queue = str(uuid.uuid4())

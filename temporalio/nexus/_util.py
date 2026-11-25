@@ -55,10 +55,26 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     )
 
 
-def get_temporal_operation_start_method_types(
-    start: Callable[..., Any],
-) -> tuple[type[Any] | None, type[Any] | None, bool]:
-    """Return the input type, payload type, and whether the annotation requires a wrapper."""
+def get_temporal_operation_start_method_input_and_output_type_annotations(
+    start: Callable[
+        [
+            NexusServiceType,
+            TemporalNexusClient,
+            InputT,
+        ],
+        Awaitable[TemporalOperationResult[OutputT] | OutputT],
+    ],
+) -> tuple[
+    type[InputT] | None,
+    type[OutputT] | None,
+]:
+    """Return operation input and output types.
+
+    The output type is the payload type, whether ``start`` is annotated with the
+    payload type or with :py:class:`temporalio.nexus.TemporalOperationResult`. For
+    example, a start method annotated ``-> MyOutput`` or
+    ``-> TemporalOperationResult[MyOutput]`` has output type ``MyOutput``.
+    """
     input_type, return_type = _get_start_method_input_and_output_type_annotations(
         start, expected_param_types=(TemporalNexusClient,)
     )
@@ -72,16 +88,15 @@ def get_temporal_operation_start_method_types(
                     f"@temporal_operation method {start} has a cyclic return type alias."
                 )
             aliases.add(return_type)
-            value = return_type.__value__
-            return_type = type(None) if value is None else value
+            return_type = return_type.__value__
 
     if return_type is None or return_type is Any:
-        return input_type, None, True
+        return input_type, None
 
     origin = typing.get_origin(return_type) or return_type
-    if isinstance(origin, type) and issubclass(origin, TemporalOperationResult):
+    if origin is TemporalOperationResult:
         args = typing.get_args(return_type)
-        return input_type, args[0] if len(args) == 1 else None, True
+        return input_type, args[0] if args else None
 
     result_types = (
         (typing.get_origin(arg) or arg for arg in typing.get_args(return_type))
@@ -89,14 +104,11 @@ def get_temporal_operation_start_method_types(
         else (origin,)
     )
     if any(
-        isinstance(result_type, type)
-        and issubclass(
-            result_type,
-            (
-                TemporalOperationResult,
-                StartOperationResultSync,
-                StartOperationResultAsync,
-            ),
+        result_type
+        in (
+            TemporalOperationResult,
+            StartOperationResultSync,
+            StartOperationResultAsync,
         )
         for result_type in result_types
     ):
@@ -104,7 +116,7 @@ def get_temporal_operation_start_method_types(
             f"@temporal_operation method {start} must declare a payload type or "
             "TemporalOperationResult with the payload type inside the wrapper."
         )
-    return input_type, return_type, False
+    return input_type, return_type
 
 
 def _get_wrapped_start_method_input_and_output_type_annotations(
