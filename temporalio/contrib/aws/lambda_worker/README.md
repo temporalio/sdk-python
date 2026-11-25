@@ -43,6 +43,42 @@ automatically from a TOML config file and/or environment variables via
 
 The file is optional -- if absent, only environment variables are used.
 
+### Credentials from AWS Secrets Manager
+
+To keep credentials out of env vars and the Lambda package, store them in AWS
+Secrets Manager and configure only the secret IDs (names or ARNs). The
+[`secrets_manager`](../secrets_manager/README.md) envconfig extension is always
+enabled, so no code changes are needed:
+
+| Env var | TOML (under `profile.<profile>.ext.aws_secrets_manager`) |
+| --- | --- |
+| `TEMPORAL_EXT_AWS_SECRETS_MANAGER_API_KEY_ID` | `api_key_id` |
+| `TEMPORAL_EXT_AWS_SECRETS_MANAGER_TLS_CLIENT_CERT_ID` | `tls.client_cert_id` |
+| `TEMPORAL_EXT_AWS_SECRETS_MANAGER_TLS_CLIENT_KEY_ID` | `tls.client_key_id` |
+| `TEMPORAL_EXT_AWS_SECRETS_MANAGER_TLS_SERVER_CA_CERT_ID` | `tls.server_ca_cert_id` |
+
+Secrets are fetched through the
+[AWS Parameters and Secrets Lambda Extension](https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets_lambda.html)
+if the function has it. Otherwise they are fetched directly with boto3, which
+requires the `boto3` extra (`temporalio[boto3]`). Either way they are cached
+across warm invocations. The Lambda execution role needs
+`secretsmanager:GetSecretValue` on the configured secrets. See the
+[`secrets_manager` README](../secrets_manager/README.md) for the full set of
+options, validation rules, caching behavior, and observability metrics.
+
+When secret IDs are configured, the extension adds a client plugin to
+`client_connect_config["plugins"]`. To add your own client plugins in the
+configure callback, keep the existing ones rather than replacing them:
+
+```python
+config.client_connect_config["plugins"] = [
+    *config.client_connect_config.get("plugins", []),
+    my_plugin,
+]
+```
+
+### Configure callback
+
 The configure callback receives a `LambdaWorkerConfig` dataclass with fields
 pre-populated with Lambda-appropriate defaults. Override any field directly in
 the callback. The `task_queue` key in `worker_config` is pre-populated from the

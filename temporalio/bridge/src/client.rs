@@ -18,8 +18,11 @@ use tokio_rustls::rustls::client::danger::{
 use tokio_rustls::rustls::client::WebPkiServerVerifier;
 use tokio_rustls::rustls::crypto::CryptoProvider;
 use tokio_rustls::rustls::pki_types::pem::PemObject;
-use tokio_rustls::rustls::pki_types::{CertificateDer, ServerName, UnixTime};
-use tokio_rustls::rustls::{self, DigitallySignedStruct, RootCertStore, SignatureScheme};
+use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
+use tokio_rustls::rustls::sign::CertifiedKey;
+use tokio_rustls::rustls::{
+    self, DigitallySignedStruct, InconsistentKeys, RootCertStore, SignatureScheme,
+};
 use tracing::warn;
 use url::Url;
 
@@ -368,15 +371,27 @@ fn fixed_server_name_verifier(
         })?;
     // Root loading and provider selection mirror tonic's default (no custom
     // verifier) client path: unparsable certificates in the bundle are
-    // skipped, and the provider is the process default if one is installed,
-    // else the build's compiled-in provider. Under a `fips` build lib.rs
-    // installs aws-lc-rs (FIPS) as the process default, so `get_default()`
-    // returns it and this fallback is not taken; the fallback is still made
-    // `cfg`-conditional because the `ring` module is absent in a FIPS build
-    // (`tokio-rustls/ring` off) and would otherwise fail to compile.
+    // skipped, and the provider is chosen as described on crypto_provider.
     let mut roots = RootCertStore::empty();
     roots.add_parsable_certificates(certs);
-    let provider = CryptoProvider::get_default().cloned().unwrap_or_else(|| {
+    let inner = WebPkiServerVerifier::builder_with_provider(roots.into(), crypto_provider())
+        .build()
+        .map_err(|err| {
+            PyValueError::new_err(format!("Failed building certificate verifier: {err}"))
+        })?;
+    let server_name = ServerName::try_from(verification_server_name.to_owned())
+        .map_err(|err| PyValueError::new_err(format!("Invalid verification server name: {err}")))?;
+    Ok(Arc::new(FixedServerNameVerifier { inner, server_name }))
+}
+
+/// The process default rustls provider if one is installed, else the build's
+/// compiled-in provider. Under a `fips` build lib.rs installs aws-lc-rs (FIPS)
+/// as the process default, so `get_default()` returns it and this fallback is
+/// not taken; the fallback is still made `cfg`-conditional because the `ring`
+/// module is absent in a FIPS build (`tokio-rustls/ring` off) and would
+/// otherwise fail to compile.
+fn crypto_provider() -> Arc<CryptoProvider> {
+    CryptoProvider::get_default().cloned().unwrap_or_else(|| {
         #[cfg(feature = "fips")]
         {
             Arc::new(rustls::crypto::aws_lc_rs::default_provider())
@@ -385,15 +400,27 @@ fn fixed_server_name_verifier(
         {
             Arc::new(rustls::crypto::ring::default_provider())
         }
-    });
-    let inner = WebPkiServerVerifier::builder_with_provider(roots.into(), provider)
-        .build()
-        .map_err(|err| {
-            PyValueError::new_err(format!("Failed building certificate verifier: {err}"))
-        })?;
-    let server_name = ServerName::try_from(verification_server_name.to_owned())
-        .map_err(|err| PyValueError::new_err(format!("Invalid verification server name: {err}")))?;
-    Ok(Arc::new(FixedServerNameVerifier { inner, server_name }))
+    })
+}
+
+/// Returns whether a PEM private key matches the first certificate in a PEM
+/// cert chain, checked with rustls's `CertifiedKey::from_der`, which it also
+/// uses to load a client cert and key for a connection. Raises ValueError if
+/// the cert or key can't be loaded. The underlying errors aren't included,
+/// since parse errors can quote parts of the key.
+#[pyfunction]
+pub fn tls_client_key_matches_cert(cert_pem: &[u8], key_pem: &[u8]) -> PyResult<bool> {
+    let cert = CertificateDer::pem_slice_iter(cert_pem)
+        .next()
+        .and_then(Result::ok)
+        .ok_or_else(|| PyValueError::new_err("invalid cert PEM"))?;
+    let key = PrivateKeyDer::from_pem_slice(key_pem)
+        .map_err(|_| PyValueError::new_err("invalid key PEM"))?;
+    match CertifiedKey::from_der(vec![cert], key, &crypto_provider()) {
+        Ok(_) => Ok(true),
+        Err(rustls::Error::InconsistentKeys(InconsistentKeys::KeyMismatch)) => Ok(false),
+        Err(_) => Err(PyValueError::new_err("unsupported or invalid cert or key")),
+    }
 }
 
 /// Delegates to the standard WebPKI verifier, but verifies the certificate
