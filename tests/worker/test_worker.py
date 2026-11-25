@@ -66,6 +66,7 @@ from temporalio.workflow import DynamicWorkflowConfig, VersioningIntent
 from tests.helpers import (
     assert_eventually,
     find_free_port,
+    load_task_queue,
     new_worker,
 )
 from tests.helpers.fork import _ForkTestResult, _TestFork
@@ -148,7 +149,7 @@ class NeverRunService:
 
 async def test_worker_fatal_error_run(client: Client):
     # Run worker with injected workflow poll error
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -157,7 +158,7 @@ async def test_worker_fatal_error_run(client: Client):
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
     # Run worker with injected activity poll error
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.activity.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -167,7 +168,7 @@ async def test_worker_fatal_error_run(client: Client):
 
     # Run worker with them both injected (was causing warning for not retrieving
     # the second error)
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             inj.workflow.poll_fail_queue.put_nowait(RuntimeError("OH NO"))
@@ -180,7 +181,7 @@ async def test_worker_fatal_error_run(client: Client):
 async def test_worker_fatal_error_with(client: Client):
     # Start the worker, wait a short bit, fail it, wait for long time (will be
     # cancelled)
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -191,7 +192,7 @@ async def test_worker_fatal_error_with(client: Client):
     assert err.value.__cause__ and str(err.value.__cause__) == "OH NO"
 
     # Raise inside the async with and confirm it works
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -199,7 +200,7 @@ async def test_worker_fatal_error_with(client: Client):
     assert str(err.value) == "IN WITH"
 
     # Demonstrate that inner re-thrown failure swallows worker failure
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -219,7 +220,7 @@ async def test_worker_fatal_error_callback(client: Client):
         nonlocal callback_err
         callback_err = exc
 
-    worker = create_worker(client, on_fatal_error)
+    worker = await create_no_cache_worker(client, on_fatal_error)
     with pytest.raises(RuntimeError) as err:
         with WorkerFailureInjector(worker) as inj:
             async with worker:
@@ -230,7 +231,7 @@ async def test_worker_fatal_error_callback(client: Client):
 
 
 async def test_worker_cancel_run(client: Client):
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     assert not worker.is_running and not worker.is_shutdown
     run_task = asyncio.create_task(worker.run())
     await asyncio.sleep(0.3)
@@ -290,7 +291,7 @@ async def test_worker_run_while_running_raises_already_started(client: Client):
 
 
 async def test_worker_run_after_shutdown_raises_already_started(client: Client):
-    worker = create_worker(client)
+    worker = await create_no_cache_worker(client)
     async with worker:
 
         async def is_running() -> None:
@@ -342,8 +343,9 @@ async def test_worker_run_before_validation_finishes_raises_already_started(
 
 async def test_worker_run_inside_async_with_raises_already_started(client: Client):
     # `async with` already runs the worker in the background
+    worker = await create_no_cache_worker(client)
     with pytest.raises(RuntimeError, match="^Already started$"):
-        async with create_worker(client) as worker:
+        async with worker:
             await worker.run()
 
 
@@ -473,6 +475,7 @@ async def test_cant_specify_max_concurrent_and_tuner(client: Client):
 
 
 async def test_warns_when_workers_too_low(client: Client):
+    # The Worker constructor gives these warnings, so the test does not run the workers.
     tuner = WorkerTuner.create_resource_based(
         target_memory_usage=0.5,
         target_cpu_usage=0.5,
@@ -482,27 +485,25 @@ async def test_warns_when_workers_too_low(client: Client):
             UserWarning,
             match="Worker max_concurrent_activities is 500 but activity_executor's max_workers is only",
         ):
-            async with new_worker(
+            new_worker(
                 client,
                 WaitOnSignalWorkflow,
                 activities=[say_hello],
                 tuner=tuner,
                 activity_executor=executor,
-            ):
-                pass
+            )
     with concurrent.futures.ThreadPoolExecutor() as executor:
         with pytest.warns(
             UserWarning,
             match="Worker max_concurrent_nexus_tasks is 500 but nexus_task_executor's max_workers is only",
         ):
-            async with new_worker(
+            new_worker(
                 client,
                 WaitOnSignalWorkflow,
                 nexus_service_handlers=[NeverRunService()],
                 tuner=tuner,
                 nexus_task_executor=executor,
-            ):
-                pass
+            )
 
 
 @nexusrpc.handler.service_handler
@@ -1701,17 +1702,24 @@ async def wait_for_worker_deployment_routing_config_propagation(
     await assert_eventually(check)
 
 
-def create_worker(
+async def create_no_cache_worker(
     client: Client,
     on_fatal_error: Callable[[BaseException], Awaitable[None]] | None = None,
 ) -> Worker:
+    # The tests that use this worker stop it right after it starts.
+    task_queue = f"task-queue-{uuid.uuid4()}"
+    await load_task_queue(client, task_queue)
     return Worker(
         client,
-        task_queue=f"task-queue-{uuid.uuid4()}",
+        task_queue=task_queue,
         activities=[never_run_activity],
         workflows=[NeverRunWorkflow],
         nexus_service_handlers=[NeverRunService()],
         on_fatal_error=on_fatal_error,
+        # A sticky queue gets a random name that the test cannot load before the worker
+        # polls it. The server can then keep a late sticky poll open for about a minute.
+        # These workers never run a workflow, so they do not need a cache.
+        max_cached_workflows=0,
     )
 
 

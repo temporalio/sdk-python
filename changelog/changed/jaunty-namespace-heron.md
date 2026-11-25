@@ -1,1 +1,0 @@
-Experimental: the S3 and GCS storage drivers now write payloads stored without a target under `v0/ns/{namespace}/d/sha256/...`, using the namespace of the storing client or worker (`null` when it is unknown), instead of `v0/d/sha256/...`. Existing objects remain retrievable.

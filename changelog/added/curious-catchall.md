@@ -1,0 +1,1 @@
+Add `@temporal_operation(dynamic=True)` for one unnamed Nexus operation fallback per service. The handler and inbound interceptors receive raw `temporalio.common.RawValue` input, reusing Temporal start, result, and cancellation behavior.

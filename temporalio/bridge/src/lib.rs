@@ -28,6 +28,7 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add("RPCError", py.get_type::<client::RPCError>())?;
     m.add_class::<client::ClientRef>()?;
     m.add_function(wrap_pyfunction!(connect_client, m)?)?;
+    m.add_function(wrap_pyfunction!(client::tls_client_key_matches_cert, m)?)?;
 
     // Metric stuff
     m.add_class::<metric::MetricMeterRef>()?;

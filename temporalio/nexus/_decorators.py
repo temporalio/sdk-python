@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import (
     TypeAlias,
+    cast,
     overload,
 )
 
@@ -14,6 +15,7 @@ from nexusrpc.handler import (
 )
 from typing_extensions import override
 
+import temporalio.common
 from temporalio.nexus._temporal_client import (
     TemporalNexusClient,
     TemporalOperationResult,
@@ -166,6 +168,7 @@ def temporal_operation(
 def temporal_operation(
     *,
     name: str | None = None,
+    dynamic: bool = False,
 ) -> Callable[
     [TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]],
     TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
@@ -177,6 +180,7 @@ def temporal_operation(
     | TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT] = None,
     *,
     name: str | None = None,
+    dynamic: bool = False,
 ) -> (
     TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT]
     | Callable[
@@ -186,9 +190,18 @@ def temporal_operation(
 ):
     """Decorator marking a method as the start method for an operation that interacts with Temporal.
 
+    Set dynamic=True to set a Nexus operation handler as a catch-all handler,
+    which will handle any unknown operation that's dispatched to that Nexus service.
+
+    A Nexus service must only have a single dynamic handler and it must accept input
+    as a temporalio.common.RawValue. Cancellation uses the same token-based handling as
+    named Temporal operations.
+
     .. warning::
        This API is experimental and unstable.
     """
+    if dynamic and name is not None:
+        raise ValueError("A dynamic operation handler cannot specify name")
 
     def decorator(
         start: TemporalOperationStartHandlerFunc[NexusServiceType, InputT, OutputT],
@@ -202,6 +215,10 @@ def temporal_operation(
             input_type,
             output_type,
         ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
+        if dynamic and input_type is not temporalio.common.RawValue:
+            raise TypeError(
+                "A dynamic operation handler must accept temporalio.common.RawValue"
+            )
 
         def operation_handler_factory(
             self: NexusServiceType,
@@ -211,6 +228,10 @@ def temporal_operation(
                 client: TemporalNexusClient,
                 input: InputT,
             ) -> TemporalOperationResult[OutputT]:
+                if dynamic:
+                    input = await cast(nexusrpc.LazyValue, input).consume(
+                        as_type=temporalio.common.RawValue
+                    )
                 return await start(
                     self,
                     ctx,
@@ -231,16 +252,29 @@ def temporal_operation(
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
             return _TemporalOperationHandler()
 
-        method_name = get_callable_name(start)
-        op = nexusrpc.Operation(
-            name=name or method_name,
-            input_type=input_type,
-            output_type=output_type,
-        )
-        op.method_name = method_name
-        nexusrpc.set_operation(operation_handler_factory, op)
+        if dynamic:
 
-        set_operation_factory(start, operation_handler_factory)
+            @nexusrpc.handler.operation_handler(dynamic=True)
+            def dynamic_operation_handler_factory(
+                self: NexusServiceType,
+            ) -> OperationHandler[nexusrpc.LazyValue, OutputT]:
+                return cast(
+                    OperationHandler[nexusrpc.LazyValue, OutputT],
+                    operation_handler_factory(self),
+                )
+
+            set_operation_factory(start, dynamic_operation_handler_factory)
+        else:
+            method_name = get_callable_name(start)
+            op = nexusrpc.Operation(
+                name=name or method_name,
+                input_type=input_type,
+                output_type=output_type,
+            )
+            op.method_name = method_name
+            nexusrpc.set_operation(operation_handler_factory, op)
+
+            set_operation_factory(start, operation_handler_factory)
         return start
 
     if start is None:

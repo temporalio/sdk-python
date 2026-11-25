@@ -30,10 +30,10 @@ from temporalio.contrib.aws.lambda_worker._defaults import (
     lambda_default_config_file_path,
 )
 from temporalio.contrib.aws.lambda_worker._run_worker import (
+    _default_load_config,
     _run_worker_internal,
     _WorkerDeps,
 )
-from temporalio.envconfig import ClientConfigProfile
 from temporalio.worker import WorkerConfig
 
 TEST_VERSION = WorkerDeploymentVersion(
@@ -207,6 +207,34 @@ class TestDefaults:
         )
 
 
+def test_default_load_config_secrets_manager_extension(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("TEMPORAL_CONFIG_FILE", str(tmp_path / "temporal.toml"))
+    monkeypatch.delenv("TEMPORAL_API_KEY", raising=False)
+    monkeypatch.delenv("PARAMETERS_SECRETS_EXTENSION_HTTP_PORT", raising=False)
+    monkeypatch.delenv("AWS_LAMBDA_FUNCTION_NAME", raising=False)
+    monkeypatch.setenv("TEMPORAL_EXT_AWS_SECRETS_MANAGER_API_KEY_ID", "")
+
+    config = _default_load_config(lambda _: None)
+    assert "plugins" not in config
+
+    # Secrets aren't fetched until a client connects, so loading needs no AWS access
+    monkeypatch.setenv(
+        "TEMPORAL_EXT_AWS_SECRETS_MANAGER_API_KEY_ID", "my-api-key-secret"
+    )
+    config = _default_load_config(lambda _: None)
+    plugins = config.get("plugins")
+    assert plugins and len(plugins) == 1
+    assert plugins[0].name() == "temporalio.contrib.aws.secrets_manager"
+
+    monkeypatch.setenv("TEMPORAL_API_KEY", "my-api-key")
+    with pytest.raises(
+        RuntimeError, match="API key secret ID cannot be set with an API key"
+    ):
+        _default_load_config(lambda _: None)
+
+
 # ---- RunWorker tests ----
 
 
@@ -247,7 +275,7 @@ def _make_test_deps(
     return _WorkerDeps(
         connect=fake_connect,
         create_worker=fake_create_worker,
-        load_config=lambda: ClientConfigProfile(),
+        load_config=lambda: {},
         getenv={"TEMPORAL_TASK_QUEUE": "test-queue"}.get,  # type: ignore[arg-type]
         extract_lambda_ctx=lambda ctx: (
             (
@@ -375,6 +403,28 @@ class TestRunWorkerInternal:
 
         assert connect_capture[0]["namespace"] == "custom-ns"
         assert worker_capture[0]["max_concurrent_activities"] == 99
+
+    def test_client_plugins_copied_per_invocation(self) -> None:
+        connect_capture: list[dict[str, Any]] = []
+        deps = _make_test_deps(connect_kwargs_capture=connect_capture)
+        base_plugin = MagicMock()
+        deps.load_config = lambda: {"plugins": [base_plugin]}
+        user_plugin = MagicMock()
+
+        def configure(config: LambdaWorkerConfig) -> None:
+            # Appending in place mustn't affect later invocations
+            plugins = config.client_connect_config.get("plugins")
+            assert isinstance(plugins, list)
+            plugins.append(user_plugin)
+
+        handler = _run_worker_internal(TEST_VERSION, configure, deps)
+        handler({}, _make_lambda_context())
+        handler({}, _make_lambda_context())
+
+        assert [c["plugins"] for c in connect_capture] == [
+            [base_plugin, user_plugin],
+            [base_plugin, user_plugin],
+        ]
 
     def test_lambda_defaults_applied(self) -> None:
         worker_capture: list[dict[str, Any]] = []

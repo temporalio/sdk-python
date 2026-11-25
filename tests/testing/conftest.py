@@ -15,7 +15,7 @@ async def ts_env() -> AsyncGenerator[WorkflowEnvironment, None]:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.WorkflowTimeSkippingEnabled=true",
+            "system.workflowTimeSkippingEnabled=true",
         ],
     ) as workflow_env:
         yield workflow_env

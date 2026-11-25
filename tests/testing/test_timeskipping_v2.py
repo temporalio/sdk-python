@@ -255,7 +255,7 @@ async def test_child_workflow_with_propagation_disabled() -> None:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.WorkflowTimeSkippingEnabled=true",
+            "system.workflowTimeSkippingEnabled=true",
         ],
         ts_config=TimeSkippingConfig(disable_propagation=True),
     ) as env:
@@ -296,7 +296,7 @@ async def test_timeskipper_wrapping_local_env_client() -> None:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.WorkflowTimeSkippingEnabled=true",
+            "system.workflowTimeSkippingEnabled=true",
         ],
     ) as env:
         assert not env.supports_time_skipping_v1
@@ -624,7 +624,7 @@ async def test_max_session_skip_count_stamped_by_env() -> None:
         dev_server_download_version=DEV_SERVER_DOWNLOAD_VERSION,
         dev_server_extra_args=[
             "--dynamic-config-value",
-            "frontend.WorkflowTimeSkippingEnabled=true",
+            "system.workflowTimeSkippingEnabled=true",
         ],
         ts_config=TimeSkippingConfig(enabled=True, max_session_skip_count=5),
     ) as env:
