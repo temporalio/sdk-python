@@ -1,1 +1,0 @@
-The workflow sandbox now raises `RestrictedWorkflowAccessError` when workflow code calls `asyncio.as_completed()` or `asyncio.wait()`, instead of only warning. Use the deterministic `workflow.as_completed()` and `workflow.wait()` instead.

@@ -7,6 +7,21 @@ This file contains assembled releases only.
 
 # Changelog
 
+## [1.37.1] - 2026-11-25
+
+### Added
+
+- Add `@temporal_operation(dynamic=True)` for one unnamed Nexus operation fallback per service. The handler and inbound interceptors receive raw `temporalio.common.RawValue` input, reusing Temporal start, result, and cancellation behavior.
+
+- `TLSConfig.verification_server_name` now also accepts a sequence of names. The server certificate is accepted if it is valid for any one of them, for targets whose servers present different certificate names (for example, regional servers behind one global address). Requires `server_root_ca_cert`.
+
+- Add `temporalio.contrib.aws.secrets_manager`, an experimental envconfig extension that loads client credentials (API key or TLS) from AWS Secrets Manager based on secret IDs configured under `profile.<profile>.ext.aws_secrets_manager` in the config file or `TEMPORAL_EXT_AWS_SECRETS_MANAGER_*` environment variables. Fetching directly from AWS (without the Lambda extension) requires the new `boto3` extra.
+- Lambda workers can load client credentials from AWS Secrets Manager: `run_worker` now loads client config with the `temporalio.contrib.aws.secrets_manager` extension, so the API key and TLS cert/key/CA can be configured as secret IDs via `TEMPORAL_EXT_AWS_SECRETS_MANAGER_*` environment variables or `profile.<profile>.ext.aws_secrets_manager` in the config file.
+
+### :boom: Breaking Changes
+
+- The workflow sandbox now raises `RestrictedWorkflowAccessError` when workflow code calls `asyncio.as_completed()` or `asyncio.wait()`, instead of only warning. Use the deterministic `workflow.as_completed()` and `workflow.wait()` instead.
+
 ## [1.37.0] - 2026-11-24
 
 ### Added
