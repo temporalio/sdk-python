@@ -30,7 +30,6 @@ from nexusrpc.handler import (
     OperationTaskCancellation,
     StartOperationContext,
 )
-from typing_extensions import override
 
 import temporalio.api.common.v1
 import temporalio.api.nexus.v1
@@ -115,41 +114,6 @@ _temporal_operation_signal_slot: ContextVar[_SignalSlot | None] = ContextVar(
 )
 
 
-class OperationTaskCancellationToken(OperationTaskCancellation):
-    """Read-only cancellation signal for the current Nexus handler task.
-
-    Get this token from :py:attr:`Info.cancellation_token`.
-    """
-
-    def __init__(self, task_cancellation: OperationTaskCancellation) -> None:
-        """Initialize the token. Obtain one from the operation info."""
-        self.__task_cancellation = task_cancellation
-
-    @override
-    def is_cancelled(self) -> bool:
-        """Return whether cancellation of the handler invocation was requested."""
-        return self.__task_cancellation.is_cancelled()
-
-    @override
-    def cancellation_reason(self) -> str | None:
-        """Return the reason for cancellation, if available."""
-        return self.__task_cancellation.cancellation_reason()
-
-    @override
-    async def wait_until_cancelled(self) -> None:
-        """Wait for cancellation of this invocation.
-
-        Async handlers can receive :py:class:`asyncio.CancelledError` at an await.
-        The worker records the cancellation reason before interrupting the handler.
-        """
-        await self.__task_cancellation.wait_until_cancelled()
-
-    @override
-    def wait_until_cancelled_sync(self, timeout: float | None = None) -> bool:
-        """Return whether cancellation occurred within the given timeout in seconds."""
-        return self.__task_cancellation.wait_until_cancelled_sync(timeout)
-
-
 @dataclass(frozen=True)
 class Info:
     """Information about the running Nexus operation.
@@ -178,8 +142,12 @@ class Info:
     Cancel invocations have no start request ID.
     """
 
-    cancellation_token: OperationTaskCancellationToken
-    """Read-only token for observing cancellation of this handler task."""
+    task_cancellation: OperationTaskCancellation
+    """Observes cancellation of this handler task.
+
+    Async handlers can also receive :py:class:`asyncio.CancelledError` at an await. The worker
+    records the cancellation reason before interrupting the handler.
+    """
 
     @classmethod
     def _from_operation_context(
@@ -201,9 +169,7 @@ class Info:
                 if isinstance(context, StartOperationContext)
                 else None
             ),
-            cancellation_token=OperationTaskCancellationToken(
-                context.task_cancellation
-            ),
+            task_cancellation=context.task_cancellation,
         )
 
 

@@ -101,6 +101,7 @@ informal introduction to the features and their implementation.
       - [Testing](#testing-1)
     - [Interceptors](#interceptors)
     - [Nexus](#nexus)
+      - [Experimental Temporal operation handlers](#experimental-temporal-operation-handlers)
     - [Plugins](#plugins)
       - [Usage](#usage-1)
       - [Plugin Implementations](#plugin-implementations)
@@ -1621,9 +1622,6 @@ asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
 Start with the [Hello Nexus sample](https://github.com/temporalio/samples-python/tree/main/hello_nexus). It demonstrates a
 greeting that returns immediately and a greeting that completes when its backing Workflow finishes.
 
-> **Pre-release.** The experimental `@nexus.temporal_operation` decorator supports both completion modes. See
-> **Experimental Temporal operation handlers** after the walkthrough for the same greeting service using one decorator.
-
 1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
     ```
     temporal operator namespace create --namespace my-handler-namespace
@@ -1715,7 +1713,11 @@ Temporal supports calling Nexus operations **from a workflow** or directly from 
 Standalone Nexus Operations are in [Public Preview](https://docs.temporal.io/evaluate/development-production-features/release-stages#public-preview).
 We aim to preserve backward compatibility and avoid breaking changes. See https://docs.temporal.io/nexus.
 
-**Experimental Temporal operation handlers**
+#### Experimental Temporal operation handlers
+
+> **Breaking change.** Start handlers no longer receive a context argument: change `(self, ctx, client, input)` to
+> `(self, client, input)` and read invocation metadata from `nexus.info()`. Custom cancel overrides receive only their
+> typed options.
 
 To implement the same service with one decorator, use `@nexus.temporal_operation`. An `async def` handler
 receives `(self, client, input)`, where `client` is a `TemporalNexusClient`. Use
@@ -1744,7 +1746,7 @@ class ExperimentalNexusServiceHandler:
 
 Register `ExperimentalNexusServiceHandler()` with the handler Worker to run this implementation. Custom cancel
 handlers receive their typed options. Use `nexus.info()` for invocation metadata and
-`nexus.info().cancellation_token` to observe cancellation of the current invocation. Worker Nexus inbound
+`nexus.info().task_cancellation` to observe cancellation of the current invocation. Worker Nexus inbound
 interceptors can read incoming headers from `input.ctx.headers`.
 
 

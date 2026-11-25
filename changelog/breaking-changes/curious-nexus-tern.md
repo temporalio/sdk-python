@@ -1,1 +1,1 @@
-Experimental Temporal Nexus start handlers now accept `(client, input)` and typed cancel overrides accept only their options. Use `temporalio.nexus.info()` for invocation metadata and a read-only cancellation token.
+Experimental Temporal Nexus start handlers now accept `(client, input)` and typed cancel overrides accept only their options. Use `temporalio.nexus.info()` for invocation metadata and `temporalio.nexus.info().task_cancellation` to observe handler task cancellation.
