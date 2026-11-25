@@ -1,0 +1,1 @@
+When a workflow cannot decode the result of an activity, child workflow, or Nexus operation, the workflow task failure message now names that activity, child workflow, or operation instead of saying "Failed decoding arguments".

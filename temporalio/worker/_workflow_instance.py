@@ -975,6 +975,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     [job.result.completed.result],
                     ret_types,
                     payload_converter,
+                    f"result of activity {handle._input.activity!r}",
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
@@ -1013,6 +1014,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     [job.result.completed.result],
                     ret_types,
                     handle._payload_converter,
+                    f"result of child workflow {handle._input.workflow!r}",
                 )
                 ret = ret_vals[0]
             handle._resolve_success(ret)
@@ -1143,6 +1145,8 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 [result.completed],
                 [handle._input.output_type] if handle._input.output_type else None,
                 payload_converter,
+                f"result of Nexus operation {handle._input.operation_name!r}"
+                f" on service {handle._input.service!r}",
             )
             handle._resolve_success(output)
         elif result.HasField("failed"):
@@ -2476,6 +2480,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         payloads: Sequence[temporalio.api.common.v1.Payload],
         types: list[type] | None,
         payload_converter: temporalio.converter.PayloadConverter,
+        description: str = "arguments",
     ) -> list[Any]:
         if not payloads:
             return []
@@ -2490,7 +2495,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
         except Exception as err:
             if self.workflow_is_failure_exception(err):
                 raise
-            raise RuntimeError("Failed decoding arguments") from err
+            raise RuntimeError(f"Failed decoding {description}") from err
 
     def _payload_converter_with_context(
         self,
