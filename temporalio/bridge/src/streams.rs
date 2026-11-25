@@ -287,7 +287,7 @@ fn store_limits(
 pub(crate) struct WorkerStreams {
     limits: Option<(usize, usize, usize)>,
     stores: Vec<(String, Py<PyAny>)>,
-    read_max_wait_millis: Option<u64>,
+    read_time_millis: Option<u64>,
 }
 
 impl WorkerStreams {
@@ -307,8 +307,8 @@ impl WorkerStreams {
             (name, Arc::new(runtime))
         });
         let mut runtimes = StreamRuntimes::new(runtimes);
-        if let Some(millis) = self.read_max_wait_millis {
-            runtimes.settings.read_max_wait = Duration::from_millis(millis);
+        if let Some(millis) = self.read_time_millis {
+            runtimes.settings.read_time = Some(Duration::from_millis(millis));
         }
         Ok(runtimes)
     }

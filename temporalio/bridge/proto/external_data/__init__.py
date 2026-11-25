@@ -1,25 +1,6 @@
-from .external_data_pb2 import (
-    LocalActivityMarkerData,
-    PatchedMarkerData,
-    StreamAppendOffsets,
-    StreamAppendResult,
-    StreamCloseIntent,
-    StreamCloseResult,
-    StreamFailure,
-    StreamLedger,
-    StreamReadPage,
-    StreamReadResult,
-)
+from .external_data_pb2 import LocalActivityMarkerData, PatchedMarkerData
 
 __all__ = [
     "LocalActivityMarkerData",
     "PatchedMarkerData",
-    "StreamAppendOffsets",
-    "StreamAppendResult",
-    "StreamCloseIntent",
-    "StreamCloseResult",
-    "StreamFailure",
-    "StreamLedger",
-    "StreamReadPage",
-    "StreamReadResult",
 ]

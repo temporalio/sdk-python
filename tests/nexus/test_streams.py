@@ -9,7 +9,7 @@ import pkgutil
 import random
 import subprocess
 import sys
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, cast
@@ -304,18 +304,6 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
             if operation == "create":
                 assert result.ref == StreamRef(id=stream_id, store=store.name())
                 created.append((result, store))
-
-
-@pytest.mark.parametrize(
-    "limit", ["max_record_bytes", "max_batch_bytes", "max_batch_records"]
-)
-def test_a_limit_below_one_raises(limit: str) -> None:
-    limits: Any = {limit: 0}
-    with pytest.raises(
-        ValueError,
-        match=rf"^StreamConfig\.{limit} must be greater than or equal to one\.$",
-    ):
-        StreamConfig([FaultStore()], **limits)
 
 
 async def test_a_stream_error_keeps_its_reason_on_every_path() -> None:
@@ -698,5 +686,26 @@ def test_a_client_call_past_its_rpc_timeout_cancels_the_store_call() -> None:
         assert loop.time() == 5
         assert hold.cancelled.is_set()
         assert asyncio.all_tasks() == {asyncio.current_task()}
+
+    run_with_virtual_clock(script())
+
+
+def test_a_page_with_no_last_offset_ends_at_its_last_record() -> None:
+    async def unset(call: Callable[[], Awaitable[Any]]) -> Any:
+        page = await call()
+        page.ClearField("last_offset")
+        return page
+
+    async def script() -> None:
+        store = FaultStore()
+        client = Client(Mock(spec=ServiceClient), stream_config=StreamConfig([store]))
+        stream = await client.create_stream(id="s", body_type=int)
+        await stream.append(1, 2)
+        store.faults["read_records"].extend([unset, unset])
+        page = await stream.read_page()
+        assert page.last_offset == page.records[-1].offset
+        # A page with no Record ends where its read started.
+        empty = await stream.read_page(from_offset=page.last_offset)
+        assert (empty.records, empty.last_offset) == ([], page.last_offset)
 
     run_with_virtual_clock(script())

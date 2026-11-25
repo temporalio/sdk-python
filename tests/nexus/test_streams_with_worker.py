@@ -14,6 +14,7 @@ from google.protobuf.message import Message
 
 from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType, StreamErrorReason, TaskQueueType
+from temporalio.api.sdk.v1 import WorkflowTaskStreamCalls
 from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
 from temporalio.api.stream.v1 import StreamRef as RefProto
 from temporalio.api.streamservice.v1 import (
@@ -290,14 +291,14 @@ def _events(history: Any, event_type: EventType.ValueType) -> list[Any]:
     return [event for event in history.events if event.event_type == event_type]
 
 
-def _stream_calls(history: Any) -> list[bytes]:
+def _stream_calls(history: Any) -> list[WorkflowTaskStreamCalls]:
     """Return the Stream calls that Core keeps on each completed Workflow Task."""
     completed = _events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
     calls = [
-        event.workflow_task_completed_event_attributes.sdk_metadata.core_stream_calls
+        event.workflow_task_completed_event_attributes.sdk_metadata.stream_calls
         for event in completed
     ]
-    return [call for call in calls if call]
+    return [call for call in calls if call.ByteSize()]
 
 
 async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> None:
@@ -828,82 +829,58 @@ class _EndingWorkflow:
 
     @workflow.run
     async def run(self, stream_id: str, how: str) -> None:
-        if how == "continued":
-            return
         stream = await workflow.create_stream(id=stream_id, body_type=int)
-        call: asyncio.Future[Any]
         if how == "append":
-            call = asyncio.ensure_future(stream.append(1))
+            asyncio.ensure_future(stream.append(1))
         elif how == "close":
-            call = asyncio.ensure_future(stream.close())
+            asyncio.ensure_future(stream.close())
         elif how == "page":
             await stream.append(1)
             await stream.read_page(wait=timedelta(minutes=5))
             return
         else:
-            call = asyncio.ensure_future(stream.read_page(wait=timedelta(minutes=5)))
+            asyncio.ensure_future(stream.read_page(wait=timedelta(minutes=5)))
             await workflow.wait_condition(lambda: self._signals > 0)
         # The task of the call makes its call in its first step.
         await asyncio.sleep(0)
-        if how == "cancel the read":
-            call.cancel()
-            await workflow.wait_condition(lambda: self._signals > 1)
-        elif how == "continue as new":
-            workflow.continue_as_new(args=[stream_id, "continued"])
-
-
-async def _end_while_a_read_waits(client: Client, how: str) -> None:
-    """Run a Workflow whose read waits on a held Store call, end the read in the way
-    of ``how``, and check that the Store call was cancelled and that a replay passes.
-    """
-    store, hold = FaultStore(), Hold()
-    store.faults["read_records"].append(hold)
-
-    async def end(handle: Any, worker: Worker) -> None:
-        await hold.started.wait()
-        if how == "cancel":
-            await handle.cancel()
-        elif how == "shutdown":
-            await worker.shutdown()
-        else:
-            await handle.signal(_EndingWorkflow.go_on)
-        await asyncio.wait_for(hold.cancelled.wait(), 10)
-        if how == "shutdown":
-            await handle.terminate()
-        elif how == "cancel the read":
-            await handle.signal(_EndingWorkflow.go_on)
-
-    # The read holds its Workflow Task until the heartbeat, so the task is short.
-    options = RunOptions(
-        _EndingWorkflow,
-        [f"ends by {how}", how],
-        task_timeout=timedelta(seconds=2),
-        during=end,
-        replay=True,
-    )
-    ran = await run(stream_client(client, store), options)
-    assert (ran.result is None) == (how not in ("cancel", "shutdown"))
-    reads = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
-    assert len(reads) == 1
 
 
 async def test_a_read_that_core_stops_leaves_no_store_task(client: Client) -> None:
-    # A cancel of the read, a terminal command, and the eviction of a Worker that shuts down
-    for how in ("cancel the read", "return", "shutdown"):
+    # The read limit of the task stops a held Store call, also while the Worker shuts
+    # down, since the shutdown waits for the task.
+    for how in ("read limit", "shutdown"):
         with failure_note(how):
-            await _end_while_a_read_waits(client, how)
+            store, hold = FaultStore(), Hold()
+            store.faults["read_records"].append(hold)
+
+            async def end(handle: Any, worker: Worker) -> None:
+                await hold.started.wait()
+                if how == "shutdown":
+                    await worker.shutdown()
+                else:
+                    await handle.signal(_EndingWorkflow.go_on)
+                await asyncio.wait_for(hold.cancelled.wait(), 10)
+                if how == "shutdown":
+                    await handle.terminate()
+
+            # A task timeout of 2 seconds gives a read limit of 1 second.
+            options = RunOptions(
+                _EndingWorkflow,
+                [f"ends by {how}", how],
+                task_timeout=timedelta(seconds=2),
+                during=end,
+                replay=True,
+            )
+            ran = await run(stream_client(client, store), options)
+            assert (ran.result is None) == (how == "read limit")
+            reads = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
+            assert len(reads) == 1
 
 
-@pytest.mark.parametrize(
-    "how", ["continue as new", "cancel", "page", "append", "close"]
-)
-async def test_a_workflow_that_ends_while_a_read_waits_leaves_nothing(
+@pytest.mark.parametrize("how", ["page", "append", "close"])
+async def test_a_stream_call_does_not_hold_the_last_command(
     client: Client, how: str
 ) -> None:
-    # The return while a read waits is a case of the test above.
-    if how in ("continue as new", "cancel"):
-        await _end_while_a_read_waits(client, how)
-        return
     # A read that gave a page, and an append or a close that nothing awaits, don't hold
     # the last command, so the Workflow ends in the task of the call.
     options = RunOptions(_EndingWorkflow, [f"ends after its {how}", how], replay=True)
@@ -918,46 +895,38 @@ class _LatePagesWorkflow:
 
     @workflow.run
     async def run(self, how: str) -> list[list[str]]:
-        wait = timedelta(seconds=30)
         s = workflow.get_stream(StreamRef[str](id=f"s of {how}"))
         t = workflow.get_stream(StreamRef[str](id=f"t of {how}"))
-        if how == "a cancel":
-            # The page of `t` makes the Workflow cancel its read of `s`, whose reader then
-            # reads `u`. A replay gives the cancel job of `s` after that cancel, as the first run.
-            u = workflow.get_stream(StreamRef[str](id=f"u of {how}"))
-
-            async def read_s() -> None:
-                try:
-                    await s.read_page(wait=wait)
-                except asyncio.CancelledError:
-                    await u.read_page()
-
-            reader = asyncio.ensure_future(read_s())
-            # The task around this read lets the reader of `s` run first if its wait ended.
-            page = await asyncio.ensure_future(t.read_page(wait=wait))
-            reader.cancel()
-            last = await t.read_page(from_offset=page.last_offset)
-            await reader
-            return [[r.body for r in page.records], [r.body for r in last.records]]
         if how == "two readers":
             # One reader takes a page of `s` and stops. The other waits for a page of
             # `t`, and then reads `s` on from the offset of the first one.
-            first = asyncio.ensure_future(s.read_page(wait=wait))
-            await t.read_page(wait=wait)
+            first = asyncio.ensure_future(self._page(s))
+            await self._page(t)
             offset = (await first).last_offset
-            second = await s.read_page(from_offset=offset, wait=wait)
+            second = await self._page(s, offset)
             return [[r.body for r in page.records] for page in (await first, second)]
         pages: list[list[str]] = []
         offset = None
         while True:
-            page = await s.read_page(from_offset=offset, wait=wait)
+            page = await s.read_page(from_offset=offset, wait=timedelta(seconds=30))
             pages.append([record.body for record in page.records])
             offset = page.last_offset
             if page.done:
                 return pages
 
+    async def _page(self, stream: Any, offset: bytes | None = None) -> Any:
+        """Return the first page of ``stream`` after ``offset`` that has a Record."""
+        while True:
+            # At the read limit of its task, a read gives a page with no Record.
+            page = await stream.read_page(
+                from_offset=offset, wait=timedelta(seconds=30)
+            )
+            if page.records:
+                return page
+            offset = page.last_offset
 
-@pytest.mark.parametrize("how", ["a loop", "two readers", "a cancel"])
+
+@pytest.mark.parametrize("how", ["a loop", "two readers"])
 async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
     client: Client, how: str
 ) -> None:
@@ -965,11 +934,9 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
     client = stream_client(client, store)
     s = await client.create_stream(id=f"s of {how}", body_type=str)
     t = await client.create_stream(id=f"t of {how}", body_type=str)
-    await client.create_stream(id=f"u of {how}", body_type=str)
     writes, expected = {
         "a loop": ([(s, "a"), (s, "b")], ["a", "b"]),
         "two readers": ([(s, "a"), (t, "x"), (s, "b")], ["a", "b"]),
-        "a cancel": ([(t, "x")], ["x"]),
     }[how]
 
     async def write(handle: Any, _worker: Any) -> None:
@@ -978,8 +945,9 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
             started = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
             assert len(_events(history, started)) > 1
 
-        # The first task ends at its heartbeat with no page. The pages then come in several
-        # activations of the next task, and a replay gives each page in its activation.
+        # The reads of the first task end at its read limit with no Record. The pages
+        # then come in several activations of a later task, and a replay gives each
+        # page in its activation.
         await assert_eventually(second_task)
         for stream, body in writes:
             await stream.append(body)
@@ -1040,15 +1008,10 @@ async def test_a_replay_gives_each_result_in_the_activation_of_the_first_run(
         ]
         return [seqs for seqs in activations if seqs]
 
-    async def release(handle: Any, _worker: Any) -> None:
-        async def forced_task() -> None:
-            history = await handle.fetch_history()
-            started = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
-            assert len(_events(history, started)) > 1
-
-        # Both reads wait past the heartbeat of the first task, which completes with no
-        # command. Legacy chunking takes that task and the next one as one in a replay.
-        await assert_eventually(forced_task)
+    async def release(_handle: Any, _worker: Any) -> None:
+        # Both reads wait in the first task, and each page comes before its read limit.
+        for hold in holds:
+            await hold.started.wait()
         for count, hold in enumerate(holds, 1):
             hold.release()
 
@@ -1061,7 +1024,6 @@ async def test_a_replay_gives_each_result_in_the_activation_of_the_first_run(
     options = RunOptions(
         _TwoReadsWorkflow,
         ["first", "second"],
-        task_timeout=timedelta(seconds=2),
         worker={"workflow_runner": live},
         during=release,
     )
@@ -1187,25 +1149,97 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
     stream = await client.create_stream(id="paged", body_type=int)
     await stream.append(1, 2, 3)
     await stream.close()
-    # A read with no limit asks for 256 Records and 4 MiB. Each Store call waits for the
-    # longest wait of the Worker at most.
-    cases: list[tuple[dict[str, int], tuple[int, int, int]]] = [
-        ({"max_records": 1, "max_bytes": 100}, (1, 100, 2)),
-        ({}, (256, 4 * 1024 * 1024, 2)),
+    # A read with no limit asks for 256 Records and 4 MiB. A Store call waits no longer
+    # than the read time of the Worker, which is shorter than the wait of the read.
+    cases: list[tuple[dict[str, int], tuple[int, int]]] = [
+        ({"max_records": 1, "max_bytes": 100}, (1, 100)),
+        ({}, (256, 4 * 1024 * 1024)),
     ]
+    read_time = timedelta(seconds=2)
     for limits, expected in cases:
         with failure_note(f"limits {limits}"):
             store.calls.clear()
             options = RunOptions(
                 _ReadAllWorkflow,
                 ["paged", limits],
-                worker={"stream_read_max_wait": timedelta(seconds=2)},
+                worker={"stream_read_time": read_time},
             )
             assert (await run(client, options)).result == [1, 2, 3]
             reads = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
-            asked = [(r.max_records, r.max_bytes, r.wait.ToSeconds()) for r in reads]
+            asked = [(r.max_records, r.max_bytes) for r in reads]
             # With one Record in a page, the read of each Record is one Store call.
             assert asked == [expected] * (3 if limits else 1)
+            waits = [r.wait.ToTimedelta() for r in reads]
+            assert timedelta(0) < waits[0] and max(waits) <= read_time
+
+
+@workflow.defn
+class _QuietReadWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> list[int]:
+        stream = workflow.get_stream(StreamRef[int](id=stream_id))
+        return [record.body async for record in stream.read(wait=timedelta(minutes=5))]
+
+
+async def test_a_workflow_read_waits_on_a_quiet_stream_across_read_limits(
+    client: Client,
+) -> None:
+    store = FaultStore()
+    client = stream_client(client, store)
+    stream = await client.create_stream(id="quiet", body_type=int)
+
+    async def write(handle: Any, _worker: Any) -> None:
+        async def limit_passed() -> None:
+            history = await handle.fetch_history()
+            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            assert len(_events(history, completed)) > 1
+
+        # On a quiet Stream, the read gets pages with no Record, and goes on in the next
+        # Workflow Task from the same offset.
+        await assert_eventually(limit_passed)
+        quiet = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
+        assert len(quiet) > 1 and not any(r.from_offset for r in quiet)
+        await stream.append(1, 2)
+        await stream.close()
+
+    options = RunOptions(
+        _QuietReadWorkflow,
+        ["quiet"],
+        worker={"stream_read_time": timedelta(milliseconds=300)},
+        during=write,
+        replay=True,
+    )
+    assert (await run(client, options)).result == [1, 2]
+
+
+async def test_a_workflow_read_with_no_wait_outlives_the_read_limit(
+    client: Client,
+) -> None:
+    store, hold = FaultStore(), Hold()
+    stream = await stream_client(client, store).create_stream(id="slow", body_type=int)
+    await stream.append(1, 2, 3)
+    store.faults["read_records"].append(hold)
+
+    async def release(handle: Any, _worker: Any) -> None:
+        async def task_completed() -> None:
+            history = await handle.fetch_history()
+            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            assert _events(history, completed)
+
+        # The task completes at its read limit, and the Store still holds the read.
+        await assert_eventually(task_completed)
+        hold.release()
+        await handle.signal(_ReadOnceWorkflow.go_on)
+
+    options = RunOptions(
+        _ReadOnceWorkflow,
+        ["slow"],
+        task_timeout=timedelta(seconds=2),
+        during=release,
+        replay=True,
+    )
+    assert (await run(stream_client(client, store), options)).result == [1, 2, 3]
+    assert not hold.cancelled.is_set()
 
 
 @dataclasses.dataclass

@@ -81,9 +81,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
         The command of the call is added before this returns, so commands are in
         the order of the calls. Cancelling the handle ends its wait immediately.
-        Core can't stop an append or a close, so those still run. A cancelled
-        read sends ``RequestCancelStreamRead``, and the job that still comes for
-        it is dropped.
+        Core can't stop an append, a close or a read, so those still run, and the
+        job that still comes for the call is dropped.
         """
         instance = self._instance
         instance._assert_not_read_only("start a Stream call")
@@ -98,8 +97,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         request = temporalio.nexus.system._support.model_to_proto(model, *converters)
         # The future of the job of the call, or the task of its Local Activity
         result: asyncio.Future[Any]
-        # The seq of the call's read, or 0 for another operation
-        read_seq = 0
         if isinstance(request, proto.AppendRecordsRequest):
             stream = self._stream(request.ref)
             seq = instance._next_seq("stream_append")
@@ -124,10 +121,10 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                     "body_type, or a StreamRef with a type argument."
                 )
             stream = self._stream(request.ref)
-            read_seq = instance._next_seq("stream_read")
+            seq = instance._next_seq("stream_read")
             instance._add_command().read_stream.CopyFrom(
                 temporalio.bridge.proto.workflow_commands.ReadStream(
-                    seq=read_seq,
+                    seq=seq,
                     stream=stream,
                     from_offset=request.from_offset,
                     wait=request.wait if request.HasField("wait") else None,
@@ -136,7 +133,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 )
             )
             result = instance.create_future()
-            self._reads[read_seq] = _Read(result, result_type)
+            self._reads[seq] = _Read(result, result_type)
         else:
             # The Local Activity picks the Store of a ref with no Store name. A replay
             # has its result, so a replay asks no selector for it. Each run of a chain
@@ -163,9 +160,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             if result.done():
                 return
             result.cancel()
-            # Only a read has a cancel command. An eviction sends no command.
-            if read_seq and not instance._deleting:
-                instance._add_command().request_cancel_stream_read.seq = read_seq
 
         task = instance.create_task(call(), name=f"stream: {operation}")
         # A callback also runs for a task that is cancelled before its first step.
@@ -188,9 +182,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         read = self._reads.pop(job.seq, None)
         if read is None:
             raise RuntimeError(f"Failed finding Stream read for sequence {job.seq}")
-        # The job of a cancelled call is dropped. So is a cancel job that comes first, as in a
-        # replay with legacy chunking, since only the cancel of the call may end its wait.
-        if read.waiter.done() or job.HasField("cancelled"):
+        # The job of a cancelled call is dropped.
+        if read.waiter.done():
             return
         if job.HasField("failed"):
             read.waiter.set_exception(self._error(job.failed))
@@ -462,13 +455,13 @@ def _for_core(
 
 def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
     stream_config: Callable[[], StreamConfig | None],
-    read_max_wait: timedelta | None,
+    read_time: timedelta | None,
 ) -> temporalio.bridge.streams.WorkerStreams:
     """Return what the bridge needs for the Stream Stores of a worker.
 
     ``stream_config`` gives the Stream config that the worker has at a call,
-    which is the one of another client after a client swap. ``read_max_wait`` is
-    the longest wait of one Store call of a read, or ``None`` for Core's default.
+    which is the one of another client after a client swap. ``read_time`` is how
+    long the reads of a Workflow Task can wait, or ``None`` for Core's default.
     """
 
     def store(name: str) -> StreamStore:
@@ -484,8 +477,8 @@ def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
             (name, _StoreCaller(functools.partial(store, name)))
             for name in sorted(names)
         ],
-        read_max_wait_millis=int(1000 * read_max_wait.total_seconds())
-        if read_max_wait is not None
+        read_time_millis=int(1000 * read_time.total_seconds())
+        if read_time is not None
         else None,
     )
 
