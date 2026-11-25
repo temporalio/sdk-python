@@ -536,6 +536,7 @@ class ExecuteNexusOperationStartInput:
 
     ctx: nexusrpc.handler.StartOperationContext
     input: Any
+    """Decoded operation input, or temporalio.common.RawValue for a dynamic handler."""
 
 
 @dataclass
