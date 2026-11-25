@@ -24,6 +24,7 @@ wit_input_dir = (
 wit_deps_dir = wit_input_dir / "deps"
 workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
+stream_output_dir = base_dir / "temporalio" / "nexus" / "system" / "stream_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
 NEX_GEN_VERSION = "0.2.13"
 proto_files = [
@@ -37,6 +38,12 @@ proto_files = [
     / "temporal"
     / "api"
     / "notificationservice"
+    / "v1"
+    / "request_response.proto",
+    gen_protos.api_proto_dir
+    / "temporal"
+    / "api"
+    / "streamservice"
     / "v1"
     / "request_response.proto",
 ]
@@ -85,11 +92,11 @@ def generate_package(
     output_dir: Path,
     descriptor_path: Path,
     *,
-    native_api: bool,
+    targets: str | None,
 ) -> None:
     args = [*command, "python", str(wit_input_dir / wit_name), str(wit_deps_dir)]
-    if native_api:
-        args.extend(["--targets", "workflow"])
+    if targets:
+        args.extend(["--targets", targets])
     subprocess.check_call(
         [
             *args,
@@ -177,6 +184,7 @@ def generate_nexus_system_api() -> None:
     required_paths = [
         wit_input_dir / "workflow-service.wit",
         wit_input_dir / "notification-service.wit",
+        wit_input_dir / "stream-service.wit",
         wit_deps_dir,
         *proto_files,
     ]
@@ -187,9 +195,10 @@ def generate_nexus_system_api() -> None:
         descriptor_path = Path(temp_dir) / "temporal_api.bin"
         build_descriptor_set(descriptor_path)
         command = nex_gen_command()
-        for wit_name, output_dir, native_api in (
-            ("workflow-service.wit", workflow_output_dir, True),
-            ("notification-service.wit", notification_output_dir, False),
+        for wit_name, output_dir, targets in (
+            ("workflow-service.wit", workflow_output_dir, "workflow"),
+            ("notification-service.wit", notification_output_dir, None),
+            ("stream-service.wit", stream_output_dir, "workflow,client"),
         ):
             shutil.rmtree(output_dir, ignore_errors=True)
             output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -198,13 +207,14 @@ def generate_nexus_system_api() -> None:
                 wit_name,
                 output_dir,
                 descriptor_path,
-                native_api=native_api,
+                targets=targets,
             )
     workflow_output_dir.parent.joinpath("__init__.py").touch()
     generate_workflow_exports()
     format_paths = [
         str(workflow_output_dir),
         str(notification_output_dir),
+        str(stream_output_dir),
         str(workflow_init_path),
     ]
     subprocess.check_call(
