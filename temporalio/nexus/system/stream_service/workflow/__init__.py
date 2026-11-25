@@ -65,12 +65,6 @@ __nexus_operation_registry__: dict[
     ),
     (
         "temporal.api.streamservice.v1.StreamService",
-        "CloseStream",
-    ): _NexusOperationInfo(
-        operation=_services.StreamService.close_stream,
-    ),
-    (
-        "temporal.api.streamservice.v1.StreamService",
         "ReadRecords",
     ): _NexusOperationInfo(
         operation=_services.StreamService.read_records,

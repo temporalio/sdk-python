@@ -13,7 +13,6 @@ import temporalio.nexus.system
 if typing.TYPE_CHECKING:
     import temporalio.client
 
-from .._resource_context_manager import resource_context_manager
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
@@ -118,7 +117,6 @@ class StreamServiceClientExtension(abc.ABC):
         return resource
 
     @typing.overload
-    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -131,7 +129,6 @@ class StreamServiceClientExtension(abc.ABC):
     ) -> Stream[BodyT]: ...
 
     @typing.overload
-    @resource_context_manager
     async def create_stream(
         self,
         *,
@@ -143,7 +140,6 @@ class StreamServiceClientExtension(abc.ABC):
         rpc_timeout: datetime.timedelta | None = None,
     ) -> Stream[object]: ...
 
-    @resource_context_manager
     async def create_stream(
         self,
         *,

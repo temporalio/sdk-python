@@ -16,39 +16,6 @@ import temporalio.api.enums.v1.stream_pb2
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
-class StreamRef(google.protobuf.message.Message):
-    """Experimental. Might change in the future.
-    A reference to one Stream, which code passes to other code as data. Callers treat the `id` as
-    opaque. An id is never used for a second Stream while the Store remembers the first one, so a
-    create for a closed or expired Stream fails. A Store can forget an expired Stream after a time
-    of its choice, and a create for its id succeeds after that. Every SDK encodes a ref in a
-    Payload with this message, so a ref that one SDK writes decodes in another.
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    ID_FIELD_NUMBER: builtins.int
-    STORE_FIELD_NUMBER: builtins.int
-    id: builtins.str
-    store: builtins.str
-    """The name under which the client and Worker config registered the Store of this Stream. An
-    SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
-    the Store from its config. Only an SDK sets and reads this field. The server and a Store
-    ignore it.
-    """
-    def __init__(
-        self,
-        *,
-        id: builtins.str = ...,
-        store: builtins.str = ...,
-    ) -> None: ...
-    def ClearField(
-        self, field_name: typing.Literal["id", b"id", "store", b"store"]
-    ) -> None: ...
-
-global___StreamRef = StreamRef
-
-@typing.final
 class WorkflowTaskAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
     One attempt of a Workflow Task. Two attempts of the same Producer compare by
@@ -172,9 +139,8 @@ global___ActivityAttempt = ActivityAttempt
 @typing.final
 class WorkflowProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of a Workflow run. Workflow code writes as this Producer when it appends or
-    closes in a Workflow Task. A write from one of its Local Activities uses a
-    `LocalActivityProducer`.
+    The Producer of a Workflow run. Workflow code writes as this Producer when it appends in a
+    Workflow Task. A write from one of its Local Activities uses a `LocalActivityProducer`.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -545,8 +511,7 @@ global___AppendRecord = AppendRecord
 @typing.final
 class StreamRecord(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One Record of a Stream, as a read returns it. A read returns only Records. A close stores no
-    Record, so a read reports it with `done` in its response.
+    One Record of a Stream, as a read returns it. A read returns only Records.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

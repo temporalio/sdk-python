@@ -11,8 +11,6 @@ import google.protobuf.descriptor
 import google.protobuf.internal.containers
 import google.protobuf.message
 
-import temporalio.api.sdk.v1.stream_calls_pb2
-
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
 @typing.final
@@ -23,7 +21,6 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
     LANG_USED_FLAGS_FIELD_NUMBER: builtins.int
     SDK_NAME_FIELD_NUMBER: builtins.int
     SDK_VERSION_FIELD_NUMBER: builtins.int
-    STREAM_CALLS_FIELD_NUMBER: builtins.int
     sdk_name: builtins.str
     """Name of the SDK that processed the task. This is usually something like "temporal-go" and is
     usually the same as client-name gRPC header. This should only be set if its value changed
@@ -74,16 +71,6 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
             aip.dev/not-precedent: These really shouldn't have negative values. --)
         """
 
-    @property
-    def stream_calls(
-        self,
-    ) -> temporalio.api.sdk.v1.stream_calls_pb2.WorkflowTaskStreamCalls:
-        """Experimental. Might change in the future.
-        The Stream calls of this Workflow Task. An SDK sets it if Workflow code got the result of a
-        Stream call in the task, asked for a close, or has a call with no result yet. So it can have
-        no entry.
-        """
-
     def __init__(
         self,
         *,
@@ -91,12 +78,7 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
         lang_used_flags: collections.abc.Iterable[builtins.int] | None = ...,
         sdk_name: builtins.str = ...,
         sdk_version: builtins.str = ...,
-        stream_calls: temporalio.api.sdk.v1.stream_calls_pb2.WorkflowTaskStreamCalls
-        | None = ...,
     ) -> None: ...
-    def HasField(
-        self, field_name: typing.Literal["stream_calls", b"stream_calls"]
-    ) -> builtins.bool: ...
     def ClearField(
         self,
         field_name: typing.Literal[
@@ -108,8 +90,6 @@ class WorkflowTaskCompletedMetadata(google.protobuf.message.Message):
             b"sdk_name",
             "sdk_version",
             b"sdk_version",
-            "stream_calls",
-            b"stream_calls",
         ],
     ) -> None: ...
 

@@ -17,38 +17,6 @@ else:
 
 DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 
-class _StreamStatus:
-    ValueType = typing.NewType("ValueType", builtins.int)
-    V: typing_extensions.TypeAlias = ValueType
-
-class _StreamStatusEnumTypeWrapper(
-    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
-        _StreamStatus.ValueType
-    ],
-    builtins.type,
-):
-    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
-    STREAM_STATUS_UNSPECIFIED: _StreamStatus.ValueType  # 0
-    STREAM_STATUS_OPEN: _StreamStatus.ValueType  # 1
-    """The Stream accepts appends."""
-    STREAM_STATUS_CLOSED: _StreamStatus.ValueType  # 2
-    """The Stream is closed. It accepts no append, and a read ends after its last Record."""
-
-class StreamStatus(_StreamStatus, metaclass=_StreamStatusEnumTypeWrapper):
-    """Experimental. Might change in the future.
-    The status of a Stream, as a describe returns it. A describe of an expired Stream fails with
-    the reason `EXPIRED`, so it has no status.
-    (-- api-linter: core::0216::synonyms=disabled
-        aip.dev/not-precedent: It has the same form as WorkflowExecutionStatus. --)
-    """
-
-STREAM_STATUS_UNSPECIFIED: StreamStatus.ValueType  # 0
-STREAM_STATUS_OPEN: StreamStatus.ValueType  # 1
-"""The Stream accepts appends."""
-STREAM_STATUS_CLOSED: StreamStatus.ValueType  # 2
-"""The Stream is closed. It accepts no append, and a read ends after its last Record."""
-global___StreamStatus = StreamStatus
-
 class _StreamIdConflictPolicy:
     ValueType = typing.NewType("ValueType", builtins.int)
     V: typing_extensions.TypeAlias = ValueType
@@ -96,30 +64,28 @@ class _StreamErrorReasonEnumTypeWrapper(
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
     """The Stream was never created (`NOT_FOUND`)."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
-    """The Retention of the Stream or its Producer idle TTL has passed (`NOT_FOUND`)."""
-    STREAM_ERROR_REASON_CLOSED: _StreamErrorReason.ValueType  # 3
-    """The Stream is closed (`FAILED_PRECONDITION`)."""
-    STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 4
+    """The Retention of the Stream has passed since its create or its last append (`NOT_FOUND`)."""
+    STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 3
     """A later attempt of the same Producer has already written, and the Store fences
     (`FAILED_PRECONDITION`).
     """
-    STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 5
+    STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 4
     """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
-    STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 6
+    STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 5
     """The offset is past the newest one, for example after a failover lost the newest Records. A
     read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
     """
-    STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 7
+    STREAM_ERROR_REASON_TOO_LARGE: _StreamErrorReason.ValueType  # 6
     """A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
-    STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 8
+    STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 7
     """The request is malformed (`INVALID_ARGUMENT`)."""
-    STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 9
+    STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 8
     """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
-    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 10
+    STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 9
     """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
-    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 11
+    STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 10
     """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
-    STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 12
+    STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 11
     """The Store returned data that isn't valid, such as a stored value of the wrong length. A
     retry reads the same data (`DATA_LOSS`).
     """
@@ -137,30 +103,28 @@ STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 """The Stream was never created (`NOT_FOUND`)."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
-"""The Retention of the Stream or its Producer idle TTL has passed (`NOT_FOUND`)."""
-STREAM_ERROR_REASON_CLOSED: StreamErrorReason.ValueType  # 3
-"""The Stream is closed (`FAILED_PRECONDITION`)."""
-STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 4
+"""The Retention of the Stream has passed since its create or its last append (`NOT_FOUND`)."""
+STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 3
 """A later attempt of the same Producer has already written, and the Store fences
 (`FAILED_PRECONDITION`).
 """
-STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 5
+STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 4
 """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
-STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 6
+STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 5
 """The offset is past the newest one, for example after a failover lost the newest Records. A
 read from it works again once the Stream has Records up to that offset (`OUT_OF_RANGE`).
 """
-STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 7
+STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 6
 """A Record or a batch is larger than the Store allows (`INVALID_ARGUMENT`)."""
-STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 8
+STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 7
 """The request is malformed (`INVALID_ARGUMENT`)."""
-STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 9
+STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 8
 """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
-STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 10
+STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 9
 """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
-STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 11
+STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 10
 """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
-STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 12
+STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 11
 """The Store returned data that isn't valid, such as a stored value of the wrong length. A
 retry reads the same data (`DATA_LOSS`).
 """

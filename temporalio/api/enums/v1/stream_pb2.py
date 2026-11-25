@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n"temporal/api/enums/v1/stream.proto\x12\x15temporal.api.enums.v1*_\n\x0cStreamStatus\x12\x1d\n\x19STREAM_STATUS_UNSPECIFIED\x10\x00\x12\x16\n\x12STREAM_STATUS_OPEN\x10\x01\x12\x18\n\x14STREAM_STATUS_CLOSED\x10\x02*\x93\x01\n\x16StreamIdConflictPolicy\x12)\n%STREAM_ID_CONFLICT_POLICY_UNSPECIFIED\x10\x00\x12"\n\x1eSTREAM_ID_CONFLICT_POLICY_FAIL\x10\x01\x12*\n&STREAM_ID_CONFLICT_POLICY_USE_EXISTING\x10\x02*\xf9\x03\n\x11StreamErrorReason\x12#\n\x1fSTREAM_ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n\x1dSTREAM_ERROR_REASON_NOT_FOUND\x10\x01\x12\x1f\n\x1bSTREAM_ERROR_REASON_EXPIRED\x10\x02\x12\x1e\n\x1aSTREAM_ERROR_REASON_CLOSED\x10\x03\x12\x1e\n\x1aSTREAM_ERROR_REASON_FENCED\x10\x04\x12&\n"STREAM_ERROR_REASON_FORMAT_TOO_NEW\x10\x05\x12\'\n#STREAM_ERROR_REASON_OFFSET_TOO_HIGH\x10\x06\x12!\n\x1dSTREAM_ERROR_REASON_TOO_LARGE\x10\x07\x12(\n$STREAM_ERROR_REASON_INVALID_ARGUMENT\x10\x08\x12)\n%STREAM_ERROR_REASON_STORE_UNAVAILABLE\x10\t\x12#\n\x1fSTREAM_ERROR_REASON_UNSUPPORTED\x10\n\x12&\n"STREAM_ERROR_REASON_ALREADY_EXISTS\x10\x0b\x12%\n!STREAM_ERROR_REASON_STORE_CORRUPT\x10\x0c\x42\x83\x01\n\x18io.temporal.api.enums.v1B\x0bStreamProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3'
+    b'\n"temporal/api/enums/v1/stream.proto\x12\x15temporal.api.enums.v1*\x93\x01\n\x16StreamIdConflictPolicy\x12)\n%STREAM_ID_CONFLICT_POLICY_UNSPECIFIED\x10\x00\x12"\n\x1eSTREAM_ID_CONFLICT_POLICY_FAIL\x10\x01\x12*\n&STREAM_ID_CONFLICT_POLICY_USE_EXISTING\x10\x02*\xd9\x03\n\x11StreamErrorReason\x12#\n\x1fSTREAM_ERROR_REASON_UNSPECIFIED\x10\x00\x12!\n\x1dSTREAM_ERROR_REASON_NOT_FOUND\x10\x01\x12\x1f\n\x1bSTREAM_ERROR_REASON_EXPIRED\x10\x02\x12\x1e\n\x1aSTREAM_ERROR_REASON_FENCED\x10\x03\x12&\n"STREAM_ERROR_REASON_FORMAT_TOO_NEW\x10\x04\x12\'\n#STREAM_ERROR_REASON_OFFSET_TOO_HIGH\x10\x05\x12!\n\x1dSTREAM_ERROR_REASON_TOO_LARGE\x10\x06\x12(\n$STREAM_ERROR_REASON_INVALID_ARGUMENT\x10\x07\x12)\n%STREAM_ERROR_REASON_STORE_UNAVAILABLE\x10\x08\x12#\n\x1fSTREAM_ERROR_REASON_UNSUPPORTED\x10\t\x12&\n"STREAM_ERROR_REASON_ALREADY_EXISTS\x10\n\x12%\n!STREAM_ERROR_REASON_STORE_CORRUPT\x10\x0b\x42\x83\x01\n\x18io.temporal.api.enums.v1B\x0bStreamProtoP\x01Z!go.temporal.io/api/enums/v1;enums\xaa\x02\x17Temporalio.Api.Enums.V1\xea\x02\x1aTemporalio::Api::Enums::V1b\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -22,10 +22,8 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, __name__, globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
     DESCRIPTOR._options = None
     DESCRIPTOR._serialized_options = b"\n\030io.temporal.api.enums.v1B\013StreamProtoP\001Z!go.temporal.io/api/enums/v1;enums\252\002\027Temporalio.Api.Enums.V1\352\002\032Temporalio::Api::Enums::V1"
-    _STREAMSTATUS._serialized_start = 61
-    _STREAMSTATUS._serialized_end = 156
-    _STREAMIDCONFLICTPOLICY._serialized_start = 159
-    _STREAMIDCONFLICTPOLICY._serialized_end = 306
-    _STREAMERRORREASON._serialized_start = 309
-    _STREAMERRORREASON._serialized_end = 814
+    _STREAMIDCONFLICTPOLICY._serialized_start = 62
+    _STREAMIDCONFLICTPOLICY._serialized_end = 209
+    _STREAMERRORREASON._serialized_start = 212
+    _STREAMERRORREASON._serialized_end = 685
 # @@protoc_insertion_point(module_scope)

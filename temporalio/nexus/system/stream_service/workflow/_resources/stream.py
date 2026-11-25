@@ -4,10 +4,7 @@ from __future__ import annotations
 
 import collections.abc
 import datetime
-import types
 import typing
-
-import typing_extensions
 
 import temporalio.nexus.system
 import temporalio.nexus.system._support as _support
@@ -18,8 +15,6 @@ from ...models import (
     AppendRecord,
     AppendRecordsRequest,
     AppendRecordsResponse,
-    CloseStreamRequest,
-    CloseStreamResponse,
     DescribeStreamRequest,
     DescribeStreamResponse,
     ReadRecordsRequest,
@@ -52,17 +47,6 @@ class Stream(typing.Generic[BodyT]):
         arguments = typing.get_args(getattr(self.ref, "__orig_class__", None))
         return typing.cast("type[BodyT]", arguments[0] if arguments else object)
 
-    async def __aenter__(self) -> typing_extensions.Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: types.TracebackType | None,
-    ) -> None:
-        await self.close()
-
     async def append(
         self,
         *records: BodyT,
@@ -75,17 +59,6 @@ class Stream(typing.Generic[BodyT]):
         )
         handle = await _append_records(request)
         return await handle
-
-    async def close(
-        self,
-    ) -> None:
-        """Close the Stream. Readers get the Records that are left, then end."""
-        request = CloseStreamRequest(
-            ref=self.ref,
-            producer=_support.workflow_producer(),
-        )
-        handle = await _close_stream(request)
-        await handle
 
     async def read_page(
         self,
@@ -119,8 +92,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record or a close before an empty
-                page.
+            wait: How long the read waits for a new Record before an empty page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
@@ -157,8 +129,7 @@ class Stream(typing.Generic[BodyT]):
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
             max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record or a close before an empty
-                page.
+            wait: How long the read waits for a new Record before an empty page.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
@@ -185,7 +156,7 @@ class Stream(typing.Generic[BodyT]):
     async def describe(
         self,
     ) -> DescribeStreamResponse:
-        """Return the status and the newest offset of the Stream."""
+        """Return the newest offset of the Stream."""
         request = DescribeStreamRequest(
             ref=self.ref,
         )
@@ -243,20 +214,6 @@ async def _append_records(
         operation="AppendRecords",
         input=request,
         output_type=AppendRecordsResponse,
-    )
-
-
-async def _close_stream(
-    request: CloseStreamRequest[BodyT],
-) -> temporalio.workflow.NexusOperationHandle[CloseStreamResponse,]:
-    nexus_client = temporalio.workflow.create_nexus_client(
-        service="temporal.api.streamservice.v1.StreamService",
-        endpoint=temporalio.nexus.system.TEMPORAL_SYSTEM_ENDPOINT,
-    )
-    return await nexus_client.start_operation(
-        operation="CloseStream",
-        input=request,
-        output_type=CloseStreamResponse,
     )
 
 
