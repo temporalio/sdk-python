@@ -18,7 +18,6 @@ from temporalio.bridge.proto.workflow_activation.workflow_activation_pb2 import 
     ResolveRequestCancelExternalWorkflow,
     ResolveSignalExternalWorkflow,
     ResolveStreamAppend,
-    ResolveStreamClose,
     ResolveStreamRead,
 )
 from temporalio.bridge.proto.workflow_commands.workflow_commands_pb2 import (
@@ -232,11 +231,6 @@ class CommandAwarePayloadVisitor(PayloadVisitor):
 
     async def _visit_coresdk_workflow_activation_ResolveStreamAppend(
         self, fs: VisitorFunctions, o: ResolveStreamAppend
-    ) -> None:
-        pass
-
-    async def _visit_coresdk_workflow_activation_ResolveStreamClose(
-        self, fs: VisitorFunctions, o: ResolveStreamClose
     ) -> None:
         pass
 

@@ -14,14 +14,11 @@ from google.protobuf.message import Message
 
 from temporalio import activity, workflow
 from temporalio.api.enums.v1 import EventType, StreamErrorReason, TaskQueueType
-from temporalio.api.sdk.v1 import WorkflowTaskStreamCalls
 from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
-from temporalio.api.stream.v1 import StreamRef as RefProto
 from temporalio.api.streamservice.v1 import (
     AppendRecordsRequest,
-    CloseStreamResponse,
     CreateStreamRequest,
-    CreateStreamResponse,
+    DescribeStreamResponse,
     ReadRecordsRequest,
 )
 from temporalio.api.taskqueue.v1 import TaskQueue
@@ -32,11 +29,7 @@ from temporalio.converter import (
     ExternalStorage,
 )
 from temporalio.exceptions import ApplicationError, StreamError
-from temporalio.nexus.system.stream_service import (
-    StreamIdConflictPolicy,
-    StreamRef,
-    StreamStatus,
-)
+from temporalio.nexus.system.stream_service import StreamIdConflictPolicy, StreamRef
 from temporalio.testing import MemoryStreamStore
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -87,16 +80,13 @@ async def _answers(
                 answers.append(
                     [appended.first_offset.hex(), appended.last_offset.hex()]
                 )
-            elif operation == "close":
-                await stream.close()
-                answers.append("closed")
             elif operation == "read":
                 page = await stream.read_page()
                 bodies = [record.body for record in page.records]
-                answers.append([bodies, (page.last_offset or b"").hex(), page.done])
+                answers.append([bodies, (page.last_offset or b"").hex()])
             else:
                 described = await stream.describe()
-                answers.append([described.status, (described.last_offset or b"").hex()])
+                answers.append([(described.last_offset or b"").hex()])
         except StreamError as err:
             answers.append(["error", err.reason, err.message])
     return answers
@@ -120,8 +110,7 @@ class _CallsWorkflow:
 
 def _writes(store: FaultStore) -> list[Message]:
     """Return each request of a Store but its reads, which Core pages in its own way,
-    without what differs between two writers of the same call. That is the Producer,
-    and the Store name of the ref, which Workflow code fills in for a ref with none.
+    without the Producer, which differs between two writers of the same call.
     """
     writes: list[Message] = []
     for request in store.requests:
@@ -131,8 +120,6 @@ def _writes(store: FaultStore) -> list[Message]:
         copy.CopyFrom(request)
         if "producer" in copy.DESCRIPTOR.fields_by_name:
             copy.ClearField("producer")
-        ref = copy.stream_ref if isinstance(copy, CreateStreamRequest) else copy.ref
-        ref.ClearField("store")
         writes.append(copy)
     return writes
 
@@ -146,8 +133,7 @@ async def test_workflow_code_and_a_client_get_the_same_answers(client: Client) -
             calls: list[list[Any]] = [
                 ["create", f"s-{seed}-{number}", rng.randrange(3)] for number in (0, 1)
             ]
-            operations = ["append", "append", "append", "close", "describe"]
-            # A replay needs a Store only for a read, so every other script has none.
+            operations = ["append", "append", "append", "describe"]
             reads = seed % 2 == 1
             if reads:
                 operations += ["read", "read"]
@@ -161,9 +147,7 @@ async def test_workflow_code_and_a_client_get_the_same_answers(client: Client) -
                 else:
                     calls.append([operation, stream_id])
             if reads:
-                # Each script reads a closed Stream to its end, and another one.
-                calls += [[operation, f"s-{seed}-0"] for operation in ("close", "read")]
-                calls.append(["read", f"s-{seed}-1"])
+                calls += [["read", f"s-{seed}-0"], ["read", f"s-{seed}-1"]]
             # The two Stores have one name and the same Stream ids, so a call is the same
             # request in both.
             for_client, for_workflow = FaultStore(), FaultStore()
@@ -178,14 +162,16 @@ async def test_workflow_code_and_a_client_get_the_same_answers(client: Client) -
                 if isinstance(request, AppendRecordsRequest)
             ]
             assert all(appends) and len(set(appends)) == len(appends)
-            # A replay writes nothing, with the Stores of the run and with none.
+            # A replay with the Stores of the run writes nothing. A replay chooses the
+            # Store of each call again, so one with no Stream config fails.
             written = _writes(for_workflow)
-            for replay_client in (workflow_client, client)[: 1 if reads else 2]:
-                await Replayer(
-                    workflows=[_CallsWorkflow],
-                    stream_config=replay_client._config["stream_config"],
-                ).replay_workflow(ran.history)
+            await Replayer(
+                workflows=[_CallsWorkflow],
+                stream_config=workflow_client._config["stream_config"],
+            ).replay_workflow(ran.history)
             assert _writes(for_workflow) == written
+            with pytest.raises(Exception, match="no stream_config"):
+                await Replayer(workflows=[_CallsWorkflow]).replay_workflow(ran.history)
 
 
 def _bodies(writer: str) -> list[Any]:
@@ -239,9 +225,7 @@ async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
     assert ran.result == _digest(expected)
     # The Store has each body as the codec gave it with no context, and the storage of
     # the Worker has none of them.
-    stored = await store.memory.read_records(
-        ReadRecordsRequest(ref=RefProto(id="bodies"))
-    )
+    stored = await store.memory.read_records(ReadRecordsRequest(stream_id="bodies"))
     assert [dict(record.body.metadata) for record in stored.records] == [
         {"encoding": b"test/wrapped", "context": b"NoneType"}
     ] * len(expected)
@@ -278,9 +262,7 @@ async def test_two_activities_with_one_id_write_as_two_producers(
     ran = await run(client, options)
     # The Producer of each Activity has the id of the Activity's scheduled event.
     scheduled = _events(ran.history, EventType.EVENT_TYPE_ACTIVITY_TASK_SCHEDULED)
-    page = await store.memory.read_records(
-        ReadRecordsRequest(ref=RefProto(id="one id"))
-    )
+    page = await store.memory.read_records(ReadRecordsRequest(stream_id="one id"))
     producers = [record.producer.workflow_activity for record in page.records]
     assert [(p.activity_id, p.scheduled_event_id) for p in producers] == [
         ("one id", event.event_id) for event in scheduled
@@ -291,20 +273,21 @@ def _events(history: Any, event_type: EventType.ValueType) -> list[Any]:
     return [event for event in history.events if event.event_type == event_type]
 
 
-def _stream_calls(history: Any) -> list[WorkflowTaskStreamCalls]:
-    """Return the Stream calls that Core keeps on each completed Workflow Task."""
-    completed = _events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
-    calls = [
-        event.workflow_task_completed_event_attributes.sdk_metadata.stream_calls
-        for event in completed
+def _stream_markers(history: Any, kind: str) -> list[Any]:
+    """Return the markers in which Core records the Stream calls of ``kind``, which
+    is ``append`` or ``read``.
+    """
+    return [
+        event
+        for event in _events(history, EventType.EVENT_TYPE_MARKER_RECORDED)
+        if event.marker_recorded_event_attributes.marker_name == f"core_stream_{kind}"
     ]
-    return [call for call in calls if call.ByteSize()]
 
 
 async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> None:
     store = FaultStore()
     client = stream_client(client, store)
-    stream = await client.create_stream(id="errors", body_type=int)
+    await client.create_stream(id="errors", body_type=int)
     append: list[Any] = ["append", "errors", [1]]
     appends = store.faults["append_records"]
     unavailable = StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE
@@ -351,31 +334,25 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
     corrupt = StreamErrorReason.STREAM_ERROR_REASON_STORE_CORRUPT
     for path in ("client", "activity", "workflow"):
         with failure_note(path):
-            appends.append(answers(CloseStreamResponse()))
+            appends.append(answers(DescribeStreamResponse()))
             [[error, reason, _]] = await answers_on(path, [append])
             assert (error, reason, len(append_request_ids())) == ("error", corrupt, 1)
-            # So does a create that the Store answers with the ref of another Stream.
-            other = CreateStreamResponse(ref=RefProto(id="other"), created=True)
-            store.faults["create_stream"].append(answers(other))
-            create = ["create", f"answered for another Stream in {path}"]
-            [[error, reason, _]] = await answers_on(path, [create])
-            assert (error, reason) == ("error", corrupt)
 
     # A refusal is the same error for a client, an Activity and Workflow code. Workflow
     # code gets it again in each task that replays the call.
-    await stream.close()
-    calls = [
-        append,
+    not_found = StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND
+    calls: list[list[Any]] = [
+        ["append", "missing", [1]],
         ["describe", "errors"],
         ["describe", "missing"],
         ["read", "missing"],
     ]
     refused = await answers_on("client", calls)
     assert [answer[:2] for answer in refused] == [
-        ["error", StreamErrorReason.STREAM_ERROR_REASON_CLOSED],
-        [StreamStatus.StreamStatusClosed, (3).to_bytes(8, "big").hex()],
-        ["error", StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND],
-        ["error", StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND],
+        ["error", not_found],
+        [(3).to_bytes(8, "big").hex()],
+        ["error", not_found],
+        ["error", not_found],
     ]
     for path in ("activity", "workflow"):
         with failure_note(path):
@@ -448,7 +425,6 @@ async def test_a_stream_call_with_no_store_fails_the_workflow_task(
     calls: list[list[Any]] = [
         ["create", "s"],
         ["append", "s", [1]],
-        ["close", "s"],
         ["describe", "s"],
         ["read", "s"],
     ]
@@ -468,52 +444,6 @@ async def test_a_stream_call_with_no_store_fails_the_workflow_task(
             # has nothing of the call.
             assert isinstance(ran.result, WorkflowFailureError)
             assert not _events(ran.history, EventType.EVENT_TYPE_MARKER_RECORDED)
-            assert not _stream_calls(ran.history)
-
-
-@workflow.defn
-class _ClosingWorkflow:
-    @workflow.run
-    async def run(self, stream_id: str, how: str) -> None:
-        stream = await workflow.create_stream(id=stream_id, body_type=str)
-        if how == "async with":
-            async with stream:
-                await stream.append("body")
-            return
-        try:
-            await stream.append("body")
-            if how == "failure":
-                raise ApplicationError("The block failed")
-            if how == "cancel":
-                await workflow.wait_condition(lambda: False)
-        finally:
-            await stream.close()
-
-
-async def test_a_close_of_workflow_code_closes_the_stream(client: Client) -> None:
-    for how in ("async with", "return", "failure", "cancel"):
-        with failure_note(how):
-            store = FaultStore()
-            stream_id = f"closed after a {how}"
-
-            async def cancel_in_the_block(handle: Any, _worker: Any) -> None:
-                async def appended() -> None:
-                    assert any(
-                        isinstance(r, AppendRecordsRequest) for r in store.requests
-                    )
-
-                await assert_eventually(appended)
-                await handle.cancel()
-
-            options = RunOptions(_ClosingWorkflow, [stream_id, how])
-            if how == "cancel":
-                options.during = cancel_in_the_block
-            ran = await run(stream_client(client, store), options)
-            assert (ran.result is None) == (how in ("async with", "return"))
-            page = await store.memory.read_records(
-                ReadRecordsRequest(ref=RefProto(id=stream_id))
-            )
-            assert (len(page.records), page.done) == (1, True)
 
 
 class _ActivityTypes(Interceptor):
@@ -553,7 +483,7 @@ async def test_a_worker_with_only_workflows_creates_a_stream(client: Client) -> 
         during=activity_pollers,
     )
     ran = await run(client, options)
-    assert ran.result == [["memory", True], [StreamStatus.StreamStatusOpen, ""]]
+    assert ran.result == [["memory", True], [""]]
     assert interceptor.types == ["__temporal_stream_store_call"] * 2
     assert not pollers
 
@@ -588,13 +518,7 @@ class _SwapWorkflow:
 
 def _calls(store: FaultStore) -> list[tuple[str, str]]:
     """Return the request type and the Stream id of each call of a Store."""
-    return [
-        (
-            type(r).__name__,
-            r.stream_ref.id if isinstance(r, CreateStreamRequest) else r.ref.id,
-        )
-        for r in store.requests
-    ]
+    return [(type(r).__name__, r.stream_id) for r in store.requests]
 
 
 # On a server with worker commands, a lone Worker polls in a loop after a new client. Marked as
@@ -738,7 +662,7 @@ async def test_an_append_over_a_limit_of_the_config_never_reaches_the_store(
                 len(request.records)
                 for request in store.requests
                 if isinstance(request, AppendRecordsRequest)
-                and request.ref.id != f"large {seed}"
+                and request.stream_id != f"large {seed}"
             ] == [len(sizes) for sizes, fits in batches if fits] * 2
 
 
@@ -775,12 +699,16 @@ _handled: dict[int, asyncio.Event] = {}
 
 @activity.defn
 async def _write_one_by_one(stream_id: str, count: int) -> None:
-    stream = activity.client().get_stream(StreamRef[str](id=stream_id))
+    client = activity.client()
+    stream = client.get_stream(StreamRef[str](id=stream_id))
+    workflow_id = activity.info().workflow_id or ""
     for number in range(count):
         await stream.append(f"a body, number {number}")
+        # A read makes no Workflow Task for a Record that SDK Core doesn't know of, so
+        # the writer signals the Workflow.
+        await client.get_workflow_handle(workflow_id).signal(_ReadingWorkflow.wake)
         # The next Record comes only once the Workflow has handled this one.
         await _handled[number].wait()
-    await stream.close()
 
 
 @activity.defn
@@ -790,6 +718,10 @@ async def _handle(number: int) -> None:
 
 @workflow.defn
 class _ReadingWorkflow:
+    @workflow.signal
+    def wake(self) -> None:
+        pass
+
     @workflow.run
     async def run(self, stream_id: str, count: int) -> list[int]:
         stream = await workflow.create_stream(id=stream_id, body_type=str)
@@ -805,6 +737,9 @@ class _ReadingWorkflow:
                 _handle, number, start_to_close_timeout=timedelta(seconds=30)
             )
             numbers.append(number)
+            # A Stream has no end, so the reader stops at the writer's last Record.
+            if number == count - 1:
+                break
         await writer
         return numbers
 
@@ -847,8 +782,6 @@ class _EndingWorkflow:
         stream = await workflow.create_stream(id=stream_id, body_type=int)
         if how == "append":
             asyncio.ensure_future(stream.append(1))
-        elif how == "close":
-            asyncio.ensure_future(stream.close())
         elif how == "page":
             await stream.append(1)
             await stream.read_page(wait=timedelta(minutes=5))
@@ -892,11 +825,11 @@ async def test_a_read_that_core_stops_leaves_no_store_task(client: Client) -> No
             assert len(reads) == 1
 
 
-@pytest.mark.parametrize("how", ["page", "append", "close"])
+@pytest.mark.parametrize("how", ["page", "append"])
 async def test_a_stream_call_does_not_hold_the_last_command(
     client: Client, how: str
 ) -> None:
-    # A read that gave a page, and an append or a close that nothing awaits, don't hold
+    # A read that gave a page, and an append that nothing awaits, don't hold
     # the last command, so the Workflow ends in the task of the call.
     options = RunOptions(_EndingWorkflow, [f"ends after its {how}", how], replay=True)
     ran = await run(stream_client(client, FaultStore()), options)
@@ -907,6 +840,10 @@ async def test_a_stream_call_does_not_hold_the_last_command(
 @workflow.defn
 class _LatePagesWorkflow:
     """Reads Records that come in a later Workflow Task than the one of its reads."""
+
+    @workflow.signal
+    def wake(self) -> None:
+        pass
 
     @workflow.run
     async def run(self, how: str) -> list[list[str]]:
@@ -926,7 +863,8 @@ class _LatePagesWorkflow:
             page = await s.read_page(from_offset=offset, wait=timedelta(seconds=30))
             pages.append([record.body for record in page.records])
             offset = page.last_offset
-            if page.done:
+            # A Stream has no end, so the loop stops at the writer's last Record.
+            if "b" in pages[-1]:
                 return pages
 
     async def _page(self, stream: Any, offset: bytes | None = None) -> Any:
@@ -955,21 +893,21 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
     }[how]
 
     async def write(handle: Any, _worker: Any) -> None:
-        async def second_task() -> None:
+        async def first_task() -> None:
             history = await handle.fetch_history()
-            started = EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED
-            assert len(_events(history, started)) > 1
+            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            assert _events(history, completed)
 
-        # The reads of the first task end at its read limit with no Record. The pages
-        # then come in several activations of a later task, and a replay gives each
+        # The reads of the first task end with no Record, and a read of an idle Stream
+        # makes no task. A Signal opens the next task, whose reads start again. The
+        # pages then come in several activations of that task, and a replay gives each
         # page in its activation.
-        await assert_eventually(second_task)
+        await assert_eventually(first_task)
+        await handle.signal(_LatePagesWorkflow.wake)
         for stream, body in writes:
             await stream.append(body)
             # The page of this Record gets an activation before the next Record comes.
             await asyncio.sleep(0.3)
-        if how == "a loop":
-            await s.close()
 
     options = RunOptions(
         _LatePagesWorkflow,
@@ -982,7 +920,9 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
     assert [body for page in ran.result for body in page] == expected
     events = [event.event_type for event in ran.history.events]
     completed = events.index(EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
-    assert events[completed + 1] == EventType.EVENT_TYPE_WORKFLOW_TASK_SCHEDULED
+    marker = EventType.EVENT_TYPE_MARKER_RECORDED
+    later = [event for event in events[completed + 1 :] if event != marker]
+    assert later[0] == EventType.EVENT_TYPE_WORKFLOW_EXECUTION_SIGNALED
 
 
 @workflow.defn
@@ -1119,7 +1059,8 @@ async def test_a_replay_reads_its_python_stores(client: Client) -> None:
 
             async def lose_the_records(handle: Any, _worker: Any) -> None:
                 async def has_read() -> None:
-                    assert _stream_calls(await handle.fetch_history())
+                    history = await handle.fetch_history()
+                    assert _stream_markers(history, "read")
 
                 await assert_eventually(has_read)
                 store.memory = MemoryStreamStore()
@@ -1155,7 +1096,13 @@ class _ReadAllWorkflow:
             max_records=limits.get("max_records"),
             max_bytes=limits.get("max_bytes"),
         )
-        return [record.body async for record in records]
+        bodies: list[int] = []
+        async for record in records:
+            bodies.append(record.body)
+            # A Stream has no end, so the reader stops at the writer's last Record.
+            if record.body == 3:
+                break
+        return bodies
 
 
 async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) -> None:
@@ -1163,12 +1110,19 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
     client = stream_client(client, store)
     stream = await client.create_stream(id="paged", body_type=int)
     await stream.append(1, 2, 3)
-    await stream.close()
-    # A read with no limit asks for 256 Records and 4 MiB. A Store call waits no longer
-    # than the read time of the Worker, which is shorter than the wait of the read.
+
+    # A read with no limit asks for 256 Records and 4 MiB. The Store gets room for one
+    # Record more, so that SDK Core knows when the Stream has more. That Record has at
+    # most the Record size of the config and an offset of 1024 bytes, each in its field.
+    # A Store call waits no longer than the read time of the Worker, which is shorter
+    # than the wait of the read.
+    def field(size: int) -> int:
+        return 1 + (size.bit_length() + 6) // 7 + size
+
+    one_more = field(StreamConfig([store]).max_record_bytes + field(1024))
     cases: list[tuple[dict[str, int], tuple[int, int]]] = [
-        ({"max_records": 1, "max_bytes": 100}, (1, 100)),
-        ({}, (256, 4 * 1024 * 1024)),
+        ({"max_records": 1, "max_bytes": 100}, (2, 100 + one_more)),
+        ({}, (257, 4 * 1024 * 1024 + one_more)),
     ]
     read_time = timedelta(seconds=2)
     for limits, expected in cases:
@@ -1190,32 +1144,46 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
 
 @workflow.defn
 class _QuietReadWorkflow:
+    @workflow.signal
+    def wake(self) -> None:
+        pass
+
     @workflow.run
     async def run(self, stream_id: str) -> list[int]:
         stream = workflow.get_stream(StreamRef[int](id=stream_id))
-        return [record.body async for record in stream.read(wait=timedelta(minutes=5))]
+        bodies: list[int] = []
+        offset = None
+        # The writer's last Record is 2, since a Stream has no end.
+        while 2 not in bodies:
+            page = await stream.read_page(from_offset=offset, wait=timedelta(minutes=5))
+            bodies.extend(record.body for record in page.records)
+            offset = page.last_offset
+        return bodies
 
 
-async def test_a_workflow_read_waits_on_a_quiet_stream_across_read_limits(
+async def test_a_workflow_read_of_a_quiet_stream_makes_no_workflow_task(
     client: Client,
 ) -> None:
     store = FaultStore()
     client = stream_client(client, store)
     stream = await client.create_stream(id="quiet", body_type=int)
+    completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
 
     async def write(handle: Any, _worker: Any) -> None:
-        async def limit_passed() -> None:
-            history = await handle.fetch_history()
-            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
-            assert len(_events(history, completed)) > 1
+        async def first_task() -> None:
+            assert _events(await handle.fetch_history(), completed)
 
-        # On a quiet Stream, the read gets pages with no Record, and goes on in the next
-        # Workflow Task from the same offset.
-        await assert_eventually(limit_passed)
+        # On a quiet Stream, the reads get pages with no Record until the read limit,
+        # and the task then completes with no new task, over several read limits.
+        await assert_eventually(first_task)
+        await asyncio.sleep(1)
+        history = await handle.fetch_history()
+        assert len(_events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED)) == 1
         quiet = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
-        assert len(quiet) > 1 and not any(r.from_offset for r in quiet)
+        assert quiet and not any(r.from_offset for r in quiet)
+        # The read starts again from the same offset in the task of a Signal.
         await stream.append(1, 2)
-        await stream.close()
+        await handle.signal(_QuietReadWorkflow.wake)
 
     options = RunOptions(
         _QuietReadWorkflow,
@@ -1227,7 +1195,7 @@ async def test_a_workflow_read_waits_on_a_quiet_stream_across_read_limits(
     assert (await run(client, options)).result == [1, 2]
 
 
-async def test_a_workflow_read_with_no_wait_outlives_the_read_limit(
+async def test_a_workflow_read_with_no_wait_reads_again_in_the_next_task(
     client: Client,
 ) -> None:
     store, hold = FaultStore(), Hold()
@@ -1241,9 +1209,11 @@ async def test_a_workflow_read_with_no_wait_outlives_the_read_limit(
             completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
             assert _events(history, completed)
 
-        # The task completes at its read limit, and the Store still holds the read.
+        # The read goes on at the read limit, since only the Store can say that the
+        # Stream has no Record. The task then completes, which stops the held read,
+        # and the read starts again in the task of the Signal.
         await assert_eventually(task_completed)
-        hold.release()
+        await asyncio.wait_for(hold.cancelled.wait(), 10)
         await handle.signal(_ReadOnceWorkflow.go_on)
 
     options = RunOptions(
@@ -1254,7 +1224,8 @@ async def test_a_workflow_read_with_no_wait_outlives_the_read_limit(
         replay=True,
     )
     assert (await run(stream_client(client, store), options)).result == [1, 2, 3]
-    assert not hold.cancelled.is_set()
+    reads = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
+    assert len([r for r in reads if not r.from_offset]) >= 2
 
 
 @dataclasses.dataclass

@@ -20,26 +20,22 @@ import temporalio.nexus.system
 import temporalio.worker
 from temporalio import workflow
 from temporalio.api.common.v1 import ActivityType, Payload
-from temporalio.api.enums.v1 import (
-    RetryState,
-    StreamErrorReason,
-    StreamStatus,
-    TimeoutType,
-)
+from temporalio.api.enums.v1 import RetryState, StreamErrorReason, TimeoutType
 from temporalio.api.failure.v1 import (
     ActivityFailureInfo,
     ApplicationFailureInfo,
     Failure,
     TimeoutFailureInfo,
 )
-from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
-from temporalio.api.stream.v1 import StreamRecord, StreamRef
-from temporalio.api.streamservice.v1 import (
+from temporalio.api.sdk.v1 import (
     CreateStreamRequest,
     CreateStreamResponse,
     DescribeStreamRequest,
-    DescribeStreamResponse,
+    StreamRef,
 )
+from temporalio.api.sdk.v1.external_storage_pb2 import ExternalStorageReference
+from temporalio.api.stream.v1 import StreamRecord
+from temporalio.api.streamservice.v1 import DescribeStreamResponse
 from temporalio.bridge.proto.activity_result import (
     ActivityResolution,
 )
@@ -49,7 +45,6 @@ from temporalio.bridge.proto.workflow_activation import (
     RemoveFromCache,
     ResolveActivity,
     ResolveStreamAppend,
-    ResolveStreamClose,
     ResolveStreamRead,
     SignalWorkflow,
     StreamAppended,
@@ -60,7 +55,6 @@ from temporalio.bridge.proto.workflow_activation import (
 from temporalio.bridge.proto.workflow_commands import (
     ActivityCancellationType,
     AppendToStream,
-    CloseStream,
     CompleteWorkflowExecution,
     ReadStream,
     RequestCancelLocalActivity,
@@ -221,9 +215,9 @@ async def test_stream_payloads_take_the_codec_with_no_context_and_no_storage() -
     envelope = to_payload("envelope")
     envelope.metadata[temporalio.nexus.system._SYSTEM_PAYLOAD_METADATA_KEY] = b"true"
     failure = Failure(
-        message="The Stream is closed",
+        message="A later attempt has written to the Stream",
         application_failure_info=ApplicationFailureInfo(
-            type="stream_closed",
+            type="stream_fenced",
             details=temporalio.api.common.v1.Payloads(payloads=[wrapped(result)]),
         ),
     )
@@ -248,9 +242,6 @@ async def test_stream_payloads_take_the_codec_with_no_context_and_no_storage() -
                 resolve_stream_append=ResolveStreamAppend(seq=1, failed=failure)
             ),
             WorkflowActivationJob(
-                resolve_stream_close=ResolveStreamClose(seq=1, failed=failure)
-            ),
-            WorkflowActivationJob(
                 resolve_activity=ResolveActivity(
                     seq=1,
                     result=ActivityResolution(completed=ActivitySuccess(result=stored)),
@@ -262,7 +253,7 @@ async def test_stream_payloads_take_the_codec_with_no_context_and_no_storage() -
     await temporalio.bridge.worker.decode_activation(
         activation, command_aware, decode_headers=True, storage_concurrency_limit=1
     )
-    read, failed_read, appended, closed, activity = activation.jobs
+    read, failed_read, appended, activity = activation.jobs
     assert [record.body for record in read.resolve_stream_read.page.records] == [
         *bodies,
         claim,
@@ -270,7 +261,6 @@ async def test_stream_payloads_take_the_codec_with_no_context_and_no_storage() -
     ]
     assert failed_read.resolve_stream_read.failed == failure
     assert appended.resolve_stream_append.failed == failure
-    assert closed.resolve_stream_close.failed == failure
     assert activity.resolve_activity.result.completed.result == result
     assert driver._retrieve_calls == 1
     assert calls == [("decode", None, 1)] * 4 + [("decode", context, 1)]
@@ -279,7 +269,7 @@ async def test_stream_payloads_take_the_codec_with_no_context_and_no_storage() -
 _REFUSALS = [
     StreamErrorReason.STREAM_ERROR_REASON_NOT_FOUND,
     StreamErrorReason.STREAM_ERROR_REASON_ALREADY_EXISTS,
-    StreamErrorReason.STREAM_ERROR_REASON_CLOSED,
+    StreamErrorReason.STREAM_ERROR_REASON_EXPIRED,
     StreamErrorReason.STREAM_ERROR_REASON_FENCED,
 ]
 _UNAVAILABLE = StreamErrorReason.STREAM_ERROR_REASON_STORE_UNAVAILABLE
@@ -291,7 +281,7 @@ class _Call:
     """One generated Stream call, and what Workflow code got for it."""
 
     operation: str
-    """One of ``create``, ``append``, ``close`` and ``describe``."""
+    """One of ``create``, ``append`` and ``describe``."""
     stream: str
     """The id of the Stream. A call on a Stream that an earlier phase created uses the
     Stream of that create."""
@@ -353,12 +343,9 @@ class _ScriptWorkflow:
             if call.operation == "append":
                 appended = await stream.append(*call.bodies)
                 call.outcome = (appended.first_offset, appended.last_offset)
-            elif call.operation == "close":
-                await stream.close()
-                call.outcome = "closed"
             else:
                 described = await stream.describe()
-                call.outcome = (described.status, described.last_offset)
+                call.outcome = described.last_offset
         except StreamError as err:
             call.outcome = err.reason
         except asyncio.CancelledError:
@@ -390,31 +377,28 @@ class _RecordingOutbound(temporalio.worker.WorkflowOutboundInterceptor):
         _Script.intercepted.append(("append", request))
         return await super().start_append_records(request)
 
-    async def start_close_stream(self, request: Any) -> Any:
-        _Script.intercepted.append(("close", request))
-        return await super().start_close_stream(request)
-
     async def start_describe_stream(self, request: Any) -> Any:
         _Script.intercepted.append(("describe", request))
         return await super().start_describe_stream(request)
 
 
 def _plan(
-    call: _Call, seq: int, store: str, history_store: str
+    call: _Call, seq: int, ref_store: str, store: str, history_store: str
 ) -> tuple[WorkflowCommand, WorkflowActivationJob, Any]:
     """Return the command that a call must send, the job that the test answers it
     with, and what Workflow code must get for it.
 
-    ``store`` is the Store name that the call must send, and ``history_store`` the
+    ``ref_store`` is the Store name of the ref that Workflow code passes, ``store``
+    the name of the Store that the SDK chose for the call, and ``history_store`` the
     one that the result of a create has.
     """
     converter = temporalio.converter.DefaultPayloadConverter()
-    stream = StreamRef(id=call.stream, store=store)
     refused = None if call.refusal is None else core_failure(call.refusal)
     command, job = WorkflowCommand(), WorkflowActivationJob()
     outcome: Any
     if call.operation == "append":
         bodies = converter.to_payloads(call.bodies)
+        stream = StreamRef(id=call.stream, store=store)
         command.append_to_stream.CopyFrom(
             AppendToStream(seq=seq, stream=stream, bodies=bodies)
         )
@@ -426,23 +410,18 @@ def _plan(
             job.resolve_stream_append.appended.CopyFrom(
                 StreamAppended(first_offset=outcome[0], last_offset=outcome[1])
             )
-    elif call.operation == "close":
-        command.close_stream.CopyFrom(CloseStream(seq=seq, stream=stream))
-        outcome = "closed"
-        job.resolve_stream_close.seq = seq
-        if refused:
-            job.resolve_stream_close.failed.CopyFrom(refused)
     else:
-        request: Message = DescribeStreamRequest(ref=stream)
+        # The request of the Local Activity has the ref of Workflow code, and the
+        # Activity gets the name of the chosen Store next to it.
+        ref = StreamRef(id=call.stream, store=ref_store)
+        request: Message = DescribeStreamRequest(ref=ref)
         request_id = None
-        described = DescribeStreamResponse(
-            status=StreamStatus.STREAM_STATUS_OPEN, last_offset=b"last%d" % seq
-        )
+        described = DescribeStreamResponse(last_offset=b"last%d" % seq)
         answer: Message = described
-        outcome = (described.status, described.last_offset)
+        outcome = described.last_offset
         if call.operation == "create":
             # Each create of a run chain has the first run id as its request id.
-            request, request_id = CreateStreamRequest(stream_ref=stream), "first-run"
+            request, request_id = CreateStreamRequest(stream_ref=ref), "first-run"
             answer = CreateStreamResponse(
                 ref=StreamRef(id=call.stream, store=history_store),
                 created=seq % 2 == 0,
@@ -454,7 +433,9 @@ def _plan(
         activity.activity_type = _STORE_CALL
         operation = request.DESCRIPTOR.name.removesuffix("Request")
         activity.arguments.extend(
-            converter.to_payloads([operation, request.SerializeToString(), request_id])
+            converter.to_payloads(
+                [operation, store, request.SerializeToString(), request_id]
+            )
         )
         activity.schedule_to_close_timeout.FromSeconds(5)
         temporalio.common.RetryPolicy(maximum_attempts=1).apply_to_proto(
@@ -516,12 +497,11 @@ async def _calls_script(rng: random.Random) -> None:
         return stores[int(context.id[1:]) % 2]
 
     config = rng.choice(
-        [None, StreamConfig(stores[:1]), StreamConfig(stores, store_selector=selector)]
+        [StreamConfig(stores[:1]), StreamConfig(stores, store_selector=selector)]
     )
-    names = "a" if config and len(config.stores) == 1 else "ab"
-    # A live create or describe needs a Stream config of the Worker, and a replay
-    # needs none.
-    replaying = config is None or rng.random() < 0.3
+    names = "a" if len(config.stores) == 1 else "ab"
+    # A replay chooses the Store of each call again, as the first run did.
+    replaying = rng.random() < 0.3
 
     # The Store name that History has for each Stream that a create of the script makes.
     # It need not be the one that the config picks for the create.
@@ -531,7 +511,7 @@ async def _calls_script(rng: random.Random) -> None:
     for _ in range(rng.randrange(1, 5)):
         phase: list[_Call] = []
         for _ in range(rng.randrange(1, 5)):
-            operation = rng.choice(["create", "append", "append", "close", "describe"])
+            operation = rng.choice(["create", "append", "append", "describe"])
             if operation != "create" and created and rng.random() < 0.5:
                 call = _Call(operation, rng.choice(sorted(created)))
             else:
@@ -548,12 +528,12 @@ async def _calls_script(rng: random.Random) -> None:
             if call.operation == "create" and not call.cancel and call.refusal is None:
                 created[call.stream] = rng.choice(names)
     # The last phase can be one call that fails the Workflow Task. Its Local Activity
-    # ends in an outage or finds no Store, or the selector raises for its append.
+    # ends in an outage or finds no Store, or the selector raises for the call.
     fatal = rng.choice([None, None, "outage", "unserved", "selector"])
-    if fatal == "selector" and not (config and config.store_selector):
+    if fatal == "selector" and not config.store_selector:
         fatal = None
     if fatal == "selector":
-        phases.append([_Call("append", "fatal")])
+        phases.append([_Call(rng.choice(["create", "append", "describe"]), "fatal")])
     elif fatal:
         last = _Call(rng.choice(["create", "describe"]), f"s{streams}")
         last.unserved = fatal == "unserved"
@@ -572,7 +552,7 @@ async def _calls_script(rng: random.Random) -> None:
     target = StorageDriverWorkflowInfo(
         namespace="ns", id="wf", run_id="run", type="_ScriptWorkflow"
     )
-    seqs = {"append": 0, "close": 0, "activity": 0}
+    seqs = {"append": 0, "activity": 0}
     jobs = [WorkflowActivationJob(initialize_workflow=InitializeWorkflow())]
     outcomes: list[Any] = []
     expected_selects: list[StreamSelectContext] = []
@@ -586,24 +566,23 @@ async def _calls_script(rng: random.Random) -> None:
         cancels: list[WorkflowCommand] = []
         jobs = []
         for call in phase:
-            by_core = call.operation in ("append", "close")
+            # Each call gets its Store in Workflow code, and only a ref with no Store
+            # name asks the selector.
             if call.stream in usable:
-                store = created[call.stream]
-            elif call.store or config is None or not by_core:
-                # The Local Activity of a create or a describe gets the ref's own Store
-                # name, and it asks the selector itself.
-                store = call.store or ""
+                ref_store = store = created[call.stream]
+            elif call.store:
+                ref_store = store = call.store
             elif config.store_selector is None:
-                store = "a"
+                ref_store, store = "", "a"
             else:
-                store = stores[int(call.stream[1:]) % 2].name()
+                ref_store, store = "", stores[int(call.stream[1:]) % 2].name()
                 expected_selects.append(
                     StreamSelectContext(id=call.stream, target=target, namespace="ns")
                 )
             kind = call.operation if call.operation in seqs else "activity"
             seqs[kind] += 1
             command, job, outcome = _plan(
-                call, seqs[kind], store, created.get(call.stream, "a")
+                call, seqs[kind], ref_store, store, created.get(call.stream, "a")
             )
             commands.append(command)
             jobs.append(job)
@@ -627,7 +606,7 @@ async def _calls_script(rng: random.Random) -> None:
         assert command.HasField("complete_workflow_execution")
         calls = [call for phase in phases for call in phase]
         assert [call.outcome for call in calls] == outcomes
-        assert not instance._streams._appends and not instance._streams._closes
+        assert not instance._streams._appends
         assert selects == expected_selects
         # An interceptor sees each call in the method of its operation, and the ref of
         # a create as Workflow code wrote it, also after its result.
@@ -645,6 +624,125 @@ async def _calls_script(rng: random.Random) -> None:
     # An eviction ends each task of the instance, also the task of a call that waits.
     evict = WorkflowActivationJob(remove_from_cache=RemoveFromCache())
     assert (await _activate(instance, evict)).HasField("successful")
+
+
+class _OwnPath:
+    """The calls of :py:class:`_EachCallWorkflow`, and what its Stores saw."""
+
+    operations: list[str] = []
+    selects: list[str] = []
+    """The Stream id of each selector call."""
+    started: list[tuple[str, int]] = []
+    """Each call that :py:class:`_OwnPathStore` started, with the number of selector
+    calls before it."""
+
+
+class _OwnPathStore(MemoryStreamStore):
+    """A Store that runs each Stream call of Workflow code itself, with no command
+    and no Local Activity, as a Store that SDK Core doesn't call would.
+    """
+
+    def _start_workflow_call(
+        self, streams: Any, operation: str, request: Message, result_type: Any
+    ) -> asyncio.Future[Any]:
+        _OwnPath.started.append((operation, len(_OwnPath.selects)))
+        return asyncio.get_running_loop().create_future()
+
+
+@workflow.defn
+class _EachCallWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        calls: list[Any] = []
+        for at, operation in enumerate(_OwnPath.operations):
+            stream = workflow.get_stream(ModelRef[int](id=f"s{at}"))
+            if operation == "create":
+                calls.append(workflow.create_stream(id=f"s{at}", body_type=int))
+            elif operation == "append":
+                calls.append(stream.append(at))
+            elif operation == "read":
+                calls.append(stream.read_page())
+            else:
+                calls.append(stream.describe())
+        if len(calls) == 1:
+            # The run gets the error of its one call, so no task holds an error that
+            # no one reads.
+            await calls[0]
+            return
+        tasks = [asyncio.ensure_future(call) for call in calls]
+        # Each task makes its call in its first step.
+        await asyncio.sleep(0)
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def test_the_store_of_a_call_is_chosen_once_and_runs_the_call() -> None:
+    operations = ["create", "append", "read", "describe"]
+    # The variant of the command that the default path sends for each operation
+    variants = {
+        "create": "schedule_local_activity",
+        "append": "append_to_stream",
+        "read": "read_stream",
+        "describe": "schedule_local_activity",
+    }
+    own, default = _OwnPathStore(name="own"), MemoryStreamStore(name="default")
+    for owned in range(2 ** len(operations)):
+        # Bit `at` of `owned` gives call `at` to the Store that runs it itself.
+        on_own = [bool(owned >> at & 1) for at in range(len(operations))]
+
+        def selector(context: StreamSelectContext) -> StreamStore:
+            _OwnPath.selects.append(context.id)
+            return own if on_own[int(context.id[1:])] else default
+
+        config = StreamConfig([own, default], store_selector=selector)
+        _OwnPath.operations = operations
+        for replaying in (False, True):
+            with failure_note(f"owned {on_own}, replaying {replaying}"):
+                _OwnPath.selects, _OwnPath.started = [], []
+                instance = _new_instance(_EachCallWorkflow, config)
+                initialize = WorkflowActivationJob(
+                    initialize_workflow=InitializeWorkflow()
+                )
+                completion = await _activate(instance, initialize, replaying=replaying)
+                # The selector runs once for each call, before the Store starts it.
+                ids = [f"s{at}" for at in range(len(operations))]
+                assert _OwnPath.selects == ids
+                assert _OwnPath.started == [
+                    (f"{name.capitalize()}{suffix}", at + 1)
+                    for at, (name, suffix, mine) in enumerate(
+                        zip(
+                            operations,
+                            ["Stream", "Records", "Records", "Stream"],
+                            on_own,
+                        )
+                    )
+                    if mine
+                ]
+                # A call on the Store that runs it itself sends no command. A cancel
+                # sends a command only for a Local Activity of the default path.
+                sent = [
+                    variants[name] for name, mine in zip(operations, on_own) if not mine
+                ]
+                cancels = [
+                    "request_cancel_local_activity"
+                    for variant in sent
+                    if variant == "schedule_local_activity"
+                ]
+                assert [
+                    command.WhichOneof("variant")
+                    for command in completion.successful.commands
+                ] == [*sent, *cancels, "complete_workflow_execution"]
+
+
+async def test_a_stream_call_with_no_stream_config_fails_the_task() -> None:
+    for operation in ["create", "append", "read", "describe"]:
+        _OwnPath.operations = [operation]
+        for replaying in (False, True):
+            instance = _new_instance(_EachCallWorkflow)
+            initialize = WorkflowActivationJob(initialize_workflow=InitializeWorkflow())
+            completion = await _activate(instance, initialize, replaying=replaying)
+            assert "no stream_config" in completion.failed.failure.message, operation
 
 
 @dataclass
@@ -710,9 +808,7 @@ class _ReadsWorkflow:
                 )
                 bodies = [record.body for record in page.records]
                 offset = page.last_offset
-                call.outcome.append((bodies, offset or b"", page.done))
-                if page.done:
-                    return
+                call.outcome.append((bodies, offset or b""))
         except StreamError as err:
             call.outcome.append(err.reason)
         except TypeError:
@@ -760,7 +856,9 @@ async def _reads_script(
     converter = temporalio.converter.DefaultPayloadConverter()
     calls: list[_ReadCall] = []
     _ReadScript.calls, _ReadScript.steps = calls, []
-    instance = _new_instance(_ReadsWorkflow)
+    instance = _new_instance(
+        _ReadsWorkflow, StreamConfig([MemoryStreamStore(name="a")])
+    )
     initialize = WorkflowActivationJob(initialize_workflow=InitializeWorkflow())
     completion = await _activate(instance, initialize, flags=flags, replaying=replaying)
     assert not completion.successful.commands
@@ -815,7 +913,6 @@ async def _reads_script(
                     for number in records
                 ],
                 last_offset=_offset(last),
-                done=rng.random() < 0.3,
             )
             job = ResolveStreamRead(seq=seq, page=page)
             if rng.random() < 0.15:
@@ -883,8 +980,8 @@ async def _reads_script(
             bodies = [converter.from_payload(r.body) for r in job.page.records]
             # The next page comes after the last_offset of this one.
             positions[call] = int.from_bytes(job.page.last_offset, "big")
-            outcomes[call].append((bodies, job.page.last_offset, job.page.done))
-            if not job.page.done and len(outcomes[call]) < reader.pages:
+            outcomes[call].append((bodies, job.page.last_offset))
+            if len(outcomes[call]) < reader.pages:
                 call_read(call, commands)
 
         signal = SignalWorkflow(signal_name="step", originating_event_id=step + 1)

@@ -7,9 +7,9 @@ import logging
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import google.protobuf.message
 import nexusrpc
@@ -41,6 +41,9 @@ from temporalio.converter import (
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 from temporalio.exceptions import StreamError
 from temporalio.nexus.system.stream_service import StreamService
+
+if TYPE_CHECKING:
+    import temporalio.worker._workflow_streams
 
 logger = logging.getLogger(__name__)
 
@@ -126,8 +129,9 @@ class StreamStore(ABC):
     @abstractmethod
     def name(self) -> str:
         """Return the name that a :py:class:`StreamConfig` registers this Store
-        under. A Store may take its name as an argument, so that two instances of
-        one Store class can be in one config.
+        under. It must return the same name every time. A Store may take its name
+        as an argument, so that two instances of one Store class can be in one
+        config.
         """
         raise NotImplementedError
 
@@ -208,6 +212,26 @@ class StreamStore(ABC):
         Record of a Stream.
         """
         raise NotImplementedError
+
+    def _start_workflow_call(
+        self,
+        streams: temporalio.worker._workflow_streams._WorkflowStreams,
+        operation: str,
+        request: google.protobuf.message.Message,
+        result_type: Any,
+    ) -> asyncio.Future[Any]:
+        """Start a Stream call of Workflow code on this Store, and return the
+        future of its result.
+
+        ``request`` is the SDK request of the call, with its ref, and
+        ``result_type`` is the type of the call's result. The SDK calls this in the
+        event loop of the Workflow, once per call, after it chose this Store and
+        before any command of the call. A replay calls it again, so it must take
+        the path of the first run for the same call. The default makes an append
+        or a read a command of SDK Core, and runs a create or a describe in a
+        Local Activity of the SDK.
+        """
+        return streams._start_by_default(self, operation, request, result_type)
 
 
 @dataclass(frozen=True)
@@ -299,9 +323,12 @@ class StreamConfig:
     Required when more than one Store is registered. When ``None``, the one
     Store takes each such call.
 
-    A Workflow replay calls the selector again, so it must return the same Store
-    for the same call. A created Stream has the name of its Store in its ref, so
-    its calls don't depend on the selector.
+    The SDK calls the selector only for a ref with no Store name. In Workflow
+    code it calls it for each such Stream call, also for a create and a
+    describe, and again in a replay. So the selector must return the same Store
+    for the same call, must not block or do I/O, and must be safe to call from
+    more than one thread. A created Stream has the name of its Store in its ref,
+    so its calls don't depend on the selector.
     """
 
     max_record_bytes: int = 1536 * 1024
@@ -319,6 +346,13 @@ class StreamConfig:
     max_batch_records: int = 1000
     """Maximum number of Records of one append. Defaults to 1000. Must be
     greater than or equal to one.
+    """
+
+    _by_name: dict[str, StreamStore] = field(
+        init=False, repr=False, compare=False, default_factory=dict
+    )
+    """Each Store of :py:attr:`stores` by its name. :py:meth:`__post_init__`
+    fills it once, so a Store that changes its name later can't change a lookup.
     """
 
     def __post_init__(self) -> None:
@@ -341,26 +375,27 @@ class StreamConfig:
                 "StreamConfig.store_selector must be specified if multiple Stores "
                 "are registered."
             )
-        names: set[str] = set()
+        by_name: dict[str, StreamStore] = {}
         for store in self.stores:
             name = store.name()
             if not name:
                 raise ValueError(
                     "StreamConfig.stores contains a Store with an empty name."
                 )
-            if name in names:
+            if name in by_name:
                 raise ValueError(
                     f"StreamConfig.stores contains multiple Stores with name '{name}'. "
                     "Each Store must have a unique name."
                 )
-            names.add(name)
+            by_name[name] = store
+        object.__setattr__(self, "_by_name", by_name)
 
     def _store(self, name: str) -> StreamStore:
         """Return the Store with a name, raising :class:`ValueError` if none has it."""
-        for store in self.stores:
-            if store.name() == name:
-                return store
-        raise ValueError(f"No Stream Store found with name '{name}'")
+        store = self._by_name.get(name)
+        if store is None:
+            raise ValueError(f"No Stream Store found with name '{name}'")
+        return store
 
     def _store_for(
         self,

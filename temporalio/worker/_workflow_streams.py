@@ -16,6 +16,7 @@ from nexusrpc import OutputT
 
 import temporalio.activity
 import temporalio.api.failure.v1
+import temporalio.api.sdk.v1 as sdk
 import temporalio.api.stream.v1
 import temporalio.api.streamservice.v1 as proto
 import temporalio.bridge.proto.workflow_activation
@@ -30,8 +31,8 @@ from temporalio.client._stream_store import (
     StreamConfig,
     StreamStore,
     _call_store,
-    _operation,
     _request_ref,
+    _sdk_request_type,
     _StoreCaller,
 )
 from temporalio.converter import StorageDriverWorkflowInfo
@@ -59,16 +60,16 @@ class _Read:
 class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
     """The Stream calls of one Workflow instance.
 
-    An append, a close and a read are commands of SDK Core, which makes the Store
-    calls and gives each result in a job. Core has no command for a create or a
-    describe, so those run in a Local Activity of the SDK.
+    Each call first gets its Store, and the Store starts the call. By default an
+    append and a read are commands of SDK Core, which makes the Store calls and
+    gives each result in a job. Core has no command for a create or a describe, so
+    those run in a Local Activity of the SDK.
     """
 
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:
         self._instance = instance
-        # Each append and close whose job hasn't come, by seq
+        # Each append whose job hasn't come, by seq
         self._appends: dict[int, asyncio.Future[Any]] = {}
-        self._closes: dict[int, asyncio.Future[Any]] = {}
         self.task_error: Exception | None = None
         """The error of a call that must fail the Workflow Task, if one came."""
         # Each read whose job hasn't come, by seq. A cancelled read gets its one job too.
@@ -81,8 +82,8 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
         The command of the call is added before this returns, so commands are in
         the order of the calls. Cancelling the handle ends its wait immediately.
-        Core can't stop an append, a close or a read, so those still run, and the
-        job that still comes for the call is dropped.
+        Core can't stop an append or a read, so those still run, and the job that
+        still comes for the call is dropped.
         """
         instance = self._instance
         instance._assert_not_read_only("start a Stream call")
@@ -95,60 +96,25 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         # The terminal of each Stream operation gives its output type.
         result_type: Any = input.output_type
         request = temporalio.nexus.system._support.model_to_proto(model, *converters)
-        # The future of the job of the call, or the task of its Local Activity
-        result: asyncio.Future[Any]
-        if isinstance(request, proto.AppendRecordsRequest):
-            stream = self._stream(request.ref)
-            seq = instance._next_seq("stream_append")
-            append = instance._add_command().append_to_stream
-            append.seq = seq
-            append.stream.CopyFrom(stream)
-            append.bodies.extend(record.body for record in request.records)
-            result = self._appends[seq] = instance.create_future()
-        elif isinstance(request, proto.CloseStreamRequest):
-            stream = self._stream(request.ref)
-            seq = instance._next_seq("stream_close")
-            close = instance._add_command().close_stream
-            close.seq = seq
-            close.stream.CopyFrom(stream)
-            result = self._closes[seq] = instance.create_future()
-        elif isinstance(request, proto.ReadRecordsRequest):
-            # The converter refuses a body of no type, and the job of the page would
-            # then fail the Workflow Task.
-            if typing.get_args(result_type) == (object,):
-                raise TypeError(
-                    "Cannot read a Stream with no body type. Give get_stream a "
-                    "body_type, or a StreamRef with a type argument."
-                )
-            stream = self._stream(request.ref)
-            seq = instance._next_seq("stream_read")
-            instance._add_command().read_stream.CopyFrom(
-                temporalio.bridge.proto.workflow_commands.ReadStream(
-                    seq=seq,
-                    stream=stream,
-                    from_offset=request.from_offset,
-                    wait=request.wait if request.HasField("wait") else None,
-                    max_records=request.max_records,
-                    max_bytes=request.max_bytes,
-                )
+        # The converter refuses a body of no type, and the job of the page would then
+        # fail the Workflow Task.
+        if isinstance(request, sdk.ReadRecordsRequest) and typing.get_args(
+            result_type
+        ) == (object,):
+            raise TypeError(
+                "Cannot read a Stream with no body type. Give get_stream a "
+                "body_type, or a StreamRef with a type argument."
             )
-            result = instance.create_future()
-            self._reads[seq] = _Read(result, result_type)
-        else:
-            # The Local Activity picks the Store of a ref with no Store name. A replay
-            # has its result, so a replay asks no selector for it. Each run of a chain
-            # sends the same id, so a Store answers the create of a later run as the
-            # create that made the Stream.
-            request_id = None
-            if isinstance(request, proto.CreateStreamRequest):
-                request_id = instance._info.first_execution_run_id
-            result = self._schedule_store_call(operation, request, request_id)
+        # The future of the job of the call, or the task of its Local Activity
+        result = self._store(_request_ref(request))._start_workflow_call(
+            self, operation, request, result_type
+        )
 
         async def call() -> OutputT:
             # `asyncio.wait` ends at a cancel of this task. `await result` would pass the
             # cancel on and wait for the cancelled Local Activity.
             await asyncio.wait([result])
-            if isinstance(request, proto.ReadRecordsRequest):
+            if isinstance(request, sdk.ReadRecordsRequest):
                 return result.result()
             return temporalio.nexus.system._support.model_from_proto(
                 self._response(operation, request, result),
@@ -166,15 +132,86 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         task.add_done_callback(stop)
         return _StreamCall(task)
 
+    def _store(self, ref: sdk.StreamRef) -> StreamStore:
+        """Return the Store of a call on ``ref``, from the Stream config of the
+        Worker's client. A call with no Store fails the Workflow Task.
+        """
+        config = self._stream_config()
+        if config is None:
+            raise self._fail_task(
+                ValueError(
+                    "Worker or Replayer has no stream_config, which every "
+                    "Stream call requires, also in a replay."
+                )
+            )
+        info = self._instance._info
+        target = StorageDriverWorkflowInfo(
+            id=info.workflow_id,
+            run_id=info.run_id,
+            type=info.workflow_type,
+            namespace=info.namespace,
+        )
+        try:
+            return config._store_for(ref, target, info.namespace)
+        except Exception as err:
+            raise self._fail_task(err)
+
+    def _start_by_default(
+        self,
+        store: StreamStore,
+        operation: str,
+        request: google.protobuf.message.Message,
+        result_type: Any,
+    ) -> asyncio.Future[Any]:
+        """Start a call on ``store`` as a command of SDK Core, or in the SDK's
+        Local Activity for a create or a describe. This is the default of
+        :py:meth:`StreamStore._start_workflow_call`.
+        """
+        instance = self._instance
+        stream = sdk.StreamRef(id=_request_ref(request).id, store=store.name())
+        if isinstance(request, sdk.AppendRecordsRequest):
+            seq = instance._next_seq("stream_append")
+            append = instance._add_command().append_to_stream
+            append.seq = seq
+            append.stream.CopyFrom(stream)
+            append.bodies.extend(record.body for record in request.records)
+            result = self._appends[seq] = instance.create_future()
+            return result
+        if isinstance(request, sdk.ReadRecordsRequest):
+            seq = instance._next_seq("stream_read")
+            instance._add_command().read_stream.CopyFrom(
+                temporalio.bridge.proto.workflow_commands.ReadStream(
+                    seq=seq,
+                    stream=stream,
+                    from_offset=request.from_offset,
+                    wait=request.wait if request.HasField("wait") else None,
+                    max_records=request.max_records,
+                    max_bytes=request.max_bytes,
+                )
+            )
+            result = instance.create_future()
+            self._reads[seq] = _Read(result, result_type)
+            return result
+        # Each run of a chain sends the same id, so a Store answers the create of a
+        # later run as the create that made the Stream.
+        request_id = None
+        if isinstance(request, sdk.CreateStreamRequest):
+            request_id = instance._info.first_execution_run_id
+        return self._schedule_store_call(store, operation, request, request_id)
+
     def resolve_append(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamAppend
     ) -> None:
-        self._resolve(self._appends, job.seq, job.appended, job)
-
-    def resolve_close(
-        self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamClose
-    ) -> None:
-        self._resolve(self._closes, job.seq, None, job)
+        future = self._appends.pop(job.seq, None)
+        if future is None:
+            raise RuntimeError(f"Failed finding Stream append for sequence {job.seq}")
+        # A cancelled call waits no more, and Core still gives the result of its write.
+        if future.done():
+            return
+        if job.HasField("failed"):
+            future.set_exception(self._error(job.failed))
+        else:
+            future.set_result(job.appended)
 
     def resolve_read(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamRead
@@ -189,9 +226,7 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             read.waiter.set_exception(self._error(job.failed))
             return
         page = proto.ReadRecordsResponse(
-            records=job.page.records,
-            last_offset=job.page.last_offset,
-            done=job.page.done,
+            records=job.page.records, last_offset=job.page.last_offset
         )
         # A body that the converter refuses fails the Workflow Task, as a result of a
         # Local Activity does.
@@ -204,24 +239,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             )
         )
 
-    def _resolve(
-        self,
-        calls: dict[int, asyncio.Future[Any]],
-        seq: int,
-        result: Any,
-        job: Any,
-    ) -> None:
-        future = calls.pop(seq, None)
-        if future is None:
-            raise RuntimeError(f"Failed finding Stream call for sequence {seq}")
-        # A cancelled call no longer waits, and Core still gives the result of its write.
-        if future.done():
-            return
-        if job.HasField("failed"):
-            future.set_exception(self._error(job.failed))
-        else:
-            future.set_result(result)
-
     def _error(self, failure: temporalio.api.failure.v1.Failure) -> BaseException:
         instance = self._instance
         return _stream_error_from_failure(failure) or (
@@ -232,25 +249,19 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
     def _schedule_store_call(
         self,
+        store: StreamStore,
         operation: str,
         request: google.protobuf.message.Message,
         request_id: str | None,
     ) -> asyncio.Future[Any]:
-        """Schedule the SDK's Local Activity for a create or a describe."""
+        """Schedule the SDK's Local Activity for a create or a describe on
+        ``store``.
+        """
         instance = self._instance
-        # A Worker whose client has no Stream config has no such Local Activity, so the
-        # call would wait with no end. A replay takes the result from History.
-        if not instance._is_replaying and self._stream_config() is None:
-            raise self._fail_task(
-                ValueError(
-                    "Client of this Worker has no stream_config, which every "
-                    "Stream call requires."
-                )
-            )
         activity = instance._outbound.start_local_activity(
             StartLocalActivityInput(
                 activity=_STORE_CALL_ACTIVITY,
-                args=(operation, request.SerializeToString(), request_id),
+                args=(operation, store.name(), request.SerializeToString(), request_id),
                 activity_id=None,
                 # A call that hangs ends before the heartbeat of the Workflow Task, and an
                 # outage fails the task immediately, so neither writes into History.
@@ -277,14 +288,11 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         result: asyncio.Future[Any],
     ) -> google.protobuf.message.Message:
         """Return the response message of a call whose ``result`` is done."""
-        if isinstance(request, proto.AppendRecordsRequest):
+        if isinstance(request, sdk.AppendRecordsRequest):
             appended = result.result()
             return proto.AppendRecordsResponse(
                 first_offset=appended.first_offset, last_offset=appended.last_offset
             )
-        if isinstance(request, proto.CloseStreamRequest):
-            result.result()
-            return proto.CloseStreamResponse()
         try:
             answer = result.result()
         except temporalio.exceptions.FailureError as err:
@@ -304,33 +312,9 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             raise error from err
         # The ref of a create has the Store name of History, so a replay gives the same
         # ref under any Stream config.
-        if isinstance(request, proto.CreateStreamRequest):
-            return proto.CreateStreamResponse.FromString(answer)
+        if isinstance(request, sdk.CreateStreamRequest):
+            return sdk.CreateStreamResponse.FromString(answer)
         return proto.DescribeStreamResponse.FromString(answer)
-
-    def _stream(
-        self, ref: temporalio.api.stream.v1.StreamRef
-    ) -> temporalio.api.stream.v1.StreamRef:
-        """Return the ref of a command, with the name of the Store that SDK Core calls.
-
-        A ref with no Store name gets the Store that the config of the Worker's
-        client picks, and an empty name if that client has no Stream config.
-        """
-        store = ref.store
-        config = self._stream_config()
-        if config and not store:
-            info = self._instance._info
-            target = StorageDriverWorkflowInfo(
-                id=info.workflow_id,
-                run_id=info.run_id,
-                type=info.workflow_type,
-                namespace=info.namespace,
-            )
-            try:
-                store = config._store_for(ref, target, info.namespace).name()
-            except Exception as err:
-                raise self._fail_task(err)
-        return temporalio.api.stream.v1.StreamRef(id=ref.id, store=store)
 
     def _fail_task(self, error: Exception) -> Exception:
         """Make ``error`` the failure of the Workflow Task and return it.
@@ -368,10 +352,12 @@ class _StreamCall(temporalio.workflow.NexusOperationHandle[OutputT]):
 
 @temporalio.activity.defn(name=_STORE_CALL_ACTIVITY)
 async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
-    operation: str, request: bytes, request_id: str | None
+    operation: str, store: str, request: bytes, request_id: str | None
 ) -> bytes:
-    """Call a Stream Store of the Worker's client for a create or a describe of
-    Workflow code. ``request_id`` is that of a create, and ``None`` for a describe.
+    """Call the Stream Store named ``store`` of the Worker's client for a create
+    or a describe of Workflow code, which chose that Store. ``request`` is the
+    encoded SDK request. ``request_id`` is that of a create, and ``None`` for a
+    describe.
 
     Returns the encoded response. The ref of a create's response has the name of
     the Store that it called, so History has the Store of the created Stream.
@@ -387,20 +373,9 @@ async def _stream_store_call(  # pyright: ignore[reportUnusedFunction]
     stream_config = client._config["stream_config"]
     if stream_config is None:
         raise ValueError("Client of this Worker has no stream_config.")
-    _, request_type, _ = _operation(operation)
-    stream_request: Any = request_type.FromString(request)
-    # The selector gets the Workflow as its target, as for an append of that Workflow.
-    target = StorageDriverWorkflowInfo(
-        id=info.workflow_id,
-        run_id=info.workflow_run_id,
-        type=info.workflow_type,
-        namespace=info.namespace,
-    )
-    picked = stream_config._store_for(
-        _request_ref(stream_request), target, client.namespace
-    )
+    stream_request = _sdk_request_type(operation).FromString(request)
     response = await _call_store(
-        picked,
+        stream_config._store(store),
         stream_config._limits(),
         client.data_converter.payload_codec,
         operation,
@@ -450,7 +425,7 @@ def _for_core(
     """
     if stream_config is None:
         return set(), None
-    return {store.name() for store in stream_config.stores}, stream_config._limits()
+    return set(stream_config._by_name), stream_config._limits()
 
 
 def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
