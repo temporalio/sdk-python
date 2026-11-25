@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import functools
+import importlib.util
 import inspect
 import os
 import sys
@@ -13,6 +14,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import IntEnum
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -36,6 +38,9 @@ from temporalio.worker.workflow_sandbox import (
 from temporalio.workflow import SandboxImportNotificationPolicy
 from tests.helpers import assert_eq_eventually
 from tests.worker.workflow_sandbox.testmodules import stateful_module
+from tests.worker.workflow_sandbox.testmodules.from_import_workflow import (
+    FromImportPassthroughWorkflow,
+)
 from tests.worker.workflow_sandbox.testmodules.proto import SomeMessage
 
 global_state = ["global orig"]
@@ -447,41 +452,69 @@ async def test_workflow_sandbox_known_issues(client: Client):
 @workflow.defn
 class BadAsyncioWorkflow:
     @workflow.run
-    async def run(self) -> list[str]:
+    async def run(self, call: str) -> None:
         # Two known bad asyncio task calls, as_completed and wait
         async def return_value(value: str) -> str:
             return value
 
-        ret = []
-        for coro in asyncio.as_completed([return_value("val1"), return_value("val2")]):
-            ret.append(await coro)
-        done, _ = await asyncio.wait(
-            [
-                asyncio.create_task(return_value("val3")),
-                asyncio.create_task(return_value("val4")),
-            ]
-        )
-        for task in done:
-            ret.append(await task)
-        return ret
+        task = asyncio.create_task(return_value("val1"))
+        try:
+            if call == "as_completed":
+                for coro in asyncio.as_completed([task]):
+                    await coro
+            else:
+                await asyncio.wait([task])
+        except RestrictedWorkflowAccessError as err:
+            raise ApplicationError(
+                str(err), type="RestrictedWorkflowAccessError"
+            ) from err
 
 
-async def test_workflow_sandbox_bad_asyncio(client: Client):
+@pytest.mark.parametrize(
+    "call,alternative",
+    [("as_completed", "workflow.as_completed()"), ("wait", "workflow.wait()")],
+)
+async def test_workflow_sandbox_bad_asyncio(
+    client: Client, call: str, alternative: str
+):
     async with new_worker(client, BadAsyncioWorkflow) as worker:
-        # We currently warn on this
-        with pytest.warns(UserWarning) as warnings:
-            result = await client.execute_workflow(
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
                 BadAsyncioWorkflow.run,
+                call,
                 id=f"workflow-{uuid.uuid4()}",
                 task_queue=worker.task_queue,
             )
-        assert "val1" in result[:2]
-        assert "val2" in result[:2]
-        assert "val3" in result[2:]
-        assert "val4" in result[2:]
-        assert len(warnings) == 2
-        assert "asyncio.as_completed()" in str(warnings[0].message)
-        assert "asyncio.wait()" in str(warnings[1].message)
+        assert isinstance(err.value.cause, ApplicationError)
+        assert err.value.cause.type == "RestrictedWorkflowAccessError"
+        assert (
+            f"asyncio.{call}() is non-deterministic, use {alternative} instead"
+            in err.value.cause.message
+        )
+
+
+@workflow.defn
+class UnsupportedTaskGroupWorkflow:
+    @workflow.run
+    async def run(self) -> str:
+        async with asyncio.TaskGroup() as group:
+            task = group.create_task(asyncio.sleep(0, result="done"))
+        return task.result()
+
+
+async def test_workflow_sandbox_task_group_warning(client: Client):
+    async with new_worker(client, UnsupportedTaskGroupWorkflow) as worker:
+        with pytest.warns(
+            UserWarning,
+            match=r"asyncio\.TaskGroup\(\) has non-deterministic task cancellation order",
+        ) as warnings:
+            result = await client.execute_workflow(
+                UnsupportedTaskGroupWorkflow.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+        assert result == "done"
+        assert len(warnings) == 1
 
 
 def new_worker(
@@ -591,6 +624,32 @@ async def test_workflow_sandbox_import_workflow_without_warning():
     )
 
 
+@pytest.mark.parametrize(
+    "main_restrictions",
+    [
+        SandboxRestrictions.default,
+        SandboxRestrictions.default.with_passthrough_all_modules(),
+        SandboxRestrictions.default.with_passthrough_modules("__temporal_main__"),
+    ],
+    ids=["default", "all_modules", "main_module"],
+)
+async def test_workflow_sandbox_validates_workflow_in_main_module(
+    main_restrictions: SandboxRestrictions, monkeypatch: pytest.MonkeyPatch
+):
+    # Load the file as __main__, like running it as a script
+    spec = importlib.util.spec_from_file_location(
+        "__main__", Path(__file__).parent / "testmodules" / "main_module_workflow.py"
+    )
+    assert spec and spec.loader
+    main_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(main_module)
+    monkeypatch.setitem(sys.modules, "__main__", main_module)
+
+    SandboxedWorkflowRunner(main_restrictions).prepare_workflow(
+        workflow._Definition.must_from_class(main_module.MainModuleWorkflow)
+    )
+
+
 async def test_workflow_sandbox_import_all_warnings(client: Client):
     restrictions = dataclasses.replace(
         SandboxRestrictions.default,
@@ -691,6 +750,18 @@ async def test_workflow_sandbox_import_suppress_warnings(client: Client):
                 task_queue=worker.task_queue,
             )
             assert len(recorder) == 0, "Expected no warnings to be issued"
+
+
+async def test_workflow_sandbox_passthrough_from_import_of_sibling_module(
+    client: Client,
+):
+    async with new_worker(client, FromImportPassthroughWorkflow) as worker:
+        module_id = await client.execute_workflow(
+            FromImportPassthroughWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+    assert module_id == id(stateful_module)
 
 
 def _assert_expected_warnings(

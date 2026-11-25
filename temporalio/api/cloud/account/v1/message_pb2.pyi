@@ -43,25 +43,62 @@ class MetricsSpec(google.protobuf.message.Message):
 global___MetricsSpec = MetricsSpec
 
 @typing.final
+class AuthenticationSettings(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RESTRICT_SESSION_LIFETIMES_FIELD_NUMBER: builtins.int
+    restrict_session_lifetimes: builtins.bool
+    """Restricts Cloud web UI session lifetimes for users in this account."""
+    def __init__(
+        self,
+        *,
+        restrict_session_lifetimes: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "restrict_session_lifetimes", b"restrict_session_lifetimes"
+        ],
+    ) -> None: ...
+
+global___AuthenticationSettings = AuthenticationSettings
+
+@typing.final
 class AccountSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     METRICS_FIELD_NUMBER: builtins.int
+    AUTHENTICATION_SETTINGS_FIELD_NUMBER: builtins.int
     @property
     def metrics(self) -> global___MetricsSpec:
         """The metrics specification for this account.
         If not specified, metrics will not be enabled.
         """
 
+    @property
+    def authentication_settings(self) -> global___AuthenticationSettings:
+        """Authentication settings for this account.
+        temporal:versioning:min_version=v0.20.0
+        """
+
     def __init__(
         self,
         *,
         metrics: global___MetricsSpec | None = ...,
+        authentication_settings: global___AuthenticationSettings | None = ...,
     ) -> None: ...
     def HasField(
-        self, field_name: typing.Literal["metrics", b"metrics"]
+        self,
+        field_name: typing.Literal[
+            "authentication_settings", b"authentication_settings", "metrics", b"metrics"
+        ],
     ) -> builtins.bool: ...
-    def ClearField(self, field_name: typing.Literal["metrics", b"metrics"]) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "authentication_settings", b"authentication_settings", "metrics", b"metrics"
+        ],
+    ) -> None: ...
 
 global___AccountSpec = AccountSpec
 

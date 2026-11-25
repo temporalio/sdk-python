@@ -205,6 +205,78 @@ class NamespaceAccess(google.protobuf.message.Message):
 global___NamespaceAccess = NamespaceAccess
 
 @typing.final
+class ProjectAccess(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    class _ProjectRole:
+        ValueType = typing.NewType("ValueType", builtins.int)
+        V: typing_extensions.TypeAlias = ValueType
+
+    class _ProjectRoleEnumTypeWrapper(
+        google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+            ProjectAccess._ProjectRole.ValueType
+        ],
+        builtins.type,
+    ):
+        DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+        PROJECT_ROLE_UNSPECIFIED: ProjectAccess._ProjectRole.ValueType  # 0
+        PROJECT_ROLE_ADMIN: ProjectAccess._ProjectRole.ValueType  # 1
+        """Full access to the project, including managing project membership."""
+        PROJECT_ROLE_WRITE: ProjectAccess._ProjectRole.ValueType  # 2
+        """Write access to project resources."""
+        PROJECT_ROLE_READ: ProjectAccess._ProjectRole.ValueType  # 3
+        """Read-only access to project resources."""
+        PROJECT_ROLE_LIST: ProjectAccess._ProjectRole.ValueType  # 4
+        """Access to list resources within the project."""
+        PROJECT_ROLE_CONTRIBUTE: ProjectAccess._ProjectRole.ValueType  # 5
+        """Access to contribute to workflows within the project."""
+        PROJECT_ROLE_MEMBER: ProjectAccess._ProjectRole.ValueType  # 6
+        """Basic membership; grants read-only access to the project."""
+        PROJECT_ROLE_DEVELOPER: ProjectAccess._ProjectRole.ValueType  # 7
+        """Inherited from the account developer role; cannot be assigned directly."""
+
+    class ProjectRole(_ProjectRole, metaclass=_ProjectRoleEnumTypeWrapper): ...
+    PROJECT_ROLE_UNSPECIFIED: ProjectAccess.ProjectRole.ValueType  # 0
+    PROJECT_ROLE_ADMIN: ProjectAccess.ProjectRole.ValueType  # 1
+    """Full access to the project, including managing project membership."""
+    PROJECT_ROLE_WRITE: ProjectAccess.ProjectRole.ValueType  # 2
+    """Write access to project resources."""
+    PROJECT_ROLE_READ: ProjectAccess.ProjectRole.ValueType  # 3
+    """Read-only access to project resources."""
+    PROJECT_ROLE_LIST: ProjectAccess.ProjectRole.ValueType  # 4
+    """Access to list resources within the project."""
+    PROJECT_ROLE_CONTRIBUTE: ProjectAccess.ProjectRole.ValueType  # 5
+    """Access to contribute to workflows within the project."""
+    PROJECT_ROLE_MEMBER: ProjectAccess.ProjectRole.ValueType  # 6
+    """Basic membership; grants read-only access to the project."""
+    PROJECT_ROLE_DEVELOPER: ProjectAccess.ProjectRole.ValueType  # 7
+    """Inherited from the account developer role; cannot be assigned directly."""
+
+    ROLE_FIELD_NUMBER: builtins.int
+    CUSTOM_ROLES_FIELD_NUMBER: builtins.int
+    role: global___ProjectAccess.ProjectRole.ValueType
+    @property
+    def custom_roles(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedScalarFieldContainer[builtins.str]:
+        """List of project-scoped custom role IDs assigned to the principal for this project.
+        temporal:versioning:min_version=v0.27.0
+        """
+
+    def __init__(
+        self,
+        *,
+        role: global___ProjectAccess.ProjectRole.ValueType = ...,
+        custom_roles: collections.abc.Iterable[builtins.str] | None = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal["custom_roles", b"custom_roles", "role", b"role"],
+    ) -> None: ...
+
+global___ProjectAccess = ProjectAccess
+
+@typing.final
 class Access(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -230,8 +302,31 @@ class Access(google.protobuf.message.Message):
             self, field_name: typing.Literal["key", b"key", "value", b"value"]
         ) -> None: ...
 
+    @typing.final
+    class ProjectAccessesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___ProjectAccess: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___ProjectAccess | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        ) -> None: ...
+
     ACCOUNT_ACCESS_FIELD_NUMBER: builtins.int
     NAMESPACE_ACCESSES_FIELD_NUMBER: builtins.int
+    PROJECT_ACCESSES_FIELD_NUMBER: builtins.int
     CUSTOM_ROLES_DEPRECATED_FIELD_NUMBER: builtins.int
     @property
     def account_access(self) -> global___AccountAccess:
@@ -245,6 +340,17 @@ class Access(google.protobuf.message.Message):
     ]:
         """The map of namespace accesses
         The key is the namespace name and the value is the access to the namespace
+        """
+
+    @property
+    def project_accesses(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___ProjectAccess
+    ]:
+        """The map of project accesses
+        The key is the project ID and the value is the access to the project
+        temporal:versioning:min_version=v0.18.0
         """
 
     @property
@@ -264,6 +370,8 @@ class Access(google.protobuf.message.Message):
             builtins.str, global___NamespaceAccess
         ]
         | None = ...,
+        project_accesses: collections.abc.Mapping[builtins.str, global___ProjectAccess]
+        | None = ...,
         custom_roles_deprecated: collections.abc.Iterable[builtins.str] | None = ...,
     ) -> None: ...
     def HasField(
@@ -278,6 +386,8 @@ class Access(google.protobuf.message.Message):
             b"custom_roles_deprecated",
             "namespace_accesses",
             b"namespace_accesses",
+            "project_accesses",
+            b"project_accesses",
         ],
     ) -> None: ...
 
@@ -309,6 +419,78 @@ class NamespaceScopedAccess(google.protobuf.message.Message):
     ) -> None: ...
 
 global___NamespaceScopedAccess = NamespaceScopedAccess
+
+@typing.final
+class ProjectScopedAccess(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    @typing.final
+    class NamespaceAccessesEntry(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        KEY_FIELD_NUMBER: builtins.int
+        VALUE_FIELD_NUMBER: builtins.int
+        key: builtins.str
+        @property
+        def value(self) -> global___NamespaceAccess: ...
+        def __init__(
+            self,
+            *,
+            key: builtins.str = ...,
+            value: global___NamespaceAccess | None = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing.Literal["value", b"value"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self, field_name: typing.Literal["key", b"key", "value", b"value"]
+        ) -> None: ...
+
+    PROJECT_ID_FIELD_NUMBER: builtins.int
+    ACCESS_FIELD_NUMBER: builtins.int
+    NAMESPACE_ACCESSES_FIELD_NUMBER: builtins.int
+    project_id: builtins.str
+    """The ID of the project the service account is assigned to - immutable."""
+    @property
+    def access(self) -> global___ProjectAccess:
+        """The project access assigned to the service account - mutable."""
+
+    @property
+    def namespace_accesses(
+        self,
+    ) -> google.protobuf.internal.containers.MessageMap[
+        builtins.str, global___NamespaceAccess
+    ]:
+        """The map of namespace accesses - mutable.
+        The key is the namespace name and the value is the access to the namespace.
+        """
+
+    def __init__(
+        self,
+        *,
+        project_id: builtins.str = ...,
+        access: global___ProjectAccess | None = ...,
+        namespace_accesses: collections.abc.Mapping[
+            builtins.str, global___NamespaceAccess
+        ]
+        | None = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["access", b"access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "access",
+            b"access",
+            "namespace_accesses",
+            b"namespace_accesses",
+            "project_id",
+            b"project_id",
+        ],
+    ) -> None: ...
+
+global___ProjectScopedAccess = ProjectScopedAccess
 
 @typing.final
 class UserSpec(google.protobuf.message.Message):
@@ -385,6 +567,7 @@ class User(google.protobuf.message.Message):
     INVITATION_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
     LAST_MODIFIED_TIME_FIELD_NUMBER: builtins.int
+    GROUP_MEMBERSHIPS_FIELD_NUMBER: builtins.int
     id: builtins.str
     """The id of the user"""
     resource_version: builtins.str
@@ -422,6 +605,17 @@ class User(google.protobuf.message.Message):
         Will not be set if the user has never been modified
         """
 
+    @property
+    def group_memberships(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___UserGroupMembership
+    ]:
+        """The SCIM and Cloud groups the user is a member of, without their access or roles.
+        This field is only set if include_group_memberships in the GetUser or GetUsers request is true
+        and the caller has access to the user's full identity information.
+        """
+
     def __init__(
         self,
         *,
@@ -434,6 +628,8 @@ class User(google.protobuf.message.Message):
         invitation: global___Invitation | None = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
         last_modified_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        group_memberships: collections.abc.Iterable[global___UserGroupMembership]
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -455,6 +651,8 @@ class User(google.protobuf.message.Message):
             b"async_operation_id",
             "created_time",
             b"created_time",
+            "group_memberships",
+            b"group_memberships",
             "id",
             b"id",
             "invitation",
@@ -473,6 +671,33 @@ class User(google.protobuf.message.Message):
     ) -> None: ...
 
 global___User = User
+
+@typing.final
+class UserGroupMembership(google.protobuf.message.Message):
+    """A group the user is a member of."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    GROUP_ID_FIELD_NUMBER: builtins.int
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    group_id: builtins.str
+    """The id of the group."""
+    display_name: builtins.str
+    """The display name of the group."""
+    def __init__(
+        self,
+        *,
+        group_id: builtins.str = ...,
+        display_name: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "display_name", b"display_name", "group_id", b"group_id"
+        ],
+    ) -> None: ...
+
+global___UserGroupMembership = UserGroupMembership
 
 @typing.final
 class GoogleGroupSpec(google.protobuf.message.Message):
@@ -851,6 +1076,7 @@ class ServiceAccountSpec(google.protobuf.message.Message):
     NAME_FIELD_NUMBER: builtins.int
     ACCESS_FIELD_NUMBER: builtins.int
     NAMESPACE_SCOPED_ACCESS_FIELD_NUMBER: builtins.int
+    PROJECT_SCOPED_ACCESS_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name associated with the service account.
@@ -862,7 +1088,7 @@ class ServiceAccountSpec(google.protobuf.message.Message):
     """
     @property
     def access(self) -> global___Access:
-        """Note: one of `Access` or `NamespaceScopedAccess` must be provided, but not both.
+        """Note: one of `Access`, `ProjectScopedAccess`, or `NamespaceScopedAccess` must be provided.
         The access assigned to the service account.
         If set, creates an account scoped service account.
         The access is mutable.
@@ -876,18 +1102,30 @@ class ServiceAccountSpec(google.protobuf.message.Message):
         Refer to `NamespaceScopedAccess` for details.
         """
 
+    @property
+    def project_scoped_access(self) -> global___ProjectScopedAccess:
+        """The project scoped access assigned to the service account.
+        If set, creates a project scoped service account (limited to a single project).
+        """
+
     def __init__(
         self,
         *,
         name: builtins.str = ...,
         access: global___Access | None = ...,
         namespace_scoped_access: global___NamespaceScopedAccess | None = ...,
+        project_scoped_access: global___ProjectScopedAccess | None = ...,
         description: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
-            "access", b"access", "namespace_scoped_access", b"namespace_scoped_access"
+            "access",
+            b"access",
+            "namespace_scoped_access",
+            b"namespace_scoped_access",
+            "project_scoped_access",
+            b"project_scoped_access",
         ],
     ) -> builtins.bool: ...
     def ClearField(
@@ -901,6 +1139,8 @@ class ServiceAccountSpec(google.protobuf.message.Message):
             b"name",
             "namespace_scoped_access",
             b"namespace_scoped_access",
+            "project_scoped_access",
+            b"project_scoped_access",
         ],
     ) -> None: ...
 
@@ -1153,10 +1393,20 @@ class CustomRoleSpec(google.protobuf.message.Message):
     NAME_FIELD_NUMBER: builtins.int
     DESCRIPTION_FIELD_NUMBER: builtins.int
     PERMISSIONS_FIELD_NUMBER: builtins.int
+    PROJECT_ID_FIELD_NUMBER: builtins.int
     name: builtins.str
     """The name of the custom role."""
     description: builtins.str
     """The description of the custom role."""
+    project_id: builtins.str
+    """The id of the project this custom role is scoped to - optional.
+    If unset, the custom role is scoped to the account: it can reference resources anywhere in the
+    account and can be assigned to principals at the account level.
+    If set, the custom role is scoped to the project: its resources must belong to that project, it
+    is not shared across projects, and it can only be assigned to principals within that project.
+    Immutable once the custom role is created - it cannot be changed via UpdateCustomRole.
+    temporal:versioning:min_version=v0.27.0
+    """
     @property
     def permissions(
         self,
@@ -1172,6 +1422,7 @@ class CustomRoleSpec(google.protobuf.message.Message):
         description: builtins.str = ...,
         permissions: collections.abc.Iterable[global___CustomRoleSpec.Permission]
         | None = ...,
+        project_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
@@ -1182,6 +1433,8 @@ class CustomRoleSpec(google.protobuf.message.Message):
             b"name",
             "permissions",
             b"permissions",
+            "project_id",
+            b"project_id",
         ],
     ) -> None: ...
 
@@ -1269,6 +1522,57 @@ class CustomRole(google.protobuf.message.Message):
 global___CustomRole = CustomRole
 
 @typing.final
+class UserProjectAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    EMAIL_FIELD_NUMBER: builtins.int
+    PROJECT_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The id of the user"""
+    email: builtins.str
+    """The email of the user"""
+    inherited_access: builtins.bool
+    """True if the user has inherited access to the project through an account role"""
+    resource_version: builtins.str
+    """The current resource version of the user."""
+    @property
+    def project_access(self) -> global___ProjectAccess:
+        """The access assigned to the user at the project level."""
+
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        email: builtins.str = ...,
+        project_access: global___ProjectAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["project_access", b"project_access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "email",
+            b"email",
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "project_access",
+            b"project_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___UserProjectAssignment = UserProjectAssignment
+
+@typing.final
 class UserNamespaceAssignment(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1320,6 +1624,56 @@ class UserNamespaceAssignment(google.protobuf.message.Message):
 global___UserNamespaceAssignment = UserNamespaceAssignment
 
 @typing.final
+class ServiceAccountProjectAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    NAME_FIELD_NUMBER: builtins.int
+    PROJECT_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The id of the service account."""
+    name: builtins.str
+    """The name of the service account."""
+    inherited_access: builtins.bool
+    """True if the user has inherited access to the project through an account role"""
+    resource_version: builtins.str
+    @property
+    def project_access(self) -> global___ProjectAccess:
+        """The access assigned to the service account at the project level."""
+
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        name: builtins.str = ...,
+        project_access: global___ProjectAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["project_access", b"project_access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "name",
+            b"name",
+            "project_access",
+            b"project_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___ServiceAccountProjectAssignment = ServiceAccountProjectAssignment
+
+@typing.final
 class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -1369,6 +1723,56 @@ class ServiceAccountNamespaceAssignment(google.protobuf.message.Message):
     ) -> None: ...
 
 global___ServiceAccountNamespaceAssignment = ServiceAccountNamespaceAssignment
+
+@typing.final
+class UserGroupProjectAssignment(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    ID_FIELD_NUMBER: builtins.int
+    DISPLAY_NAME_FIELD_NUMBER: builtins.int
+    PROJECT_ACCESS_FIELD_NUMBER: builtins.int
+    INHERITED_ACCESS_FIELD_NUMBER: builtins.int
+    RESOURCE_VERSION_FIELD_NUMBER: builtins.int
+    id: builtins.str
+    """The id of the group"""
+    display_name: builtins.str
+    """The display name of the group"""
+    inherited_access: builtins.bool
+    """True if the group has inherited access to the project through an account role"""
+    resource_version: builtins.str
+    @property
+    def project_access(self) -> global___ProjectAccess:
+        """The access assigned to the group at the project level."""
+
+    def __init__(
+        self,
+        *,
+        id: builtins.str = ...,
+        display_name: builtins.str = ...,
+        project_access: global___ProjectAccess | None = ...,
+        inherited_access: builtins.bool = ...,
+        resource_version: builtins.str = ...,
+    ) -> None: ...
+    def HasField(
+        self, field_name: typing.Literal["project_access", b"project_access"]
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "display_name",
+            b"display_name",
+            "id",
+            b"id",
+            "inherited_access",
+            b"inherited_access",
+            "project_access",
+            b"project_access",
+            "resource_version",
+            b"resource_version",
+        ],
+    ) -> None: ...
+
+global___UserGroupProjectAssignment = UserGroupProjectAssignment
 
 @typing.final
 class UserGroupNamespaceAssignment(google.protobuf.message.Message):

@@ -64,6 +64,31 @@ class OperatorServiceStub:
     ]
     """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
 
+    SoftDeleteNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceResponse,
+    ]
+    """SoftDeleteNamespace moves a namespace to NAMESPACE_STATE_SOFT_DELETED on every cluster in its
+    replication config. Executions stop making progress, but no data is removed. A running restore
+    is marked failed. Idempotent.
+    """
+
+    RestoreNamespace: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceResponse,
+    ]
+    """RestoreNamespace moves a soft-deleted namespace back to NAMESPACE_STATE_REGISTERED on every
+    cluster in its replication config, then starts a job that refreshes every execution so they
+    resume. Returns UNAVAILABLE until every cluster has the new state; retry until it succeeds.
+    Idempotent.
+    """
+
+    DescribeNamespaceRestore: grpc.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreResponse,
+    ]
+    """DescribeNamespaceRestore reports the state and progress of the namespace's most recent restore."""
+
     AddOrUpdateRemoteCluster: grpc.UnaryUnaryMultiCallable[
         temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
         temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterResponse,
@@ -162,6 +187,31 @@ class OperatorServiceAsyncStub:
         temporalio.api.operatorservice.v1.request_response_pb2.DeleteNamespaceResponse,
     ]
     """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
+
+    SoftDeleteNamespace: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceResponse,
+    ]
+    """SoftDeleteNamespace moves a namespace to NAMESPACE_STATE_SOFT_DELETED on every cluster in its
+    replication config. Executions stop making progress, but no data is removed. A running restore
+    is marked failed. Idempotent.
+    """
+
+    RestoreNamespace: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceResponse,
+    ]
+    """RestoreNamespace moves a soft-deleted namespace back to NAMESPACE_STATE_REGISTERED on every
+    cluster in its replication config, then starts a job that refreshes every execution so they
+    resume. Returns UNAVAILABLE until every cluster has the new state; retry until it succeeds.
+    Idempotent.
+    """
+
+    DescribeNamespaceRestore: grpc.aio.UnaryUnaryMultiCallable[
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreRequest,
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreResponse,
+    ]
+    """DescribeNamespaceRestore reports the state and progress of the namespace's most recent restore."""
 
     AddOrUpdateRemoteCluster: grpc.aio.UnaryUnaryMultiCallable[
         temporalio.api.operatorservice.v1.request_response_pb2.AddOrUpdateRemoteClusterRequest,
@@ -289,6 +339,52 @@ class OperatorServiceServicer(metaclass=abc.ABCMeta):
         ],
     ]:
         """DeleteNamespace synchronously deletes a namespace and asynchronously reclaims all namespace resources."""
+
+    @abc.abstractmethod
+    def SoftDeleteNamespace(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.SoftDeleteNamespaceResponse
+        ],
+    ]:
+        """SoftDeleteNamespace moves a namespace to NAMESPACE_STATE_SOFT_DELETED on every cluster in its
+        replication config. Executions stop making progress, but no data is removed. A running restore
+        is marked failed. Idempotent.
+        """
+
+    @abc.abstractmethod
+    def RestoreNamespace(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.RestoreNamespaceResponse
+        ],
+    ]:
+        """RestoreNamespace moves a soft-deleted namespace back to NAMESPACE_STATE_REGISTERED on every
+        cluster in its replication config, then starts a job that refreshes every execution so they
+        resume. Returns UNAVAILABLE until every cluster has the new state; retry until it succeeds.
+        Idempotent.
+        """
+
+    @abc.abstractmethod
+    def DescribeNamespaceRestore(
+        self,
+        request: temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreRequest,
+        context: _ServicerContext,
+    ) -> typing.Union[
+        temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreResponse,
+        collections.abc.Awaitable[
+            temporalio.api.operatorservice.v1.request_response_pb2.DescribeNamespaceRestoreResponse
+        ],
+    ]:
+        """DescribeNamespaceRestore reports the state and progress of the namespace's most recent restore."""
 
     @abc.abstractmethod
     def AddOrUpdateRemoteCluster(

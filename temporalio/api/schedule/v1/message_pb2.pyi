@@ -824,7 +824,8 @@ class SchedulePatch(google.protobuf.message.Message):
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """If set, applies the specified time-skipping configuration to this schedule,
+        """Experimental.
+        If set, applies the specified time-skipping configuration to this schedule,
         replacing any existing time-skipping configuration.
         """
 
@@ -939,7 +940,8 @@ class ScheduleInfo(google.protobuf.message.Message):
     def time_skipping_info(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingInfo:
-        """Information about time skipping for this schedule.
+        """Experimental.
+        Information about time skipping for this schedule.
         If the schedule has never enabled time skipping, this will be unset.
         """
 

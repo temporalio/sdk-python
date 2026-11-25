@@ -11,6 +11,7 @@ from collections.abc import (
     Mapping,
 )
 from datetime import timedelta
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -146,6 +147,12 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         # We are intentionally not calling the base class's __init__ here
         self._client = client
 
+    @cached_property
+    def _targetless_data_converter(self) -> temporalio.converter.DataConverter:
+        return self._client.data_converter._with_store_context(
+            StorageDriverStoreContext(namespace=self._client.namespace)
+        )
+
     ### Workflow calls
 
     async def start_workflow(
@@ -245,6 +252,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=input.id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=input.id, type=input.workflow, namespace=self._client.namespace
                 ),
@@ -284,6 +292,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=input.id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=input.id, type=input.workflow, namespace=self._client.namespace
                 ),
@@ -412,6 +421,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=input.id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=input.id,
                     run_id=input.run_id or None,
@@ -478,6 +488,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=input.id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=input.id,
                     run_id=input.run_id or None,
@@ -514,6 +525,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=input.id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=input.id,
                     run_id=input.run_id or None,
@@ -594,6 +606,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_type=None,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverActivityInfo(
                     id=input.id,
                     type=input.activity_type,
@@ -905,6 +918,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 workflow_id=workflow_id,
             ),
             StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverWorkflowInfo(
                     id=workflow_id,
                     run_id=(input.run_id or None)
@@ -1113,6 +1127,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
         if isinstance(id_or_token, AsyncActivityIDReference):
             if id_or_token.workflow_id:
                 return StorageDriverStoreContext(
+                    namespace=self._client.namespace,
                     target=StorageDriverWorkflowInfo(
                         id=id_or_token.workflow_id or None,
                         run_id=id_or_token.run_id or None,
@@ -1120,6 +1135,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                     ),
                 )
             return StorageDriverStoreContext(
+                namespace=self._client.namespace,
                 target=StorageDriverActivityInfo(
                     id=id_or_token.activity_id,
                     run_id=id_or_token.run_id or None,
@@ -1127,7 +1143,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 ),
             )
         else:
-            return StorageDriverStoreContext(target=None)
+            return StorageDriverStoreContext(namespace=self._client.namespace)
 
     async def heartbeat_async_activity(
         self, input: HeartbeatAsyncActivityInput
@@ -1345,7 +1361,7 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
                 initial_patch=initial_patch,
                 identity=self._client.identity,
                 request_id=str(uuid.uuid4()),
-                memo=await self._client.data_converter._encode_memo(input.memo)
+                memo=await self._targetless_data_converter._encode_memo(input.memo)
                 if input.memo
                 else None,
             )
@@ -1570,7 +1586,9 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             service=input.service,
             operation=input.operation,
         )
-        data_converter = self._client.data_converter.with_context(nexus_context)
+        data_converter = self._client.data_converter._with_contexts(
+            nexus_context, StorageDriverStoreContext(namespace=self._client.namespace)
+        )
         req = temporalio.api.workflowservice.v1.StartNexusOperationExecutionRequest(
             namespace=self._client.namespace,
             identity=self._client.identity,
@@ -1802,5 +1820,5 @@ class _ClientImpl(OutboundInterceptor):  # pyright: ignore[reportUnusedClass]
             dest,
             self._client.config(active_config=True)["header_codec_behavior"]
             == HeaderCodecBehavior.CODEC,
-            self._client.data_converter,
+            self._targetless_data_converter,
         )

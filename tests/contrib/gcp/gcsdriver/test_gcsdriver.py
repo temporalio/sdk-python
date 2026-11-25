@@ -62,7 +62,7 @@ def test_configuration(client: MemoryClient) -> None:
 @pytest.mark.parametrize(
     "target,prefix",
     [
-        (None, "v0"),
+        (None, "v0/ns/null"),
         (
             StorageDriverWorkflowInfo(namespace=""),
             "v0/ns/null/wt/null/wi/null/ri/null",
@@ -107,6 +107,47 @@ async def test_object_names(
         "hash_algorithm": "sha256",
         "hash_value": digest,
     }
+
+
+@pytest.mark.parametrize(
+    "target,namespace,prefix",
+    [
+        (None, "ambient /%", "v0/ns/ambient %2F%25"),
+        (None, None, "v0/ns/null"),
+        (None, "", "v0/ns/null"),
+        (StorageDriverWorkflowInfo(namespace="target"), "ambient", "v0/ns/target/wt"),
+        (StorageDriverActivityInfo(namespace="target"), "ambient", "v0/ns/target/at"),
+        (StorageDriverWorkflowInfo(namespace=""), "ambient", "v0/ns/null/wt"),
+    ],
+)
+async def test_object_names_ambient_namespace(
+    client: MemoryClient,
+    target: StorageDriverWorkflowInfo | StorageDriverActivityInfo | None,
+    namespace: str | None,
+    prefix: str,
+) -> None:
+    original = payload()
+    [claim] = await GCSStorageDriver(client, "bucket").store(
+        StorageDriverStoreContext(target=target, namespace=namespace), [original]
+    )
+    digest = hashlib.sha256(original.SerializeToString()).hexdigest()
+    object_name = claim.claim_data["object_name"]
+    assert object_name.startswith(f"{prefix}/")
+    assert object_name.endswith(f"/d/sha256/{digest}")
+    if target is None:
+        assert object_name == f"{prefix}/d/sha256/{digest}"
+
+
+async def test_long_object_name_without_target_uses_ambient_namespace(
+    client: MemoryClient,
+) -> None:
+    original = payload()
+    digest = hashlib.sha256(original.SerializeToString()).hexdigest()
+    namespace = "日" * 400
+    [claim] = await GCSStorageDriver(client, "bucket").store(
+        StorageDriverStoreContext(namespace=namespace), [original]
+    )
+    assert claim.claim_data["object_name"] == f"v0/ns/{namespace}/d/sha256/{digest}"
 
 
 @pytest.mark.parametrize(

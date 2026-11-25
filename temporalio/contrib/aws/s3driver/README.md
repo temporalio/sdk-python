@@ -68,9 +68,10 @@ Activity key:
 
     v0/ns/{namespace}/at/{activity-type}/ai/{activity-id}/ri/{run-id}/d/{hash-algorithm}/{hex-digest}
 
-Fallback key (used when no namespace, workflow, or activity information is available):
+Key without a target, scoped to the namespace of the client or worker performing the operation
+(`null` when it is unknown):
 
-    v0/d/{hash-algorithm}/{hex-digest}
+    v0/ns/{namespace}/d/{hash-algorithm}/{hex-digest}
 
 - Missing values (including a missing run ID) are encoded as the literal `null`.
 - An empty namespace on a workflow or activity target is written as `/ns/null`.

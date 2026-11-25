@@ -755,7 +755,9 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """Time-skipping configuration. If not set, time skipping is disabled."""
+        """Experimental.
+        Time-skipping configuration. If not set, time skipping is disabled.
+        """
 
     @property
     def propagated_nexus_serialization_context(
@@ -767,7 +769,8 @@ class StartWorkflowExecutionRequest(google.protobuf.message.Message):
     def time_skipping_state_propagation(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingStatePropagation:
-        """Time-skipping state propagated by the execution that started this workflow.
+        """Experimental.
+        Time-skipping state propagated by the execution that started this workflow.
         This field is intended for use by the Temporal server, for example when a schedule
         starts a workflow, and is not intended to be set by external clients.
         """
@@ -1228,6 +1231,7 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     BINARY_CHECKSUM_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -1267,6 +1271,12 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state. Optional."""
+
     def __init__(
         self,
         *,
@@ -1281,12 +1291,16 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_version_capabilities",
@@ -1306,6 +1320,8 @@ class PollWorkflowTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_control_task_queue",
@@ -2097,6 +2113,7 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     TASK_QUEUE_METADATA_FIELD_NUMBER: builtins.int
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -2135,6 +2152,12 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
     ) -> temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions:
         """Worker deployment options that user has set in the worker."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state. Optional."""
+
     def __init__(
         self,
         *,
@@ -2150,12 +2173,16 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
         | None = ...,
         deployment_options: temporalio.api.deployment.v1.message_pb2.WorkerDeploymentOptions
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -2175,6 +2202,8 @@ class PollActivityTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "task_queue_metadata",
@@ -3645,7 +3674,9 @@ class SignalWithStartWorkflowExecutionRequest(google.protobuf.message.Message):
     def time_skipping_config(
         self,
     ) -> temporalio.api.common.v1.message_pb2.TimeSkippingConfig:
-        """Time-skipping configuration. If not set, time skipping is disabled."""
+        """Experimental.
+        Time-skipping configuration. If not set, time skipping is disabled.
+        """
 
     def __init__(
         self,
@@ -8115,6 +8146,7 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     WORKER_VERSION_CAPABILITIES_FIELD_NUMBER: builtins.int
     DEPLOYMENT_OPTIONS_FIELD_NUMBER: builtins.int
     WORKER_HEARTBEAT_FIELD_NUMBER: builtins.int
+    POLLER_POOL_INFO_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     poller_group_id: builtins.str
     """Unless this is the first poll, the client must pass one of the poller group IDs received in
@@ -8153,6 +8185,12 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
     ]:
         """Worker info to be sent to the server."""
 
+    @property
+    def poller_pool_info(
+        self,
+    ) -> temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo:
+        """Worker-reported poller pool state. Optional."""
+
     def __init__(
         self,
         *,
@@ -8169,12 +8207,16 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             temporalio.api.worker.v1.message_pb2.WorkerHeartbeat
         ]
         | None = ...,
+        poller_pool_info: temporalio.api.taskqueue.v1.message_pb2.PollerPoolInfo
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "deployment_options",
             b"deployment_options",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_version_capabilities",
@@ -8192,6 +8234,8 @@ class PollNexusTaskQueueRequest(google.protobuf.message.Message):
             b"namespace",
             "poller_group_id",
             b"poller_group_id",
+            "poller_pool_info",
+            b"poller_pool_info",
             "task_queue",
             b"task_queue",
             "worker_heartbeat",
@@ -9570,10 +9614,7 @@ class UpdateWorkflowExecutionOptionsResponse(google.protobuf.message.Message):
 
     @property
     def update_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """The Workflow Execution time when the options were updated. When time skipping is
-        enabled, this is the workflow's virtual time rather than wall-clock time.
-
-        This timestamp cannot be used for time-skipping fast-forward verification,
+        """Deprecated. Not populated by the server; for time-skipping fast-forward verification,
         use `fast_forward_id` in `PollWorkflowExecutionTimeSkippingRequest` instead.
         """
 
@@ -11876,10 +11917,10 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
         RATE_LIMIT_FIELD_NUMBER: builtins.int
         REASON_FIELD_NUMBER: builtins.int
         reason: builtins.str
-        """Reason for why the rate limit was set."""
+        """Reason why the rate limit was updated"""
         @property
         def rate_limit(self) -> temporalio.api.taskqueue.v1.message_pb2.RateLimit:
-            """Rate Limit to be updated"""
+            """Rate limit to be updated"""
 
         def __init__(
             self,
@@ -11894,6 +11935,37 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
             self,
             field_name: typing.Literal[
                 "rate_limit", b"rate_limit", "reason", b"reason"
+            ],
+        ) -> None: ...
+
+    @typing.final
+    class ConcurrencyLimitUpdate(google.protobuf.message.Message):
+        DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+        CONCURRENCY_LIMIT_FIELD_NUMBER: builtins.int
+        REASON_FIELD_NUMBER: builtins.int
+        reason: builtins.str
+        """Reason why the limit was updated"""
+        @property
+        def concurrency_limit(
+            self,
+        ) -> temporalio.api.taskqueue.v1.message_pb2.ConcurrencyLimit:
+            """Limit to be updated"""
+
+        def __init__(
+            self,
+            *,
+            concurrency_limit: temporalio.api.taskqueue.v1.message_pb2.ConcurrencyLimit
+            | None = ...,
+            reason: builtins.str = ...,
+        ) -> None: ...
+        def HasField(
+            self, field_name: typing.Literal["concurrency_limit", b"concurrency_limit"]
+        ) -> builtins.bool: ...
+        def ClearField(
+            self,
+            field_name: typing.Literal[
+                "concurrency_limit", b"concurrency_limit", "reason", b"reason"
             ],
         ) -> None: ...
 
@@ -11923,6 +11995,7 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
     UPDATE_FAIRNESS_KEY_RATE_LIMIT_DEFAULT_FIELD_NUMBER: builtins.int
     SET_FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
     UNSET_FAIRNESS_WEIGHT_OVERRIDES_FIELD_NUMBER: builtins.int
+    UPDATE_QUEUE_CONCURRENCY_LIMIT_FIELD_NUMBER: builtins.int
     namespace: builtins.str
     identity: builtins.str
     task_queue: builtins.str
@@ -11964,6 +12037,15 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
         or to the default weight of 1.0.
         """
 
+    @property
+    def update_queue_concurrency_limit(
+        self,
+    ) -> global___UpdateTaskQueueConfigRequest.ConcurrencyLimitUpdate:
+        """Update queue-wide concurrency limit.
+        If not set, this configuration is unchanged.
+        If the `concurrency_limit` field in the `ConcurrencyLimitUpdate` is missing, remove the existing limit.
+        """
+
     def __init__(
         self,
         *,
@@ -11981,12 +12063,16 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
         | None = ...,
         unset_fairness_weight_overrides: collections.abc.Iterable[builtins.str]
         | None = ...,
+        update_queue_concurrency_limit: global___UpdateTaskQueueConfigRequest.ConcurrencyLimitUpdate
+        | None = ...,
     ) -> None: ...
     def HasField(
         self,
         field_name: typing.Literal[
             "update_fairness_key_rate_limit_default",
             b"update_fairness_key_rate_limit_default",
+            "update_queue_concurrency_limit",
+            b"update_queue_concurrency_limit",
             "update_queue_rate_limit",
             b"update_queue_rate_limit",
         ],
@@ -12008,6 +12094,8 @@ class UpdateTaskQueueConfigRequest(google.protobuf.message.Message):
             b"unset_fairness_weight_overrides",
             "update_fairness_key_rate_limit_default",
             b"update_fairness_key_rate_limit_default",
+            "update_queue_concurrency_limit",
+            b"update_queue_concurrency_limit",
             "update_queue_rate_limit",
             b"update_queue_rate_limit",
         ],
@@ -14241,6 +14329,7 @@ class PollWorkflowExecutionTimeSkippingRequest(google.protobuf.message.Message):
     execution. Currently the only supported policy is waiting for completion of the fast-forward
     identified by `fast_forward_id`; the poll also returns once anything else settles that outcome
     (e.g. the execution ends or time skipping is disabled).
+    Experimental. Might change in the future.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -14286,6 +14375,10 @@ global___PollWorkflowExecutionTimeSkippingRequest = (
 
 @typing.final
 class PollWorkflowExecutionTimeSkippingResponse(google.protobuf.message.Message):
+    """Result of polling a workflow execution's time-skipping fast-forward.
+    Experimental. Might change in the future.
+    """
+
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     FAST_FORWARD_POLLING_RESULT_FIELD_NUMBER: builtins.int

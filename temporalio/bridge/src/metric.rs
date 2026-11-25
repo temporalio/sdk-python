@@ -55,10 +55,11 @@ pub struct MetricGaugeFloatRef {
     gauge: metrics::GaugeF64,
 }
 
-pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeterRef> {
-    runtime_ref
+pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> PyResult<Option<MetricMeterRef>> {
+    Ok(runtime_ref
         .runtime
         .core
+        .read()?
         .telemetry()
         .get_metric_meter()
         .map(|meter| {
@@ -69,7 +70,7 @@ pub fn new_metric_meter(runtime_ref: &runtime::RuntimeRef) -> Option<MetricMeter
                 meter,
                 default_attributes,
             }
-        })
+        }))
 }
 
 #[pymethods]
@@ -355,7 +356,7 @@ fn convert_metric_event(
                 )
                 .expect("Unable to create buffered metric"),
             ));
-            populate_into.set(Arc::new(buffered_ref)).unwrap();
+            populate_into.set(buffered_ref).unwrap();
             None
         }
         // Create the attributes and put it on the lazy ref

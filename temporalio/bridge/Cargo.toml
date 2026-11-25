@@ -46,6 +46,7 @@ async-trait = "0.1"
 # aws-lc-fips-sys instead of aws-lc-sys. Ported from sdk-ruby PR #466.
 aws-lc-rs = { version = "1", features = ["fips"], optional = true }
 futures = "0.3"
+parking_lot = "0.12"
 prost = "0.14"
 pyo3 = { version = "0.29", features = [
     "extension-module",
@@ -58,16 +59,16 @@ pythonize = "0.29"
 # default-features disabled so the rustls provider isn't pinned to `tls-ring`;
 # the bridge's tls-ring/tls-aws-lc features (above) select it. Re-add the
 # crate's non-TLS default (`envconfig`).
-temporalio-client = { version = "1.1.0", path = "./sdk-core/crates/client", default-features = false, features = [
+temporalio-client = { version = "1.3.0", path = "./sdk-core/crates/client", default-features = false, features = [
     "envconfig",
     "experimental",
 ] }
-temporalio-common = { version = "1.1.0", path = "./sdk-core/crates/common", features = [
+temporalio-common = { version = "1.3.0", path = "./sdk-core/crates/common", features = [
     "envconfig", "otel"
 ]}
 # default-features disabled (drops the pinned `tls-ring`); re-add the non-TLS
 # defaults the bridge relied on (`envconfig`, `prometheus`) plus `ephemeral-server`.
-temporalio-sdk-core = { version = "0.10.0", path = "./sdk-core/crates/sdk-core", default-features = false, features = [
+temporalio-sdk-core = { version = "0.12.0", path = "./sdk-core/crates/sdk-core", default-features = false, features = [
     "ephemeral-server",
     "envconfig",
     "prometheus",

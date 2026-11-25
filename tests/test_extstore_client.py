@@ -34,6 +34,7 @@ from temporalio.converter import (
     DataConverter,
     ExternalStorage,
     JSONProtoPayloadConverter,
+    StorageDriverStoreContext,
 )
 from temporalio.exceptions import ApplicationError
 from temporalio.service import ServiceClient
@@ -242,6 +243,36 @@ async def test_create_schedule_encodes_action_input_reference() -> None:
     await _assert_encoded_reference(
         client.data_converter, req.schedule.action.start_workflow.input.payloads[0]
     )
+
+
+async def test_create_schedule_stores_header_with_client_namespace() -> None:
+    service = _FakeWorkflowService(
+        {"create_schedule": temporalio.api.workflowservice.v1.CreateScheduleResponse()}
+    )
+    driver = InMemoryTestDriver()
+    data_converter = DataConverter(
+        payload_codec=RecordingPayloadCodec(CODEC_ENCODING.decode()),
+        external_storage=ExternalStorage(drivers=[driver], payload_size_threshold=50),
+    )
+    client = _client(
+        service, data_converter, header_codec_behavior=HeaderCodecBehavior.CODEC
+    )
+    action = ScheduleActionStartWorkflow("Workflow", id="wf", task_queue="tq")
+    [header] = temporalio.converter.default().payload_converter.to_payloads([LARGE])
+    action.headers = {"large": header}
+
+    await client.create_schedule(
+        "schedule", Schedule(action=action, spec=ScheduleSpec())
+    )
+
+    req = service.requests["create_schedule"]
+    await _assert_encoded_reference(
+        client.data_converter,
+        req.schedule.action.start_workflow.header.fields["large"],
+    )
+    assert driver._store_contexts == [
+        StorageDriverStoreContext(namespace="test-namespace")
+    ]
 
 
 async def test_async_activity_completion_encodes_references() -> None:

@@ -24,6 +24,7 @@ class ConnectivityRule(google.protobuf.message.Message):
     STATE_FIELD_NUMBER: builtins.int
     ASYNC_OPERATION_ID_FIELD_NUMBER: builtins.int
     CREATED_TIME_FIELD_NUMBER: builtins.int
+    PROJECT_ID_FIELD_NUMBER: builtins.int
     id: builtins.str
     """The id of the private connectivity rule."""
     resource_version: builtins.str
@@ -33,6 +34,8 @@ class ConnectivityRule(google.protobuf.message.Message):
     state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType
     async_operation_id: builtins.str
     """The id of the async operation that is creating/updating/deleting the connectivity rule, if any."""
+    project_id: builtins.str
+    """The ID of the project this connectivity rule belongs to."""
     @property
     def spec(self) -> global___ConnectivityRuleSpec:
         """The connectivity rule specification."""
@@ -50,6 +53,7 @@ class ConnectivityRule(google.protobuf.message.Message):
         state: temporalio.api.cloud.resource.v1.message_pb2.ResourceState.ValueType = ...,
         async_operation_id: builtins.str = ...,
         created_time: google.protobuf.timestamp_pb2.Timestamp | None = ...,
+        project_id: builtins.str = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -64,6 +68,8 @@ class ConnectivityRule(google.protobuf.message.Message):
             b"created_time",
             "id",
             b"id",
+            "project_id",
+            b"project_id",
             "resource_version",
             b"resource_version",
             "spec",
@@ -156,15 +162,27 @@ class PrivateConnectivityRule(google.protobuf.message.Message):
     CONNECTION_ID_FIELD_NUMBER: builtins.int
     GCP_PROJECT_ID_FIELD_NUMBER: builtins.int
     REGION_FIELD_NUMBER: builtins.int
+    AZURE_PE_RESOURCE_ID_FIELD_NUMBER: builtins.int
     connection_id: builtins.str
-    """Connection id provided to enforce the private connectivity. This is required both by AWS and GCP."""
+    """Connection id provided by user to enforce the private connectivity.
+    For AWS: VPC endpoint ID (e.g. "vpce-0123456789abcdef0").
+    For GCP: PSC connection ID (numeric string).
+    For Azure: not set by the customer; populated internally with the PPv2 LinkID
+    returned by the infra plane during Private Endpoint connection approval.
+    """
     gcp_project_id: builtins.str
-    """For GCP private connectivity service, GCP needs both GCP project id and the Private Service Connect Connection IDs
-    AWS only needs the connection_id
+    """For GCP private connectivity service, GCP needs both GCP project id and the Private Service Connect Connection IDs.
+    AWS only needs the connection_id.
     """
     region: builtins.str
     """The region of the connectivity rule. This should align with the namespace.
-    Example: "aws-us-west-2"
+    Example: "aws-us-west-2", "gcp-us-central1", "azure-eastus"
+    """
+    azure_pe_resource_id: builtins.str
+    """azure_pe_resource_id is the ARM resource ID of the customer's Azure Private Endpoint.
+    Required for Azure private connectivity rules.
+    Example: "/subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.Network/privateEndpoints/{name}"
+    temporal:versioning:min_version=v0.18.0
     """
     def __init__(
         self,
@@ -172,10 +190,13 @@ class PrivateConnectivityRule(google.protobuf.message.Message):
         connection_id: builtins.str = ...,
         gcp_project_id: builtins.str = ...,
         region: builtins.str = ...,
+        azure_pe_resource_id: builtins.str = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing.Literal[
+            "azure_pe_resource_id",
+            b"azure_pe_resource_id",
             "connection_id",
             b"connection_id",
             "gcp_project_id",

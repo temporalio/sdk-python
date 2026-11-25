@@ -14,16 +14,20 @@ _sym_db = _symbol_database.Default()
 
 
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
+from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 from temporalio.api.enums.v1 import (
     common_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_common__pb2,
+)
+from temporalio.api.enums.v1 import (
+    namespace_pb2 as temporal_dot_api_dot_enums_dot_v1_dot_namespace__pb2,
 )
 from temporalio.api.nexus.v1 import (
     message_pb2 as temporal_dot_api_dot_nexus_dot_v1_dot_message__pb2,
 )
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto\x1a#temporal/api/nexus/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto"\xff\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse"M\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t" \n\x1eRemoveSearchAttributesResponse"0\n\x1bListSearchAttributesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"|\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t\x12\x39\n\x16namespace_delete_delay\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"\xa0\x01\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08\x12\x1d\n\x15\x66rontend_http_address\x18\x03 \x01(\t\x12\x1a\n\x12\x65nable_replication\x18\x04 \x01(\x08""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xe0\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12\x14\n\x0chttp_address\x18\x07 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08\x12\x1e\n\x16is_replication_enabled\x18\x08 \x01(\x08"%\n\x17GetNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t"M\n\x18GetNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"O\n\x1a\x43reateNexusEndpointRequest\x12\x31\n\x04spec\x18\x01 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1b\x43reateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"l\n\x1aUpdateNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1bUpdateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"9\n\x1a\x44\x65leteNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03"\x1d\n\x1b\x44\x65leteNexusEndpointResponse"U\n\x19ListNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x0c\n\x04name\x18\x03 \x01(\t"i\n\x1aListNexusEndpointsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x32\n\tendpoints\x18\x02 \x03(\x0b\x32\x1f.temporal.api.nexus.v1.EndpointB\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
+    b'\n6temporal/api/operatorservice/v1/request_response.proto\x12\x1ftemporal.api.operatorservice.v1\x1a"temporal/api/enums/v1/common.proto\x1a%temporal/api/enums/v1/namespace.proto\x1a#temporal/api/nexus/v1/message.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xff\x01\n\x1a\x41\x64\x64SearchAttributesRequest\x12l\n\x11search_attributes\x18\x01 \x03(\x0b\x32Q.temporal.api.operatorservice.v1.AddSearchAttributesRequest.SearchAttributesEntry\x12\x11\n\tnamespace\x18\x02 \x01(\t\x1a`\n\x15SearchAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01"\x1d\n\x1b\x41\x64\x64SearchAttributesResponse"M\n\x1dRemoveSearchAttributesRequest\x12\x19\n\x11search_attributes\x18\x01 \x03(\t\x12\x11\n\tnamespace\x18\x02 \x01(\t" \n\x1eRemoveSearchAttributesResponse"0\n\x1bListSearchAttributesRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t"\xe2\x04\n\x1cListSearchAttributesResponse\x12n\n\x11\x63ustom_attributes\x18\x01 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.CustomAttributesEntry\x12n\n\x11system_attributes\x18\x02 \x03(\x0b\x32S.temporal.api.operatorservice.v1.ListSearchAttributesResponse.SystemAttributesEntry\x12h\n\x0estorage_schema\x18\x03 \x03(\x0b\x32P.temporal.api.operatorservice.v1.ListSearchAttributesResponse.StorageSchemaEntry\x1a`\n\x15\x43ustomAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a`\n\x15SystemAttributesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\x36\n\x05value\x18\x02 \x01(\x0e\x32\'.temporal.api.enums.v1.IndexedValueType:\x02\x38\x01\x1a\x34\n\x12StorageSchemaEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01"|\n\x16\x44\x65leteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t\x12\x39\n\x16namespace_delete_delay\x18\x03 \x01(\x0b\x32\x19.google.protobuf.Duration"4\n\x17\x44\x65leteNamespaceResponse\x12\x19\n\x11\x64\x65leted_namespace\x18\x01 \x01(\t"E\n\x1aSoftDeleteNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t"\x1d\n\x1bSoftDeleteNamespaceResponse"B\n\x17RestoreNamespaceRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t"\x1a\n\x18RestoreNamespaceResponse"J\n\x1f\x44\x65scribeNamespaceRestoreRequest\x12\x11\n\tnamespace\x18\x01 \x01(\t\x12\x14\n\x0cnamespace_id\x18\x02 \x01(\t"\xe6\x02\n DescribeNamespaceRestoreResponse\x12;\n\x05state\x18\x01 \x01(\x0e\x32,.temporal.api.enums.v1.NamespaceRestoreState\x12\x14\n\x0chost_cluster\x18\x02 \x01(\t\x12.\n\nstart_time\x18\x03 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12.\n\nclose_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x0e\n\x06run_id\x18\x05 \x01(\t\x12\x1d\n\x15total_execution_count\x18\x06 \x01(\x03\x12!\n\x19processed_execution_count\x18\x07 \x01(\x03\x12=\n\x19\x65stimated_completion_time\x18\x08 \x01(\x0b\x32\x1a.google.protobuf.Timestamp"\xa0\x01\n\x1f\x41\x64\x64OrUpdateRemoteClusterRequest\x12\x18\n\x10\x66rontend_address\x18\x01 \x01(\t\x12(\n enable_remote_cluster_connection\x18\x02 \x01(\x08\x12\x1d\n\x15\x66rontend_http_address\x18\x03 \x01(\t\x12\x1a\n\x12\x65nable_replication\x18\x04 \x01(\x08""\n AddOrUpdateRemoteClusterResponse"2\n\x1aRemoveRemoteClusterRequest\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t"\x1d\n\x1bRemoveRemoteClusterResponse"A\n\x13ListClustersRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c"s\n\x14ListClustersResponse\x12\x42\n\x08\x63lusters\x18\x01 \x03(\x0b\x32\x30.temporal.api.operatorservice.v1.ClusterMetadata\x12\x17\n\x0fnext_page_token\x18\x04 \x01(\x0c"\xe0\x01\n\x0f\x43lusterMetadata\x12\x14\n\x0c\x63luster_name\x18\x01 \x01(\t\x12\x12\n\ncluster_id\x18\x02 \x01(\t\x12\x0f\n\x07\x61\x64\x64ress\x18\x03 \x01(\t\x12\x14\n\x0chttp_address\x18\x07 \x01(\t\x12 \n\x18initial_failover_version\x18\x04 \x01(\x03\x12\x1b\n\x13history_shard_count\x18\x05 \x01(\x05\x12\x1d\n\x15is_connection_enabled\x18\x06 \x01(\x08\x12\x1e\n\x16is_replication_enabled\x18\x08 \x01(\x08"%\n\x17GetNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t"M\n\x18GetNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"O\n\x1a\x43reateNexusEndpointRequest\x12\x31\n\x04spec\x18\x01 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1b\x43reateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"l\n\x1aUpdateNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03\x12\x31\n\x04spec\x18\x03 \x01(\x0b\x32#.temporal.api.nexus.v1.EndpointSpec"P\n\x1bUpdateNexusEndpointResponse\x12\x31\n\x08\x65ndpoint\x18\x01 \x01(\x0b\x32\x1f.temporal.api.nexus.v1.Endpoint"9\n\x1a\x44\x65leteNexusEndpointRequest\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07version\x18\x02 \x01(\x03"\x1d\n\x1b\x44\x65leteNexusEndpointResponse"U\n\x19ListNexusEndpointsRequest\x12\x11\n\tpage_size\x18\x01 \x01(\x05\x12\x17\n\x0fnext_page_token\x18\x02 \x01(\x0c\x12\x0c\n\x04name\x18\x03 \x01(\t"i\n\x1aListNexusEndpointsResponse\x12\x17\n\x0fnext_page_token\x18\x01 \x01(\x0c\x12\x32\n\tendpoints\x18\x02 \x03(\x0b\x32\x1f.temporal.api.nexus.v1.EndpointB\xbe\x01\n"io.temporal.api.operatorservice.v1B\x14RequestResponseProtoP\x01Z5go.temporal.io/api/operatorservice/v1;operatorservice\xaa\x02!Temporalio.Api.OperatorService.V1\xea\x02$Temporalio::Api::OperatorService::V1b\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -39,62 +43,74 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_options = b"8\001"
     _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._options = None
     _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_options = b"8\001"
-    _ADDSEARCHATTRIBUTESREQUEST._serialized_start = 197
-    _ADDSEARCHATTRIBUTESREQUEST._serialized_end = 452
-    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_start = 356
-    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_end = 452
-    _ADDSEARCHATTRIBUTESRESPONSE._serialized_start = 454
-    _ADDSEARCHATTRIBUTESRESPONSE._serialized_end = 483
-    _REMOVESEARCHATTRIBUTESREQUEST._serialized_start = 485
-    _REMOVESEARCHATTRIBUTESREQUEST._serialized_end = 562
-    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_start = 564
-    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_end = 596
-    _LISTSEARCHATTRIBUTESREQUEST._serialized_start = 598
-    _LISTSEARCHATTRIBUTESREQUEST._serialized_end = 646
-    _LISTSEARCHATTRIBUTESRESPONSE._serialized_start = 649
-    _LISTSEARCHATTRIBUTESRESPONSE._serialized_end = 1259
-    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_start = 1011
-    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_end = 1107
-    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_start = 1109
-    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_end = 1205
-    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_start = 1207
-    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_end = 1259
-    _DELETENAMESPACEREQUEST._serialized_start = 1261
-    _DELETENAMESPACEREQUEST._serialized_end = 1385
-    _DELETENAMESPACERESPONSE._serialized_start = 1387
-    _DELETENAMESPACERESPONSE._serialized_end = 1439
-    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_start = 1442
-    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 1602
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 1604
-    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 1638
-    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 1640
-    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 1690
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 1692
-    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 1721
-    _LISTCLUSTERSREQUEST._serialized_start = 1723
-    _LISTCLUSTERSREQUEST._serialized_end = 1788
-    _LISTCLUSTERSRESPONSE._serialized_start = 1790
-    _LISTCLUSTERSRESPONSE._serialized_end = 1905
-    _CLUSTERMETADATA._serialized_start = 1908
-    _CLUSTERMETADATA._serialized_end = 2132
-    _GETNEXUSENDPOINTREQUEST._serialized_start = 2134
-    _GETNEXUSENDPOINTREQUEST._serialized_end = 2171
-    _GETNEXUSENDPOINTRESPONSE._serialized_start = 2173
-    _GETNEXUSENDPOINTRESPONSE._serialized_end = 2250
-    _CREATENEXUSENDPOINTREQUEST._serialized_start = 2252
-    _CREATENEXUSENDPOINTREQUEST._serialized_end = 2331
-    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 2333
-    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 2413
-    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 2415
-    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 2523
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 2525
-    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 2605
-    _DELETENEXUSENDPOINTREQUEST._serialized_start = 2607
-    _DELETENEXUSENDPOINTREQUEST._serialized_end = 2664
-    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 2666
-    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 2695
-    _LISTNEXUSENDPOINTSREQUEST._serialized_start = 2697
-    _LISTNEXUSENDPOINTSREQUEST._serialized_end = 2782
-    _LISTNEXUSENDPOINTSRESPONSE._serialized_start = 2784
-    _LISTNEXUSENDPOINTSRESPONSE._serialized_end = 2889
+    _ADDSEARCHATTRIBUTESREQUEST._serialized_start = 269
+    _ADDSEARCHATTRIBUTESREQUEST._serialized_end = 524
+    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_start = 428
+    _ADDSEARCHATTRIBUTESREQUEST_SEARCHATTRIBUTESENTRY._serialized_end = 524
+    _ADDSEARCHATTRIBUTESRESPONSE._serialized_start = 526
+    _ADDSEARCHATTRIBUTESRESPONSE._serialized_end = 555
+    _REMOVESEARCHATTRIBUTESREQUEST._serialized_start = 557
+    _REMOVESEARCHATTRIBUTESREQUEST._serialized_end = 634
+    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_start = 636
+    _REMOVESEARCHATTRIBUTESRESPONSE._serialized_end = 668
+    _LISTSEARCHATTRIBUTESREQUEST._serialized_start = 670
+    _LISTSEARCHATTRIBUTESREQUEST._serialized_end = 718
+    _LISTSEARCHATTRIBUTESRESPONSE._serialized_start = 721
+    _LISTSEARCHATTRIBUTESRESPONSE._serialized_end = 1331
+    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_start = 1083
+    _LISTSEARCHATTRIBUTESRESPONSE_CUSTOMATTRIBUTESENTRY._serialized_end = 1179
+    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_start = 1181
+    _LISTSEARCHATTRIBUTESRESPONSE_SYSTEMATTRIBUTESENTRY._serialized_end = 1277
+    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_start = 1279
+    _LISTSEARCHATTRIBUTESRESPONSE_STORAGESCHEMAENTRY._serialized_end = 1331
+    _DELETENAMESPACEREQUEST._serialized_start = 1333
+    _DELETENAMESPACEREQUEST._serialized_end = 1457
+    _DELETENAMESPACERESPONSE._serialized_start = 1459
+    _DELETENAMESPACERESPONSE._serialized_end = 1511
+    _SOFTDELETENAMESPACEREQUEST._serialized_start = 1513
+    _SOFTDELETENAMESPACEREQUEST._serialized_end = 1582
+    _SOFTDELETENAMESPACERESPONSE._serialized_start = 1584
+    _SOFTDELETENAMESPACERESPONSE._serialized_end = 1613
+    _RESTORENAMESPACEREQUEST._serialized_start = 1615
+    _RESTORENAMESPACEREQUEST._serialized_end = 1681
+    _RESTORENAMESPACERESPONSE._serialized_start = 1683
+    _RESTORENAMESPACERESPONSE._serialized_end = 1709
+    _DESCRIBENAMESPACERESTOREREQUEST._serialized_start = 1711
+    _DESCRIBENAMESPACERESTOREREQUEST._serialized_end = 1785
+    _DESCRIBENAMESPACERESTORERESPONSE._serialized_start = 1788
+    _DESCRIBENAMESPACERESTORERESPONSE._serialized_end = 2146
+    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_start = 2149
+    _ADDORUPDATEREMOTECLUSTERREQUEST._serialized_end = 2309
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_start = 2311
+    _ADDORUPDATEREMOTECLUSTERRESPONSE._serialized_end = 2345
+    _REMOVEREMOTECLUSTERREQUEST._serialized_start = 2347
+    _REMOVEREMOTECLUSTERREQUEST._serialized_end = 2397
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_start = 2399
+    _REMOVEREMOTECLUSTERRESPONSE._serialized_end = 2428
+    _LISTCLUSTERSREQUEST._serialized_start = 2430
+    _LISTCLUSTERSREQUEST._serialized_end = 2495
+    _LISTCLUSTERSRESPONSE._serialized_start = 2497
+    _LISTCLUSTERSRESPONSE._serialized_end = 2612
+    _CLUSTERMETADATA._serialized_start = 2615
+    _CLUSTERMETADATA._serialized_end = 2839
+    _GETNEXUSENDPOINTREQUEST._serialized_start = 2841
+    _GETNEXUSENDPOINTREQUEST._serialized_end = 2878
+    _GETNEXUSENDPOINTRESPONSE._serialized_start = 2880
+    _GETNEXUSENDPOINTRESPONSE._serialized_end = 2957
+    _CREATENEXUSENDPOINTREQUEST._serialized_start = 2959
+    _CREATENEXUSENDPOINTREQUEST._serialized_end = 3038
+    _CREATENEXUSENDPOINTRESPONSE._serialized_start = 3040
+    _CREATENEXUSENDPOINTRESPONSE._serialized_end = 3120
+    _UPDATENEXUSENDPOINTREQUEST._serialized_start = 3122
+    _UPDATENEXUSENDPOINTREQUEST._serialized_end = 3230
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_start = 3232
+    _UPDATENEXUSENDPOINTRESPONSE._serialized_end = 3312
+    _DELETENEXUSENDPOINTREQUEST._serialized_start = 3314
+    _DELETENEXUSENDPOINTREQUEST._serialized_end = 3371
+    _DELETENEXUSENDPOINTRESPONSE._serialized_start = 3373
+    _DELETENEXUSENDPOINTRESPONSE._serialized_end = 3402
+    _LISTNEXUSENDPOINTSREQUEST._serialized_start = 3404
+    _LISTNEXUSENDPOINTSREQUEST._serialized_end = 3489
+    _LISTNEXUSENDPOINTSRESPONSE._serialized_start = 3491
+    _LISTNEXUSENDPOINTSRESPONSE._serialized_end = 3596
 # @@protoc_insertion_point(module_scope)

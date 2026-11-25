@@ -164,6 +164,11 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNexusEndpointRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNexusEndpointResponse.FromString,
         )
+        self.MoveNexusEndpointToProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/MoveNexusEndpointToProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectResponse.FromString,
+        )
         self.GetUserGroups = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroups",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupsRequest.SerializeToString,
@@ -284,6 +289,31 @@ class CloudServiceStub(object):
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateNamespaceExportSinkRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateNamespaceExportSinkResponse.FromString,
         )
+        self.CreateCallerRateLimit = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateCallerRateLimit",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitResponse.FromString,
+        )
+        self.GetCallerRateLimit = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCallerRateLimit",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitResponse.FromString,
+        )
+        self.GetCallerRateLimits = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCallerRateLimits",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsResponse.FromString,
+        )
+        self.UpdateCallerRateLimit = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateCallerRateLimit",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitResponse.FromString,
+        )
+        self.DeleteCallerRateLimit = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteCallerRateLimit",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitResponse.FromString,
+        )
         self.UpdateNamespaceTags = channel.unary_unary(
             "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateNamespaceTags",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateNamespaceTagsRequest.SerializeToString,
@@ -398,6 +428,71 @@ class CloudServiceStub(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupNamespaceAssignments",
             request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.SerializeToString,
             response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.FromString,
+        )
+        self.GetProjects = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProjects",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsResponse.FromString,
+        )
+        self.GetProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectResponse.FromString,
+        )
+        self.CreateProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectResponse.FromString,
+        )
+        self.UpdateProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectResponse.FromString,
+        )
+        self.MoveNamespaceToProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/MoveNamespaceToProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectResponse.FromString,
+        )
+        self.DeleteProject = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteProject",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectResponse.FromString,
+        )
+        self.SetUserProjectAccess = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserProjectAccess",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessResponse.FromString,
+        )
+        self.SetUserGroupProjectAccess = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserGroupProjectAccess",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessResponse.FromString,
+        )
+        self.SetServiceAccountProjectAccess = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetServiceAccountProjectAccess",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessResponse.FromString,
+        )
+        self.GetUserProjectAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserProjectAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsResponse.FromString,
+        )
+        self.GetServiceAccountProjectAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetServiceAccountProjectAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsResponse.FromString,
+        )
+        self.GetUserGroupProjectAssignments = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupProjectAssignments",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsResponse.FromString,
+        )
+        self.GetProjectScopedServiceAccounts = channel.unary_unary(
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProjectScopedServiceAccounts",
+            request_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsRequest.SerializeToString,
+            response_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsResponse.FromString,
         )
 
 
@@ -584,6 +679,12 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def MoveNexusEndpointToProject(self, request, context):
+        """Move a nexus endpoint to a different project within the same account"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def GetUserGroups(self, request, context):
         """Get all user groups"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -732,6 +833,36 @@ class CloudServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def CreateCallerRateLimit(self, request, context):
+        """Create a caller rate limit"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetCallerRateLimit(self, request, context):
+        """Get a caller rate limit"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetCallerRateLimits(self, request, context):
+        """Get caller rate limits"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateCallerRateLimit(self, request, context):
+        """Update a caller rate limit"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteCallerRateLimit(self, request, context):
+        """Delete a caller rate limit"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
     def UpdateNamespaceTags(self, request, context):
         """Update the tags for a namespace"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -868,6 +999,84 @@ class CloudServiceServicer(object):
 
     def GetUserGroupNamespaceAssignments(self, request, context):
         """Get user groups with access to a namespace"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetProjects(self, request, context):
+        """Get all projects"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetProject(self, request, context):
+        """Get a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def CreateProject(self, request, context):
+        """Create a new project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def UpdateProject(self, request, context):
+        """Update a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def MoveNamespaceToProject(self, request, context):
+        """Move a namespace to a different project within the same account"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def DeleteProject(self, request, context):
+        """Delete a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetUserProjectAccess(self, request, context):
+        """Set a user's access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetUserGroupProjectAccess(self, request, context):
+        """Set a user group's access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def SetServiceAccountProjectAccess(self, request, context):
+        """Set a service account's access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetUserProjectAssignments(self, request, context):
+        """Get users with access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetServiceAccountProjectAssignments(self, request, context):
+        """Get service accounts with access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetUserGroupProjectAssignments(self, request, context):
+        """Get user groups with access to a project"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
+    def GetProjectScopedServiceAccounts(self, request, context):
+        """Get service accounts scoped to a project"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
@@ -1020,6 +1229,11 @@ def add_CloudServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNexusEndpointRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteNexusEndpointResponse.SerializeToString,
         ),
+        "MoveNexusEndpointToProject": grpc.unary_unary_rpc_method_handler(
+            servicer.MoveNexusEndpointToProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectResponse.SerializeToString,
+        ),
         "GetUserGroups": grpc.unary_unary_rpc_method_handler(
             servicer.GetUserGroups,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupsRequest.FromString,
@@ -1140,6 +1354,31 @@ def add_CloudServiceServicer_to_server(servicer, server):
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateNamespaceExportSinkRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.ValidateNamespaceExportSinkResponse.SerializeToString,
         ),
+        "CreateCallerRateLimit": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateCallerRateLimit,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitResponse.SerializeToString,
+        ),
+        "GetCallerRateLimit": grpc.unary_unary_rpc_method_handler(
+            servicer.GetCallerRateLimit,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitResponse.SerializeToString,
+        ),
+        "GetCallerRateLimits": grpc.unary_unary_rpc_method_handler(
+            servicer.GetCallerRateLimits,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsResponse.SerializeToString,
+        ),
+        "UpdateCallerRateLimit": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateCallerRateLimit,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitResponse.SerializeToString,
+        ),
+        "DeleteCallerRateLimit": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteCallerRateLimit,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitResponse.SerializeToString,
+        ),
         "UpdateNamespaceTags": grpc.unary_unary_rpc_method_handler(
             servicer.UpdateNamespaceTags,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateNamespaceTagsRequest.FromString,
@@ -1254,6 +1493,71 @@ def add_CloudServiceServicer_to_server(servicer, server):
             servicer.GetUserGroupNamespaceAssignments,
             request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.FromString,
             response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.SerializeToString,
+        ),
+        "GetProjects": grpc.unary_unary_rpc_method_handler(
+            servicer.GetProjects,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsResponse.SerializeToString,
+        ),
+        "GetProject": grpc.unary_unary_rpc_method_handler(
+            servicer.GetProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectResponse.SerializeToString,
+        ),
+        "CreateProject": grpc.unary_unary_rpc_method_handler(
+            servicer.CreateProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectResponse.SerializeToString,
+        ),
+        "UpdateProject": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectResponse.SerializeToString,
+        ),
+        "MoveNamespaceToProject": grpc.unary_unary_rpc_method_handler(
+            servicer.MoveNamespaceToProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectResponse.SerializeToString,
+        ),
+        "DeleteProject": grpc.unary_unary_rpc_method_handler(
+            servicer.DeleteProject,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectResponse.SerializeToString,
+        ),
+        "SetUserProjectAccess": grpc.unary_unary_rpc_method_handler(
+            servicer.SetUserProjectAccess,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessResponse.SerializeToString,
+        ),
+        "SetUserGroupProjectAccess": grpc.unary_unary_rpc_method_handler(
+            servicer.SetUserGroupProjectAccess,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessResponse.SerializeToString,
+        ),
+        "SetServiceAccountProjectAccess": grpc.unary_unary_rpc_method_handler(
+            servicer.SetServiceAccountProjectAccess,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessResponse.SerializeToString,
+        ),
+        "GetUserProjectAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUserProjectAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsResponse.SerializeToString,
+        ),
+        "GetServiceAccountProjectAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetServiceAccountProjectAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsResponse.SerializeToString,
+        ),
+        "GetUserGroupProjectAssignments": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUserGroupProjectAssignments,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsResponse.SerializeToString,
+        ),
+        "GetProjectScopedServiceAccounts": grpc.unary_unary_rpc_method_handler(
+            servicer.GetProjectScopedServiceAccounts,
+            request_deserializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsRequest.FromString,
+            response_serializer=temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -2110,6 +2414,35 @@ class CloudService(object):
         )
 
     @staticmethod
+    def MoveNexusEndpointToProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/MoveNexusEndpointToProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNexusEndpointToProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def GetUserGroups(
         request,
         target,
@@ -2806,6 +3139,151 @@ class CloudService(object):
         )
 
     @staticmethod
+    def CreateCallerRateLimit(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateCallerRateLimit",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateCallerRateLimitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetCallerRateLimit(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCallerRateLimit",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetCallerRateLimits(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetCallerRateLimits",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetCallerRateLimitsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateCallerRateLimit(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateCallerRateLimit",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateCallerRateLimitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteCallerRateLimit(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteCallerRateLimit",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteCallerRateLimitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
     def UpdateNamespaceTags(
         request,
         target,
@@ -3462,6 +3940,383 @@ class CloudService(object):
             "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupNamespaceAssignments",
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsRequest.SerializeToString,
             temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupNamespaceAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetProjects(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProjects",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def CreateProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/CreateProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.CreateProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def UpdateProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/UpdateProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.UpdateProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def MoveNamespaceToProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/MoveNamespaceToProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.MoveNamespaceToProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def DeleteProject(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/DeleteProject",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.DeleteProjectResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetUserProjectAccess(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserProjectAccess",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserProjectAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetUserGroupProjectAccess(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetUserGroupProjectAccess",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetUserGroupProjectAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def SetServiceAccountProjectAccess(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/SetServiceAccountProjectAccess",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.SetServiceAccountProjectAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetUserProjectAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserProjectAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserProjectAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetServiceAccountProjectAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetServiceAccountProjectAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetServiceAccountProjectAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetUserGroupProjectAssignments(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetUserGroupProjectAssignments",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetUserGroupProjectAssignmentsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+        )
+
+    @staticmethod
+    def GetProjectScopedServiceAccounts(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/temporal.api.cloud.cloudservice.v1.CloudService/GetProjectScopedServiceAccounts",
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsRequest.SerializeToString,
+            temporal_dot_api_dot_cloud_dot_cloudservice_dot_v1_dot_request__response__pb2.GetProjectScopedServiceAccountsResponse.FromString,
             options,
             channel_credentials,
             insecure,

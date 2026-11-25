@@ -98,6 +98,58 @@ class GCSSpec(google.protobuf.message.Message):
 global___GCSSpec = GCSSpec
 
 @typing.final
+class AzureBlobSpec(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    TENANT_ID_FIELD_NUMBER: builtins.int
+    STORAGE_ACCOUNT_FIELD_NUMBER: builtins.int
+    CONTAINER_NAME_FIELD_NUMBER: builtins.int
+    REGION_FIELD_NUMBER: builtins.int
+    SUBSCRIPTION_ID_FIELD_NUMBER: builtins.int
+    RESOURCE_GROUP_FIELD_NUMBER: builtins.int
+    tenant_id: builtins.str
+    """The customer's Azure tenant ID where the storage account exists and where Temporal's app registration is consented/granted access."""
+    storage_account: builtins.str
+    """The name of the destination Azure storage account where Temporal will send data."""
+    container_name: builtins.str
+    """The name of the destination Azure Blob container where Temporal will send data."""
+    region: builtins.str
+    """The region where the Azure storage account is located."""
+    subscription_id: builtins.str
+    """The Azure subscription ID that contains the storage account."""
+    resource_group: builtins.str
+    """The Azure resource group that contains the storage account."""
+    def __init__(
+        self,
+        *,
+        tenant_id: builtins.str = ...,
+        storage_account: builtins.str = ...,
+        container_name: builtins.str = ...,
+        region: builtins.str = ...,
+        subscription_id: builtins.str = ...,
+        resource_group: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "container_name",
+            b"container_name",
+            "region",
+            b"region",
+            "resource_group",
+            b"resource_group",
+            "storage_account",
+            b"storage_account",
+            "subscription_id",
+            b"subscription_id",
+            "tenant_id",
+            b"tenant_id",
+        ],
+    ) -> None: ...
+
+global___AzureBlobSpec = AzureBlobSpec
+
+@typing.final
 class KinesisSpec(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 

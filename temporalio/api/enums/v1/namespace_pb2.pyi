@@ -32,6 +32,10 @@ class _NamespaceStateEnumTypeWrapper(
     NAMESPACE_STATE_REGISTERED: _NamespaceState.ValueType  # 1
     NAMESPACE_STATE_DEPRECATED: _NamespaceState.ValueType  # 2
     NAMESPACE_STATE_DELETED: _NamespaceState.ValueType  # 3
+    NAMESPACE_STATE_SOFT_DELETED: _NamespaceState.ValueType  # 4
+    """Set by OperatorService.SoftDeleteNamespace. Executions make no progress, but no data is
+    removed until the namespace is restored or deleted.
+    """
 
 class NamespaceState(_NamespaceState, metaclass=_NamespaceStateEnumTypeWrapper): ...
 
@@ -39,7 +43,38 @@ NAMESPACE_STATE_UNSPECIFIED: NamespaceState.ValueType  # 0
 NAMESPACE_STATE_REGISTERED: NamespaceState.ValueType  # 1
 NAMESPACE_STATE_DEPRECATED: NamespaceState.ValueType  # 2
 NAMESPACE_STATE_DELETED: NamespaceState.ValueType  # 3
+NAMESPACE_STATE_SOFT_DELETED: NamespaceState.ValueType  # 4
+"""Set by OperatorService.SoftDeleteNamespace. Executions make no progress, but no data is
+removed until the namespace is restored or deleted.
+"""
 global___NamespaceState = NamespaceState
+
+class _NamespaceRestoreState:
+    ValueType = typing.NewType("ValueType", builtins.int)
+    V: typing_extensions.TypeAlias = ValueType
+
+class _NamespaceRestoreStateEnumTypeWrapper(
+    google.protobuf.internal.enum_type_wrapper._EnumTypeWrapper[
+        _NamespaceRestoreState.ValueType
+    ],
+    builtins.type,
+):
+    DESCRIPTOR: google.protobuf.descriptor.EnumDescriptor
+    NAMESPACE_RESTORE_STATE_UNSPECIFIED: _NamespaceRestoreState.ValueType  # 0
+    NAMESPACE_RESTORE_STATE_RUNNING: _NamespaceRestoreState.ValueType  # 1
+    NAMESPACE_RESTORE_STATE_COMPLETED: _NamespaceRestoreState.ValueType  # 2
+    NAMESPACE_RESTORE_STATE_FAILED: _NamespaceRestoreState.ValueType  # 3
+
+class NamespaceRestoreState(
+    _NamespaceRestoreState, metaclass=_NamespaceRestoreStateEnumTypeWrapper
+):
+    """State of a restore started by OperatorService.RestoreNamespace."""
+
+NAMESPACE_RESTORE_STATE_UNSPECIFIED: NamespaceRestoreState.ValueType  # 0
+NAMESPACE_RESTORE_STATE_RUNNING: NamespaceRestoreState.ValueType  # 1
+NAMESPACE_RESTORE_STATE_COMPLETED: NamespaceRestoreState.ValueType  # 2
+NAMESPACE_RESTORE_STATE_FAILED: NamespaceRestoreState.ValueType  # 3
+global___NamespaceRestoreState = NamespaceRestoreState
 
 class _ArchivalState:
     ValueType = typing.NewType("ValueType", builtins.int)

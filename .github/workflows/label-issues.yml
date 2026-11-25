@@ -1,0 +1,12 @@
+name: Label issues with repository name
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  label:
+    uses: temporalio/.github/.github/workflows/label-issues.yml@main

@@ -33,7 +33,12 @@ from .failed_cause_pb2 import (
     StartChildWorkflowExecutionFailedCause,
     WorkflowTaskFailedCause,
 )
-from .namespace_pb2 import ArchivalState, NamespaceState, ReplicationState
+from .namespace_pb2 import (
+    ArchivalState,
+    NamespaceRestoreState,
+    NamespaceState,
+    ReplicationState,
+)
 from .nexus_pb2 import (
     NexusHandlerErrorRetryBehavior,
     NexusOperationExecutionStatus,
@@ -94,6 +99,7 @@ __all__ = [
     "FastForwardPollingResult",
     "HistoryEventFilterType",
     "IndexedValueType",
+    "NamespaceRestoreState",
     "NamespaceState",
     "NexusHandlerErrorRetryBehavior",
     "NexusOperationCancellationState",

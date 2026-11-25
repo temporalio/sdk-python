@@ -1,1 +1,0 @@
-The workflow sandbox now restricts `time.clock_gettime()` and `time.clock_gettime_ns()` at runtime, like `time.time()` and `time.monotonic()`. Calling them from workflow code raises `RestrictedWorkflowAccessError`.
