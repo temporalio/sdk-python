@@ -9,14 +9,14 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 use temporalio_sdk_core::StreamRuntimes;
 use temporalio_streams::proto::{
-    AppendRecordsRequest, AppendRecordsResponse, CloseStreamRequest, CloseStreamResponse,
-    CreateStreamRequest, CreateStreamResponse, DescribeStreamRequest, DescribeStreamResponse,
-    ReadRecordsRequest, ReadRecordsResponse, StreamErrorReason,
+    sdk, AppendRecordsRequest, AppendRecordsResponse, CreateStreamRequest, CreateStreamResponse,
+    DescribeStreamRequest, DescribeStreamResponse, ReadRecordsRequest, ReadRecordsResponse,
+    StreamErrorReason,
 };
 use temporalio_streams::record::StoreLimits;
 use temporalio_streams::{
-    AppendError, CloseError, CreateError, DescribeError, ReadError, StreamError, StreamRuntime,
-    StreamStore, WireReason,
+    AppendError, CreateError, DescribeError, ReadError, StreamError, StreamRuntime, StreamStore,
+    WireReason,
 };
 
 use crate::runtime;
@@ -198,13 +198,6 @@ impl StreamStore for PythonStore {
         Box::pin(self.call("ReadRecords", request, None))
     }
 
-    fn close_stream(
-        &self,
-        request: CloseStreamRequest,
-    ) -> BoxFuture<'_, Result<CloseStreamResponse, CloseError>> {
-        Box::pin(self.call("CloseStream", request, None))
-    }
-
     fn describe_stream(
         &self,
         request: DescribeStreamRequest,
@@ -214,10 +207,11 @@ impl StreamStore for PythonStore {
 }
 
 /// Calls the Python Store of `caller` for one Stream operation through a `StreamRuntime`, which
-/// checks the request and the response. A create and an append need their `request_id`, which
-/// the other operations don't take. The awaitable raises `StreamError` for a failed call. The
-/// runtime has no limit of a batch, since the SDK that calls the Store has those in its Stream
-/// config.
+/// checks the request and the response. The request and the response are those of a Store, with
+/// the Stream id, so a Store can run the checks of the runtime around itself. A create and an
+/// append need their `request_id`, which the other operations don't take. The awaitable raises
+/// `StreamError` for a failed call. The runtime has no limit of a batch, since the SDK that calls
+/// the Store has those in its Stream config.
 #[pyfunction]
 #[pyo3(signature = (runtime_ref, caller, operation, request, request_id=None))]
 pub fn call_stream_store<'p>(
@@ -240,8 +234,8 @@ pub fn call_stream_store<'p>(
             .ok_or_else(|| PyValueError::new_err(format!("A {operation} call needs a request id")))
     };
     macro_rules! run {
-        (|$request:ident| $call:expr) => {{
-            let $request = Message::decode(request.as_bytes())
+        (|$request:ident: $type:ty| $call:expr) => {{
+            let $request: $type = Message::decode(request.as_bytes())
                 .map_err(|err| PyValueError::new_err(format!("Invalid proto: {err}")))?;
             runtime_ref.runtime.future_into_py(py, async move {
                 let response = $call.await;
@@ -254,18 +248,56 @@ pub fn call_stream_store<'p>(
     match operation {
         "CreateStream" => {
             let request_id = with_request_id()?;
-            run!(|decoded| stream_runtime.create_stream(decoded, request_id))
+            run!(|decoded: CreateStreamRequest| async {
+                let request = sdk::CreateStreamRequest {
+                    stream_ref: Some(stream_ref(decoded.stream_id)),
+                    id_conflict_policy: decoded.id_conflict_policy,
+                };
+                let response = stream_runtime.create_stream(request, request_id).await?;
+                Ok::<_, CreateError>(CreateStreamResponse {
+                    created: response.created,
+                })
+            })
         }
         "AppendRecords" => {
             let request_id = with_request_id()?;
-            run!(|decoded| stream_runtime.append_records(decoded, request_id))
+            run!(|decoded: AppendRecordsRequest| {
+                let request = sdk::AppendRecordsRequest {
+                    r#ref: Some(stream_ref(decoded.stream_id)),
+                    producer: decoded.producer,
+                    records: decoded.records,
+                };
+                stream_runtime.append_records(request, request_id)
+            })
         }
-        "ReadRecords" => run!(|decoded| stream_runtime.read_records(decoded)),
-        "CloseStream" => run!(|decoded| stream_runtime.close_stream(decoded)),
-        "DescribeStream" => run!(|decoded| stream_runtime.describe_stream(decoded)),
+        "ReadRecords" => run!(|decoded: ReadRecordsRequest| {
+            let request = sdk::ReadRecordsRequest {
+                r#ref: Some(stream_ref(decoded.stream_id)),
+                from_offset: decoded.from_offset,
+                max_records: decoded.max_records,
+                max_bytes: decoded.max_bytes,
+                wait: decoded.wait,
+            };
+            stream_runtime.read_records(request)
+        }),
+        "DescribeStream" => run!(|decoded: DescribeStreamRequest| {
+            let request = sdk::DescribeStreamRequest {
+                r#ref: Some(stream_ref(decoded.stream_id)),
+            };
+            stream_runtime.describe_stream(request)
+        }),
         _ => Err(PyValueError::new_err(format!(
             "Unknown Stream operation: {operation}"
         ))),
+    }
+}
+
+/// Returns the ref that the runtime takes for a Store request's Stream id. The runtime gives the
+/// Store only the id, so the ref needs no Store name.
+fn stream_ref(id: String) -> sdk::StreamRef {
+    sdk::StreamRef {
+        id,
+        store: String::new(),
     }
 }
 

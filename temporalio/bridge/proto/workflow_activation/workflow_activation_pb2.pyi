@@ -67,8 +67,8 @@ class WorkflowActivation(google.protobuf.message.Message):
      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
      normally would have when executing.
     * Stream results go after the local activity resolutions, because a replay scans ahead for them
-     too. Appends go first, then closes, then reads, each in `seq` order. If a replay gives several
-     activations in one, the Stream results keep the order of those activations.
+     too. Appends go before reads, each in `seq` order. If a replay gives several activations in
+     one, the Stream results keep the order of those activations.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
@@ -254,9 +254,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
     DO_UPDATE_FIELD_NUMBER: builtins.int
     RESOLVE_NEXUS_OPERATION_START_FIELD_NUMBER: builtins.int
     RESOLVE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
-    RESOLVE_STREAM_READ_FIELD_NUMBER: builtins.int
     RESOLVE_STREAM_APPEND_FIELD_NUMBER: builtins.int
-    RESOLVE_STREAM_CLOSE_FIELD_NUMBER: builtins.int
+    RESOLVE_STREAM_READ_FIELD_NUMBER: builtins.int
     REMOVE_FROM_CACHE_FIELD_NUMBER: builtins.int
     @property
     def initialize_workflow(self) -> global___InitializeWorkflow:
@@ -332,16 +331,12 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         """A nexus operation resolved."""
 
     @property
-    def resolve_stream_read(self) -> global___ResolveStreamRead:
-        """A read of a Stream finished."""
-
-    @property
     def resolve_stream_append(self) -> global___ResolveStreamAppend:
         """An append to a Stream finished."""
 
     @property
-    def resolve_stream_close(self) -> global___ResolveStreamClose:
-        """A close of a Stream finished."""
+    def resolve_stream_read(self) -> global___ResolveStreamRead:
+        """A read of a Stream finished."""
 
     @property
     def remove_from_cache(self) -> global___RemoveFromCache:
@@ -372,9 +367,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
         do_update: global___DoUpdate | None = ...,
         resolve_nexus_operation_start: global___ResolveNexusOperationStart | None = ...,
         resolve_nexus_operation: global___ResolveNexusOperation | None = ...,
-        resolve_stream_read: global___ResolveStreamRead | None = ...,
         resolve_stream_append: global___ResolveStreamAppend | None = ...,
-        resolve_stream_close: global___ResolveStreamClose | None = ...,
+        resolve_stream_read: global___ResolveStreamRead | None = ...,
         remove_from_cache: global___RemoveFromCache | None = ...,
     ) -> None: ...
     def HasField(
@@ -410,8 +404,6 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_signal_external_workflow",
             "resolve_stream_append",
             b"resolve_stream_append",
-            "resolve_stream_close",
-            b"resolve_stream_close",
             "resolve_stream_read",
             b"resolve_stream_read",
             "signal_workflow",
@@ -455,8 +447,6 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             b"resolve_signal_external_workflow",
             "resolve_stream_append",
             b"resolve_stream_append",
-            "resolve_stream_close",
-            b"resolve_stream_close",
             "resolve_stream_read",
             b"resolve_stream_read",
             "signal_workflow",
@@ -486,9 +476,8 @@ class WorkflowActivationJob(google.protobuf.message.Message):
             "do_update",
             "resolve_nexus_operation_start",
             "resolve_nexus_operation",
-            "resolve_stream_read",
             "resolve_stream_append",
-            "resolve_stream_close",
+            "resolve_stream_read",
             "remove_from_cache",
         ]
         | None
@@ -1685,13 +1674,13 @@ global___RemoveFromCache = RemoveFromCache
 
 @typing.final
 class ResolveStreamAppend(google.protobuf.message.Message):
-    """The result of an `AppendToStream`. Core gives it in the next activation after the Store answers.
-    History keeps the index of that activation with the result, counted as for the marker of a local
-    activity, so a replay gives both kinds of result in the order of the first run. A result that
-    arrives while the task completes comes in the first activation of the next task.
+    """The result of an `AppendToStream`. Core gives it in the next activation after the Store answers,
+    or in the first activation of the next task if it arrives while the task completes.
 
-    As for a local activity, a replay gives the result in the same activation as the first run only
-    if workflow task chunking is off. With chunking, a replay can give the jobs of several
+    The `core_stream_append` marker of that activation records the result with the activation's
+    index, on the same counter as local activity markers, so a replay gives both kinds of result in
+    the order of the first run. As for a local activity, the replay uses the same activation as the
+    first run only if workflow task chunking is off. With chunking, it can give the jobs of several
     activations in one, in their order.
     """
 
@@ -1706,7 +1695,7 @@ class ResolveStreamAppend(google.protobuf.message.Message):
     def appended(self) -> global___StreamAppended: ...
     @property
     def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """An `ApplicationFailureInfo` of the type `stream_<reason>`, such as `stream_closed`, with
+        """An `ApplicationFailureInfo` of the type `stream_<reason>`, such as `stream_fenced`, with
         `non_retryable` set. Its details have one `binary/protobuf` payload of a
         `temporalio.api.stream.v1.StreamErrorDetails`.
         """
@@ -1767,40 +1756,10 @@ class StreamAppended(google.protobuf.message.Message):
 global___StreamAppended = StreamAppended
 
 @typing.final
-class ResolveStreamClose(google.protobuf.message.Message):
-    """The result of a `CloseStream`. The activation rules of `ResolveStreamAppend` apply to it too."""
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SEQ_FIELD_NUMBER: builtins.int
-    FAILED_FIELD_NUMBER: builtins.int
-    seq: builtins.int
-    """The `seq` of the `CloseStream`."""
-    @property
-    def failed(self) -> temporalio.api.failure.v1.message_pb2.Failure:
-        """Unset if the Stream is closed, also when it was already closed. When set, it has the same
-        parts as the `failed` of a `ResolveStreamAppend`.
-        """
-
-    def __init__(
-        self,
-        *,
-        seq: builtins.int = ...,
-        failed: temporalio.api.failure.v1.message_pb2.Failure | None = ...,
-    ) -> None: ...
-    def HasField(
-        self, field_name: typing.Literal["failed", b"failed"]
-    ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing.Literal["failed", b"failed", "seq", b"seq"]
-    ) -> None: ...
-
-global___ResolveStreamClose = ResolveStreamClose
-
-@typing.final
 class ResolveStreamRead(google.protobuf.message.Message):
     """The result of a `ReadStream`. Each read gets exactly one, unless Core drops the read (see
-    `ReadStream`). The activation rules of `ResolveStreamAppend` apply to it too.
+    `ReadStream`). The activation rules of `ResolveStreamAppend` apply to it too, with the
+    `core_stream_read` marker in place of the `core_stream_append` one.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1846,13 +1805,16 @@ class StreamPage(google.protobuf.message.Message):
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
     RECORDS_FIELD_NUMBER: builtins.int
-    DONE_FIELD_NUMBER: builtins.int
     LAST_OFFSET_FIELD_NUMBER: builtins.int
-    done: builtins.bool
-    """True if the Stream is closed and has no Record after this page."""
+    WAIT_CUT_FIELD_NUMBER: builtins.int
     last_offset: builtins.bytes
     """The offset where the page ends, also for a page with no Record. The next read can pass it as
     its `from_offset`.
+    """
+    wait_cut: builtins.bool
+    """True if the page has no Record because the read time of the Workflow Task ended the wait
+    before the `wait` of the read. A reader that waits for a Record can read again from
+    `last_offset`. It's false for a page that ends a whole wait.
     """
     @property
     def records(
@@ -1860,9 +1822,8 @@ class StreamPage(google.protobuf.message.Message):
     ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
         temporalio.api.stream.v1.message_pb2.StreamRecord
     ]:
-        """The Records of the page, in the order of the Stream. It's empty if the Stream is closed and
-        has no Record after the `from_offset` of the read, or if no Record came while the read
-        waited.
+        """The Records of the page, in the order of the Stream. It's empty if no Record came while the
+        read waited.
         """
 
     def __init__(
@@ -1872,13 +1833,18 @@ class StreamPage(google.protobuf.message.Message):
             temporalio.api.stream.v1.message_pb2.StreamRecord
         ]
         | None = ...,
-        done: builtins.bool = ...,
         last_offset: builtins.bytes = ...,
+        wait_cut: builtins.bool = ...,
     ) -> None: ...
     def ClearField(
         self,
         field_name: typing.Literal[
-            "done", b"done", "last_offset", b"last_offset", "records", b"records"
+            "last_offset",
+            b"last_offset",
+            "records",
+            b"records",
+            "wait_cut",
+            b"wait_cut",
         ],
     ) -> None: ...
 

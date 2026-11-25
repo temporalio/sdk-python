@@ -24,8 +24,8 @@ import temporalio.api.common.v1.message_pb2
 import temporalio.api.enums.v1.workflow_pb2
 import temporalio.api.failure.v1.message_pb2
 import temporalio.api.sdk.v1.event_group_marker_pb2
+import temporalio.api.sdk.v1.stream_pb2
 import temporalio.api.sdk.v1.user_metadata_pb2
-import temporalio.api.stream.v1.message_pb2
 import temporalio.api.workflow.v1.message_pb2
 import temporalio.bridge.proto.child_workflow.child_workflow_pb2
 import temporalio.bridge.proto.common.common_pb2
@@ -106,9 +106,8 @@ class WorkflowCommand(google.protobuf.message.Message):
     UPDATE_RESPONSE_FIELD_NUMBER: builtins.int
     SCHEDULE_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
     REQUEST_CANCEL_NEXUS_OPERATION_FIELD_NUMBER: builtins.int
-    READ_STREAM_FIELD_NUMBER: builtins.int
     APPEND_TO_STREAM_FIELD_NUMBER: builtins.int
-    CLOSE_STREAM_FIELD_NUMBER: builtins.int
+    READ_STREAM_FIELD_NUMBER: builtins.int
     @property
     def user_metadata(self) -> temporalio.api.sdk.v1.user_metadata_pb2.UserMetadata:
         """User metadata that may or may not be persisted into history depending on the command type.
@@ -186,11 +185,9 @@ class WorkflowCommand(google.protobuf.message.Message):
         self,
     ) -> global___RequestCancelNexusOperation: ...
     @property
-    def read_stream(self) -> global___ReadStream: ...
-    @property
     def append_to_stream(self) -> global___AppendToStream: ...
     @property
-    def close_stream(self) -> global___CloseStream: ...
+    def read_stream(self) -> global___ReadStream: ...
     def __init__(
         self,
         *,
@@ -229,9 +226,8 @@ class WorkflowCommand(google.protobuf.message.Message):
         schedule_nexus_operation: global___ScheduleNexusOperation | None = ...,
         request_cancel_nexus_operation: global___RequestCancelNexusOperation
         | None = ...,
-        read_stream: global___ReadStream | None = ...,
         append_to_stream: global___AppendToStream | None = ...,
-        close_stream: global___CloseStream | None = ...,
+        read_stream: global___ReadStream | None = ...,
     ) -> None: ...
     def HasField(
         self,
@@ -246,8 +242,6 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
-            "close_stream",
-            b"close_stream",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -305,8 +299,6 @@ class WorkflowCommand(google.protobuf.message.Message):
             b"cancel_timer",
             "cancel_workflow_execution",
             b"cancel_workflow_execution",
-            "close_stream",
-            b"close_stream",
             "complete_workflow_execution",
             b"complete_workflow_execution",
             "continue_as_new_workflow_execution",
@@ -379,9 +371,8 @@ class WorkflowCommand(google.protobuf.message.Message):
             "update_response",
             "schedule_nexus_operation",
             "request_cancel_nexus_operation",
-            "read_stream",
             "append_to_stream",
-            "close_stream",
+            "read_stream",
         ]
         | None
     ): ...
@@ -1963,25 +1954,19 @@ global___RequestCancelNexusOperation = RequestCancelNexusOperation
 @typing.final
 class AppendToStream(google.protobuf.message.Message):
     """Appends Records to a Stream as the Workflow's Producer. Core calls the Store while the Workflow
-    Task is open, and sends the result in a `ResolveStreamAppend` job. As for a Local Activity, Core
-    keeps the task open while an append runs. An append has no event, so History keeps its result in
-    the `stream_calls` of the `sdk_metadata` of the task's completion.
+    Task is open, keeps the task open as it does for a Local Activity, and sends the result in a
+    `ResolveStreamAppend` job.
 
-    An append is at-least-once. If History has no result of it, a later attempt of the Workflow Task
-    writes the batch again.
-
-    No command cancels an append, so lang must accept the job of an append that nothing awaits.
-    Core drops an append that has no result when lang sends the Workflow's last command.
-
-    Core sends the appends and the closes of one Stream to the Store one at a time, in the order of
-    their commands.
-
-    A bad `seq` or `stream`, or a Store that the Worker has no runtime for, fails the Workflow Task.
-    So does a Store that is still unavailable at the task's heartbeat. The failure message then
-    starts with `StreamStoreUnavailable:`. An empty batch, or one over the limits of its Store,
-    gives lang a `failed` job.
-
-    A replay compares the `seq` and the `stream` of the command with History, not the `bodies`.
+    * An append is at-least-once. If History has no result for it, a later attempt of the Workflow
+      Task writes the batch again.
+    * No command cancels an append. Lang must accept the result of an append that nothing awaits,
+      and Core drops an append that has no result at the Workflow's last command.
+    * The appends of one Stream go to the Store one at a time, in the order of their commands.
+    * A bad `seq` or `stream`, or a Store that the Worker has no runtime for, fails the Workflow
+      Task. So does a Store that is still unavailable at the task's heartbeat, with a failure
+      message that starts with `StreamStoreUnavailable:`.
+    * An empty batch, or one over the limits of its Store, gives lang a `failed` job.
+    * A replay compares the `seq` and the `stream` of the command with History, not the `bodies`.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -1992,7 +1977,7 @@ class AppendToStream(google.protobuf.message.Message):
     seq: builtins.int
     """Lang's incremental sequence number for appends, starting at 1."""
     @property
-    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    def stream(self) -> temporalio.api.sdk.v1.stream_pb2.StreamRef: ...
     @property
     def bodies(
         self,
@@ -2003,7 +1988,7 @@ class AppendToStream(google.protobuf.message.Message):
         self,
         *,
         seq: builtins.int = ...,
-        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream: temporalio.api.sdk.v1.stream_pb2.StreamRef | None = ...,
         bodies: collections.abc.Iterable[temporalio.api.common.v1.message_pb2.Payload]
         | None = ...,
     ) -> None: ...
@@ -2020,72 +2005,67 @@ class AppendToStream(google.protobuf.message.Message):
 global___AppendToStream = AppendToStream
 
 @typing.final
-class CloseStream(google.protobuf.message.Message):
-    """Closes a Stream. The Workflow Task of the command records only the intent to close. Core closes
-    the Stream once History has that task, so a task that fails closes nothing, and its retry can
-    still append. The result comes in a `ResolveStreamClose` job of a later task.
-
-    An append that lang sends in the same task is written before the close.
-
-    The rules of `AppendToStream` about cancellation, the Workflow's last command, task failures and
-    replay apply to a close too. So Workflow code that needs its close must await the result before
-    its last command.
-    """
-
-    DESCRIPTOR: google.protobuf.descriptor.Descriptor
-
-    SEQ_FIELD_NUMBER: builtins.int
-    STREAM_FIELD_NUMBER: builtins.int
-    seq: builtins.int
-    """Lang's incremental sequence number for closes, starting at 1."""
-    @property
-    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
-    def __init__(
-        self,
-        *,
-        seq: builtins.int = ...,
-        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
-    ) -> None: ...
-    def HasField(
-        self, field_name: typing.Literal["stream", b"stream"]
-    ) -> builtins.bool: ...
-    def ClearField(
-        self, field_name: typing.Literal["seq", b"seq", "stream", b"stream"]
-    ) -> None: ...
-
-global___CloseStream = CloseStream
-
-@typing.final
 class ReadStream(google.protobuf.message.Message):
-    """Reads one page of a Stream, which has the Records after `from_offset`. The result comes in one
+    """Reads one page of a Stream, with the Records after `from_offset`. The result comes in one
     `ResolveStreamRead` job, by the activation rules of `ResolveStreamAppend`. To read on, lang sends
-    a new `ReadStream` from the `last_offset` of the page.
+    a new `ReadStream` from the `last_offset` of the page. A Stream has no end that a read reports,
+    so the application's own last Record tells a reader to stop.
 
-    A read has a time limit in each Workflow Task (`StreamSettings::read_time`), which is always
-    before the heartbeat of the task. So a read alone never keeps a task open with heartbeats. At
-    the limit, a read with no answer fails with `STREAM_ERROR_REASON_STORE_UNAVAILABLE` if its last
-    try failed or got no answer. Otherwise a read with a `wait` gives a page with no Record whose
-    `last_offset` is its `from_offset`, and a read with no `wait` goes on until the Store answers,
-    since only the Store can say that the Stream has no Record. From the limit on, no read keeps
-    the task open.
+    A page is one answer of the Store. It has the Records that the Store has at once, up to
+    `max_records` and `max_bytes`, and Core never waits to fill it. A read with no Record after
+    `from_offset` waits up to `wait`, but at most the read time that its Workflow Task has left
+    (`StreamSettings::read_time`, half the task timeout by default, from the end of a replay). If
+    the Store answers with no Record before the wait is up, Core asks again from that answer's
+    `last_offset`, at most once per 100 ms. A page with no Record has the `last_offset` of the
+    Store's answer, which is `from_offset` if the Store moved past nothing. Its `wait_cut` is true if
+    the read time ended the wait before `wait`.
 
-    Core keeps the Workflow Task while a read has no answer, as for an append, with one difference.
-    A command or a message for the server doesn't wait for a read. Core then completes the task and
-    asks for a new one, and the page comes in a later task.
+    At the read limit a read with a `wait` gives a page with no Record and `wait_cut`. A read with no
+    `wait` goes on, since only the Store can say that the Stream has no Record after its offset.
+    Before the limit Core keeps the task open while a read runs, unless the task has a command or a
+    message for the server.
+
+    Before the task completes, each read that had no answer in it gets a check, which is one Store
+    call with no wait and a short deadline (`StreamSettings::read_check_deadline`). A command waits
+    for the check and no longer. If the check gets Records, the task gives them, or holds them for
+    the first activation of the next task if it has a command. If it gets no Record, a read with a
+    `wait` stops and starts again when the next task opens, and a read with no `wait` gives the page
+    with no Record. After the read limit each new read of the task is a check. So a read on an idle
+    Stream never makes a new task, and a drain with no `wait` ends in its task.
+
+    Core asks for a new task when it knows that the Stream has Records for an open read. It knows
+    that when the Store gave Records after the page that the read continues from, or when the task
+    holds back the read's page. It also asks for a new task when the read result budget of the task
+    holds back a read. A query answer and the heartbeat of a Local Activity or an append ask for a
+    new task whatever the reads say.
+
+    A Store outage fails the Workflow Task, as for an append, and never reaches lang as a read
+    result. That's the case if a check fails or gets no answer by its deadline, or if a read has had
+    no answer since a failed try at the read limit, at the completion or at the heartbeat. The
+    failure message then starts with `StreamStoreUnavailable:`.
+
+    One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the first
+    activation of the next task. Once a task gave `StreamSettings::max_task_read_results` read
+    results, 256 by default, its new reads get no check and start when the next task opens, which
+    Core asks for at once.
 
     No command cancels a read, so lang must accept the job of a read that nothing awaits. Core drops
     a read that has no result when lang sends the Workflow's last command.
 
-    History keeps the offsets, the count and a digest of each page, not its Records. A replay reads
-    the page from the Store again, and fails if the Records are gone or differ. That includes the
-    replay for a query of a closed Workflow.
+    The `core_stream_read` marker of the activation that gets the page keeps its offsets, the count
+    and a digest of its Records, and never the Records. A replay, also the replay for a query of a
+    closed Workflow, reads the page from the Store again, and fails if the Records are gone or
+    differ. So the Retention of the Stream must cover the life of the Workflow and the time in which
+    it gets queries. A replay reads the Records of all the read markers of History again, so a
+    reader should continue as new before those pass the 16 MiB that a Worker reads in one task. A
+    Worker with no runtime for the Store of a marker can't replay, and fails the task, or gives the
+    error as the answer of a legacy query.
 
-    One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the next
-    task.
-
-    A negative `wait`, `max_records` or `max_bytes`, or a `from_offset` over 1024 bytes, fails the
-    Workflow Task, as the cases of `AppendToStream` do. A replay compares the `seq`, the `stream`
-    and the `from_offset` of the command with History.
+    A replay compares the `seq`, the `stream` and the `from_offset` of the command with History, and
+    not the `max_records`, the `max_bytes` or the `wait`. It accepts a marker with no entry after any
+    task. After a replay Core doesn't know which Streams have Records after the pages of History, so
+    it learns that from the next answer of the Store. A negative `wait`, `max_records` or
+    `max_bytes`, a `from_offset` over 1024 bytes, or a bad `seq` or `stream` fails the Workflow Task.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2109,7 +2089,7 @@ class ReadStream(google.protobuf.message.Message):
     Store for at most 16 MiB. One larger Record still comes as a page.
     """
     @property
-    def stream(self) -> temporalio.api.stream.v1.message_pb2.StreamRef: ...
+    def stream(self) -> temporalio.api.sdk.v1.stream_pb2.StreamRef: ...
     @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:
         """How long the read waits for a Record if the Stream has none after `from_offset`. If it's
@@ -2120,7 +2100,7 @@ class ReadStream(google.protobuf.message.Message):
         self,
         *,
         seq: builtins.int = ...,
-        stream: temporalio.api.stream.v1.message_pb2.StreamRef | None = ...,
+        stream: temporalio.api.sdk.v1.stream_pb2.StreamRef | None = ...,
         from_offset: builtins.bytes = ...,
         wait: google.protobuf.duration_pb2.Duration | None = ...,
         max_records: builtins.int = ...,

@@ -17,7 +17,7 @@ from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
 
 DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
-    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08\x42\x32\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
+    b'\n3temporal/sdk/core/external_data/external_data.proto\x12\x15\x63oresdk.external_data\x1a\x1egoogle/protobuf/duration.proto\x1a\x1fgoogle/protobuf/timestamp.proto"\xb2\x02\n\x17LocalActivityMarkerData\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x0f\n\x07\x61ttempt\x18\x02 \x01(\r\x12\x13\n\x0b\x61\x63tivity_id\x18\x03 \x01(\t\x12\x15\n\ractivity_type\x18\x04 \x01(\t\x12\x31\n\rcomplete_time\x18\x05 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12*\n\x07\x62\x61\x63koff\x18\x06 \x01(\x0b\x32\x19.google.protobuf.Duration\x12:\n\x16original_schedule_time\x18\x07 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x1d\n\x10\x61\x63tivation_index\x18\x08 \x01(\x04H\x00\x88\x01\x01\x42\x13\n\x11_activation_index"3\n\x11PatchedMarkerData\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\ndeprecated\x18\x02 \x01(\x08"T\n\x16StreamAppendMarkerData\x12:\n\x07\x61ppends\x18\x01 \x03(\x0b\x32).coresdk.external_data.StreamAppendResult"\xe0\x01\n\x12StreamAppendResult\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t\x12\x18\n\x10\x61\x63tivation_index\x18\x04 \x01(\x04\x12>\n\x08\x61ppended\x18\x05 \x01(\x0b\x32*.coresdk.external_data.StreamAppendOffsetsH\x00\x12\x37\n\x07\x66\x61ilure\x18\x06 \x01(\x0b\x32$.coresdk.external_data.StreamFailureH\x00\x42\x08\n\x06result"@\n\x13StreamAppendOffsets\x12\x14\n\x0c\x66irst_offset\x18\x01 \x01(\x0c\x12\x13\n\x0blast_offset\x18\x02 \x01(\x0c"0\n\rStreamFailure\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t"N\n\x14StreamReadMarkerData\x12\x36\n\x05reads\x18\x01 \x03(\x0b\x32\'.coresdk.external_data.StreamReadResult"\xea\x01\n\x10StreamReadResult\x12\x0b\n\x03seq\x18\x01 \x01(\r\x12\x11\n\tstream_id\x18\x02 \x01(\t\x12\r\n\x05store\x18\x03 \x01(\t\x12\x18\n\x10\x61\x63tivation_index\x18\x04 \x01(\x04\x12\x13\n\x0b\x66rom_offset\x18\x05 \x01(\x0c\x12\x35\n\x04page\x18\x06 \x01(\x0b\x32%.coresdk.external_data.StreamReadPageH\x00\x12\x37\n\x07\x66\x61ilure\x18\x07 \x01(\x0b\x32$.coresdk.external_data.StreamFailureH\x00\x42\x08\n\x06result"s\n\x0eStreamReadPage\x12\x14\n\x0crecord_count\x18\x01 \x01(\r\x12\x0e\n\x06\x64igest\x18\x02 \x01(\x0c\x12\x14\n\x0crecord_bytes\x18\x03 \x01(\x04\x12\x13\n\x0blast_offset\x18\x04 \x01(\x0c\x12\x10\n\x08wait_cut\x18\x05 \x01(\x08\x42\x32\xea\x02/Temporalio::Internal::Bridge::Api::ExternalDatab\x06proto3'
 )
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
@@ -31,4 +31,18 @@ if _descriptor._USE_C_DESCRIPTORS == False:
     _LOCALACTIVITYMARKERDATA._serialized_end = 450
     _PATCHEDMARKERDATA._serialized_start = 452
     _PATCHEDMARKERDATA._serialized_end = 503
+    _STREAMAPPENDMARKERDATA._serialized_start = 505
+    _STREAMAPPENDMARKERDATA._serialized_end = 589
+    _STREAMAPPENDRESULT._serialized_start = 592
+    _STREAMAPPENDRESULT._serialized_end = 816
+    _STREAMAPPENDOFFSETS._serialized_start = 818
+    _STREAMAPPENDOFFSETS._serialized_end = 882
+    _STREAMFAILURE._serialized_start = 884
+    _STREAMFAILURE._serialized_end = 932
+    _STREAMREADMARKERDATA._serialized_start = 934
+    _STREAMREADMARKERDATA._serialized_end = 1012
+    _STREAMREADRESULT._serialized_start = 1015
+    _STREAMREADRESULT._serialized_end = 1249
+    _STREAMREADPAGE._serialized_start = 1251
+    _STREAMREADPAGE._serialized_end = 1366
 # @@protoc_insertion_point(module_scope)
