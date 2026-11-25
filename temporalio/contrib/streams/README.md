@@ -59,12 +59,18 @@ A Stream has no end that a read reports, so a reader stops at the application's 
 with a `wait` it stops once no Record came within the wait. It reads a page only when the caller
 asks for the next Record, so a reader that stops at its last Record leaves no read open.
 
-In Workflow code, a read with no Record to give waits up to its `wait`, but at most to the read
-limit of its Workflow Task (the Worker option `stream_read_time`), and then gives a page with no
-Record. A read asks for a new Workflow Task only when the Stream has more Records for it, so a
-read of an idle Stream makes no task. A replay reads the Records again from the Store, so the
-Retention of the Stream must cover the life of the Workflow and the time in which it gets
-queries.
+In Workflow code, a read with no `wait` gives the answer of the Store, which can be a page with no
+Record. A read with a `wait` and no Record to give waits up to its `wait`, but at most to the read
+limit of its Workflow Task (the Worker option `stream_read_time`). At that limit `read_page` gives
+a page with no Record. `read_pages()` yields that page and reads again from its offset, and so
+does `read()`. Each read waits its whole `wait` again, so with a `wait` that the read limit cuts,
+they go on until a Record comes, also over more than one Workflow Task. To stop at a time, call
+`read_page` in a loop that checks `workflow.now()`. A read with a `wait` that has no Record when
+its task completes starts again in the next task. It asks for a new Workflow Task only when the
+Stream has more Records for it, so a read of an idle Stream makes no task. An outage of the Store
+fails the Workflow Task, and Workflow code gets no error. A replay reads the Records again from the
+Store, so the Retention of the Stream must cover the life of the Workflow and the time in which it
+gets queries.
 
 In Workflow code, a read with no `max_records` gives at most 256 Records in a page, and a read
 with no `max_bytes` at most 4 MiB of them. A page has at most 16 MiB of Records, also for a larger

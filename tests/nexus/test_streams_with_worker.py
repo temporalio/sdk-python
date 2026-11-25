@@ -397,6 +397,53 @@ async def test_a_store_error_is_the_same_error_on_every_path(client: Client) -> 
             ]
 
 
+class _DownReadsStore(FaultStore):
+    """A Store whose reads fail as an outage until :py:attr:`up` is true."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.up = False
+
+    async def read_records(self, request: ReadRecordsRequest) -> Any:
+        if not self.up:
+            self.calls.append((request, None))
+            raise ConnectionError("The connection is gone")
+        return await super().read_records(request)
+
+
+async def test_a_store_outage_at_a_workflow_read_fails_the_workflow_task(
+    client: Client,
+) -> None:
+    store = _DownReadsStore()
+    client = stream_client(client, store)
+    await (await client.create_stream(id="down", body_type=int)).append(1)
+
+    async def back_after_a_task_failure(handle: Any, _worker: Any) -> None:
+        await assert_task_fail_eventually(handle)
+        store.up = True
+
+    # SDK Core tries the read again up to the read limit, and then fails the task, as
+    # for an append. Workflow code gets no error, also on a Worker that fails a
+    # Workflow for any exception, and the read runs in the next task.
+    for failure_types in ([], [Exception]):
+        with failure_note(f"failure types {failure_types}"):
+            store.up = False
+            options = RunOptions(
+                _CallsWorkflow,
+                [[["read", "down"]]],
+                task_timeout=timedelta(seconds=2),
+                worker={"workflow_failure_exception_types": failure_types},
+                during=back_after_a_task_failure,
+            )
+            ran = await run(client, options)
+            assert ran.result == [[[1], (1).to_bytes(8, "big").hex()]]
+            failed = _events(ran.history, EventType.EVENT_TYPE_WORKFLOW_TASK_FAILED)
+            assert failed
+            for event in failed:
+                message = event.workflow_task_failed_event_attributes.failure.message
+                assert message.startswith("StreamStoreUnavailable:"), message
+
+
 @workflow.defn
 class _CatchingWorkflow:
     @workflow.run
@@ -909,10 +956,12 @@ async def test_a_replay_gives_a_read_the_pages_of_the_first_run(
             # The page of this Record gets an activation before the next Record comes.
             await asyncio.sleep(0.3)
 
+    # The default read limit is half the task timeout, so a read with no Record
+    # is cut at 3 s, and a slow host still doesn't time out the task.
     options = RunOptions(
         _LatePagesWorkflow,
         [how],
-        task_timeout=timedelta(seconds=2),
+        task_timeout=timedelta(seconds=6),
         during=write,
         replay=True,
     )
@@ -1111,11 +1160,11 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
     stream = await client.create_stream(id="paged", body_type=int)
     await stream.append(1, 2, 3)
 
-    # A read with no limit asks for 256 Records and 4 MiB. The Store gets room for one
-    # Record more, so that SDK Core knows when the Stream has more. That Record has at
-    # most the Record size of the config and an offset of 1024 bytes, each in its field.
-    # A Store call waits no longer than the read time of the Worker, which is shorter
-    # than the wait of the read.
+    # A read with no limit asks for 256 Records and 4 MiB. SDK Core asks the Store for
+    # room for one Record more, since it acts on whether the Stream has more. That
+    # Record has at most the Record size of the config and an offset of 1024 bytes,
+    # each in its field. A Store call waits no longer than the read time of the
+    # Worker, which is shorter than the wait of the read.
     def field(size: int) -> int:
         return 1 + (size.bit_length() + 6) // 7 + size
 
@@ -1133,13 +1182,22 @@ async def test_a_workflow_read_asks_the_store_with_its_limits(client: Client) ->
                 ["paged", limits],
                 worker={"stream_read_time": read_time},
             )
-            assert (await run(client, options)).result == [1, 2, 3]
+            ran = await run(client, options)
+            assert ran.result == [1, 2, 3]
             reads = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
             asked = [(r.max_records, r.max_bytes) for r in reads]
             # With one Record in a page, the read of each Record is one Store call.
             assert asked == [expected] * (3 if limits else 1)
             waits = [r.wait.ToTimedelta() for r in reads]
             assert timedelta(0) < waits[0] and max(waits) <= read_time
+            # A replay asks for the Records that History recorded, and no more.
+            store.calls.clear()
+            await Replayer(
+                workflows=[_ReadAllWorkflow],
+                stream_config=client._config["stream_config"],
+            ).replay_workflow(ran.history)
+            replayed = [r for r in store.requests if isinstance(r, ReadRecordsRequest)]
+            assert [r.max_records for r in replayed] == ([1] * 3 if limits else [3])
 
 
 @workflow.defn
@@ -1193,6 +1251,50 @@ async def test_a_workflow_read_of_a_quiet_stream_makes_no_workflow_task(
         replay=True,
     )
     assert (await run(client, options)).result == [1, 2]
+
+
+@workflow.defn
+class _FirstRecordWorkflow:
+    @workflow.signal
+    def wake(self) -> None:
+        pass
+
+    @workflow.run
+    async def run(self, stream_id: str) -> list[int]:
+        stream = workflow.get_stream(StreamRef[int](id=stream_id))
+        async for record in stream.read(wait=timedelta(seconds=5)):
+            return [record.body]
+        return []
+
+
+async def test_a_workflow_read_goes_on_after_the_read_limit_cut_its_wait(
+    client: Client,
+) -> None:
+    store = FaultStore()
+    client = stream_client(client, store)
+    stream = await client.create_stream(id="cut", body_type=int)
+
+    async def write(handle: Any, _worker: Any) -> None:
+        async def cut_page() -> None:
+            history = await handle.fetch_history()
+            markers = _stream_markers(history, "read")
+            assert any(b'"wait_cut":true' in m.SerializeToString() for m in markers)
+            assert _events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED)
+
+        # The read limit cuts the wait of 5 s at 1 s. The iterator reads again, and
+        # that read waits for the next task, which a Signal opens.
+        await assert_eventually(cut_page)
+        await stream.append(1)
+        await handle.signal(_FirstRecordWorkflow.wake)
+
+    options = RunOptions(
+        _FirstRecordWorkflow,
+        ["cut"],
+        worker={"stream_read_time": timedelta(seconds=1)},
+        during=write,
+        replay=True,
+    )
+    assert (await run(client, options)).result == [1]
 
 
 async def test_a_workflow_read_with_no_wait_reads_again_in_the_next_task(

@@ -1004,3 +1004,80 @@ async def _reads_script(
     # An eviction sends no command, also for the reads whose readers it cancels.
     evict = WorkflowActivationJob(remove_from_cache=RemoveFromCache())
     assert not (await _activate(instance, evict)).successful.commands
+
+
+@workflow.defn
+class _ReadToTheEndWorkflow:
+    @workflow.run
+    async def run(self, how: str) -> list[Any]:
+        stream = workflow.get_stream(ModelRef[int](id="s", store="a"))
+        wait = timedelta(seconds=5)
+        if how == "read_page":
+            page = await stream.read_page(wait=wait)
+            return [page.records, page.last_offset]
+        if how == "read":
+            return [record.body async for record in stream.read(wait=wait)]
+        pages = stream.read_pages(wait=wait)
+        return [[record.body for record in page.records] async for page in pages]
+
+
+async def test_a_read_goes_on_after_a_page_that_the_read_limit_cut() -> None:
+    converter = temporalio.converter.DefaultPayloadConverter()
+
+    def read(seq: int, after: int) -> WorkflowCommand:
+        command = ReadStream(
+            seq=seq,
+            stream=StreamRef(id="s", store="a"),
+            from_offset=_offset(after),
+            wait=Duration(seconds=5),
+        )
+        return WorkflowCommand(read_stream=command)
+
+    def page(
+        seq: int, records: Sequence[int], last: int, wait_cut: bool = False
+    ) -> WorkflowActivationJob:
+        stream_page = StreamPage(
+            records=[
+                StreamRecord(offset=_offset(number), body=converter.to_payload(number))
+                for number in records
+            ],
+            last_offset=_offset(last),
+            wait_cut=wait_cut,
+        )
+        job = ResolveStreamRead(seq=seq, page=stream_page)
+        return WorkflowActivationJob(resolve_stream_read=job)
+
+    def start(how: str) -> WorkflowActivationJob:
+        arguments = [converter.to_payload(how)]
+        return WorkflowActivationJob(
+            initialize_workflow=InitializeWorkflow(arguments=arguments)
+        )
+
+    def result(completion: WorkflowActivationCompletion) -> Any:
+        [complete] = completion.successful.commands
+        return converter.from_payload(complete.complete_workflow_execution.result)
+
+    config = StreamConfig([MemoryStreamStore(name="a")])
+    # A single read gives the cut page as it is, with no Record.
+    instance = _new_instance(_ReadToTheEndWorkflow, config)
+    completion = await _activate(instance, start("read_page"))
+    assert list(completion.successful.commands) == [read(1, 0)]
+    assert result(await _activate(instance, page(1, [], 0, wait_cut=True))) == [
+        [],
+        None,
+    ]
+
+    for how in ("read", "read_pages"):
+        with failure_note(how):
+            instance = _new_instance(_ReadToTheEndWorkflow, config)
+            completion = await _activate(instance, start(how))
+            assert list(completion.successful.commands) == [read(1, 0)]
+            completion = await _activate(instance, page(1, [1], 1))
+            assert list(completion.successful.commands) == [read(2, 1)]
+            # The read limit of the task ended this wait, so the reader reads again.
+            completion = await _activate(instance, page(2, [], 1, wait_cut=True))
+            assert list(completion.successful.commands) == [read(3, 1)]
+            # A page with no Record after the whole wait ends the reader.
+            completion = await _activate(instance, page(3, [], 1))
+            expected = [1] if how == "read" else [[1], [], []]
+            assert result(completion) == expected

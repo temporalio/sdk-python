@@ -230,14 +230,16 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         )
         # A body that the converter refuses fails the Workflow Task, as a result of a
         # Local Activity does.
-        read.waiter.set_result(
-            temporalio.nexus.system._support.model_from_proto(
-                page,
-                read.page_type,
-                self._instance._context_free_payload_converter,
-                self._instance._context_free_failure_converter,
-            )
+        model = temporalio.nexus.system._support.model_from_proto(
+            page,
+            read.page_type,
+            self._instance._context_free_payload_converter,
+            self._instance._context_free_failure_converter,
         )
+        if job.page.wait_cut and not model.records:
+            # So `read` and `read_pages` read again where a whole wait would end them.
+            model.records = temporalio.nexus.system._support.WaitCutRecords()
+        read.waiter.set_result(model)
 
     def _error(self, failure: temporalio.api.failure.v1.Failure) -> BaseException:
         instance = self._instance

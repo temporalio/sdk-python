@@ -278,8 +278,8 @@ class StreamConfig:
       any other Local Activity.
     - An append is at-least-once. If a Workflow Task fails after its append, the
       next attempt of the task writes the batch again.
-    - An outage of the Store gives Workflow code no error. The Workflow Task
-      fails, and the server tries it again.
+    - An outage of the Store gives Workflow code no error, also at a read. The
+      Workflow Task fails, and the server tries it again.
     - A call that Workflow code doesn't await before the Workflow ends may not
       happen.
     - A call with no Store fails the Workflow Task, also when Workflow code
@@ -291,15 +291,25 @@ class StreamConfig:
     - A read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record over
       :py:attr:`max_record_bytes`. So a reader needs a limit at least as large
       as that of each writer of its Stream.
-    - A read with no Record to give waits up to its ``wait``, but at most to the
-      read limit of its Workflow Task, which the Worker option
-      ``stream_read_time`` sets. It then gives a page with no Record. A read
-      with no wait goes on until the Store answers.
+    - A read with no wait gives the answer of the Store, which can be a page with
+      no Record.
+    - A read with a ``wait`` and no Record to give waits up to its ``wait``, but
+      at most to the read limit of its Workflow Task, which the Worker option
+      ``stream_read_time`` sets. At that limit ``read_page`` gives a page with no
+      Record. ``read_pages`` yields that page and reads again from its offset,
+      and so does ``read``. Each read waits its whole ``wait`` again. So with a
+      ``wait`` that the read limit cuts, they go on until a Record comes, also
+      over more than one Workflow Task. To stop at a time, call ``read_page``
+      in a loop that checks ``workflow.now()``.
     - A read holds its Workflow Task up to the read limit. A Signal that comes
       meanwhile waits until the read has its page, or until that limit. A
-      command for the server doesn't wait for a read.
-    - A read asks for a new Workflow Task only when SDK Core knows that the
-      Stream has more Records for it, so a read of an idle Stream makes no task.
+      command for the server waits only for one Store call with no wait for each
+      read, of at most 1 s.
+    - A read with a ``wait`` that has no Record when its Workflow Task completes
+      starts again in the next task. It asks for that task only when SDK Core
+      knows that the Stream has more Records for it, so a read of an idle Stream
+      makes no task. A Workflow Task gives at most 256 read results, and later
+      reads start in the next task.
     - A replay reads the Records of each read from the Store again. So the
       Retention of a Stream must cover the life of each Workflow that reads it,
       and the time in which that Workflow gets queries.

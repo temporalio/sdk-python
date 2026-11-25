@@ -393,6 +393,35 @@ def test_a_read_waits_for_the_next_write_or_for_its_wait() -> None:
             run_with_virtual_clock(script(random.Random(seed)))
 
 
+async def test_a_store_call_of_the_bridge_gives_the_store_the_caps_of_the_read() -> (
+    None
+):
+    asked: list[ReadRecordsRequest] = []
+
+    class Asked(_MemoryStreams):
+        async def read_records(
+            self, request: ReadRecordsRequest
+        ) -> ReadRecordsResponse:
+            asked.append(request)
+            return await super().read_records(request)
+
+    streams = Asked("memory", retention=timedelta(days=1), resend_window=1, fence=False)
+    await streams.create_stream(CreateStreamRequest(stream_id=_S), request_id="c")
+    await streams.append_records(_client_append(), request_id="a")
+    await streams.append_records(_client_append(), request_id="b")
+    read = ReadRecordsRequest(stream_id=_S, max_records=1, max_bytes=100)
+    answer = await call_stream_store(
+        Runtime.default()._core_runtime,
+        _StoreCaller(lambda: streams),
+        "ReadRecords",
+        read.SerializeToString(),
+    )
+    # Only SDK Core asks for one Record more, since only it acts on whether the
+    # Stream has more after the page. Client and Activity code don't.
+    assert asked == [read]
+    assert len(ReadRecordsResponse.FromString(answer).records) == 1
+
+
 async def test_a_dropped_store_call_never_reaches_the_store() -> None:
     asked: list[str] = []
 
