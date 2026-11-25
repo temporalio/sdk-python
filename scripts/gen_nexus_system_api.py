@@ -46,6 +46,7 @@ proto_files = [
     / "streamservice"
     / "v1"
     / "request_response.proto",
+    gen_protos.api_proto_dir / "temporal" / "api" / "sdk" / "v1" / "stream.proto",
 ]
 
 
