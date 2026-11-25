@@ -151,10 +151,6 @@ async def env(env_type: str) -> AsyncGenerator[WorkflowEnvironment, None]:
         "frontend.activityAPIsEnabled=true",
         "--dynamic-config-value",
         "frontend.enableCancelWorkerPollsOnShutdown=true",
-        # The server can miss a poll that comes right after `ShutdownWorker`, and the Worker then
-        # waits until that poll expires. A short expiration keeps such a shutdown fast.
-        "--dynamic-config-value",
-        'matching.longPollExpirationInterval="5s"',
         "--dynamic-config-value",
         "frontend.WorkerHeartbeatsEnabled=true",
         "--dynamic-config-value",
