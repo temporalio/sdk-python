@@ -3540,9 +3540,9 @@ class ChildAlreadyStartedWorkflow:
     async def run(self) -> None:
         # Try to start it twice
         id = f"{workflow.info().workflow_id}_child"
-        await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+        await workflow.start_child_workflow(WaitForCancelWorkflow.run, id=id)
         try:
-            await workflow.start_child_workflow(LongSleepWorkflow.run, id=id)
+            await workflow.start_child_workflow(WaitForCancelWorkflow.run, id=id)
         except WorkflowAlreadyStartedError:
             raise ApplicationError("Already started")
 
@@ -3554,7 +3554,7 @@ async def test_workflow_child_already_started(client: Client, env: WorkflowEnvir
             "Java test server: https://github.com/temporalio/sdk-java/issues/1220"
         )
     async with new_worker(
-        client, ChildAlreadyStartedWorkflow, LongSleepWorkflow
+        client, ChildAlreadyStartedWorkflow, WaitForCancelWorkflow
     ) as worker:
         with pytest.raises(WorkflowFailureError) as err:
             await client.execute_workflow(
@@ -10655,7 +10655,7 @@ class UncancelShieldChildWorkflow:
         # Start a child workflow via execute (which internally uses shield loops)
         child_task = asyncio.create_task(
             workflow.execute_child_workflow(
-                LongSleepWorkflow.run,
+                WaitForCancelWorkflow.run,
                 id=f"{workflow.info().workflow_id}_child",
             )
         )
@@ -10691,7 +10691,7 @@ async def test_workflow_uncancel_shield_child_workflow(client: Client):
         async with new_worker(
             client,
             UncancelShieldChildWorkflow,
-            LongSleepWorkflow,
+            WaitForCancelWorkflow,
         ) as worker:
             handle = await client.start_workflow(
                 UncancelShieldChildWorkflow.run,
