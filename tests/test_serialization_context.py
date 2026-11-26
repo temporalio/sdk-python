@@ -2734,7 +2734,6 @@ class NexusStartedExecutionHandler:
     @nexus.temporal_operation
     async def update_workflow(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: NexusUpdateInput,
     ) -> nexus.TemporalOperationResult[str]:
@@ -2749,7 +2748,6 @@ class NexusStartedExecutionHandler:
     @nexus.temporal_operation
     async def start_workflow(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: NexusStartedInput,
     ) -> nexus.TemporalOperationResult[str]:
@@ -2758,7 +2756,6 @@ class NexusStartedExecutionHandler:
     @nexus.temporal_operation
     async def start_retried_workflow(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: NexusStartedInput,
     ) -> nexus.TemporalOperationResult[str]:
@@ -2774,7 +2771,6 @@ class NexusStartedExecutionHandler:
     @nexus.temporal_operation
     async def start_activity(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: NexusStartedInput,
     ) -> nexus.TemporalOperationResult[str]:

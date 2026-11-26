@@ -101,6 +101,7 @@ informal introduction to the features and their implementation.
       - [Testing](#testing-1)
     - [Interceptors](#interceptors)
     - [Nexus](#nexus)
+      - [Experimental Temporal operation handlers](#experimental-temporal-operation-handlers)
     - [Plugins](#plugins)
       - [Usage](#usage-1)
       - [Plugin Implementations](#plugin-implementations)
@@ -1618,26 +1619,8 @@ code](https://github.com/temporalio/samples-python/blob/main/context_propagation
 [Nexus](https://github.com/nexus-rpc/) is a synchronous RPC protocol. Arbitrary duration operations that can respond
 asynchronously are modeled on top of a set of pre-defined synchronous RPCs.
 
-Temporal supports calling Nexus operations **from a workflow** or directly from a client using
-[Standalone Nexus Operations](https://docs.temporal.io/develop/python/nexus/standalone-operations).
-Standalone Nexus Operations are in [Public Preview](https://docs.temporal.io/evaluate/development-production-features/release-stages#public-preview).
-We aim to preserve backward compatibility and avoid breaking changes. See https://docs.temporal.io/nexus.
-
-To get started quickly using Nexus with Temporal, see the Python Nexus sample:
-https://github.com/temporalio/samples-python/tree/nexus/hello_nexus.
-
-
-Two types of Nexus operation are supported, each using a decorator:
-
-- `@temporalio.nexus.workflow_run_operation`: a Nexus operation that is backed by a Temporal workflow. The operation
-  handler you write will start the handler workflow and then respond with a token indicating that the handler workflow
-  is in progress. When the handler workflow completes, Temporal server will automatically deliver the result (success or
-  failure) to the caller workflow.
-- `@nexusrpc.handler.sync_operation`: an operation that responds synchronously. It may be `def` or `async def` and it
-may do network I/O, but it must respond within 10 seconds.
-
-The following steps are an overview of the [Python Nexus sample](
-https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
+Start with the [Hello Nexus sample](https://github.com/temporalio/samples-python/tree/main/hello_nexus). It demonstrates a
+greeting that returns immediately and a greeting that completes when its backing Workflow finishes.
 
 1. Create the caller and handler namespaces, and the Nexus endpoint. For example,
     ```
@@ -1653,6 +1636,8 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
 2. Define your service contract. This specifies the names and input/output types of your operations. You will use this
    to refer to the operations when calling them from a workflow.
     ```python
+    import nexusrpc
+
     @nexusrpc.service
     class MyNexusService:
         my_sync_operation: nexusrpc.Operation[MyInput, MyOutput]
@@ -1661,6 +1646,11 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
 
 3. Implement your operation handlers in a service handler:
     ```python
+    import uuid
+
+    from nexusrpc.handler import StartOperationContext, service_handler, sync_operation
+    from temporalio import nexus
+
     @service_handler(service=MyNexusService)
     class MyNexusServiceHandler:
         @sync_operation
@@ -1669,9 +1659,9 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
         ) -> MyOutput:
             return MyOutput(message=f"Hello {input.name} from sync operation!")
 
-        @workflow_run_operation
+        @nexus.workflow_run_operation
         async def my_workflow_run_operation(
-            self, ctx: WorkflowRunOperationContext, input: MyInput
+            self, ctx: nexus.WorkflowRunOperationContext, input: MyInput
         ) -> nexus.WorkflowHandle[MyOutput]:
             return await ctx.start_workflow(
                 WorkflowStartedByNexusOperation.run,
@@ -1717,6 +1707,47 @@ https://github.com/temporalio/samples-python/tree/nexus/hello_nexus).
             sync_result = await sync_operation_handle
             return sync_result, wf_result
     ```
+
+Temporal supports calling Nexus operations **from a workflow** or directly from a client using
+[Standalone Nexus Operations](https://docs.temporal.io/develop/python/nexus/standalone-operations).
+Standalone Nexus Operations are in [Public Preview](https://docs.temporal.io/evaluate/development-production-features/release-stages#public-preview).
+We aim to preserve backward compatibility and avoid breaking changes. See https://docs.temporal.io/nexus.
+
+#### Experimental Temporal operation handlers
+
+> **Breaking change.** Start handlers no longer receive a context argument: change `(self, ctx, client, input)` to
+> `(self, client, input)` and read invocation metadata from `nexus.info()`. Custom cancel overrides receive only their
+> typed options.
+
+To implement the same service with one decorator, use `@nexus.temporal_operation`. An `async def` handler
+receives `(self, client, input)`, where `client` is a `TemporalNexusClient`. Use
+`TemporalOperationResult.sync(value)` to complete immediately, or return the result of the client method
+that starts a backing Workflow, Workflow Update, or Activity to complete later.
+
+```python
+@service_handler(service=MyNexusService)
+class ExperimentalNexusServiceHandler:
+    @nexus.temporal_operation
+    async def my_sync_operation(
+        self, client: nexus.TemporalNexusClient, input: MyInput
+    ) -> nexus.TemporalOperationResult[MyOutput]:
+        return nexus.TemporalOperationResult.sync(MyOutput(message=f"Hello, {input.name}!"))
+
+    @nexus.temporal_operation
+    async def my_workflow_run_operation(
+        self, client: nexus.TemporalNexusClient, input: MyInput
+    ) -> nexus.TemporalOperationResult[MyOutput]:
+        return await client.start_workflow(
+            WorkflowStartedByNexusOperation.run,
+            input,
+            id=str(uuid.uuid4()),
+        )
+```
+
+Register `ExperimentalNexusServiceHandler()` with the handler Worker to run this implementation. Custom cancel
+handlers receive their typed options. Use `nexus.info()` for invocation metadata and
+`nexus.task_cancellation()` to observe cancellation of the current invocation. Worker Nexus inbound
+interceptors can read incoming headers from `input.ctx.headers`.
 
 
 ### Plugins

@@ -27,9 +27,9 @@ import nexusrpc
 from nexusrpc.handler import (
     CancelOperationContext,
     OperationContext,
+    OperationTaskCancellation,
     StartOperationContext,
 )
-from typing_extensions import Self
 
 import temporalio.api.common.v1
 import temporalio.api.nexus.v1
@@ -130,6 +130,40 @@ class Info:
     task_queue: str
     """The task queue of the worker handling this Nexus operation."""
 
+    service: str
+    """The service name for the current Nexus request."""
+
+    operation: str
+    """The operation name for the current Nexus request."""
+
+    request_id: str | None
+    """Opaque ID shared by retries of the same start request, if available.
+
+    Cancel invocations have no start request ID.
+    """
+
+    @classmethod
+    def _from_operation_context(
+        cls,
+        context: OperationContext,
+        *,
+        endpoint: str,
+        namespace: str,
+        task_queue: str,
+    ) -> Info:
+        return cls(
+            endpoint=endpoint,
+            namespace=namespace,
+            task_queue=task_queue,
+            service=context.service,
+            operation=context.operation,
+            request_id=(
+                (context.request_id or None)
+                if isinstance(context, StartOperationContext)
+                else None
+            ),
+        )
+
 
 def in_operation() -> bool:
     """Whether the current code is inside a Nexus operation."""
@@ -139,6 +173,15 @@ def in_operation() -> bool:
 def info() -> Info:
     """Get the current Nexus operation information."""
     return _temporal_context().info()
+
+
+def task_cancellation() -> OperationTaskCancellation:
+    """Get the cancellation state of the current Nexus handler task.
+
+    Async handlers can also receive :py:class:`asyncio.CancelledError` at an await. The worker
+    records the cancellation reason before interrupting the handler.
+    """
+    return _temporal_context().nexus_context.task_cancellation
 
 
 def client() -> temporalio.client.Client:
@@ -640,34 +683,6 @@ class _TemporalCancelOperationContext(_TemporalOperationCtx[CancelOperationConte
 
     def set(self) -> None:
         _temporal_cancel_operation_context.set(self)
-
-
-class TemporalStartOperationContext(StartOperationContext):
-    """Context received by a Temporal Nexus operation when it is started.
-
-    .. warning::
-       This API is experimental and unstable.
-    """
-
-    @classmethod
-    def _from_start_operation_context(cls, ctx: StartOperationContext) -> Self:
-        return cls(
-            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
-        )
-
-
-class TemporalCancelOperationContext(CancelOperationContext):
-    """Context received by a Temporal Nexus operation when it is canceled.
-
-    .. warning::
-       This API is experimental and unstable.
-    """
-
-    @classmethod
-    def _from_cancel_operation_context(cls, ctx: CancelOperationContext) -> Self:
-        return cls(
-            **{f.name: getattr(ctx, f.name) for f in dataclasses.fields(ctx)},
-        )
 
 
 class LoggerAdapter(logging.LoggerAdapter):

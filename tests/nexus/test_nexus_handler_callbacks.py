@@ -170,7 +170,6 @@ class OperationKindsNotificationHandler:
     @nexus.temporal_operation(name="TemporalOnComplete")
     async def temporal_on_complete(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         _client: nexus.TemporalNexusClient,
         _input: notifications.OnCompleteRequest[NotificationValue, NotificationValue],
     ) -> nexus.TemporalOperationResult[notifications.OnCompleteResponse]:
@@ -558,7 +557,6 @@ class ActivityOnCompleteHandler:
     @nexus.temporal_operation
     async def on_complete(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: notifications.OnCompleteRequest[EchoOutput, CallbackContext],
     ) -> nexus.TemporalOperationResult[notifications.OnCompleteResponse]:
@@ -591,7 +589,6 @@ class WorkflowOnCompleteHandler:
     @nexus.temporal_operation
     async def on_complete(
         self,
-        _ctx: nexus.TemporalStartOperationContext,
         client: nexus.TemporalNexusClient,
         input: notifications.OnCompleteRequest[EchoOutput, CallbackContext],
     ) -> nexus.TemporalOperationResult[notifications.OnCompleteResponse]:

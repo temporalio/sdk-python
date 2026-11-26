@@ -102,20 +102,15 @@ async def test_collected_operation_names(
         assert actual_op.output_type == expected_op.output_type
 
 
-def test_unsafe_narrow_context_annotations_warn_and_drop_input_type():
-    """Unsafe context annotations warn and prevent input type inference.
-
-    Decorators construct a specific context type at runtime. If a handler annotates a
-    narrower or unrelated context type, the decorator cannot safely call it, so we
-    should warn and avoid using the handler annotation to infer operation input type.
-    """
+def test_unsafe_narrow_parameter_annotations_warn_and_drop_input_type():
+    """Narrower SDK parameter annotations prevent inference of the input type."""
 
     with pytest.warns(
         UserWarning,
-        match="Expected parameter 1 .* TemporalStartOperationContext",
+        match="Expected parameter 1 .* TemporalNexusClient",
     ):
 
-        class MyTemporalOpCtx(nexus.TemporalStartOperationContext):
+        class MyTemporalNexusClient(nexus.TemporalNexusClient):
             def custom_method(self):
                 raise NotImplementedError
 
@@ -123,8 +118,7 @@ def test_unsafe_narrow_context_annotations_warn_and_drop_input_type():
             @nexus.temporal_operation  # type: ignore[arg-type]
             async def op(
                 self,
-                _ctx: MyTemporalOpCtx,
-                _client: nexus.TemporalNexusClient,
+                _client: MyTemporalNexusClient,
                 _input: Input,
             ) -> nexus.TemporalOperationResult[Output]:
                 raise NotImplementedError
@@ -158,13 +152,8 @@ def test_unsafe_narrow_context_annotations_warn_and_drop_input_type():
     assert workflow_op.output_type == Output
 
 
-def test_safe_broader_context_annotations_preserve_input_type_without_warnings():
-    """Safe context annotations preserve input type inference without warnings.
-
-    A handler can safely annotate a context parameter with the exact runtime context
-    type or a broader base type. These cases should keep handler-derived operation
-    input metadata intact.
-    """
+def test_safe_broader_parameter_annotations_preserve_input_type_without_warnings():
+    """Broader SDK parameter annotations preserve inference of the input type."""
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -173,8 +162,7 @@ def test_safe_broader_context_annotations_preserve_input_type_without_warnings()
             @nexus.temporal_operation
             async def op(
                 self,
-                _ctx: nexusrpc.handler.StartOperationContext,
-                _client: nexus.TemporalNexusClient,
+                _client: object,
                 _input: Input,
             ) -> nexus.TemporalOperationResult[Output]:
                 raise NotImplementedError
