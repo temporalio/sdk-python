@@ -227,6 +227,42 @@ async def test_temporal_operation_preserves_explicit_result_modes(
     assert await handler.start_operation(client, None) is result
 
 
+@pytest.mark.parametrize(
+    ("annotation", "returned", "error"),
+    [
+        (
+            nexus.TemporalOperationResult[str],
+            "payload",
+            "must return a TemporalOperationResult",
+        ),
+        (Any, "payload", "must return a TemporalOperationResult"),
+        (Signature.empty, "payload", "must return a TemporalOperationResult"),
+        (
+            str,
+            nexus.TemporalOperationResult[str].sync("payload"),
+            "annotated with a payload type but returned a TemporalOperationResult",
+        ),
+    ],
+)
+async def test_temporal_operation_rejects_result_that_contradicts_annotation(
+    annotation: Any, returned: Any, error: str
+):
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return returned
+
+    if annotation is Signature.empty:
+        del Handler.start.__annotations__["return"]
+    else:
+        Handler.start.__annotations__["return"] = annotation
+
+    method = nexus.temporal_operation(Handler.start)
+    handler = getattr(method, "__nexus_operation_factory__")(Handler())
+    client = cast(nexus.TemporalNexusClient, object())
+    with pytest.raises(TypeError, match=error):
+        await handler.start_operation(client, None)
+
+
 @pytest.mark.skipif(
     sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
 )

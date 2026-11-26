@@ -55,7 +55,7 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     )
 
 
-def get_temporal_operation_start_method_input_and_output_type_annotations(
+def get_temporal_operation_start_method_types(
     start: Callable[
         [
             NexusServiceType,
@@ -67,13 +67,18 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
 ) -> tuple[
     type[InputT] | None,
     type[OutputT] | None,
+    bool,
 ]:
-    """Return operation input and output types.
+    """Return operation input and output types, and whether ``start`` returns a wrapper.
 
     The output type is the payload type, whether ``start`` is annotated with the
     payload type or with :py:class:`temporalio.nexus.TemporalOperationResult`. For
     example, a start method annotated ``-> MyOutput`` or
     ``-> TemporalOperationResult[MyOutput]`` has output type ``MyOutput``.
+
+    The last value is ``True`` when ``start`` must return a
+    :py:class:`temporalio.nexus.TemporalOperationResult`: it is annotated with one, or
+    its return type is unspecified (``Any`` or no annotation).
     """
     input_type, return_type = _get_start_method_input_and_output_type_annotations(
         start, expected_param_types=(TemporalNexusClient,)
@@ -94,12 +99,12 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
             return_type = return_type.__value__
 
     if return_type is None or return_type is Any:
-        return input_type, None
+        return input_type, None, True
 
     origin = typing.get_origin(return_type) or return_type
     if origin is TemporalOperationResult:
         args = typing.get_args(return_type)
-        return input_type, args[0] if args else None
+        return input_type, args[0] if args else None, True
 
     result_types = (
         (typing.get_origin(arg) or arg for arg in typing.get_args(return_type))
@@ -119,7 +124,7 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
             f"@temporal_operation method {start} must declare a payload type or "
             "TemporalOperationResult with the payload type inside the wrapper."
         )
-    return input_type, return_type
+    return input_type, return_type, False
 
 
 def _get_wrapped_start_method_input_and_output_type_annotations(

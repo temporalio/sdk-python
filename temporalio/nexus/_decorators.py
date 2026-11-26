@@ -31,7 +31,7 @@ from ._operation_handlers import (
 from ._token import WorkflowHandle
 from ._util import (
     get_callable_name,
-    get_temporal_operation_start_method_input_and_output_type_annotations,
+    get_temporal_operation_start_method_types,
     get_workflow_run_start_method_input_and_output_type_annotations,
     is_async_callable,
     set_operation_factory,
@@ -193,9 +193,10 @@ def temporal_operation(
 
     To return a :py:class:`TemporalOperationResult`, annotate the method with
     ``TemporalOperationResult[PayloadType]``. The wrapper can hold either a
-    synchronous payload or an asynchronous operation token. A returned
-    ``TemporalOperationResult`` is used as is; any other value completes the
-    operation synchronously.
+    synchronous payload or an asynchronous operation token. A method with an
+    unspecified return type, such as ``Any`` or no annotation, must also return a
+    ``TemporalOperationResult``. Returning the other form than the annotation
+    declares raises :py:class:`TypeError`.
 
     Set dynamic=True to set a Nexus operation handler as a catch-all handler,
     which will handle any unknown operation that's dispatched to that Nexus service.
@@ -218,10 +219,9 @@ def temporal_operation(
                 f"{start} is not an `async def` method. "
                 "@temporal_operation must decorate an `async def` start method."
             )
-        (
-            input_type,
-            output_type,
-        ) = get_temporal_operation_start_method_input_and_output_type_annotations(start)
+        input_type, output_type, is_wrapped = get_temporal_operation_start_method_types(
+            start
+        )
         if dynamic and input_type is not temporalio.common.RawValue:
             raise TypeError(
                 "A dynamic operation handler must accept temporalio.common.RawValue"
@@ -252,8 +252,18 @@ def temporal_operation(
                     input: InputT,
                 ) -> TemporalOperationResult[Any]:
                     result = await _start(client, input)
-                    if isinstance(result, TemporalOperationResult):
+                    if is_wrapped:
+                        if not isinstance(result, TemporalOperationResult):
+                            raise TypeError(
+                                f"@temporal_operation method {start} must return a "
+                                "TemporalOperationResult."
+                            )
                         return result
+                    if isinstance(result, TemporalOperationResult):
+                        raise TypeError(
+                            f"@temporal_operation method {start} is annotated with a "
+                            "payload type but returned a TemporalOperationResult."
+                        )
                     return TemporalOperationResult.sync(result)
 
             _TemporalOperationHandler.start_operation.__doc__ = start.__doc__
