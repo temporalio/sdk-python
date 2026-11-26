@@ -66,10 +66,15 @@ class WorkflowActivation(google.protobuf.message.Message):
      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
      normally would have when executing.
-    * Stream results go with the local activity resolutions, because a replay scans ahead for them
-     too. In one activation of the first run, the Stream results go first, appends before reads,
-     each in `seq` order, and then the local activity resolutions. If a replay gives several
-     activations in one, the results keep the order of those activations.
+    * Stream results go with the local activity resolutions, for the same reason. Core records a
+     Stream result in a `core_stream_append` or `core_stream_read` marker, which History has after
+     the `WorkflowTaskCompleted` event of its task. A replay must give the result before it reaches
+     that event, so it scans ahead in History for the marker, as for a local activity marker. Each
+     result in the marker has the index of the activation that got it, so the replay gives it in
+     that same activation. In one activation, the Stream results go first, appends before reads,
+     each in `seq` order, and then the local activity resolutions. A replay with workflow task
+     chunking on can give several activations of the first run as one. Then the results go in the
+     order of those activations.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 

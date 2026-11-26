@@ -144,17 +144,8 @@ global___PatchedMarkerData = PatchedMarkerData
 
 @typing.final
 class StreamAppendMarkerData(google.protobuf.message.Message):
-    """The data of a `core_stream_append` marker, which the marker's `data` detail holds as JSON with
-    each `bytes` field in lower-case hex. Core records one marker for each activation that gives
-    Workflow code the result of an append. A completion that leaves an append open in a task with
-    no such marker records one with no entry, so that a replay with chunking on keeps the task
-    apart from the next one.
-
-    Every later version of Core must read the markers in History, so these rules apply to each
-    message of the marker.
-    * A field never changes its name, because the name is its key in the JSON.
-    * A new field is `optional`, because older markers don't have it.
-    * A new `repeated` field gets `#[serde(default)]` in `build.rs`, for the same reason.
+    """The data of a `core_stream_append` marker, as JSON with `bytes` fields in lower-case hex. An
+    empty marker keeps a task with an open append apart from the next task when chunking is on.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -188,7 +179,9 @@ class StreamAppendResult(google.protobuf.message.Message):
     seq: builtins.int
     stream_id: builtins.str
     store: builtins.str
-    """The Store name of the Stream's ref."""
+    """The name of the Store that the append used. For a ref with no Store name, it is the name of
+    the Worker's only Stream runtime.
+    """
     activation_index: builtins.int
     """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
     @property
@@ -288,9 +281,10 @@ global___StreamFailure = StreamFailure
 @typing.final
 class StreamReadMarkerData(google.protobuf.message.Message):
     """The data of a `core_stream_read` marker. Core records one in each activation in which Workflow
-    code got the page of a read, and one with no entry by the rule of `StreamAppendMarkerData`. The
-    marker keeps the offsets, the count and a digest of each page, never its Records. A replay reads
-    the Records from the Store again. The JSON rules of `StreamAppendMarkerData` apply.
+    code got the page of a read. An empty marker keeps a task with an open read and no open append
+    apart from the next task when chunking is on. The marker keeps the offsets, the count and a
+    digest of each page, never its Records. A replay reads the Records from the Store again. Its
+    JSON has `bytes` fields in lower-case hex, as for appends.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -325,7 +319,9 @@ class StreamReadResult(google.protobuf.message.Message):
     seq: builtins.int
     stream_id: builtins.str
     store: builtins.str
-    """The Store name of the Stream's ref."""
+    """The name of the Store that the read used. For a ref with no Store name, it is the name of the
+    Worker's only Stream runtime.
+    """
     activation_index: builtins.int
     """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
     from_offset: builtins.bytes
