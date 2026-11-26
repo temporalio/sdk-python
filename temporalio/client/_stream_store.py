@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import google.protobuf.message
 import nexusrpc
@@ -41,9 +41,6 @@ from temporalio.converter import (
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 from temporalio.exceptions import StreamError
 from temporalio.nexus.system.stream_service import StreamService
-
-if TYPE_CHECKING:
-    import temporalio.worker._workflow_streams
 
 logger = logging.getLogger(__name__)
 
@@ -212,26 +209,6 @@ class StreamStore(ABC):
         Record of a Stream.
         """
         raise NotImplementedError
-
-    def _start_workflow_call(
-        self,
-        streams: temporalio.worker._workflow_streams._WorkflowStreams,
-        operation: str,
-        request: google.protobuf.message.Message,
-        result_type: Any,
-    ) -> asyncio.Future[Any]:
-        """Start a Stream call of Workflow code on this Store, and return the
-        future of its result.
-
-        ``request`` is the SDK request of the call, with its ref, and
-        ``result_type`` is the type of the call's result. The SDK calls this in the
-        event loop of the Workflow, once per call, after it chose this Store and
-        before any command of the call. A replay calls it again, so it must take
-        the path of the first run for the same call. The default makes an append
-        or a read a command of SDK Core, and runs a create or a describe in a
-        Local Activity of the SDK.
-        """
-        return streams._start_by_default(self, operation, request, result_type)
 
 
 @dataclass(frozen=True)

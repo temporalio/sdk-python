@@ -626,27 +626,13 @@ async def _calls_script(rng: random.Random) -> None:
     assert (await _activate(instance, evict)).HasField("successful")
 
 
-class _OwnPath:
-    """The calls of :py:class:`_EachCallWorkflow`, and what its Stores saw."""
+class _EachCall:
+    """The calls of :py:class:`_EachCallWorkflow`, and what its selector saw."""
 
     operations: list[str] = []
-    selects: list[str] = []
-    """The Stream id of each selector call."""
-    started: list[tuple[str, int]] = []
-    """Each call that :py:class:`_OwnPathStore` started, with the number of selector
-    calls before it."""
-
-
-class _OwnPathStore(MemoryStreamStore):
-    """A Store that runs each Stream call of Workflow code itself, with no command
-    and no Local Activity, as a Store that SDK Core doesn't call would.
-    """
-
-    def _start_workflow_call(
-        self, streams: Any, operation: str, request: Message, result_type: Any
-    ) -> asyncio.Future[Any]:
-        _OwnPath.started.append((operation, len(_OwnPath.selects)))
-        return asyncio.get_running_loop().create_future()
+    instance: _WorkflowInstanceImpl | None = None
+    selects: list[tuple[str, int]] = []
+    """The Stream id of each selector call, with the number of commands before it."""
 
 
 @workflow.defn
@@ -654,7 +640,7 @@ class _EachCallWorkflow:
     @workflow.run
     async def run(self) -> None:
         calls: list[Any] = []
-        for at, operation in enumerate(_OwnPath.operations):
+        for at, operation in enumerate(_EachCall.operations):
             stream = workflow.get_stream(ModelRef[int](id=f"s{at}"))
             if operation == "create":
                 calls.append(workflow.create_stream(id=f"s{at}", body_type=int))
@@ -677,67 +663,64 @@ class _EachCallWorkflow:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def test_the_store_of_a_call_is_chosen_once_and_runs_the_call() -> None:
+async def test_the_store_of_a_call_is_chosen_before_its_command() -> None:
     operations = ["create", "append", "read", "describe"]
-    # The variant of the command that the default path sends for each operation
-    variants = {
-        "create": "schedule_local_activity",
-        "append": "append_to_stream",
-        "read": "read_stream",
-        "describe": "schedule_local_activity",
-    }
-    own, default = _OwnPathStore(name="own"), MemoryStreamStore(name="default")
-    for owned in range(2 ** len(operations)):
-        # Bit `at` of `owned` gives call `at` to the Store that runs it itself.
-        on_own = [bool(owned >> at & 1) for at in range(len(operations))]
+    converter = temporalio.converter.DefaultPayloadConverter()
+
+    def store_of(command: WorkflowCommand) -> str:
+        variant = command.WhichOneof("variant")
+        if variant == "append_to_stream":
+            return command.append_to_stream.stream.store
+        if variant == "read_stream":
+            return command.read_stream.stream.store
+        # The Local Activity of a create or a describe has the Store name second.
+        [_, store, *_] = command.schedule_local_activity.arguments
+        return converter.from_payload(store, str)
+
+    a, b = MemoryStreamStore(name="a"), MemoryStreamStore(name="b")
+    for mask in range(2 ** len(operations)):
+        # Bit `at` of `mask` gives call `at` to Store b.
+        on_b = [bool(mask >> at & 1) for at in range(len(operations))]
 
         def selector(context: StreamSelectContext) -> StreamStore:
-            _OwnPath.selects.append(context.id)
-            return own if on_own[int(context.id[1:])] else default
+            assert _EachCall.instance
+            sent = _EachCall.instance._current_completion.successful.commands
+            _EachCall.selects.append((context.id, len(sent)))
+            return b if on_b[int(context.id[1:])] else a
 
-        config = StreamConfig([own, default], store_selector=selector)
-        _OwnPath.operations = operations
+        config = StreamConfig([a, b], store_selector=selector)
+        _EachCall.operations = operations
         for replaying in (False, True):
-            with failure_note(f"owned {on_own}, replaying {replaying}"):
-                _OwnPath.selects, _OwnPath.started = [], []
-                instance = _new_instance(_EachCallWorkflow, config)
+            with failure_note(f"on b {on_b}, replaying {replaying}"):
+                _EachCall.selects = []
+                instance = _EachCall.instance = _new_instance(_EachCallWorkflow, config)
                 initialize = WorkflowActivationJob(
                     initialize_workflow=InitializeWorkflow()
                 )
                 completion = await _activate(instance, initialize, replaying=replaying)
-                # The selector runs once for each call, before the Store starts it.
-                ids = [f"s{at}" for at in range(len(operations))]
-                assert _OwnPath.selects == ids
-                assert _OwnPath.started == [
-                    (f"{name.capitalize()}{suffix}", at + 1)
-                    for at, (name, suffix, mine) in enumerate(
-                        zip(
-                            operations,
-                            ["Stream", "Records", "Records", "Stream"],
-                            on_own,
-                        )
-                    )
-                    if mine
+                # The selector runs once for each call, before the command of the call.
+                assert _EachCall.selects == [
+                    (f"s{at}", at) for at in range(len(operations))
                 ]
-                # A call on the Store that runs it itself sends no command. A cancel
-                # sends a command only for a Local Activity of the default path.
-                sent = [
-                    variants[name] for name, mine in zip(operations, on_own) if not mine
+                commands = completion.successful.commands
+                assert [command.WhichOneof("variant") for command in commands] == [
+                    "schedule_local_activity",
+                    "append_to_stream",
+                    "read_stream",
+                    "schedule_local_activity",
+                    # A cancel sends a command only for a Local Activity.
+                    "request_cancel_local_activity",
+                    "request_cancel_local_activity",
+                    "complete_workflow_execution",
                 ]
-                cancels = [
-                    "request_cancel_local_activity"
-                    for variant in sent
-                    if variant == "schedule_local_activity"
+                assert [store_of(command) for command in commands[:4]] == [
+                    "b" if mine else "a" for mine in on_b
                 ]
-                assert [
-                    command.WhichOneof("variant")
-                    for command in completion.successful.commands
-                ] == [*sent, *cancels, "complete_workflow_execution"]
 
 
 async def test_a_stream_call_with_no_stream_config_fails_the_task() -> None:
     for operation in ["create", "append", "read", "describe"]:
-        _OwnPath.operations = [operation]
+        _EachCall.operations = [operation]
         for replaying in (False, True):
             instance = _new_instance(_EachCallWorkflow)
             initialize = WorkflowActivationJob(initialize_workflow=InitializeWorkflow())

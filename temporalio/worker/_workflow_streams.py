@@ -60,10 +60,10 @@ class _Read:
 class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
     """The Stream calls of one Workflow instance.
 
-    Each call first gets its Store, and the Store starts the call. By default an
-    append and a read are commands of SDK Core, which makes the Store calls and
-    gives each result in a job. Core has no command for a create or a describe, so
-    those run in a Local Activity of the SDK.
+    Each call first gets its Store, and :py:func:`_start_call` then starts it on
+    that Store. An append and a read are commands of SDK Core, which makes the
+    Store calls and gives each result in a job. Core has no command for a create or
+    a describe, so those run in a Local Activity of the SDK.
     """
 
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:
@@ -105,10 +105,9 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 "Cannot read a Stream with no body type. Give get_stream a "
                 "body_type, or a StreamRef with a type argument."
             )
+        store = self._store(_request_ref(request)).name()
         # The future of the job of the call, or the task of its Local Activity
-        result = self._store(_request_ref(request))._start_workflow_call(
-            self, operation, request, result_type
-        )
+        result = _start_call(self, store, operation, request, result_type)
 
         async def call() -> OutputT:
             # `asyncio.wait` ends at a cancel of this task. `await result` would pass the
@@ -155,49 +154,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             return config._store_for(ref, target, info.namespace)
         except Exception as err:
             raise self._fail_task(err)
-
-    def _start_by_default(
-        self,
-        store: StreamStore,
-        operation: str,
-        request: google.protobuf.message.Message,
-        result_type: Any,
-    ) -> asyncio.Future[Any]:
-        """Start a call on ``store`` as a command of SDK Core, or in the SDK's
-        Local Activity for a create or a describe. This is the default of
-        :py:meth:`StreamStore._start_workflow_call`.
-        """
-        instance = self._instance
-        stream = sdk.StreamRef(id=_request_ref(request).id, store=store.name())
-        if isinstance(request, sdk.AppendRecordsRequest):
-            seq = instance._next_seq("stream_append")
-            append = instance._add_command().append_to_stream
-            append.seq = seq
-            append.stream.CopyFrom(stream)
-            append.bodies.extend(record.body for record in request.records)
-            result = self._appends[seq] = instance.create_future()
-            return result
-        if isinstance(request, sdk.ReadRecordsRequest):
-            seq = instance._next_seq("stream_read")
-            instance._add_command().read_stream.CopyFrom(
-                temporalio.bridge.proto.workflow_commands.ReadStream(
-                    seq=seq,
-                    stream=stream,
-                    from_offset=request.from_offset,
-                    wait=request.wait if request.HasField("wait") else None,
-                    max_records=request.max_records,
-                    max_bytes=request.max_bytes,
-                )
-            )
-            result = instance.create_future()
-            self._reads[seq] = _Read(result, result_type)
-            return result
-        # Each run of a chain sends the same id, so a Store answers the create of a
-        # later run as the create that made the Stream.
-        request_id = None
-        if isinstance(request, sdk.CreateStreamRequest):
-            request_id = instance._info.first_execution_run_id
-        return self._schedule_store_call(store, operation, request, request_id)
 
     def resolve_append(
         self, job: temporalio.bridge.proto.workflow_activation.ResolveStreamAppend
@@ -251,19 +207,19 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
     def _schedule_store_call(
         self,
-        store: StreamStore,
+        store: str,
         operation: str,
         request: google.protobuf.message.Message,
         request_id: str | None,
     ) -> asyncio.Future[Any]:
-        """Schedule the SDK's Local Activity for a create or a describe on
-        ``store``.
+        """Schedule the SDK's Local Activity for a create or a describe on the
+        Store named ``store``.
         """
         instance = self._instance
         activity = instance._outbound.start_local_activity(
             StartLocalActivityInput(
                 activity=_STORE_CALL_ACTIVITY,
-                args=(operation, store.name(), request.SerializeToString(), request_id),
+                args=(operation, store, request.SerializeToString(), request_id),
                 activity_id=None,
                 # A call that hangs ends before the heartbeat of the Workflow Task, and an
                 # outage fails the task immediately, so neither writes into History.
@@ -333,6 +289,53 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         return cast(
             Callable[[], StreamConfig | None], functions["__temporal_stream_config"]
         )()
+
+
+def _start_call(
+    streams: _WorkflowStreams,
+    store: str,
+    operation: str,
+    request: google.protobuf.message.Message,
+    result_type: Any,
+) -> asyncio.Future[Any]:
+    """Start a Stream call of Workflow code on the Store named ``store``, and return
+    the future of its result.
+
+    An append or a read is a command of SDK Core. A create or a describe runs in
+    the SDK's Local Activity. ``request`` is the SDK request of the call, with its
+    ref, and ``result_type`` is the type of the call's result.
+    """
+    instance = streams._instance
+    stream = sdk.StreamRef(id=_request_ref(request).id, store=store)
+    if isinstance(request, sdk.AppendRecordsRequest):
+        seq = instance._next_seq("stream_append")
+        append = instance._add_command().append_to_stream
+        append.seq = seq
+        append.stream.CopyFrom(stream)
+        append.bodies.extend(record.body for record in request.records)
+        result = streams._appends[seq] = instance.create_future()
+        return result
+    if isinstance(request, sdk.ReadRecordsRequest):
+        seq = instance._next_seq("stream_read")
+        instance._add_command().read_stream.CopyFrom(
+            temporalio.bridge.proto.workflow_commands.ReadStream(
+                seq=seq,
+                stream=stream,
+                from_offset=request.from_offset,
+                wait=request.wait if request.HasField("wait") else None,
+                max_records=request.max_records,
+                max_bytes=request.max_bytes,
+            )
+        )
+        result = instance.create_future()
+        streams._reads[seq] = _Read(result, result_type)
+        return result
+    # Each run of a chain sends the same id, so a Store answers the create of a
+    # later run as the create that made the Stream.
+    request_id = None
+    if isinstance(request, sdk.CreateStreamRequest):
+        request_id = instance._info.first_execution_run_id
+    return streams._schedule_store_call(store, operation, request, request_id)
 
 
 class _StreamCall(temporalio.workflow.NexusOperationHandle[OutputT]):
