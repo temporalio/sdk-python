@@ -1496,6 +1496,9 @@ class WorkflowExecutionStatus(IntEnum):
     TIMED_OUT = int(
         temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_TIMED_OUT
     )
+    PAUSED = int(
+        temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_PAUSED
+    )
 
 
 @dataclass
