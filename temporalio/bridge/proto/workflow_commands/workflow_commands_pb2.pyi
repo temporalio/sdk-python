@@ -1962,8 +1962,9 @@ class AppendToStream(google.protobuf.message.Message):
     * No command cancels an append. Lang must accept the result of an append that nothing awaits,
       and Core drops an append that has no result at the Workflow's last command.
     * The appends of one Stream go to the Store one at a time, in the order of their commands.
-    * A `stream` with no Store name is on the Store of the Worker's only Stream runtime, also in a
-      replay. If the Worker has none or several, the Workflow Task fails.
+    * A `stream` with no Store name is on the Store of the Worker's Stream runtime under the empty
+      name, else of its only Stream runtime, also in a replay. If the Worker has neither, the
+      Workflow Task fails.
     * A bad `seq` or `stream`, or a Store that the Worker has no runtime for, fails the Workflow
       Task. So does a Store that is still unavailable at the task's heartbeat, with a failure
       message that starts with `StreamStoreUnavailable:`.
@@ -2062,8 +2063,8 @@ class ReadStream(google.protobuf.message.Message):
     Worker with no runtime for the Store of a marker can't replay, and fails the task, or gives the
     error as the answer of a legacy query.
 
-    A `stream` with no Store name is on the Store of the Worker's only Stream runtime, as for an
-    append.
+    A `stream` with no Store name is on the Store of the Worker's Stream runtime under the empty
+    name, else of its only Stream runtime, as for an append.
 
     A replay compares the `seq`, the `stream` and the `from_offset` of the command with History, and
     not the `max_records`, the `max_bytes` or the `wait`. It accepts a marker with no entry after any

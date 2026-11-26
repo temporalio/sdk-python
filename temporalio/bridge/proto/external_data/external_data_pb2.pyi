@@ -179,8 +179,8 @@ class StreamAppendResult(google.protobuf.message.Message):
     seq: builtins.int
     stream_id: builtins.str
     store: builtins.str
-    """The name of the Store that the append used. For a ref with no Store name, it is the name of
-    the Worker's only Stream runtime.
+    """The name of the Store that the append used. For a ref with no Store name, it is the empty
+    name if the Worker has a Stream runtime under it, else the name of its only runtime.
     """
     activation_index: builtins.int
     """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
@@ -319,8 +319,8 @@ class StreamReadResult(google.protobuf.message.Message):
     seq: builtins.int
     stream_id: builtins.str
     store: builtins.str
-    """The name of the Store that the read used. For a ref with no Store name, it is the name of the
-    Worker's only Stream runtime.
+    """The name of the Store that the read used. For a ref with no Store name, it is the empty name
+    if the Worker has a Stream runtime under it, else the name of its only runtime.
     """
     activation_index: builtins.int
     """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
