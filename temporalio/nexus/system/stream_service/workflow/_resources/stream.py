@@ -67,7 +67,9 @@ class Stream(typing.Generic[BodyT]):
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> ReadRecordsResponse[BodyT]:
-        """Read one page of Records. The poll iterator reads them all."""
+        """Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
+        """
         request = ReadRecordsRequest(
             ref=self.ref,
             from_offset=from_offset,
@@ -87,7 +89,8 @@ class Stream(typing.Generic[BodyT]):
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
         """Yield each response of ``read_page`` until the poll helper stops.
 
-        Read one page of Records. The poll iterator reads them all.
+        Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
@@ -124,7 +127,8 @@ class Stream(typing.Generic[BodyT]):
         ``next_request`` resumes after the last item that the iterator yielded. It is
         ``None`` after the last page.
 
-        Read one page of Records. The poll iterator reads them all.
+        Read one page of Records. The poll iterator keeps reading after a page with no
+        Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
