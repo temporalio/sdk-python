@@ -204,7 +204,13 @@ class _BodiesWorkflow:
         )
         stream = workflow.get_stream(StreamRef[Any](id=stream_id))
         await stream.append(*_bodies("workflow"))
-        return _digest([record.body async for record in stream.read()])
+        bodies: list[Any] = []
+        async for record in stream.read():
+            bodies.append(record.body)
+            # A Stream has no end, so the reader stops at the Records of the 3 writers.
+            if len(bodies) == 3 * len(_bodies("workflow")):
+                break
+        return _digest(bodies)
 
 
 async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
@@ -1054,7 +1060,12 @@ class _ReadOnceWorkflow:
     @workflow.run
     async def run(self, stream_id: str) -> list[int]:
         stream = workflow.get_stream(StreamRef[int](id=stream_id))
-        bodies = [record.body async for record in stream.read()]
+        bodies: list[int] = []
+        async for record in stream.read():
+            bodies.append(record.body)
+            # A Stream has no end, so the reader stops at the writer's last Record.
+            if record.body == 3:
+                break
         await workflow.wait_condition(lambda: self._go_on)
         return bodies
 
@@ -1264,7 +1275,7 @@ class _FirstRecordWorkflow:
         stream = workflow.get_stream(StreamRef[int](id=stream_id))
         async for record in stream.read(wait=timedelta(seconds=5)):
             return [record.body]
-        return []
+        raise AssertionError("A Workflow reader never ends by itself")
 
 
 async def test_a_workflow_read_goes_on_after_the_read_limit_cut_its_wait(

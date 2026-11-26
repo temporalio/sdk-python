@@ -990,7 +990,7 @@ async def _reads_script(
 
 
 @workflow.defn
-class _ReadToTheEndWorkflow:
+class _ReadToTwoWorkflow:
     @workflow.run
     async def run(self, how: str) -> list[Any]:
         stream = workflow.get_stream(ModelRef[int](id="s", store="a"))
@@ -998,13 +998,22 @@ class _ReadToTheEndWorkflow:
         if how == "read_page":
             page = await stream.read_page(wait=wait)
             return [page.records, page.last_offset]
+        # A Stream has no end, so the reader stops at the writer's last Record, 2.
+        found: list[Any] = []
         if how == "read":
-            return [record.body async for record in stream.read(wait=wait)]
-        pages = stream.read_pages(wait=wait)
-        return [[record.body for record in page.records] async for page in pages]
+            async for record in stream.read(wait=wait):
+                found.append(record.body)
+                if record.body == 2:
+                    break
+            return found
+        async for page in stream.read_pages(wait=wait):
+            found.append([record.body for record in page.records])
+            if 2 in found[-1]:
+                break
+        return found
 
 
-async def test_a_read_goes_on_after_a_page_that_the_read_limit_cut() -> None:
+async def test_a_read_goes_on_after_a_page_with_no_record() -> None:
     converter = temporalio.converter.DefaultPayloadConverter()
 
     def read(seq: int, after: int) -> WorkflowCommand:
@@ -1041,26 +1050,28 @@ async def test_a_read_goes_on_after_a_page_that_the_read_limit_cut() -> None:
         return converter.from_payload(complete.complete_workflow_execution.result)
 
     config = StreamConfig([MemoryStreamStore(name="a")])
-    # A single read gives the cut page as it is, with no Record.
-    instance = _new_instance(_ReadToTheEndWorkflow, config)
-    completion = await _activate(instance, start("read_page"))
-    assert list(completion.successful.commands) == [read(1, 0)]
-    assert result(await _activate(instance, page(1, [], 0, wait_cut=True))) == [
-        [],
-        None,
-    ]
+    # A single read gives a page with no Record as it is, also a cut one.
+    for wait_cut in (True, False):
+        with failure_note(f"wait_cut {wait_cut}"):
+            instance = _new_instance(_ReadToTwoWorkflow, config)
+            completion = await _activate(instance, start("read_page"))
+            assert list(completion.successful.commands) == [read(1, 0)]
+            completion = await _activate(instance, page(1, [], 0, wait_cut=wait_cut))
+            assert result(completion) == [[], None]
 
     for how in ("read", "read_pages"):
         with failure_note(how):
-            instance = _new_instance(_ReadToTheEndWorkflow, config)
+            instance = _new_instance(_ReadToTwoWorkflow, config)
             completion = await _activate(instance, start(how))
             assert list(completion.successful.commands) == [read(1, 0)]
             completion = await _activate(instance, page(1, [1], 1))
             assert list(completion.successful.commands) == [read(2, 1)]
-            # The read limit of the task ended this wait, so the reader reads again.
+            # A page with no Record doesn't end the reader, whether the read limit of
+            # the task cut its wait or the whole wait passed.
             completion = await _activate(instance, page(2, [], 1, wait_cut=True))
             assert list(completion.successful.commands) == [read(3, 1)]
-            # A page with no Record after the whole wait ends the reader.
             completion = await _activate(instance, page(3, [], 1))
-            expected = [1] if how == "read" else [[1], [], []]
+            assert list(completion.successful.commands) == [read(4, 1)]
+            completion = await _activate(instance, page(4, [2], 2))
+            expected = [1, 2] if how == "read" else [[1], [], [], [2]]
             assert result(completion) == expected

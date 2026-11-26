@@ -350,11 +350,11 @@ class Worker:
                 WARNING: This setting is experimental.
             stream_read_time: How long the Stream reads of a Workflow Task can
                 wait, from the start of the task or the end of its replay. At that
-                limit, a read with a wait gives a page with no Record, after which
-                ``read`` and ``read_pages`` read again with the whole wait. So with
-                a longer wait they go on until a Record comes. A read with no wait
-                goes on without holding the task until the Store answers. Defaults
-                to half the Workflow Task timeout. The limit is always before the
+                limit, a read with a wait gives a page with no Record. ``read`` and
+                ``read_pages`` never end at a page with no Record, and read again
+                with the whole wait, also in a later task. A read with no wait goes
+                on without holding the task until the Store answers. Defaults to
+                half the Workflow Task timeout. The limit is always before the
                 heartbeat of the task, so a read alone never makes the Worker send
                 a heartbeat. Appends have no such limit.
                 WARNING: This setting is experimental.

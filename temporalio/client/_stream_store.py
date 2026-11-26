@@ -273,11 +273,15 @@ class StreamConfig:
     - A read with a ``wait`` and no Record to give waits up to its ``wait``, but
       at most to the read limit of its Workflow Task, which the Worker option
       ``stream_read_time`` sets. At that limit ``read_page`` gives a page with no
-      Record. ``read_pages`` yields that page and reads again from its offset,
-      and so does ``read``. Each read waits its whole ``wait`` again. So with a
-      ``wait`` that the read limit cuts, they go on until a Record comes, also
-      over more than one Workflow Task. To stop at a time, call ``read_page``
-      in a loop that checks ``workflow.now()``.
+      Record.
+    - ``read`` and ``read_pages`` never end at a page with no Record.
+      ``read_pages`` yields that page, and both read again from its offset. So
+      they go on until a Record comes, also over more than one Workflow Task.
+      Workflow code decides when to stop, for example with a ``break``, its own
+      timer, a Signal or an Activity. Each page is a read result in History. With
+      no ``wait`` or a short one, an iterator on a Stream with no new Record
+      gets page after page with no Record, and History grows fast. So give an
+      iterator a long ``wait``.
     - A read holds its Workflow Task up to the read limit. A Signal that comes
       meanwhile waits until the read has its page, or until that limit. A
       command for the server waits only for one Store call with no wait for each

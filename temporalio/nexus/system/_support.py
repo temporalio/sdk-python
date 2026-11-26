@@ -182,23 +182,16 @@ def _timestamp(time: datetime) -> "Timestamp":
     return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
 
 
-class WaitCutRecords(list[typing.Any]):
-    """The Records of a page of Workflow code that has no Record because the read
-    limit of its Workflow Task ended the wait before the ``wait`` of the read.
-
-    The page model has no field for that, and this list is equal to ``[]``. The
-    poll helpers read it before the caller gets the page, so a copy of the list
-    that the caller makes can't change the next read.
-    """
-
-
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    # A Stream has no end that a read reports. A page with no Record says that no
-    # Record came within the wait, or at once with no wait, so the read stops there.
-    # The read limit of a Workflow Task is not the end of the wait, so it reads again.
-    if not response.records and not isinstance(response.records, WaitCutRecords):
+    from temporalio.workflow import in_workflow
+
+    # A Stream has no end that a read reports. In client and Activity code, a page
+    # with no Record says that no Record came within the wait, or at once with no
+    # wait, so the read stops there. Workflow code decides itself when it stops,
+    # since a read that waits goes on in later Workflow Tasks.
+    if not response.records and not in_workflow():
         return None
     return dataclasses.replace(
         request, from_offset=response.last_offset or request.from_offset
