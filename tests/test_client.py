@@ -15,6 +15,8 @@ import pytest
 from google.protobuf import json_format
 
 import temporalio.api.common.v1
+import temporalio.api.enums.v1
+import temporalio.api.workflow.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
@@ -65,6 +67,7 @@ from temporalio.client import (
     TaskReachabilityType,
     TerminateWorkflowInput,
     WorkflowContinuedAsNewError,
+    WorkflowExecution,
     WorkflowExecutionCount,
     WorkflowExecutionCountAggregationGroup,
     WorkflowExecutionStatus,
@@ -366,6 +369,14 @@ async def test_describe(
     assert desc.workflow_type == "kitchen_sink"
     assert desc.root_id == desc.id
     assert desc.root_run_id == desc.run_id
+
+
+def test_workflow_execution_from_paused_info():
+    info = temporalio.api.workflow.v1.WorkflowExecutionInfo(
+        status=temporalio.api.enums.v1.WorkflowExecutionStatus.WORKFLOW_EXECUTION_STATUS_PAUSED
+    )
+    execution = WorkflowExecution._from_raw_info(info, "default", DataConverter.default)
+    assert execution.status == WorkflowExecutionStatus.PAUSED
 
 
 async def test_query(client: Client, worker: ExternalWorker):
