@@ -64,6 +64,11 @@ class Input:
     expect_sync_response: bool = False
 
 
+@dataclass
+class DirectResult:
+    value: str
+
+
 def test_temporal_operation_result_validates_single_result_kind() -> None:
     assert nexus.TemporalOperationResult.sync(None).value is None
     assert nexus.TemporalOperationResult.async_token("token").token == "token"
@@ -142,6 +147,7 @@ class TestService:
     concurrent_start: Operation[Input, str]
     retry_after_failed_start: Operation[Input, str]
     sync_result: Operation[Input, str]
+    direct_result: Operation[Input, list[DirectResult] | None]
     custom_cancel: Operation[str, None]
     update_op: Operation[Input, str]
     bad_update_stage_op: Operation[Input, str]
@@ -280,6 +286,14 @@ class TestServiceHandler:
         input: Input,
     ) -> nexus.TemporalOperationResult[str]:
         return nexus.TemporalOperationResult.sync(input.value)
+
+    @nexus.temporal_operation(name="direct_result")
+    async def direct_result(
+        self, _client: nexus.TemporalNexusClient, input: Input
+    ) -> list[DirectResult] | None:
+        if input.value:
+            return [DirectResult(value=input.value)]
+        return None
 
     @operation_handler
     def custom_cancel(self) -> nexus.TemporalOperationHandler[str, None]:
@@ -1574,6 +1588,61 @@ async def test_temporal_operation_sync_result(client: Client, env: WorkflowEnvir
         )
 
 
+@workflow.defn
+class DirectResultCaller:
+    @workflow.run
+    async def run(self, input: Input) -> list[DirectResult] | None:
+        client = workflow.create_nexus_client(
+            service=TestServiceHandler,
+            endpoint=make_nexus_endpoint_name(input.task_queue),
+        )
+        result = await client.execute_operation(
+            TestServiceHandler.direct_result,
+            input,
+            schedule_to_close_timeout=timedelta(seconds=5),
+        )
+        if result is not None:
+            assert type(result[0]) is DirectResult
+        return result
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"), [("test", [DirectResult("test")]), ("", None)]
+)
+async def test_temporal_operation_direct_result(
+    client: Client,
+    env: WorkflowEnvironment,
+    value: str,
+    expected: list[DirectResult] | None,
+):
+    task_queue = str(uuid.uuid4())
+    await env.create_nexus_endpoint(make_nexus_endpoint_name(task_queue), task_queue)
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        nexus_service_handlers=[TestServiceHandler()],
+        workflows=[DirectResultCaller],
+    ):
+        handle = await client.start_workflow(
+            DirectResultCaller.run,
+            Input(value=value, task_queue=task_queue),
+            task_queue=task_queue,
+            id=str(uuid.uuid4()),
+        )
+        assert await handle.result() == expected
+        nexus_events = [
+            event.event_type
+            for event in (await handle.fetch_history()).events
+            if EventType.Name(event.event_type).startswith(
+                "EVENT_TYPE_NEXUS_OPERATION_"
+            )
+        ]
+        assert nexus_events == [
+            EventType.EVENT_TYPE_NEXUS_OPERATION_SCHEDULED,
+            EventType.EVENT_TYPE_NEXUS_OPERATION_COMPLETED,
+        ]
+
+
 async def test_temporal_operation_observes_invocation_timeout(
     client: Client, env: WorkflowEnvironment
 ) -> None:
@@ -1589,7 +1658,7 @@ async def test_temporal_operation_observes_invocation_timeout(
         @nexus.temporal_operation
         async def wait_for_cancellation(
             self, _client: nexus.TemporalNexusClient, _input: None
-        ) -> nexus.TemporalOperationResult[None]:
+        ) -> None:
             token = nexus.task_cancellation()
             assert not token.is_cancelled()
             assert token.cancellation_reason() is None
@@ -1606,7 +1675,6 @@ async def test_temporal_operation_observes_invocation_timeout(
                 await asyncio.wait_for(token.wait_until_cancelled(), timeout=1)
                 observed.set_result(token)
                 raise
-            return nexus.TemporalOperationResult.sync(None)
 
     task_queue = str(uuid.uuid4())
     endpoint_name = make_nexus_endpoint_name(task_queue)

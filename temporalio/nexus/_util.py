@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 import inspect
+import types
 import typing
 import warnings
 from collections.abc import Awaitable, Callable
@@ -48,29 +49,54 @@ def get_workflow_run_start_method_input_and_output_type_annotations(
     )
 
 
-def get_temporal_operation_start_method_input_and_output_type_annotations(
+def get_temporal_operation_start_method_types(
     start: Callable[
         [
             NexusServiceType,
             TemporalNexusClient,
             InputT,
         ],
-        Awaitable[TemporalOperationResult[OutputT]],
+        Awaitable[TemporalOperationResult[OutputT] | OutputT],
     ],
 ) -> tuple[
     type[InputT] | None,
     type[OutputT] | None,
+    bool,
 ]:
-    """Return operation input and output types.
+    """Return operation input and output types, and whether ``start`` returns a wrapper.
 
-    ``start`` must be a type-annotated start method that returns a
-    :py:class:`temporalio.nexus.TemporalOperationResult`.
+    The output type is the payload type, whether ``start`` is annotated with the
+    payload type or with :py:class:`temporalio.nexus.TemporalOperationResult`. For
+    example, a start method annotated ``-> MyOutput`` or
+    ``-> TemporalOperationResult[MyOutput]`` has output type ``MyOutput``.
+
+    The last value is ``True`` when ``start`` must return a
+    :py:class:`temporalio.nexus.TemporalOperationResult`: it is annotated with one, or
+    its return type is unspecified (``Any`` or no annotation).
     """
-    return _get_wrapped_start_method_input_and_output_type_annotations(
-        start,
-        expected_param_types=(TemporalNexusClient,),
-        expected_return_origin=TemporalOperationResult,
+    input_type, return_type = _get_start_method_input_and_output_type_annotations(
+        start, expected_param_types=(TemporalNexusClient,)
     )
+
+    if return_type is None or return_type is Any:
+        return input_type, None, True
+
+    origin = typing.get_origin(return_type) or return_type
+    if origin is TemporalOperationResult:
+        args = typing.get_args(return_type)
+        return input_type, args[0] if args else None, True
+
+    if origin in (typing.Union, types.UnionType) and any(  # pyright: ignore[reportDeprecated]
+        (typing.get_origin(arg) or arg) is TemporalOperationResult
+        for arg in typing.get_args(return_type)
+    ):
+        raise TypeError(
+            f"@temporal_operation method {start} mixes a payload type with "
+            "TemporalOperationResult in its return annotation. Annotate it with "
+            "TemporalOperationResult[...] and return TemporalOperationResult.sync(...) "
+            "for immediate results."
+        )
+    return input_type, return_type, False
 
 
 def _get_wrapped_start_method_input_and_output_type_annotations(

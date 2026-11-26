@@ -3,9 +3,11 @@ Test that operation_handler decorator results in operation definitions with the 
 and input/output types.
 """
 
+import typing
 import warnings
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from inspect import Signature
+from typing import Any, ClassVar, cast
 
 import nexusrpc.handler
 import pytest
@@ -186,3 +188,114 @@ def test_safe_broader_parameter_annotations_preserve_input_type_without_warnings
         assert isinstance(op, nexusrpc.Operation)
         assert op.input_type == Input
         assert op.output_type == Output
+
+
+_TuplePayload = tuple[str, int]
+
+
+@pytest.mark.parametrize(
+    ("annotation", "output_type"),
+    [
+        (Signature.empty, None),
+        (Any, None),
+        (nexus.TemporalOperationResult, None),
+        (nexus.TemporalOperationResult[None], type(None)),
+        (nexus.TemporalOperationResult[_TuplePayload], _TuplePayload),
+    ],
+)
+async def test_temporal_operation_preserves_explicit_result_modes(
+    annotation: Any, output_type: type | None
+):
+    result = nexus.TemporalOperationResult[None].sync(None)
+
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return result
+
+    if annotation is Signature.empty:
+        del Handler.start.__annotations__["return"]
+    else:
+        Handler.start.__annotations__["return"] = annotation
+
+    method = nexus.temporal_operation(Handler.start)
+    op = nexusrpc.get_operation(method)
+    assert op
+    assert op.output_type is output_type
+    handler = getattr(method, "__nexus_operation_factory__")(Handler())
+    client = cast(nexus.TemporalNexusClient, object())
+    assert await handler.start_operation(client, None) is result
+
+
+@pytest.mark.parametrize(
+    ("annotation", "returned", "error"),
+    [
+        (
+            nexus.TemporalOperationResult[str],
+            "payload",
+            "must return a TemporalOperationResult",
+        ),
+        (Any, "payload", "must return a TemporalOperationResult"),
+        (Signature.empty, "payload", "must return a TemporalOperationResult"),
+        (
+            str,
+            nexus.TemporalOperationResult[str].sync("payload"),
+            "annotated with a payload type but returned a TemporalOperationResult",
+        ),
+    ],
+)
+async def test_temporal_operation_rejects_result_that_contradicts_annotation(
+    annotation: Any, returned: Any, error: str
+):
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return returned
+
+    if annotation is Signature.empty:
+        del Handler.start.__annotations__["return"]
+    else:
+        Handler.start.__annotations__["return"] = annotation
+
+    method = nexus.temporal_operation(Handler.start)
+    handler = getattr(method, "__nexus_operation_factory__")(Handler())
+    client = cast(nexus.TemporalNexusClient, object())
+    with pytest.raises(TypeError, match=error):
+        await handler.start_operation(client, None)
+
+
+@pytest.mark.parametrize(
+    "annotation",
+    [
+        Output | None,
+        typing.Literal["a", "b"],
+    ],
+)
+async def test_temporal_operation_accepts_direct_payload_annotations(
+    annotation: Any,
+):
+    value = Output()
+
+    class Handler:
+        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
+            return value
+
+    Handler.start.__annotations__["return"] = annotation
+    method = nexus.temporal_operation(Handler.start)
+    op = nexusrpc.get_operation(method)
+    assert op
+    assert op.output_type == annotation
+    handler = getattr(method, "__nexus_operation_factory__")(Handler())
+    client = cast(nexus.TemporalNexusClient, object())
+    result = await handler.start_operation(client, None)
+    assert isinstance(result, nexus.TemporalOperationResult)
+    assert result.value is value
+
+
+def test_temporal_operation_rejects_union_with_result_wrapper():
+    class Handler:
+        async def start(
+            self, _client: nexus.TemporalNexusClient, _input: None
+        ) -> Output | nexus.TemporalOperationResult[Output]:
+            raise NotImplementedError
+
+    with pytest.raises(TypeError, match="mixes a payload type with"):
+        nexus.temporal_operation(Handler.start)

@@ -656,7 +656,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         rpc_timeout: timedelta | None = None,
     ) -> NexusOperationHandle[OutputT]: ...
 
-    # Overload for temporal_operation methods
+    # Overloads for temporal_operation methods
     @overload
     @abstractmethod
     async def start_operation(
@@ -668,6 +668,36 @@ class NexusClient(ABC, Generic[NexusServiceType]):
                 InputT,
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
+        ],
+        arg: InputT,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> NexusOperationHandle[OutputT]: ...
+
+    @overload
+    @abstractmethod
+    async def start_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[OutputT],
         ],
         arg: InputT,
         *,
@@ -932,7 +962,7 @@ class NexusClient(ABC, Generic[NexusServiceType]):
         rpc_timeout: timedelta | None = None,
     ) -> OutputT: ...
 
-    # Overload for temporal_operation methods
+    # Overloads for temporal_operation methods
     @overload
     @abstractmethod
     async def execute_operation(
@@ -944,6 +974,36 @@ class NexusClient(ABC, Generic[NexusServiceType]):
                 InputT,
             ],
             Awaitable[temporalio.nexus.TemporalOperationResult[OutputT]],
+        ],
+        arg: InputT,
+        *,
+        id: str,
+        id_reuse_policy: temporalio.common.NexusOperationIDReusePolicy = temporalio.common.NexusOperationIDReusePolicy.ALLOW_DUPLICATE,
+        id_conflict_policy: temporalio.common.NexusOperationIDConflictPolicy = temporalio.common.NexusOperationIDConflictPolicy.FAIL,
+        schedule_to_close_timeout: timedelta | None = None,
+        schedule_to_start_timeout: timedelta | None = None,
+        start_to_close_timeout: timedelta | None = None,
+        search_attributes: temporalio.common.TypedSearchAttributes | None = None,
+        summary: str | None = None,
+        headers: Mapping[str, str] | None = None,
+        completion_callbacks: Sequence[
+            temporalio.nexus.CompletionCallback[OutputT]
+        ] = (),
+        rpc_metadata: Mapping[str, str | bytes] = {},
+        rpc_timeout: timedelta | None = None,
+    ) -> OutputT: ...
+
+    @overload
+    @abstractmethod
+    async def execute_operation(
+        self,
+        operation: Callable[
+            [
+                NexusServiceType,
+                temporalio.nexus.TemporalNexusClient,
+                InputT,
+            ],
+            Awaitable[OutputT],
         ],
         arg: InputT,
         *,
