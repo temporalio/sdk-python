@@ -15,7 +15,6 @@ from nexusrpc import (
     InputT,
     OutputT,
 )
-from nexusrpc.handler import StartOperationResultAsync, StartOperationResultSync
 
 from temporalio.nexus._operation_context import WorkflowRunOperationContext
 from temporalio.nexus._temporal_client import (
@@ -87,23 +86,15 @@ def get_temporal_operation_start_method_types(
         args = typing.get_args(return_type)
         return input_type, args[0] if args else None, True
 
-    result_types = (
-        (typing.get_origin(arg) or arg for arg in typing.get_args(return_type))
-        if origin in (typing.Union, types.UnionType)  # pyright: ignore[reportDeprecated]
-        else (origin,)
-    )
-    if any(
-        result_type
-        in (
-            TemporalOperationResult,
-            StartOperationResultSync,
-            StartOperationResultAsync,
-        )
-        for result_type in result_types
+    if origin in (typing.Union, types.UnionType) and any(  # pyright: ignore[reportDeprecated]
+        (typing.get_origin(arg) or arg) is TemporalOperationResult
+        for arg in typing.get_args(return_type)
     ):
         raise TypeError(
-            f"@temporal_operation method {start} must declare a payload type or "
-            "TemporalOperationResult with the payload type inside the wrapper."
+            f"@temporal_operation method {start} mixes a payload type with "
+            "TemporalOperationResult in its return annotation. Annotate it with "
+            "TemporalOperationResult[...] and return TemporalOperationResult.sync(...) "
+            "for immediate results."
         )
     return input_type, return_type, False
 

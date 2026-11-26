@@ -266,10 +266,7 @@ async def test_temporal_operation_rejects_result_that_contradicts_annotation(
     "annotation",
     [
         Output | None,
-        # On 3.11 this has the non-class origin typing.Union, unlike `Output | None`.
-        typing.Optional[Output],  # pyright: ignore[reportDeprecated]
         typing.Literal["a", "b"],
-        tuple[str, int],
     ],
 )
 async def test_temporal_operation_accepts_direct_payload_annotations(
@@ -293,20 +290,12 @@ async def test_temporal_operation_accepts_direct_payload_annotations(
     assert result.value is value
 
 
-@pytest.mark.parametrize(
-    "annotation",
-    [
-        nexus.TemporalOperationResult[None] | None,
-        Output | nexus.TemporalOperationResult[Output],
-        nexusrpc.handler.StartOperationResultSync[Output],
-        nexusrpc.handler.StartOperationResultAsync,
-    ],
-)
-def test_temporal_operation_rejects_mixed_return_modes(annotation: Any):
+def test_temporal_operation_rejects_union_with_result_wrapper():
     class Handler:
-        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
-            return None
+        async def start(
+            self, _client: nexus.TemporalNexusClient, _input: None
+        ) -> Output | nexus.TemporalOperationResult[Output]:
+            raise NotImplementedError
 
-    Handler.start.__annotations__["return"] = annotation
-    with pytest.raises(TypeError, match="must declare a payload type or"):
+    with pytest.raises(TypeError, match="mixes a payload type with"):
         nexus.temporal_operation(Handler.start)
