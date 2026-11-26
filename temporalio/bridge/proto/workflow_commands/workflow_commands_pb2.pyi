@@ -2026,12 +2026,12 @@ class ReadStream(google.protobuf.message.Message):
     message for the server.
 
     Before the task completes, each read that had no answer in it gets a check, which is one Store
-    call with no wait and a short deadline (`StreamSettings::read_check_deadline`). A command waits
-    for the check and no longer. If the check gets Records, the task gives them, or holds them for
-    the first activation of the next task if it has a command. If it gets no Record, a read with a
-    `wait` stops and starts again when the next task opens, and a read with no `wait` gives the page
-    with no Record. After the read limit each new read of the task is a check. So a read on an idle
-    Stream never makes a new task, and a drain with no `wait` ends in its task.
+    call with no wait and a short deadline of 1 s. A command waits for the check and no longer. If
+    the check gets Records, the task gives them, or holds them for the first activation of the next
+    task if it has a command. If it gets no Record, a read with a `wait` stops and starts again when
+    the next task opens, and a read with no `wait` gives the page with no Record. After the read
+    limit each new read of the task is a check. So a read on an idle Stream never makes a new task,
+    and a drain with no `wait` ends in its task.
 
     Core asks for a new task when it knows that the Stream has Records for an open read. It knows
     that when the Store gave Records after the page that the read continues from, or when the task
@@ -2045,9 +2045,8 @@ class ReadStream(google.protobuf.message.Message):
     failure message then starts with `StreamStoreUnavailable:`.
 
     One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the first
-    activation of the next task. Once a task gave `StreamSettings::max_task_read_results` read
-    results, 256 by default, its new reads get no check and start when the next task opens, which
-    Core asks for at once.
+    activation of the next task. Once a task gave 256 read results, its new reads get no check and
+    start when the next task opens, which Core asks for at once.
 
     No command cancels a read, so lang must accept the job of a read that nothing awaits. Core drops
     a read that has no result when lang sends the Workflow's last command.

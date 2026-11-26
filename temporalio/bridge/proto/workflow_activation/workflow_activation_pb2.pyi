@@ -50,7 +50,7 @@ class WorkflowActivation(google.protobuf.message.Message):
     3. random-seed-updates
     4. signals/updates
     5. all others
-    6. local activity resolutions, then Stream results
+    6. Stream results and local activity resolutions
     7. queries
     8. evictions
 
@@ -66,9 +66,10 @@ class WorkflowActivation(google.protobuf.message.Message):
      in that same activation (prime example: cancelling not-wait-for-cancel activities). So, we do
      this to ensure the LA resolution happens after that cancel (or whatever else it may be) as it
      normally would have when executing.
-    * Stream results go after the local activity resolutions, because a replay scans ahead for them
-     too. Appends go before reads, each in `seq` order. If a replay gives several activations in
-     one, the Stream results keep the order of those activations.
+    * Stream results go with the local activity resolutions, because a replay scans ahead for them
+     too. In one activation of the first run, the Stream results go first, appends before reads,
+     each in `seq` order, and then the local activity resolutions. If a replay gives several
+     activations in one, the results keep the order of those activations.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
