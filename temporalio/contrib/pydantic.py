@@ -36,9 +36,18 @@ from temporalio.converter import (
 
 @dataclass
 class ToJsonOptions:
-    """Options for converting to JSON with pydantic."""
+    """Options for converting to JSON with pydantic.
+
+    ``by_alias`` defaults to ``True`` so the options path keeps the same wire
+    format as the default converter, which follows ``pydantic_core.to_json``.
+    Set it to ``False`` to serialize under field names instead. Models whose
+    fields use ``serialization_alias`` without an alias that validation
+    accepts need ``False`` to round-trip, since ``validate_json`` never reads
+    serialization aliases.
+    """
 
     exclude_unset: bool = False
+    by_alias: bool = True
 
 
 class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
@@ -111,7 +120,9 @@ class PydanticJSONPlainPayloadConverter(EncodingPayloadConverter):
         """
         data = (
             self._schema_serializer.to_json(
-                value, by_alias=True, exclude_unset=self._to_json_options.exclude_unset
+                value,
+                by_alias=self._to_json_options.by_alias,
+                exclude_unset=self._to_json_options.exclude_unset,
             )
             if self._to_json_options
             else to_json(value)

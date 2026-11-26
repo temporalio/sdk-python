@@ -8,7 +8,7 @@ import uuid
 
 import pydantic
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ValidationError
 
 import temporalio.contrib.pydantic
 from temporalio.client import Client
@@ -615,3 +615,35 @@ def test_model_instantiation_from_restricted_proxy_values():
     assert p.path_field == restricted_path
     assert p.uuid_field == restricted_uuid
     assert p.datetime_field == restricted_datetime
+
+
+# A serialization_alias changes only the emitted key, never the keys
+# validate_json accepts, so the default by-alias wire format (which keeps
+# alias models round-trippable, matching pydantic_core.to_json) cannot
+# round-trip such a field. ToJsonOptions(by_alias=False) restores the
+# round-trip by serializing under field names instead.
+class SerializationAliasModel(BaseModel):
+    name: str = Field(..., serialization_alias="username")
+
+
+def test_pydantic_json_converter_keeps_serialization_alias_by_default() -> None:
+    user = SerializationAliasModel(name="John Doe")
+
+    converter = PydanticJSONPlainPayloadConverter()
+    payload = converter.to_payload(user)
+    assert payload is not None
+    assert payload.data == b'{"username":"John Doe"}'
+    with pytest.raises(ValidationError):
+        converter.from_payload(payload, SerializationAliasModel)
+
+
+def test_to_json_options_by_alias_false_round_trips_serialization_alias() -> None:
+    user = SerializationAliasModel(name="John Doe")
+
+    converter = PydanticJSONPlainPayloadConverter(
+        temporalio.contrib.pydantic.ToJsonOptions(by_alias=False)
+    )
+    payload = converter.to_payload(user)
+    assert payload is not None
+    assert payload.data == b'{"name":"John Doe"}'
+    assert converter.from_payload(payload, SerializationAliasModel) == user
