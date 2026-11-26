@@ -1,0 +1,1 @@
+Add `by_alias` to `temporalio.contrib.pydantic.ToJsonOptions` (default `True`) so a converter can serialize Pydantic fields under their names instead of their aliases, restoring round-trips for models whose fields set `serialization_alias` without an alias that validation accepts.
