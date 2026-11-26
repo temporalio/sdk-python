@@ -3,7 +3,6 @@ Test that operation_handler decorator results in operation definitions with the 
 and input/output types.
 """
 
-import sys
 import typing
 import warnings
 from dataclasses import dataclass
@@ -263,25 +262,6 @@ async def test_temporal_operation_rejects_result_that_contradicts_annotation(
         await handler.start_operation(client, None)
 
 
-@pytest.mark.skipif(
-    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
-)
-def test_temporal_operation_resolves_direct_payload_alias():
-    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
-    aliases: dict[str, Any] = {}
-    exec("type Payload = str", aliases)
-
-    class Handler:
-        async def echo(self, _client: nexus.TemporalNexusClient, value: str) -> str:
-            return value
-
-    Handler.echo.__annotations__["return"] = aliases["Payload"]
-    method = nexus.temporal_operation(Handler.echo)
-    _, operation = get_operation_factory(method)
-    assert operation is not None
-    assert operation.output_type is str
-
-
 @pytest.mark.parametrize(
     "annotation",
     [
@@ -329,22 +309,4 @@ def test_temporal_operation_rejects_mixed_return_modes(annotation: Any):
 
     Handler.start.__annotations__["return"] = annotation
     with pytest.raises(TypeError, match="must declare a payload type or"):
-        nexus.temporal_operation(Handler.start)
-
-
-@pytest.mark.skipif(
-    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
-)
-def test_temporal_operation_rejects_cyclic_return_alias():
-    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
-    aliases: dict[str, Any] = {}
-    exec("type A = B\ntype B = A", aliases)
-
-    class Handler:
-        async def start(self, _client: nexus.TemporalNexusClient, _input: None) -> Any:
-            return None
-
-    # Equivalent to annotating `-> A`, where A refers to B and B refers back to A.
-    Handler.start.__annotations__["return"] = aliases["A"]
-    with pytest.raises(TypeError, match="cyclic return type alias"):
         nexus.temporal_operation(Handler.start)

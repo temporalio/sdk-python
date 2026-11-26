@@ -1,5 +1,4 @@
 import asyncio
-import sys
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -1605,57 +1604,6 @@ class DirectResultCaller:
         if result is not None:
             assert type(result[0]) is DirectResult
         return result
-
-
-@pytest.mark.parametrize("sync", [True, False])
-@pytest.mark.skipif(
-    sys.version_info < (3, 12), reason="Native type aliases require Python 3.12"
-)
-async def test_temporal_operation_accepts_aliased_explicit_result(
-    client: Client, env: WorkflowEnvironment, sync: bool
-) -> None:
-    if env.supports_time_skipping_v1:
-        pytest.skip("Standalone Nexus Operation tests don't work with time skipping")
-
-    @service
-    class AliasService:
-        echo: Operation[Input, str]
-
-    class Handler:
-        async def echo(
-            self, client: nexus.TemporalNexusClient, input: Input
-        ) -> nexus.TemporalOperationResult[str]:
-            if sync:
-                return nexus.TemporalOperationResult.sync(input.value)
-            return await client.start_workflow(
-                EchoWorkflow.run, input, id=str(uuid.uuid4())
-            )
-
-    # The `type` statement is a SyntaxError on 3.11, which must still import this module.
-    aliases: dict[str, Any] = {"TemporalOperationResult": nexus.TemporalOperationResult}
-    exec("type Result = TemporalOperationResult[str]", aliases)
-    Handler.echo.__annotations__["return"] = aliases["Result"]
-    setattr(Handler, "echo", nexus.temporal_operation(Handler.echo))
-    handler = service_handler(service=AliasService)(Handler)
-    task_queue = str(uuid.uuid4())
-    endpoint = make_nexus_endpoint_name(task_queue)
-    await env.create_nexus_endpoint(endpoint, task_queue)
-    async with Worker(
-        client,
-        task_queue=task_queue,
-        workflows=[EchoWorkflow],
-        nexus_service_handlers=[handler()],
-    ):
-        nexus_client = client.create_nexus_client(AliasService, endpoint)
-        assert (
-            await nexus_client.execute_operation(
-                AliasService.echo,
-                Input(value="echo", task_queue=task_queue),
-                id=str(uuid.uuid4()),
-                schedule_to_close_timeout=timedelta(seconds=5),
-            )
-            == "echo"
-        )
 
 
 @pytest.mark.parametrize(

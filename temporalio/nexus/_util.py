@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import inspect
-import sys
 import types
 import typing
 import warnings
@@ -10,10 +9,6 @@ from collections.abc import Awaitable, Callable
 from typing import (
     Any,
 )
-
-if sys.version_info >= (3, 12):
-    # CI type-checks under 3.11, where native type aliases are unavailable.
-    from typing import TypeAliasType  # pyright: ignore[reportUnreachable]
 
 import nexusrpc
 from nexusrpc import (
@@ -83,20 +78,6 @@ def get_temporal_operation_start_method_types(
     input_type, return_type = _get_start_method_input_and_output_type_annotations(
         start, expected_param_types=(TemporalNexusClient,)
     )
-    if sys.version_info >= (3, 12):
-        # Native aliases (`type R = ...`) arrive as TypeAliasType objects; unwrap them
-        # to read the payload type. Track visited aliases so a cyclic alias fails
-        # instead of looping.
-        aliases: set[TypeAliasType] = set()  # pyright: ignore[reportUnreachable]
-        while (
-            isinstance(return_type, TypeAliasType) and not return_type.__type_params__
-        ):
-            if return_type in aliases:
-                raise TypeError(
-                    f"@temporal_operation method {start} has a cyclic return type alias."
-                )
-            aliases.add(return_type)
-            return_type = return_type.__value__
 
     if return_type is None or return_type is Any:
         return input_type, None, True
