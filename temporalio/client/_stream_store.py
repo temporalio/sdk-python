@@ -106,7 +106,11 @@ class StreamStore(ABC):
     :py:class:`temporalio.exceptions.StreamError` with the reason, such as
     ``STREAM_ERROR_REASON_EXPIRED`` for ``EXPIRED`` in these docs. Any other
     exception is an outage of the Store, and the caller gets a ``StreamError``
-    with ``STREAM_ERROR_REASON_STORE_UNAVAILABLE``.
+    with ``STREAM_ERROR_REASON_STORE_UNAVAILABLE``. A refusal of an append or a
+    read of Workflow code puts its message, cut to 4 KiB, in a Stream marker
+    whose data has at most 1 MiB. So a Store keeps its messages short, since
+    many long ones in one activation fail the Workflow Task with
+    ``StreamMarkerTooLarge``.
 
     How the SDK calls a Store:
 
