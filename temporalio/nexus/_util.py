@@ -79,6 +79,9 @@ def get_temporal_operation_start_method_input_and_output_type_annotations(
         start, expected_param_types=(TemporalNexusClient,)
     )
     if sys.version_info >= (3, 12):
+        # Native aliases (`type R = ...`) arrive as TypeAliasType objects; unwrap them
+        # to read the payload type. Track visited aliases so a cyclic alias fails
+        # instead of looping.
         aliases: set[TypeAliasType] = set()  # pyright: ignore[reportUnreachable]
         while (
             isinstance(return_type, TypeAliasType) and not return_type.__type_params__
