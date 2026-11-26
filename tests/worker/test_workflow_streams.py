@@ -71,6 +71,7 @@ from temporalio.converter import (
     WorkflowSerializationContext,
 )
 from temporalio.exceptions import ApplicationError, StreamError
+from temporalio.nexus.system import _support
 from temporalio.nexus.system.stream_service import StreamRef as ModelRef
 from temporalio.testing import MemoryStreamStore
 from temporalio.worker._workflow import _CommandAwareDataConverter
@@ -992,9 +993,9 @@ async def _reads_script(
 @workflow.defn
 class _ReadToTwoWorkflow:
     @workflow.run
-    async def run(self, how: str) -> list[Any]:
+    async def run(self, how: str, seconds: float | None = 5) -> list[Any]:
         stream = workflow.get_stream(ModelRef[int](id="s", store="a"))
-        wait = timedelta(seconds=5)
+        wait = None if seconds is None else timedelta(seconds=seconds)
         if how == "read_page":
             page = await stream.read_page(wait=wait)
             return [page.records, page.last_offset]
@@ -1016,12 +1017,12 @@ class _ReadToTwoWorkflow:
 async def test_a_read_goes_on_after_a_page_with_no_record() -> None:
     converter = temporalio.converter.DefaultPayloadConverter()
 
-    def read(seq: int, after: int) -> WorkflowCommand:
+    def read(seq: int, after: int, seconds: int | None = 5) -> WorkflowCommand:
         command = ReadStream(
             seq=seq,
             stream=StreamRef(id="s", store="a"),
             from_offset=_offset(after),
-            wait=Duration(seconds=5),
+            wait=None if seconds is None else Duration(seconds=seconds),
         )
         return WorkflowCommand(read_stream=command)
 
@@ -1039,8 +1040,8 @@ async def test_a_read_goes_on_after_a_page_with_no_record() -> None:
         job = ResolveStreamRead(seq=seq, page=stream_page)
         return WorkflowActivationJob(resolve_stream_read=job)
 
-    def start(how: str) -> WorkflowActivationJob:
-        arguments = [converter.to_payload(how)]
+    def start(how: str, seconds: int | None = 5) -> WorkflowActivationJob:
+        arguments = [converter.to_payload(how), converter.to_payload(seconds)]
         return WorkflowActivationJob(
             initialize_workflow=InitializeWorkflow(arguments=arguments)
         )
@@ -1075,3 +1076,22 @@ async def test_a_read_goes_on_after_a_page_with_no_record() -> None:
             completion = await _activate(instance, page(4, [2], 2))
             expected = [1, 2] if how == "read" else [[1], [], [], [2]]
             assert result(completion) == expected
+
+    # The first read of an iterator has the caller's wait. A later read has it too,
+    # or the default of 1 minute when the caller gave none. A wait of zero stays.
+    default = int(_support.DEFAULT_READ_WAIT.total_seconds())
+    cases: list[tuple[int | None, int | None]] = [(None, default), (0, 0), (5, 5)]
+    for how in ("read", "read_pages"):
+        for given, later in cases:
+            with failure_note(f"{how} with wait {given}"):
+                instance = _new_instance(_ReadToTwoWorkflow, config)
+                completion = await _activate(instance, start(how, given))
+                assert list(completion.successful.commands) == [read(1, 0, given)]
+                completion = await _activate(instance, page(1, [1], 1))
+                assert list(completion.successful.commands) == [read(2, 1, later)]
+                completion = await _activate(instance, page(2, [], 1))
+                assert list(completion.successful.commands) == [read(3, 1, later)]
+    # A single read has no default wait.
+    instance = _new_instance(_ReadToTwoWorkflow, config)
+    completion = await _activate(instance, start("read_page", None))
+    assert list(completion.successful.commands) == [read(1, 0, None)]

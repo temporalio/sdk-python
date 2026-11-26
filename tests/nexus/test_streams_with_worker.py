@@ -227,7 +227,10 @@ async def test_a_body_reads_the_same_on_every_path(client: Client) -> None:
     ran = await run(client, options)
 
     expected = [*_bodies("client"), *_bodies("activity"), *_bodies("workflow")]
-    assert [record.body async for record in stream.read()] == expected
+    # A Stream has no end, so the reader takes the Records that it knows of.
+    records = stream.read()
+    async with asyncio.timeout(10):
+        assert [(await anext(records)).body for _ in expected] == expected
     assert ran.result == _digest(expected)
     # The Store has each body as the codec gave it with no context, and the storage of
     # the Worker has none of them.
@@ -1305,9 +1308,10 @@ class _FirstRecordWorkflow:
         pass
 
     @workflow.run
-    async def run(self, stream_id: str) -> list[int]:
+    async def run(self, stream_id: str, seconds: float | None = 5) -> list[int]:
         stream = workflow.get_stream(StreamRef[int](id=stream_id))
-        async for record in stream.read(wait=timedelta(seconds=5)):
+        wait = None if seconds is None else timedelta(seconds=seconds)
+        async for record in stream.read(wait=wait):
             return [record.body]
         raise AssertionError("A Workflow reader never ends by itself")
 
@@ -1340,6 +1344,43 @@ async def test_a_workflow_read_goes_on_after_the_read_limit_cut_its_wait(
         replay=True,
     )
     assert (await run(client, options)).result == [1]
+
+
+async def test_a_workflow_iterator_with_no_wait_parks_on_an_idle_stream(
+    client: Client,
+) -> None:
+    store = FaultStore()
+    client = stream_client(client, store)
+    stream = await client.create_stream(id="idle", body_type=int)
+
+    async def write(handle: Any, _worker: Any) -> None:
+        async def first_task() -> None:
+            completed = EventType.EVENT_TYPE_WORKFLOW_TASK_COMPLETED
+            assert _events(await handle.fetch_history(), completed)
+
+        # The first read gives the empty answer of the Store at once. The later ones
+        # have the default wait. The read limit cuts a few of them, then one parks,
+        # so the idle Stream makes no new task over several read limits.
+        await assert_eventually(first_task)
+        await asyncio.sleep(4)
+        history = await handle.fetch_history()
+        tasks = _events(history, EventType.EVENT_TYPE_WORKFLOW_TASK_STARTED)
+        markers = _stream_markers(history, "read")
+        assert len(tasks) == 1, len(tasks)
+        assert 2 <= len(markers) <= 6, len(markers)
+        await stream.append(1)
+        await handle.signal(_FirstRecordWorkflow.wake)
+
+    options = RunOptions(
+        _FirstRecordWorkflow,
+        ["idle", None],
+        task_timeout=timedelta(seconds=10),
+        worker={"stream_read_time": timedelta(seconds=1)},
+        during=write,
+        replay=True,
+    )
+    ran = await asyncio.wait_for(run(client, options), 30)
+    assert ran.result == [1]
 
 
 async def test_a_workflow_read_with_no_wait_reads_again_in_the_next_task(

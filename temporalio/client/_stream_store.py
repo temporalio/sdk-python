@@ -48,6 +48,10 @@ _definition = nexusrpc.get_service_definition(StreamService)
 assert _definition
 _STREAM_SERVICE: nexusrpc.ServiceDefinition = _definition
 
+_READ_ANSWER_TIME = timedelta(seconds=1)
+"""The time that a client read leaves its Store to answer before the
+``rpc_timeout``. A tenth of a shorter timeout is used instead."""
+
 
 class StreamStore(ABC):
     """Base class of a Stream Store, which keeps the Records of Streams.
@@ -194,7 +198,10 @@ class StreamStore(ABC):
           set it. If it's empty, the caller gets the offset of the last Record of
           the page, or ``from_offset`` for a page with no Record.
         * A read with nothing after ``from_offset`` answers once a Record comes or
-          once its ``wait`` is up. With no ``wait``, it answers at once.
+          once its ``wait`` is up. With no ``wait``, it answers at once. The SDK
+          never sends a ``wait`` of zero, and sends no ``wait`` instead. A Store
+          that answers at once with no Record despite a ``wait`` makes an iterator
+          of the caller read again and again.
         * Every offset that a response returned is a valid ``from_offset``. A read
           fails with ``OFFSET_TOO_HIGH`` only when ``from_offset`` is past the end
           of the Stream.
@@ -247,6 +254,23 @@ class StreamConfig:
     since its create or since the last append that wrote a batch. A reader learns
     the end of a Stream from the application's own last Record.
 
+    ``read`` and ``read_pages`` never end at a page with no Record, in client,
+    Activity and Workflow code. ``read_pages`` yields that page, and both read
+    again from its offset. The caller decides when to stop, for example with a
+    ``break`` or its own timeout. With no ``wait``, the first read of an iterator
+    gives the answer of the Store at once, and each later read waits up to 1
+    minute for a new Record. So an iterator on an idle Stream doesn't call its
+    Store in a loop. After the first page, the ``next_request`` of ``read`` has
+    that wait. A ``wait`` of zero is no wait at all, also for the later
+    reads, so such an iterator on an idle Stream reads again at once, page after
+    page. ``read_page`` has no default wait.
+
+    In client and Activity code, the wait of a read ends shortly before its
+    ``rpc_timeout``, so that the Store can answer in time. A read holds an
+    Activity up to its wait, so an Activity that heartbeats between Records needs
+    a ``wait`` shorter than its heartbeat timeout, or a heartbeat from another
+    task.
+
     For the Stream calls of Workflow code:
 
     - The SDK chooses the Store of each call before the call starts, also in a
@@ -274,14 +298,13 @@ class StreamConfig:
       at most to the read limit of its Workflow Task, which the Worker option
       ``stream_read_time`` sets. At that limit ``read_page`` gives a page with no
       Record.
-    - ``read`` and ``read_pages`` never end at a page with no Record.
-      ``read_pages`` yields that page, and both read again from its offset. So
-      they go on until a Record comes, also over more than one Workflow Task.
-      Workflow code decides when to stop, for example with a ``break``, its own
-      timer, a Signal or an Activity. Each page is a read result in History. With
-      no ``wait`` or a short one, an iterator on a Stream with no new Record
-      gets page after page with no Record, and History grows fast. So give an
-      iterator a long ``wait``.
+    - ``read`` and ``read_pages`` go on until a Record comes, also over more
+      than one Workflow Task. Workflow code decides when to stop, for example
+      with a ``break``, its own timer, a Signal or an Activity. Each page is a
+      read result in History. With a ``wait`` of zero or a short one, an
+      iterator on a Stream with no new Record gets page after page with no
+      Record, and History grows fast. With the default wait, an idle Stream
+      gives an iterator few such pages and no new Workflow Task.
     - A read holds its Workflow Task up to the read limit. A Signal that comes
       meanwhile waits until the read has its page, or until that limit. A
       command for the server waits only for one Store call with no wait for each
@@ -485,7 +508,8 @@ def _store_request(
             max_records=request.max_records,
             max_bytes=request.max_bytes,
         )
-        if request.HasField("wait"):
+        # A Store may take a zero wait as one with no end, such as Redis BLOCK 0.
+        if request.HasField("wait") and (request.wait.seconds or request.wait.nanos):
             read.wait.CopyFrom(request.wait)
         return read
     return DescribeStreamRequest(stream_id=stream_id)
@@ -553,6 +577,17 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
         StreamError: The call failed.
     """
     store_request = _store_request(request)
+    if (
+        isinstance(store_request, ReadRecordsRequest)
+        and store_request.HasField("wait")
+        and timeout is not None
+        and timeout > timedelta(0)
+    ):
+        # A wait is only a bound, and a Store that waits all of it must still answer
+        # before the timeout fails the read.
+        longest = timeout - min(_READ_ANSWER_TIME, timeout / 10)
+        if store_request.wait.ToTimedelta() > longest:
+            store_request.wait.FromTimedelta(longest)
     if isinstance(store_request, AppendRecordsRequest):
         if codec:
             for appended in store_request.records:

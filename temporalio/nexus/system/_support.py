@@ -182,19 +182,22 @@ def _timestamp(time: datetime) -> "Timestamp":
     return models.Timestamp(seconds=proto.seconds, nanos=proto.nanos)
 
 
+DEFAULT_READ_WAIT = timedelta(minutes=1)
+"""The ``wait`` of each read of ``read`` and ``read_pages`` after their first page,
+when the caller gave no ``wait``."""
+
+
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    from temporalio.workflow import in_workflow
-
-    # A Stream has no end that a read reports. In client and Activity code, a page
-    # with no Record says that no Record came within the wait, or at once with no
-    # wait, so the read stops there. Workflow code decides itself when it stops,
-    # since a read that waits goes on in later Workflow Tasks.
-    if not response.records and not in_workflow():
-        return None
+    # A Stream has no end that a read reports, so an iterator reads on after a page
+    # with no Record, and the caller decides when to stop. A read with no wait would
+    # call the Store in a loop on an idle Stream, so it waits unless told otherwise.
+    # A wait of zero is the caller's choice of no wait.
     return dataclasses.replace(
-        request, from_offset=response.last_offset or request.from_offset
+        request,
+        from_offset=response.last_offset or request.from_offset,
+        wait=DEFAULT_READ_WAIT if request.wait is None else request.wait,
     )
 
 

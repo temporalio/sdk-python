@@ -352,7 +352,9 @@ class Worker:
                 wait, from the start of the task or the end of its replay. At that
                 limit, a read with a wait gives a page with no Record. ``read`` and
                 ``read_pages`` never end at a page with no Record, and read again
-                with the whole wait, also in a later task. A read with no wait goes
+                with the whole wait, also in a later task. With no wait given,
+                their reads after the first page wait up to 1 minute, cut at this
+                limit. A read with no wait, such as ``read_page`` with none, goes
                 on without holding the task until the Store answers. Defaults to
                 half the Workflow Task timeout. The limit is always before the
                 heartbeat of the task, so a read alone never makes the Worker send

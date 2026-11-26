@@ -54,6 +54,7 @@ from temporalio.nexus.system.stream_service import (
 )
 from temporalio.service import ServiceClient
 from temporalio.testing import ActivityEnvironment
+from temporalio.testing._stream_store import _MemoryStreams
 from temporalio.worker._workflow_streams import _stream_error_from_failure
 from tests.helpers.streams import (
     FaultStore,
@@ -221,7 +222,8 @@ async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) 
                             max_bytes=rng.choice([0, 1, 2**62]),
                         )
                         wait = rng.choice([None, 0, 1, 30 * 24 * 3600])
-                        if wait is not None:
+                        # A Store gets no wait for a wait of zero.
+                        if wait:
                             expected.wait.FromSeconds(wait)
                         call = client.get_stream(ref).read_page(
                             from_offset=expected.from_offset or None,
@@ -354,6 +356,8 @@ class _FakeReads(temporalio.client.OutboundInterceptor):
         """The number of Records of the Stream, which a test can raise."""
         self.starts: list[int] = []
         """The Record after which each read started, in the order of the reads."""
+        self.waits: list[timedelta | None] = []
+        """The wait of each read, in the order of the reads."""
 
     async def start_nexus_operation(
         self, input: temporalio.client.StartNexusOperationInput
@@ -361,6 +365,7 @@ class _FakeReads(temporalio.client.OutboundInterceptor):
         request: ReadRecordsRequest[int] = input.arg
         start = int.from_bytes(request.from_offset or b"", "big")
         self.starts.append(start)
+        self.waits.append(request.wait)
         size = self._rng.randrange(1, 4)
         # A read with a wait can see no Record come within its wait, also when more
         # come later. With no wait, a Store answers with no Record only at the end.
@@ -381,9 +386,7 @@ class _FakeReads(temporalio.client.OutboundInterceptor):
         return handle
 
 
-async def test_a_read_gives_each_record_once_and_ends_at_a_page_with_no_record() -> (
-    None
-):
+async def test_a_read_gives_each_record_once_past_pages_with_no_record() -> None:
     for seed in range(300):
         with failure_note(f"seed {seed}"):
             await _read_script(random.Random(seed))
@@ -401,26 +404,27 @@ async def _read_script(rng: random.Random) -> None:
     [reads] = fake
     wait = rng.choice([None, timedelta(0), timedelta(seconds=5)])
     got: list[int] = []
+    later = _support.DEFAULT_READ_WAIT if wait is None else wait
     for _ in range(rng.randrange(1, 4)):
         # More Records come after each read, and a reader picks up where it stopped.
-        reads.records += rng.randrange(6)
+        reads.records += rng.randrange(1, 6)
         offset = got[-1].to_bytes(8, "big") if got else None
-        stop_at = rng.choice([None, *range(len(got) + 1, reads.records + 1)])
+        # A Stream has no end, so the reader stops at a Record that it knows of.
+        stop_at = rng.randrange(len(got) + 1, reads.records + 1)
         first_read = len(reads.starts)
         async for record in stream.read(from_offset=offset, wait=wait):
             got.append(record.body)
             if len(got) == stop_at:
                 break
-        assert got == list(range(1, len(got) + 1))
-        if stop_at is not None and len(got) == stop_at:
-            # The read stops at the caller's last Record, so no read starts after it.
-            assert all(start < stop_at for start in reads.starts[first_read:])
-        else:
-            # Each read stops at its first page with no Record, which a read with no
-            # wait gives only at the end.
-            assert reads.starts[-1] == len(got)
-            if not wait:
-                assert len(got) == reads.records
+        # A page with no Record before the caller's last Record doesn't end the read.
+        assert got == list(range(1, stop_at + 1))
+        # The read stops at the caller's last Record, so no read starts after it.
+        assert all(start < stop_at for start in reads.starts[first_read:])
+        # The first read has the caller's wait. A later one has it too, or the
+        # default wait when the caller gave none.
+        assert reads.waits[first_read:] == [wait] + [later] * (
+            len(reads.waits) - first_read - 1
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -672,6 +676,83 @@ def test_a_client_call_past_its_rpc_timeout_cancels_the_store_call() -> None:
         assert loop.time() == 5
         assert hold.cancelled.is_set()
         assert asyncio.all_tasks() == {asyncio.current_task()}
+
+    run_with_virtual_clock(script())
+
+
+def test_a_client_iterator_on_an_idle_stream_waits_between_reads() -> None:
+    # The Streams of a MemoryStreamStore with no call through the threads of Core, so
+    # the virtual clock doesn't jump past a wait while an append is on its way.
+    class ReadLog(_MemoryStreams):
+        def __init__(self) -> None:
+            super().__init__(
+                "memory", retention=timedelta(days=1), resend_window=16, fence=False
+            )
+            self.reads: list[proto.ReadRecordsRequest] = []
+
+        async def read_records(
+            self, request: proto.ReadRecordsRequest
+        ) -> proto.ReadRecordsResponse:
+            self.reads.append(request)
+            return await super().read_records(request)
+
+    def waits(store: ReadLog) -> list[timedelta | None]:
+        return [
+            request.wait.ToTimedelta() if request.HasField("wait") else None
+            for request in store.reads
+        ]
+
+    async def script() -> None:
+        loop = asyncio.get_running_loop()
+        store = ReadLog()
+        client = Client(Mock(spec=ServiceClient), stream_config=StreamConfig([store]))
+        stream = await client.create_stream(id="s", body_type=int)
+        minute = _support.DEFAULT_READ_WAIT
+        ten, nine = timedelta(seconds=10), timedelta(seconds=9)
+        # With no wait, the first read answers at once and each later one waits the
+        # default wait. A wait of zero is the caller's choice to read in a loop, and
+        # the Store gets no wait for it. A wait ends before the rpc_timeout, so the
+        # Store answers in time.
+        cases: list[tuple[timedelta | None, timedelta | None, list[Any]]] = [
+            (None, None, [None, minute, minute, minute, minute]),
+            (ten, None, [ten] * 5),
+            (timedelta(0), None, [None] * 5),
+            (None, ten, [None, nine, nine, nine, nine]),
+            (minute, ten, [nine] * 5),
+            (timedelta(seconds=5), ten, [timedelta(seconds=5)] * 5),
+            # A Store has a tenth of a short timeout to answer, and a timeout of
+            # zero is no timeout.
+            (ten, timedelta(seconds=2), [timedelta(seconds=1.8)] * 5),
+            (ten, timedelta(0), [ten] * 5),
+        ]
+        for wait, rpc_timeout, expected in cases:
+            with failure_note(f"wait {wait}, rpc_timeout {rpc_timeout}"):
+                store.reads.clear()
+                start = loop.time()
+                pages = stream.read_pages(wait=wait, rpc_timeout=rpc_timeout)
+                for _ in expected:
+                    assert not (await anext(pages)).records
+                await pages.aclose()
+                assert waits(store) == expected
+                assert loop.time() - start == pytest.approx(
+                    sum(w.total_seconds() for w in expected if w)
+                )
+
+        # A Record that comes during a wait ends it at once, and the caller stops.
+        async def append_later() -> None:
+            await asyncio.sleep(90)
+            await stream.append(1)
+
+        store.reads.clear()
+        start = loop.time()
+        appending = asyncio.create_task(append_later())
+        async with asyncio.timeout(600):
+            async for record in stream.read():
+                assert record.body == 1
+                break
+        await appending
+        assert loop.time() - start == pytest.approx(90)
+        assert waits(store) == [None, minute, minute]
 
     run_with_virtual_clock(script())
 
