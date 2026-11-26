@@ -318,8 +318,11 @@ class StreamConfig:
     code it calls it for each such Stream call, also for a create and a
     describe, and again in a replay. So the selector must return the same Store
     for the same call, must not block or do I/O, and must be safe to call from
-    more than one thread. A created Stream has the name of its Store in its ref,
-    so its calls don't depend on the selector.
+    more than one thread. SDK Core fails a replay with a nondeterminism error
+    when a replayed append or read goes to another Store than the one in
+    History. A replayed create or describe gives the result that History has. A
+    created Stream has the name of its Store in its ref, so its calls don't
+    depend on the selector.
     """
 
     max_record_bytes: int = 1536 * 1024

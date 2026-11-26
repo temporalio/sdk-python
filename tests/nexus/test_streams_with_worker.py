@@ -643,6 +643,40 @@ async def test_a_worker_uses_the_stream_config_of_its_new_client(
             assert selects == [("StorageDriverWorkflowInfo", client.namespace)]
 
 
+@workflow.defn
+class _AppendOnceWorkflow:
+    @workflow.run
+    async def run(self, stream_id: str) -> None:
+        await workflow.get_stream(StreamRef[int](id=stream_id)).append(1)
+
+
+async def test_a_replay_fails_when_the_selector_picks_another_store(
+    client: Client,
+) -> None:
+    first, second = FaultStore("first"), FaultStore("second")
+    for store in (first, second):
+        await stream_client(client, store).create_stream(id="picked", body_type=int)
+    options = RunOptions(_AppendOnceWorkflow, ["picked"])
+    ran = await run(
+        stream_client(client, first, second, store_selector=lambda _: first), options
+    )
+    assert ran.result is None
+    for picked in (first, second):
+        with failure_note(f"replay picks {picked.name()}"):
+
+            def select(_: Any) -> FaultStore:
+                return picked
+
+            config = StreamConfig([first, second], store_selector=select)
+            replay = Replayer(workflows=[_AppendOnceWorkflow], stream_config=config)
+            if picked is first:
+                await replay.replay_workflow(ran.history)
+                continue
+            # SDK Core compares the Store of a replayed append with History.
+            with pytest.raises(workflow.NondeterminismError, match="Store `first`"):
+                await replay.replay_workflow(ran.history)
+
+
 async def test_an_append_over_a_limit_of_the_config_never_reaches_the_store(
     client: Client,
 ) -> None:
