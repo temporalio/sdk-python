@@ -339,7 +339,9 @@ class StreamConfig:
     return one of :py:attr:`stores`.
 
     Required when more than one Store is registered. When ``None``, the one
-    Store takes each such call.
+    Store takes each such call. In Workflow code, the SDK gives SDK Core the
+    name of the Store that it picks, so Core never gets a ref with no Store
+    name.
 
     The SDK calls the selector only for a ref with no Store name. In Workflow
     code it calls it for each such Stream call, also for a create and a

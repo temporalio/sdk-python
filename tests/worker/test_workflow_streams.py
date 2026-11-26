@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import pytest
 from google.protobuf.duration_pb2 import Duration
 from google.protobuf.message import Message
 
@@ -664,20 +665,20 @@ class _EachCallWorkflow:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
+def _store_of(command: WorkflowCommand) -> str:
+    """Return the Store name that the command of a Stream call has."""
+    variant = command.WhichOneof("variant")
+    if variant == "append_to_stream":
+        return command.append_to_stream.stream.store
+    if variant == "read_stream":
+        return command.read_stream.stream.store
+    # The Local Activity of a create or a describe has the Store name second.
+    [_, store, *_] = command.schedule_local_activity.arguments
+    return temporalio.converter.DefaultPayloadConverter().from_payload(store, str)
+
+
 async def test_the_store_of_a_call_is_chosen_before_its_command() -> None:
     operations = ["create", "append", "read", "describe"]
-    converter = temporalio.converter.DefaultPayloadConverter()
-
-    def store_of(command: WorkflowCommand) -> str:
-        variant = command.WhichOneof("variant")
-        if variant == "append_to_stream":
-            return command.append_to_stream.stream.store
-        if variant == "read_stream":
-            return command.read_stream.stream.store
-        # The Local Activity of a create or a describe has the Store name second.
-        [_, store, *_] = command.schedule_local_activity.arguments
-        return converter.from_payload(store, str)
-
     a, b = MemoryStreamStore(name="a"), MemoryStreamStore(name="b")
     for mask in range(2 ** len(operations)):
         # Bit `at` of `mask` gives call `at` to Store b.
@@ -714,9 +715,50 @@ async def test_the_store_of_a_call_is_chosen_before_its_command() -> None:
                     "request_cancel_local_activity",
                     "complete_workflow_execution",
                 ]
-                assert [store_of(command) for command in commands[:4]] == [
+                assert [_store_of(command) for command in commands[:4]] == [
                     "b" if mine else "a" for mine in on_b
                 ]
+
+
+# SDK Core uses the only Store of a Worker for a ref with no Store name. The SDK
+# picks that Store itself, so each command has its name.
+async def test_a_ref_with_no_store_name_goes_to_the_only_store() -> None:
+    operations = ["create", "append", "read", "describe"]
+    config = StreamConfig([MemoryStreamStore(name="only")])
+    _EachCall.operations = operations
+    for replaying in (False, True):
+        with failure_note(f"replaying {replaying}"):
+            instance = _new_instance(_EachCallWorkflow, config)
+            initialize = WorkflowActivationJob(initialize_workflow=InitializeWorkflow())
+            completion = await _activate(instance, initialize, replaying=replaying)
+            commands = completion.successful.commands[: len(operations)]
+            assert [command.WhichOneof("variant") for command in commands] == [
+                "schedule_local_activity",
+                "append_to_stream",
+                "read_stream",
+                "schedule_local_activity",
+            ]
+            stores = [_store_of(command) for command in commands]
+            assert stores == ["only"] * len(operations)
+
+
+async def test_a_ref_with_no_store_name_needs_a_selector_for_two_stores() -> None:
+    a, b = MemoryStreamStore(name="a"), MemoryStreamStore(name="b")
+    with pytest.raises(ValueError, match="store_selector must be specified"):
+        StreamConfig([a, b])
+    unregistered = MemoryStreamStore(name="c")
+    config = StreamConfig([a, b], store_selector=lambda _: unregistered)
+    for operation in ["create", "append", "read", "describe"]:
+        _EachCall.operations = [operation]
+        for replaying in (False, True):
+            with failure_note(f"{operation}, replaying {replaying}"):
+                instance = _new_instance(_EachCallWorkflow, config)
+                initialize = WorkflowActivationJob(
+                    initialize_workflow=InitializeWorkflow()
+                )
+                completion = await _activate(instance, initialize, replaying=replaying)
+                message = completion.failed.failure.message
+                assert "not registered in StreamConfig.stores" in message
 
 
 async def test_a_stream_call_with_no_stream_config_fails_the_task() -> None:
