@@ -26,7 +26,7 @@ workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_s
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
 stream_output_dir = base_dir / "temporalio" / "nexus" / "system" / "stream_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
-NEX_GEN_VERSION = "0.2.13"
+NEX_GEN_VERSION = "0.2.14"
 proto_files = [
     gen_protos.api_proto_dir
     / "temporal"
