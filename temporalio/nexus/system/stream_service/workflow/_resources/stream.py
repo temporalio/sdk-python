@@ -87,15 +87,16 @@ class Stream(typing.Generic[BodyT]):
         wait: datetime.timedelta | None = None,
         max_bytes: int | None = None,
     ) -> collections.abc.AsyncGenerator[ReadRecordsResponse[BodyT], None]:
-        """Yield each response of ``read_page`` until the poll helper stops.
+        """Yield each response of ``read_page`` until the poll helper returns ``None``.
 
         Read one page of Records. The poll iterator keeps reading after a page with no
         Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
-            max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record before an empty page.
+            max_records: The maximum number of Records in one page. Zero uses the Store
+                default.
+            wait: How long to wait for a new Record. Unset returns immediately.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """
@@ -125,15 +126,16 @@ class Stream(typing.Generic[BodyT]):
         """Yield each item of ``read_pages``, page by page.
 
         ``next_request`` resumes after the last item that the iterator yielded. It is
-        ``None`` after the last page.
+        ``None`` when the page helper returns ``None``.
 
         Read one page of Records. The poll iterator keeps reading after a page with no
         Record.
 
         Args:
             from_offset: Read after this offset. Empty means from the beginning.
-            max_records: The maximum number of Records in one page.
-            wait: How long the read waits for a new Record before an empty page.
+            max_records: The maximum number of Records in one page. Zero uses the Store
+                default.
+            wait: How long to wait for a new Record. Unset returns immediately.
             max_bytes: The maximum bytes of Records in a page. A larger Record is
                 returned alone.
         """

@@ -195,7 +195,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class AppendRecordsRequest(typing.Generic[BodyT]):
-    """Append one batch. The Store writes a batch that arrives again only once."""
+    """Append one batch. Retries are deduplicated within the Store resend window."""
 
     ref: StreamRef[BodyT]
     records: list[AppendRecord[BodyT]]
@@ -319,7 +319,7 @@ temporalio.converter.transfer_type_convertible(
 
 @dataclasses.dataclass(slots=True)
 class Producer:
-    """The writer of a batch. A later attempt supersedes an earlier one."""
+    """The writer of a batch. Attempts compare only within the same Producer."""
 
     kind: ProducerKind | None = None
 

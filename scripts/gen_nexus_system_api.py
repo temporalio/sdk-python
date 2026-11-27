@@ -26,7 +26,8 @@ workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_s
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
 stream_output_dir = base_dir / "temporalio" / "nexus" / "system" / "stream_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
-NEX_GEN_VERSION = "0.2.14"
+# Empty-page polls need the cancellation fix before its nexgen release.
+NEX_GEN_REVISION = "cb6dccfa158bab4c0662b85a31d3da63d0b8179b"
 proto_files = [
     gen_protos.api_proto_dir
     / "temporal"
@@ -53,25 +54,27 @@ proto_files = [
 def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
-    if (
-        shutil.which("nexgen") is None
-        or subprocess.check_output(["nexgen", "--version"], text=True).strip()
-        != f"nexgen {NEX_GEN_VERSION}"
-    ):
+    install_dir = base_dir / "build" / "nexgen" / NEX_GEN_REVISION
+    binary = install_dir / "bin" / ("nexgen.exe" if os.name == "nt" else "nexgen")
+    if not binary.is_file():
         subprocess.check_call(
             [
                 "cargo",
                 "install",
                 "--locked",
                 "nexgen",
-                "--version",
-                NEX_GEN_VERSION,
+                "--git",
+                "https://github.com/temporalio/nexgen.git",
+                "--rev",
+                NEX_GEN_REVISION,
+                "--root",
+                str(install_dir),
                 "--features",
                 "advanced",
                 "--force",
             ]
         )
-    return ["nexgen"]
+    return [str(binary)]
 
 
 def build_descriptor_set(descriptor_path: Path) -> None:

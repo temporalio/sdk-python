@@ -18,10 +18,8 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class WorkflowTaskAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One attempt of a Workflow Task. Two attempts of the same Producer compare by
-    `started_event_id`, then `attempt`, then `started_time`. Attempts of different Producers have
-    no order. A Producer is for one run, so the attempts of a reset run or of the next run in a
-    chain have no order with the attempts of this run.
+    Attempts of one Producer compare by `started_event_id`, then `attempt`, then `started_time`.
+    Attempts from different runs have no order, including reset and Continue-As-New runs.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -32,14 +30,11 @@ class WorkflowTaskAttempt(google.protobuf.message.Message):
     started_event_id: builtins.int
     """Required."""
     attempt: builtins.int
-    """Required. The attempt number of the task, starting at 1. Every task starts at 1 again, so
-    this number alone can't order the writes of a run.
-    """
+    """Required. Starts at 1 for each task, so this number alone cannot order writes in a run."""
     @property
     def started_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """When this attempt started. The server can use a started event id for a second task, for
-        example after it drops a speculative task, and this time distinguishes the two. It's empty
-        when the server sent no started time for the task.
+        """Distinguishes tasks when the server reuses a started event id after a speculative task.
+        Empty when the server did not send a started time.
         """
 
     def __init__(
@@ -69,9 +64,8 @@ global___WorkflowTaskAttempt = WorkflowTaskAttempt
 @typing.final
 class LocalActivityAttempt(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One attempt of a Local Activity. Two attempts compare by `task`, then `attempt`, so the same
-    call in a later Workflow Task is a later attempt. Attempts of two runs have no order. Their
-    Records have only their order in the Stream.
+    Attempts of one Producer compare by `task`, then `attempt`.
+    A later Workflow Task therefore has a later attempt. Attempts from different runs have no order.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -113,9 +107,7 @@ class ActivityAttempt(google.protobuf.message.Message):
     """Required. The attempt number, starting at 1."""
     @property
     def attempt_scheduled_time(self) -> google.protobuf.timestamp_pb2.Timestamp:
-        """Required. When the server scheduled this attempt. A reset of the Activity starts the
-        attempt number at 1 again, so this time is what orders the attempts across a reset.
-        """
+        """Required. A reset restarts the attempt number, so this time orders attempts across a reset."""
 
     def __init__(
         self,
@@ -139,8 +131,7 @@ global___ActivityAttempt = ActivityAttempt
 @typing.final
 class WorkflowProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of a Workflow run. Workflow code writes as this Producer when it appends in a
-    Workflow Task. A write from one of its Local Activities uses a `LocalActivityProducer`.
+    Workflow writes share one Producer per run. Local Activity writes use `LocalActivityProducer`.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -154,14 +145,10 @@ class WorkflowProducer(google.protobuf.message.Message):
     workflow_id: builtins.str
     """Required."""
     run_id: builtins.str
-    """Required. The id of this run, not the first run id of its chain. Each run is a separate
-    Producer.
-    """
+    """Required. This run id separates the Producer from other runs in the chain."""
     @property
     def attempt(self) -> global___WorkflowTaskAttempt:
-        """The Workflow Task attempt that makes the write. Workflow code leaves it empty, and the SDK
-        sets it before it sends the write to the Store.
-        """
+        """Workflow code leaves this empty so that the SDK can set the actual Workflow Task attempt."""
 
     def __init__(
         self,
@@ -210,9 +197,8 @@ class LocalActivityProducer(google.protobuf.message.Message):
     run_id: builtins.str
     """Required."""
     activity_id: builtins.str
-    """Required. The id that the SDK gives the call, because a Local Activity has no scheduled
-    event. Two Local Activities of one run must not share it, or the Store takes them as one
-    Producer. Each SDK makes it from a counter of its own, unless the user sets it.
+    """Required. Local Activities have no scheduled event, so this id distinguishes calls in a run.
+    The SDK assigns an id from its counter unless the user sets one. Do not reuse it within a run.
     """
     @property
     def attempt(self) -> global___LocalActivityAttempt:
@@ -271,9 +257,8 @@ class WorkflowActivityProducer(google.protobuf.message.Message):
     activity_id: builtins.str
     """Required."""
     scheduled_event_id: builtins.int
-    """The id of the `ActivityTaskScheduled` event of the Activity in the History of its run. A run
-    can use an Activity id again after the first Activity ended, and this id separates the two
-    Activities, so they are separate Producers. It's zero when the SDK doesn't have it.
+    """Distinguishes calls when a run reuses an Activity id after an Activity completes.
+    Zero when the SDK does not have the `ActivityTaskScheduled` event id.
     """
     @property
     def attempt(self) -> global___ActivityAttempt:
@@ -315,8 +300,7 @@ global___WorkflowActivityProducer = WorkflowActivityProducer
 @typing.final
 class StandaloneActivityProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of a Standalone Activity. Its attempts compare as those of a Workflow's Activity
-    do.
+    Standalone Activity attempts use the same order as Workflow Activity attempts.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -365,8 +349,7 @@ global___StandaloneActivityProducer = StandaloneActivityProducer
 @typing.final
 class ClientProducer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Producer of a client. A client has no run and no attempt, so a Store never fences its
-    writes and a reader never hides them.
+    Clients have no attempt, so their writes cannot be fenced or superseded by a later attempt.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -376,9 +359,7 @@ class ClientProducer(google.protobuf.message.Message):
     namespace: builtins.str
     """Required."""
     id: builtins.str
-    """Required. The caller can set it, for example to the id of the Nexus operation that
-    writes. Without one, the SDK makes an id for each client object.
-    """
+    """Required. The SDK generates an id per client object unless the caller supplies one."""
     def __init__(
         self,
         *,
@@ -394,17 +375,10 @@ global___ClientProducer = ClientProducer
 @typing.final
 class Producer(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The writer of a batch of Records. A Producer is one unit of work, such as one Activity or one
-    Workflow run. Two Producers are the same when they have the same kind and the same ids.
-    Every kind except a client also has the attempt that made the write, and the attempt is not
-    part of what identifies the Producer.
-
-    A Store that fences fails a write with `FENCED` when a later attempt of the same Producer has
-    already written. A Store that doesn't fence accepts the write. Each Record has its Producer
-    and attempt either way, so a reader can hide the Records of an earlier attempt.
-
-    Attempts of different Producers have no order. A new run has new Producers, so no write fences
-    or supersedes the Records of an earlier run, such as the base run of a reset.
+    The kind and ids identify a Producer. The attempt does not.
+    With fencing enabled, a write fails with `FENCED` after a later attempt of that Producer writes.
+    Records retain their Producer and attempt so that readers can apply their own retry policy.
+    Attempts of different Producers have no order. A reset run cannot fence its base run.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -485,8 +459,7 @@ global___Producer = Producer
 @typing.final
 class AppendRecord(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    One Record of a batch to append. The Store stores it with the Producer of the batch and
-    assigns its offset.
+    The Store adds the batch Producer and assigns an offset.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -510,9 +483,7 @@ global___AppendRecord = AppendRecord
 
 @typing.final
 class StreamRecord(google.protobuf.message.Message):
-    """Experimental. Might change in the future.
-    One Record of a Stream, as a read returns it. A read returns only Records.
-    """
+    """Experimental. Might change in the future."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -520,11 +491,8 @@ class StreamRecord(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     OFFSET_FIELD_NUMBER: builtins.int
     offset: builtins.bytes
-    """Required. The position of this Record in its Stream. It's never empty. Offsets are unique
-    and ordered within one Stream, but they have gaps, so they don't count Records. Two offsets
-    of one Stream compare as unsigned bytes, in the order of their Records, so a reader, a
-    Store and the server can order them without decoding them. An offset doesn't identify
-    its Stream, so a read checks it against the Stream of the request.
+    """Required and nonempty. Offsets are unique within a Stream. Unsigned byte order matches
+    Record order. Gaps cannot be used to count Records. Offsets do not identify their Stream.
     """
     @property
     def producer(self) -> global___Producer: ...
@@ -552,8 +520,7 @@ global___StreamRecord = StreamRecord
 @typing.final
 class StreamErrorDetails(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The details of a failed Stream call. They're in the gRPC status details, and in the details
-    of the application failure when the call is a Nexus operation.
+    Returned in gRPC status details or Nexus application failure details.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

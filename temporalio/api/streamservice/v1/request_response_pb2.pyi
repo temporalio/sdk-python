@@ -20,15 +20,12 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class CreateStreamRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Creates a Stream. If the Stream already exists, the result depends on `id_conflict_policy`.
-    `FAIL` fails with `ALREADY_EXISTS`, and `USE_EXISTING` succeeds with `created` false. A retry of
-    the create that made the Stream, with the same request id, returns `created` true. The Store
-    remembers the request id of that create, so a retry after a lost response doesn't fail with
-    `ALREADY_EXISTS`. Either policy fails with `EXPIRED` for an expired Stream.
+    `FAIL` returns `ALREADY_EXISTS` for an existing Stream. `USE_EXISTING` returns `created` false.
+    A retry with the original create request id returns `created` true, even with `FAIL`.
+    Either policy returns `EXPIRED` while the Store remembers an expired Stream.
 
-    A create has no Retention. Retention is a setting of the Store, as it's a setting of the
-    namespace for Workflows. It's the only lifetime setting of a Stream. It starts at the create,
-    and each append starts it again. When it passes, the Stream is expired.
+    Retention is a Store setting. It starts at create and restarts when an append writes a new batch.
+    Reads and resends keep the existing expiry.
     (-- api-linter: core::0133=disabled
         aip.dev/not-precedent: The request identifies a Stream by its id. --)
     """
@@ -60,9 +57,7 @@ global___CreateStreamRequest = CreateStreamRequest
 
 @typing.final
 class CreateStreamResponse(google.protobuf.message.Message):
-    """Experimental. Might change in the future.
-    The result of a create.
-    """
+    """Experimental. Might change in the future."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -81,13 +76,9 @@ global___CreateStreamResponse = CreateStreamResponse
 @typing.final
 class AppendRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Appends one batch of Records as one Producer. If the same batch arrives again, with the same
-    Producer, attempt and request id, the Store writes it only once while it remembers the id, and it
-    returns the offsets of the first write. A caller that got no response sends the batch again with
-    the same request id. A Store remembers the request ids of the most recent batches of each
-    Producer of the Stream. How many it remembers is a setting of the Store, so a try that arrives
-    after more batches than that is written again. When the request id is empty, a retry is written
-    again.
+    Retries must use the same Producer, attempt, request id and batch. A remembered request id
+    returns the original offsets without writing again. The Store sets its resend window per
+    Producer. An empty or forgotten request id permits a second write.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -161,8 +152,7 @@ global___AppendRecordsResponse = AppendRecordsResponse
 @typing.final
 class ReadRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    Reads one page of Records after an offset. When no Record is left, the read waits for a new
-    one, so a reader long-polls.
+    Reads after an offset. When no Record is available, `wait` controls how long the read waits.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -182,12 +172,12 @@ class ReadRecordsRequest(google.protobuf.message.Message):
         aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
     """
     max_records: builtins.int
-    """The maximum number of Records in one page. Zero means no limit."""
+    """The maximum number of Records in one page. Zero uses the Store default."""
     max_bytes: builtins.int
     """The maximum total size of the Records in one page, in bytes. A caller sets it so that a
     page fits a limit of its own, such as the size of a History marker. A Record larger than
-    this is still returned, alone in its page, so a read always makes progress. Zero means no
-    limit.
+    this is still returned, alone in its page, so a read always makes progress. Zero uses the
+    Store default.
     """
     @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:
@@ -227,9 +217,7 @@ global___ReadRecordsRequest = ReadRecordsRequest
 
 @typing.final
 class ReadRecordsResponse(google.protobuf.message.Message):
-    """Experimental. Might change in the future.
-    One page of a read.
-    """
+    """Experimental. Might change in the future."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -268,9 +256,7 @@ global___ReadRecordsResponse = ReadRecordsResponse
 
 @typing.final
 class DescribeStreamRequest(google.protobuf.message.Message):
-    """Experimental. Might change in the future.
-    Gets the newest offset of a Stream.
-    """
+    """Experimental. Might change in the future."""
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
 
@@ -291,8 +277,7 @@ global___DescribeStreamRequest = DescribeStreamRequest
 @typing.final
 class DescribeStreamResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The state of a Stream. It doesn't include Retention, which is a setting of the Store and not
-    of one Stream.
+    Retention is a Store setting and is not returned here.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
