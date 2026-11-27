@@ -364,8 +364,5 @@ class VirtualClockLoop(asyncio.SelectorEventLoop):
 
 def run_with_virtual_clock(main: Coroutine[Any, Any, _T]) -> _T:
     """Run ``main`` on a new :py:class:`VirtualClockLoop` and return its result."""
-    loop = VirtualClockLoop()
-    try:
-        return loop.run_until_complete(main)
-    finally:
-        loop.close()
+    with asyncio.Runner(loop_factory=VirtualClockLoop) as runner:
+        return runner.run(main)
