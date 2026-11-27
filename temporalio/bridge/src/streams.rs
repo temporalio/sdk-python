@@ -68,7 +68,7 @@ impl Drop for CallGuard<'_> {
     fn drop(&mut self) {
         let state = std::mem::replace(&mut *lock(&self.state), CallState::Dropped);
         if let CallState::Running(task) = state {
-            // asyncio requires cross-thread cancellation to run through its event loop.
+            // `asyncio` requires cross-thread cancellation to run through its event loop.
             let _ = Python::try_attach(|py| {
                 let cancel = task.getattr(py, "cancel")?;
                 let event_loop = self.task_locals.event_loop(py);
@@ -80,7 +80,6 @@ impl Drop for CallGuard<'_> {
 }
 
 impl PythonStore {
-    // Core doesn't catch Store panics, so failures must return errors.
     async fn call<Request, Response, R>(
         &self,
         operation: &'static str,
