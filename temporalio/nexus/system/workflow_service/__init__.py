@@ -56,5 +56,6 @@ __nexus_operation_registry__: dict[
     ): _NexusOperationInfo(
         operation=_services.WorkflowService.signal_with_start_workflow,
         serialization_context=_support.signal_with_start_workflow_serialization_context,
+        storage_target=_support.signal_with_start_workflow_storage_target,
     ),
 }
