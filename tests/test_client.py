@@ -18,6 +18,7 @@ import temporalio.api.common.v1
 import temporalio.api.workflowservice.v1
 import temporalio.common
 import temporalio.exceptions
+import temporalio.service
 from temporalio import workflow
 from temporalio.api.enums.v1 import (
     CancelExternalWorkflowExecutionFailedCause,
@@ -827,6 +828,16 @@ def test_history_from_json():
     assert json_format.MessageToDict(history) == json_format.MessageToDict(
         _history_from_json(json_format.MessageToDict(history_from_dict))
     )
+
+
+async def test_schedule_action_headers_proto() -> None:
+    headers = {"custom-header": temporalio.api.common.v1.Payload(data=b"value")}
+    action = ScheduleActionStartWorkflow(
+        "workflow-name", id="wid", task_queue="tq", headers=headers
+    )
+    client = Client(service_client=mock.Mock(spec=temporalio.service.ServiceClient))
+    proto = await action._to_proto(client)
+    assert dict(proto.start_workflow.header.fields) == headers
 
 
 def test_schedule_policy_proto() -> None:
