@@ -1953,23 +1953,16 @@ global___RequestCancelNexusOperation = RequestCancelNexusOperation
 
 @typing.final
 class AppendToStream(google.protobuf.message.Message):
-    """Appends Records to a Stream as the Workflow's Producer. Core calls the Store while the Workflow
-    Task is open, keeps the task open as it does for a Local Activity, and sends the result in a
-    `ResolveStreamAppend` job.
+    """Appends Records as the Workflow Producer and returns ResolveStreamAppend. A retry of a task
+    whose append has no result in History can write the batch again. Core sends appends to each
+    Stream in command order.
 
-    * An append is at-least-once. If History has no result for it, a later attempt of the Workflow
-      Task writes the batch again.
-    * No command cancels an append. Lang must accept the result of an append that nothing awaits,
-      and Core drops an append that has no result at the Workflow's last command.
-    * The appends of one Stream go to the Store one at a time, in the order of their commands.
-    * A `stream` with no Store name is on the Store of the Worker's Stream runtime under the empty
-      name, else of its only Stream runtime, also in a replay. If the Worker has neither, the
-      Workflow Task fails.
-    * A bad `seq` or `stream`, or a Store that the Worker has no runtime for, fails the Workflow
-      Task. So does a Store that is still unavailable at the task's heartbeat, with a failure
-      message that starts with `StreamStoreUnavailable:`.
-    * An empty batch, or one over the limits of its Store, gives lang a `failed` job.
-    * A replay compares the `seq` and the `stream` of the command with History, not the `bodies`.
+    An empty Store name selects the runtime under the empty name, or the only runtime if there
+    is no such entry. Invalid seq or Stream references, missing runtimes and a Store outage at
+    the task heartbeat fail the Workflow Task. Invalid batches return a failed job.
+
+    Lang must accept results for appends it no longer awaits. The terminal Workflow command drops
+    unresolved appends. Replay matches seq and Stream and uses the result in History.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2009,68 +2002,34 @@ global___AppendToStream = AppendToStream
 
 @typing.final
 class ReadStream(google.protobuf.message.Message):
-    """Reads one page of a Stream, with the Records after `from_offset`. The result comes in one
-    `ResolveStreamRead` job, by the activation rules of `ResolveStreamAppend`. To read on, lang sends
-    a new `ReadStream` from the `last_offset` of the page. A Stream has no end that a read reports,
-    so the application's own last Record tells a reader to stop.
+    """Reads one page after from_offset. A reader continues from the page's last_offset until an
+    application Record tells it to stop. ResolveStreamRead follows the ordering of ResolveStreamAppend.
 
-    A page is one answer of the Store. It has the Records that the Store has at once, up to
-    `max_records` and `max_bytes`, and Core never waits to fill it. A read with no Record after
-    `from_offset` waits up to `wait`, but at most the read time that its Workflow Task has left
-    (`StreamSettings::read_time`, half the task timeout by default, from the end of a replay). If
-    the Store answers with no Record before the wait is up, Core asks again from that answer's
-    `last_offset`, at most once per 100 ms. A page with no Record has the `last_offset` of the
-    Store's answer, which is `from_offset` if the Store moved past nothing. Its `wait_cut` is true if
-    the read time ended the wait before `wait`.
+    A page returns as soon as Records are available. For an empty page Core polls from the Store's
+    returned offset at most once per 100 ms until wait expires or the task reaches its read time.
+    StreamSettings.read_time defaults to half the task timeout and starts when replay ends.
+    An empty page reports wait_cut when the task read time shortens the wait.
 
-    At the read limit a read with a `wait` gives a page with no Record and `wait_cut`. A read with no
-    `wait` goes on, since only the Store can say that the Stream has no Record after its offset.
-    Before the limit Core keeps the task open while a read runs, unless the task has a command or a
-    message for the server.
+    Before completing a task, Core checks unanswered reads with a nonblocking Store call and a
+    one-second deadline. If the task has a command or a server message, it waits only for this check.
+    Core carries available Records into the next task when a command must go first. An empty
+    blocking read resumes on a later task. An idle Stream alone does not request another task.
+    A nonblocking read can return an empty page in the current task, even after the read deadline.
 
-    Before the task completes, each read that had no answer in it gets a check, which is one Store
-    call with no wait and a short deadline of 1 s. A command waits for the check and no longer. If
-    the check gets Records, the task gives them, or holds them for the first activation of the next
-    task if it has a command. If it gets no Record, a read with a `wait` stops and starts again when
-    the next task opens, and a read with no `wait` gives the page with no Record. After the read
-    limit each new read of the task is a check. So a read on an idle Stream never makes a new task,
-    and a drain with no `wait` ends in its task.
+    Each task delivers at most 16 MiB of encoded Records. After 256 read results, new reads wait
+    for the next task. Reads already running can finish. A single Record over 16 MiB gives a failed
+    job with stream_unsupported. A Store outage or an unanswered check fails the Workflow Task with
+    StreamStoreUnavailable. Lang must accept results it no longer awaits. The terminal Workflow
+    command drops unresolved reads.
 
-    Core asks for a new task when it knows that the Stream has Records for an open read. It knows
-    that when the Store gave Records after the page that the read continues from, or when the task
-    holds back the read's page. It also asks for a new task when the read result budget of the task
-    holds back a read. A query answer and the heartbeat of a Local Activity or an append ask for a
-    new task whatever the reads say.
+    Replay matches seq, Stream and from_offset. It rereads the recorded range and verifies the
+    Record count and digest. Retention must cover Workflow replay and later queries. Missing or
+    changed Records give a StreamReplay error. A missing runtime or unavailable Store fails the
+    Workflow Task, or the legacy query. Replay loads History in parts. The Store selection rules
+    are the same as for AppendToStream.
 
-    A Store outage fails the Workflow Task, as for an append, and never reaches lang as a read
-    result. That's the case if a check fails or gets no answer by its deadline, or if a read has had
-    no answer since a failed try at the read limit, at the completion or at the heartbeat. The
-    failure message then starts with `StreamStoreUnavailable:`.
-
-    One Workflow Task gives at most 16 MiB of Records. A page that doesn't fit comes in the first
-    activation of the next task. Once a task gave 256 read results, its new reads get no check and
-    start when the next task opens, which Core asks for at once.
-
-    No command cancels a read, so lang must accept the job of a read that nothing awaits. Core drops
-    a read that has no result when lang sends the Workflow's last command.
-
-    The `core_stream_read` marker of the activation that gets the page keeps its offsets, the count
-    and a digest of its Records, and never the Records. A replay, also the replay for a query of a
-    closed Workflow, reads the page from the Store again, and fails if the Records are gone or
-    differ. So the Retention of the Stream must cover the life of the Workflow and the time in which
-    it gets queries. A replay reads the Records of all the read markers of History again, so a
-    reader should continue as new before those pass the 16 MiB that a Worker reads in one task. A
-    Worker with no runtime for the Store of a marker can't replay, and fails the task, or gives the
-    error as the answer of a legacy query.
-
-    A `stream` with no Store name is on the Store of the Worker's Stream runtime under the empty
-    name, else of its only Stream runtime, as for an append.
-
-    A replay compares the `seq`, the `stream` and the `from_offset` of the command with History, and
-    not the `max_records`, the `max_bytes` or the `wait`. It accepts a marker with no entry after any
-    task. After a replay Core doesn't know which Streams have Records after the pages of History, so
-    it learns that from the next answer of the Store. A negative `wait`, `max_records` or
-    `max_bytes`, a `from_offset` over 1024 bytes, or a bad `seq` or `stream` fails the Workflow Task.
+    Negative limits or wait, an offset over 1024 bytes, or an invalid seq or Stream reference
+    fail the Workflow Task.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -2090,8 +2049,8 @@ class ReadStream(google.protobuf.message.Message):
     max_records: builtins.int
     """The maximum number of Records in the page, which is 256 if this is zero."""
     max_bytes: builtins.int
-    """The maximum size of the Records in the page, which is 4 MiB if this is zero. Core asks the
-    Store for at most 16 MiB. One larger Record still comes as a page.
+    """Page size in encoded Record bytes. Zero selects 4 MiB. A single Record may exceed this
+    request limit up to the Workflow Task limit of 16 MiB.
     """
     @property
     def stream(self) -> temporalio.api.sdk.v1.stream_pb2.StreamRef: ...

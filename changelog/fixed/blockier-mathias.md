@@ -1,0 +1,2 @@
+Core: A Workflow Stream read returns an unsupported-read error for a single Record over 16 MiB. New read markers preserve the Producer's optional timestamps and signed values during replay. Workers can still replay the original marker format, including previously delivered oversized Records. Older Workers cannot interpret the new digest format.
+Core: Workflow replay now skips timed-out tasks consistently when a History page ends at the task start.

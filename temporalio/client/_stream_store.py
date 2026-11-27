@@ -356,9 +356,9 @@ class StreamConfig:
     """
 
     max_record_bytes: int = 1536 * 1024
-    """Maximum size in bytes of one Record of an append or a live Workflow read. Defaults to 1.5 MiB. Must be greater than or
-    equal to one. The size is that of the stored Record, which counts its
-    Producer.
+    """Maximum stored Record size for an append or a live Workflow read.
+
+    Includes its Producer. Defaults to 1.5 MiB and must be at least one.
     """
 
     max_batch_bytes: int = 4 * 1024 * 1024
@@ -414,7 +414,6 @@ class StreamConfig:
         object.__setattr__(self, "_by_name", by_name)
 
     def _store(self, name: str) -> StreamStore:
-        """Return the Store with a name, raising :class:`ValueError` if none has it."""
         store = self._by_name.get(name)
         if store is None:
             raise ValueError(f"No Stream Store found with name '{name}'")
@@ -426,9 +425,6 @@ class StreamConfig:
         target: StorageDriverActivityInfo | StorageDriverWorkflowInfo | None,
         namespace: str,
     ) -> StreamStore:
-        """Return the Store of a call on ``ref``, the ref of the call's request,
-        raising :class:`ValueError` if there is none.
-        """
         if ref.store:
             return self._store(ref.store)
         if self.store_selector is None:
@@ -443,12 +439,10 @@ class StreamConfig:
         return selected
 
     def _limits(self) -> tuple[int, int, int]:
-        """Return the three limits, in the order in which the bridge takes them."""
         return self.max_record_bytes, self.max_batch_bytes, self.max_batch_records
 
 
 def _request_ref(request: google.protobuf.message.Message) -> sdk.StreamRef:
-    """Return the ref of an SDK Stream request, which is ``stream_ref`` in a create."""
     if isinstance(request, sdk.CreateStreamRequest):
         return request.stream_ref
     assert isinstance(
@@ -473,18 +467,12 @@ _STORE_OPERATIONS: dict[str, tuple[str, _Message, _Message]] = {
 
 
 def _store_operation(name: str) -> tuple[str, _Message, _Message]:
-    """Return the :py:class:`StreamStore` method of a Stream operation, with the
-    classes of its Store request and of its Store response.
-    """
     return _STORE_OPERATIONS[name]
 
 
 def _sdk_request_type(  # pyright: ignore[reportUnusedFunction]
     name: str,
 ) -> _Message:
-    """Return the class of the SDK request of a Stream operation, which has the
-    ref of its Stream.
-    """
     operation = _STREAM_SERVICE.operation_definitions[name]
     converter = _get_transfer_type_converter(operation.input_type)
     assert converter and converter.transfer_type
@@ -494,9 +482,6 @@ def _sdk_request_type(  # pyright: ignore[reportUnusedFunction]
 def _store_request(
     request: google.protobuf.message.Message,
 ) -> google.protobuf.message.Message:
-    """Return the Store request of an SDK request, which has the id of the Stream
-    of the request's ref.
-    """
     stream_id = _request_ref(request).id
     if isinstance(request, sdk.CreateStreamRequest):
         return CreateStreamRequest(
@@ -634,7 +619,6 @@ async def _call_store(  # pyright: ignore[reportUnusedFunction]
 
 
 def _activity_target() -> StorageDriverActivityInfo | None:
-    """Return the running Activity as the target of a Stream call, if there is one."""
     if not temporalio.activity.in_activity():
         return None
     info = temporalio.activity.info()
@@ -650,9 +634,6 @@ async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]
     client: temporalio.client.Client,
     input: temporalio.client.StartNexusOperationInput,
 ) -> temporalio.client.NexusOperationHandle[Any]:
-    """Call the Stream Store of a Stream operation of a client, and return a handle
-    that has its result.
-    """
     stream_config = client._config["stream_config"]
     if stream_config is None:
         raise ValueError(
@@ -679,7 +660,6 @@ async def _call_stream_store(  # pyright: ignore[reportUnusedFunction]
         request_id,
         input.rpc_timeout,
     )
-    # Each generated Stream call gives its result type.
     result_type: Any = input.result_type
     handle: temporalio.client.NexusOperationHandle[Any] = (
         temporalio.client.NexusOperationHandle(

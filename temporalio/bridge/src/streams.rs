@@ -21,8 +21,6 @@ use temporalio_streams::{
 
 use crate::runtime;
 
-/// A Stream Store that is a Python object. `caller` is a `_StoreCaller` of
-/// `temporalio.client._stream_store`, and its `call` runs on the event loop of the task locals.
 struct PythonStore {
     caller: Py<PyAny>,
     event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
@@ -60,8 +58,7 @@ impl OnTask {
     }
 }
 
-/// The guard that cancels the Python task of a call that its caller drops before the answer. Core
-/// drops a call when it stops a read, evicts a run, gives up a try or shuts down.
+// Dropping a Core future must also stop its Python Store task.
 struct CallGuard<'a> {
     state: Arc<Mutex<CallState>>,
     task_locals: &'a pyo3_async_runtimes::TaskLocals,
@@ -71,8 +68,7 @@ impl Drop for CallGuard<'_> {
     fn drop(&mut self) {
         let state = std::mem::replace(&mut *lock(&self.state), CallState::Dropped);
         if let CallState::Running(task) = state {
-            // The loop may be closed and the interpreter may be finalizing, and then there's no
-            // task left to cancel. asyncio lets another thread only schedule the cancel.
+            // asyncio requires cross-thread cancellation to run through its event loop.
             let _ = Python::try_attach(|py| {
                 let cancel = task.getattr(py, "cancel")?;
                 let event_loop = self.task_locals.event_loop(py);
@@ -138,7 +134,6 @@ impl PythonStore {
     }
 }
 
-/// Returns the error of a call that can't reach Python, since the interpreter is shutting down.
 fn interpreter_gone<R: WireReason>(operation: &str) -> StreamError<R> {
     StreamError::store_unavailable(format!(
         "The Python interpreter is shutting down, so the Store can't take the {operation} call"
@@ -199,12 +194,8 @@ impl StreamStore for PythonStore {
     }
 }
 
-/// Calls the Python Store of `caller` for one Stream operation through a `StreamRuntime`, which
-/// checks the request and the response. The request and the response are those of a Store, with
-/// the Stream id, so a Store can run the checks of the runtime around itself. A create and an
-/// append need their `request_id`, which the other operations don't take. The awaitable raises
-/// `StreamError` for a failed call. The runtime has no limit of a batch, since the SDK that calls
-/// the Store has those in its Stream config.
+// Stores use Core's request and response checks without duplicating its validation rules.
+// The calling SDK checks batch limits from its Stream config.
 #[pyfunction]
 #[pyo3(signature = (runtime_ref, caller, operation, request, request_id=None))]
 pub fn call_stream_store<'p>(
@@ -285,8 +276,6 @@ pub fn call_stream_store<'p>(
     }
 }
 
-/// Returns the ref that the runtime takes for a Store request's Stream id. The runtime gives the
-/// Store only the id, so the ref needs no Store name.
 fn stream_ref(id: String) -> sdk::StreamRef {
     sdk::StreamRef {
         id,

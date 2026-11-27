@@ -307,7 +307,6 @@ class Client(StreamServiceClientExtension):
             stream_config=stream_config,
         )
         self._initial_config = config.copy()
-        # The id of this client as a Producer of Streams
         self._stream_producer_id = str(uuid.uuid4())
 
         for plugin in plugins:

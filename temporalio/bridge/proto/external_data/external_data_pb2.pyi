@@ -387,8 +387,8 @@ class StreamReadPage(google.protobuf.message.Message):
     WAIT_CUT_FIELD_NUMBER: builtins.int
     record_count: builtins.int
     digest: builtins.bytes
-    """The first 16 bytes of a SHA-256 over the Records, in an encoding that Core owns. It's empty if
-    the page has no Record.
+    """The first 16 bytes of SHA-256 over the Records in a Core-owned encoding. New markers prefix
+    these bytes with version 1. Original markers contain just the legacy hash. Empty for no Records.
     """
     record_bytes: builtins.int
     """The size of the Records, as the `max_bytes` of a read measures it. A replay asks the Store for

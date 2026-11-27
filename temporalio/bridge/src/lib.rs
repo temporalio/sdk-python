@@ -54,7 +54,6 @@ fn temporal_sdk_bridge(py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
         (wrap_pyfunction!(runtime::shutdown_runtimes, m)?,),
     )?;
 
-    // Stream stuff
     m.add_function(wrap_pyfunction!(streams::call_stream_store, m)?)?;
     m.add_function(wrap_pyfunction!(streams::check_stream_append, m)?)?;
 

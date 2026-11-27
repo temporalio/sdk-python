@@ -1680,14 +1680,9 @@ global___RemoveFromCache = RemoveFromCache
 
 @typing.final
 class ResolveStreamAppend(google.protobuf.message.Message):
-    """The result of an `AppendToStream`. Core gives it in the next activation after the Store answers,
-    or in the first activation of the next task if it arrives while the task completes.
-
-    The `core_stream_append` marker of that activation records the result with the activation's
-    index, on the same counter as local activity markers, so a replay gives both kinds of result in
-    the order of the first run. As for a local activity, the replay uses the same activation as the
-    first run only if workflow task chunking is off. With chunking, it can give the jobs of several
-    activations in one, in their order.
+    """Core delivers the result in the next activation, or in the next task when the Store answers
+    during completion. Stream and Local Activity markers share an activation index. Replay
+    preserves result order. With task chunking, several activations can replay as one.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

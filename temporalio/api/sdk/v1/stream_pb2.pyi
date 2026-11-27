@@ -174,7 +174,9 @@ class ReadRecordsRequest(google.protobuf.message.Message):
         aip.dev/not-precedent: "from" marks the start of a range of offsets. --)
     """
     max_records: builtins.int
+    """Zero uses the configured default."""
     max_bytes: builtins.int
+    """One Record can exceed this target unless an SDK hard limit rejects it."""
     @property
     def ref(self) -> global___StreamRef:
         """Required."""

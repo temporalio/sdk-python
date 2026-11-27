@@ -124,9 +124,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         return _StreamCall(task)
 
     def _store(self, ref: sdk.StreamRef) -> StreamStore:
-        """Return the Store of a call on ``ref``, from the Stream config of the
-        Worker's client. A call with no Store fails the Workflow Task.
-        """
         config = self._stream_config()
         if config is None:
             raise self._fail_task(
@@ -201,9 +198,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         request: google.protobuf.message.Message,
         request_id: str | None,
     ) -> asyncio.Future[Any]:
-        """Schedule the SDK's Local Activity for a create or a describe on the
-        Store named ``store``.
-        """
         instance = self._instance
         activity = instance._outbound.start_local_activity(
             StartLocalActivityInput(
@@ -234,7 +228,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         request: google.protobuf.message.Message,
         result: asyncio.Future[Any],
     ) -> google.protobuf.message.Message:
-        """Return the response message of a call whose ``result`` is done."""
         if isinstance(request, sdk.AppendRecordsRequest):
             appended = result.result()
             return proto.AppendRecordsResponse(
@@ -414,9 +407,6 @@ def _stream_error_from_failure(
 def _for_core(
     stream_config: StreamConfig | None,
 ) -> tuple[set[str], tuple[int, int, int] | None]:
-    """Return the Store names and the limits of a Stream config, which Core has
-    from the start of a worker.
-    """
     if stream_config is None:
         return set(), None
     return set(stream_config._by_name), stream_config._limits()
@@ -455,9 +445,6 @@ def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
 def _check_stream_swap(  # pyright: ignore[reportUnusedFunction]
     existing: StreamConfig | None, new: StreamConfig | None
 ) -> None:
-    """Raise if the new client of a worker has other Stream Stores or other
-    limits than the existing one.
-    """
     names, limits = _for_core(existing)
     new_names, new_limits = _for_core(new)
     if new_names != names:
