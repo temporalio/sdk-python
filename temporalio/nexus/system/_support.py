@@ -183,17 +183,13 @@ def _timestamp(time: datetime) -> "Timestamp":
 
 
 DEFAULT_READ_WAIT = timedelta(minutes=1)
-"""The ``wait`` of each read of ``read`` and ``read_pages`` after their first page,
-when the caller gave no ``wait``."""
+"""Default wait after the first page of ``read`` and ``read_pages``."""
 
 
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
-    # A Stream has no end that a read reports, so an iterator reads on after a page
-    # with no Record, and the caller decides when to stop. A read with no wait would
-    # call the Store in a loop on an idle Stream, so it waits unless told otherwise.
-    # A wait of zero is the caller's choice of no wait.
+    # Empty pages don't end a Stream. The default wait avoids busy polling.
     return dataclasses.replace(
         request,
         from_offset=response.last_offset or request.from_offset,

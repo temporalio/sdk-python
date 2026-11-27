@@ -28,20 +28,14 @@ struct PythonStore {
     event_loop_task_locals: Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
 }
 
-/// The state of one call of a Python Store, which the call's guard and its `OnTask` share.
 enum CallState {
-    /// Python hasn't started the task of the call.
     Pending,
-    /// The Python task that runs the call.
     Running(Py<PyAny>),
-    /// The caller dropped the call before its answer.
     Dropped,
-    /// The call has its answer.
     Done,
 }
 
-// Nothing calls into Python while it holds this lock, since `OnTask` takes it with the GIL held
-// and the guard needs the GIL only after it let the lock go.
+// Release this lock before acquiring the GIL to avoid a deadlock with `OnTask`.
 fn lock(state: &Mutex<CallState>) -> MutexGuard<'_, CallState> {
     state.lock().unwrap_or_else(PoisonError::into_inner)
 }
@@ -90,8 +84,7 @@ impl Drop for CallGuard<'_> {
 }
 
 impl PythonStore {
-    /// Calls the Store. `request_id` is that of a create or an append, and `None` for the other
-    /// operations. Core doesn't catch a panic of a Store, so every failure here is an error.
+    // Core doesn't catch Store panics, so failures must return errors.
     async fn call<Request, Response, R>(
         &self,
         operation: &'static str,

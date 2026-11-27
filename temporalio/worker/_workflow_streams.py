@@ -48,13 +48,8 @@ _STORE_CALL_ACTIVITY = "__temporal_stream_store_call"
 
 @dataclass
 class _Read:
-    """The read of one ``read_page`` call."""
-
     waiter: asyncio.Future[Any]
-    """Gets the page of the call."""
-
     page_type: Any
-    """The type of the page that the call returns."""
 
 
 class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
@@ -68,11 +63,10 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
 
     def __init__(self, instance: _WorkflowInstanceImpl) -> None:
         self._instance = instance
-        # Each append whose job hasn't come, by seq
         self._appends: dict[int, asyncio.Future[Any]] = {}
         self.task_error: Exception | None = None
         """The error of a call that must fail the Workflow Task, if one came."""
-        # Each read whose job hasn't come, by seq. A cancelled read gets its one job too.
+        # Cancelled reads still receive one result from Core.
         self._reads: dict[int, _Read] = {}
 
     def start(
@@ -93,7 +87,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
             instance._context_free_failure_converter,
         )
         model = input.input
-        # The terminal of each Stream operation gives its output type.
         result_type: Any = input.output_type
         request = temporalio.nexus.system._support.model_to_proto(model, *converters)
         # The converter refuses a body of no type, and the job of the page would then
@@ -106,7 +99,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
                 "body_type, or a StreamRef with a type argument."
             )
         store = self._store(_request_ref(request)).name()
-        # The future of the job of the call, or the task of its Local Activity
         result = _start_call(self, store, operation, request, result_type)
 
         async def call() -> OutputT:
@@ -175,7 +167,6 @@ class _WorkflowStreams:  # pyright: ignore[reportUnusedClass]
         read = self._reads.pop(job.seq, None)
         if read is None:
             raise RuntimeError(f"Failed finding Stream read for sequence {job.seq}")
-        # The job of a cancelled call is dropped.
         if read.waiter.done():
             return
         if job.HasField("failed"):
@@ -450,7 +441,7 @@ def _bridge_streams(  # pyright: ignore[reportUnusedFunction]
     names, limits = _for_core(stream_config())
     return temporalio.bridge.streams.WorkerStreams(
         limits=limits,
-        # Each caller finds its Store in the config that the worker has at the call.
+        # Client swaps must affect later Store calls.
         stores=[
             (name, _StoreCaller(functools.partial(store, name)))
             for name in sorted(names)

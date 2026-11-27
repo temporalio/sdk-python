@@ -196,7 +196,7 @@ class StreamStore(ABC):
         """Read one page of Records after ``from_offset``, in the order of the Stream.
 
         * A page has at most ``max_records`` Records, and Records of at most
-          ``max_bytes`` in total, where zero is no limit. It always has its first
+          ``max_bytes`` in total. Zero uses the Store's default. A page has its first
           Record, even when that Record alone is over ``max_bytes``.
         * ``last_offset`` is where the next read continues. A Store doesn't have to
           set it. If it's empty, the caller gets the offset of the last Record of
@@ -269,8 +269,8 @@ class StreamConfig:
     reads, so such an iterator on an idle Stream reads again at once, page after
     page. ``read_page`` has no default wait.
 
-    In client and Activity code, the wait of a read ends shortly before its
-    ``rpc_timeout``, so that the Store can answer in time. A read holds an
+    In client and Activity code, a positive ``rpc_timeout`` caps the read's wait
+    below that timeout, so the Store has time to answer. A read holds an
     Activity up to its wait, so an Activity that heartbeats between Records needs
     a ``wait`` shorter than its heartbeat timeout, or a heartbeat from another
     task.
@@ -293,9 +293,10 @@ class StreamConfig:
       with other limits, as it refuses one with other Store names.
     - A page of a read has at most 256 Records and 4 MiB of Records by default,
       and never more than 16 MiB.
-    - A read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record over
-      :py:attr:`max_record_bytes`. So a reader needs a limit at least as large
-      as that of each writer of its Stream.
+    - A live read fails with ``STREAM_ERROR_REASON_UNSUPPORTED`` for a Record
+      over :py:attr:`max_record_bytes`. A reader needs a limit at least as large
+      as each writer's limit. Replay accepts recorded successes under smaller
+      limits, so a configuration change cannot alter a recorded result.
     - A read with no wait gives the answer of the Store, which can be a page with
       no Record.
     - A read with a ``wait`` and no Record to give waits up to its ``wait``, but
@@ -355,8 +356,7 @@ class StreamConfig:
     """
 
     max_record_bytes: int = 1536 * 1024
-    """Maximum size in bytes of one Record of an append, and of one Record that a
-    read of Workflow code gives. Defaults to 1.5 MiB. Must be greater than or
+    """Maximum size in bytes of one Record of an append or a live Workflow read. Defaults to 1.5 MiB. Must be greater than or
     equal to one. The size is that of the stored Record, which counts its
     Producer.
     """

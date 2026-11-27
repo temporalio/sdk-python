@@ -584,21 +584,16 @@ class BinaryProtoPayloadConverter(EncodingPayloadConverter):
             raise RuntimeError("Failed parsing") from err
 
 
-# Only these types decode by their type arguments and under `T | None`. Other types keep
-# their decoding, because a change would alter the replay of existing Workflow Histories.
+# Restrict new decoding rules to new types to preserve existing Workflow histories.
 _typed_decode_types: set[type] = set()
 
 
 def _is_typed_decode_type(hint: Any) -> bool:
-    """Return whether ``hint`` is a type of ``_typed_decode_types`` or an alias of one."""
     origin = typing.get_origin(hint) or hint
     return any(origin is typed for typed in _typed_decode_types)
 
 
 def _non_none_arg(hint: Any) -> Any:
-    """Return ``X`` for the hint ``X | None`` of a type of ``_typed_decode_types``, and
-    the hint itself for any other.
-    """
     origin = typing.get_origin(hint)
     if origin is typing.Union or origin is UnionType:  # type:ignore[reportDeprecated]
         args = typing.get_args(hint)
@@ -654,7 +649,6 @@ class _TemporalTransferTypePayloadConverter(PayloadConverter, WithSerializationC
         """See base class."""
         if type_hints is None:
             return self._inner_payload_converter.from_payloads(payloads, None)
-        # A hint `T | None` of a type of `_typed_decode_types` takes the converter of `T`.
         value_hints = [_non_none_arg(type_hint) for type_hint in type_hints]
         converters = [
             _get_transfer_type_converter(value_hint) for value_hint in value_hints
@@ -863,7 +857,6 @@ def _get_iso_datetime_parser() -> Callable[[str], datetime]:
 
 
 def _with_type_args(hint: Any, type_var_args: Mapping[Any, Any]) -> Any:
-    """Return a hint with each of its type variables replaced by its argument."""
     if not type_var_args:
         return hint
     if isinstance(hint, TypeVar):
@@ -1046,9 +1039,6 @@ def value_to_type(
             ret_dict = hint(**ret_dict)
         return ret_dict
 
-    # Dataclass, also with type arguments such as ``Box[int]`` for a type of
-    # ``_typed_decode_types``. The class of such a hint is its origin, and its arguments
-    # stand for the type variables.
     dataclass_type: Any = hint
     type_var_args: dict[Any, Any] = {}
     alias_origin = typing.get_origin(hint)

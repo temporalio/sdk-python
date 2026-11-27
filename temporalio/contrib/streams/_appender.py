@@ -84,12 +84,11 @@ class BufferedAppender(Generic[BodyT]):
         )
         self._max_batch_records = max_batch_records
         self._buffer: list[BodyT] = []
-        # When the oldest Record came into an empty buffer
         self._first_at = 0.0
         self._timer: asyncio.TimerHandle | None = None
         self._writing: asyncio.Task[None] | None = None
         self._appended = 0
-        # Count of the Records that a batch wrote or that a failed batch left behind
+        # Failed batches also settle buffered Records, so flush cannot wait forever.
         self._settled = 0
         self._error: Exception | None = None
         self._last_offset: bytes | None = None
@@ -160,7 +159,6 @@ class BufferedAppender(Generic[BodyT]):
                 raise
 
     def _schedule(self) -> None:
-        """Start the next batch, immediately or when the delay of its first Record ends."""
         if self._writing or not self._buffer:
             return
         if self._max_batch_records and len(self._buffer) >= self._max_batch_records:
@@ -183,8 +181,7 @@ class BufferedAppender(Generic[BodyT]):
             response = await self._stream.append(*batch)
             self._last_offset = response.last_offset
         except BaseException as err:
-            # The Records behind a batch that failed, or whose write was cancelled, are
-            # never written, so a reader sees no gap.
+            # Later batches must not create a gap after this failed batch.
             self._unwritten = len(batch) + len(self._buffer)
             self._settled += len(self._buffer)
             self._buffer.clear()

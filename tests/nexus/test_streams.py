@@ -776,3 +776,38 @@ def test_a_page_with_no_last_offset_ends_at_its_last_record() -> None:
         assert (empty.records, empty.last_offset) == ([], page.last_offset)
 
     run_with_virtual_clock(script())
+
+
+@pytest.mark.parametrize("by_page", [False, True])
+async def test_zero_wait_poll_can_be_cancelled_after_an_empty_page(
+    by_page: bool,
+) -> None:
+    class IdleStore(_MemoryStreams):
+        reads: int = 0
+
+        async def read_records(
+            self, request: proto.ReadRecordsRequest
+        ) -> proto.ReadRecordsResponse:
+            assert not request.HasField("wait")
+            self.reads += 1
+            assert self.reads == 1, "another poll ran before the pending cancellation"
+            return proto.ReadRecordsResponse()
+
+    store = IdleStore(
+        "memory", retention=timedelta(days=1), resend_window=16, fence=False
+    )
+    client = Client(Mock(spec=ServiceClient), stream_config=StreamConfig([store]))
+    stream = await client.create_stream(id="s", body_type=int)
+
+    async def consume() -> None:
+        if by_page:
+            async for page in stream.read_pages(wait=timedelta(0)):
+                assert not page.records
+        else:
+            _ = await anext(stream.read(wait=timedelta(0)))
+
+    task = asyncio.create_task(consume())
+    _ = asyncio.get_running_loop().call_soon(task.cancel)
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert store.reads == 1
