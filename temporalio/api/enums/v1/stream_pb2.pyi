@@ -32,21 +32,20 @@ class _StreamIdConflictPolicyEnumTypeWrapper(
     STREAM_ID_CONFLICT_POLICY_FAIL: _StreamIdConflictPolicy.ValueType  # 1
     """The create fails with `ALREADY_EXISTS`."""
     STREAM_ID_CONFLICT_POLICY_USE_EXISTING: _StreamIdConflictPolicy.ValueType  # 2
-    """The create returns the open Stream, and the Retention of that Stream doesn't change."""
+    """The create returns the existing Stream without changing its expiry."""
 
 class StreamIdConflictPolicy(
     _StreamIdConflictPolicy, metaclass=_StreamIdConflictPolicyEnumTypeWrapper
 ):
     """Experimental. Might change in the future.
-    What a create does if its Stream already exists. Unspecified means `FAIL`, as it does for a
-    Workflow start.
+    The conflict policy for an existing Stream. Unspecified means `FAIL`.
     """
 
 STREAM_ID_CONFLICT_POLICY_UNSPECIFIED: StreamIdConflictPolicy.ValueType  # 0
 STREAM_ID_CONFLICT_POLICY_FAIL: StreamIdConflictPolicy.ValueType  # 1
 """The create fails with `ALREADY_EXISTS`."""
 STREAM_ID_CONFLICT_POLICY_USE_EXISTING: StreamIdConflictPolicy.ValueType  # 2
-"""The create returns the open Stream, and the Retention of that Stream doesn't change."""
+"""The create returns the existing Stream without changing its expiry."""
 global___StreamIdConflictPolicy = StreamIdConflictPolicy
 
 class _StreamErrorReason:
@@ -64,11 +63,9 @@ class _StreamErrorReasonEnumTypeWrapper(
     STREAM_ERROR_REASON_NOT_FOUND: _StreamErrorReason.ValueType  # 1
     """The Stream was never created (`NOT_FOUND`)."""
     STREAM_ERROR_REASON_EXPIRED: _StreamErrorReason.ValueType  # 2
-    """The Retention of the Stream has passed since its create or its last append (`NOT_FOUND`)."""
+    """Retention has passed since create or the last append of a new batch (`NOT_FOUND`)."""
     STREAM_ERROR_REASON_FENCED: _StreamErrorReason.ValueType  # 3
-    """A later attempt of the same Producer has already written, and the Store fences
-    (`FAILED_PRECONDITION`).
-    """
+    """A later attempt of this Producer has written, and fencing is enabled (`FAILED_PRECONDITION`)."""
     STREAM_ERROR_REASON_FORMAT_TOO_NEW: _StreamErrorReason.ValueType  # 4
     """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
     STREAM_ERROR_REASON_OFFSET_TOO_HIGH: _StreamErrorReason.ValueType  # 5
@@ -80,34 +77,28 @@ class _StreamErrorReasonEnumTypeWrapper(
     STREAM_ERROR_REASON_INVALID_ARGUMENT: _StreamErrorReason.ValueType  # 7
     """The request is malformed (`INVALID_ARGUMENT`)."""
     STREAM_ERROR_REASON_STORE_UNAVAILABLE: _StreamErrorReason.ValueType  # 8
-    """The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
+    """The Store failed or did not respond. A retry can succeed (`UNAVAILABLE`)."""
     STREAM_ERROR_REASON_UNSUPPORTED: _StreamErrorReason.ValueType  # 9
     """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
     STREAM_ERROR_REASON_ALREADY_EXISTS: _StreamErrorReason.ValueType  # 10
     """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
     STREAM_ERROR_REASON_STORE_CORRUPT: _StreamErrorReason.ValueType  # 11
-    """The Store returned data that isn't valid, such as a stored value of the wrong length. A
-    retry reads the same data (`DATA_LOSS`).
-    """
+    """Stored data is invalid. Retrying cannot repair it (`DATA_LOSS`)."""
 
 class StreamErrorReason(
     _StreamErrorReason, metaclass=_StreamErrorReasonEnumTypeWrapper
 ):
     """Experimental. Might change in the future.
-    Why a Stream call failed. Each reason maps to one gRPC status code, shown in parentheses, and
-    several reasons share a code. So callers check the reason and not the status code. An SDK
-    raises one error type with the reason in it.
+    Several reasons share a gRPC status code. Callers must check the reason to distinguish them.
     """
 
 STREAM_ERROR_REASON_UNSPECIFIED: StreamErrorReason.ValueType  # 0
 STREAM_ERROR_REASON_NOT_FOUND: StreamErrorReason.ValueType  # 1
 """The Stream was never created (`NOT_FOUND`)."""
 STREAM_ERROR_REASON_EXPIRED: StreamErrorReason.ValueType  # 2
-"""The Retention of the Stream has passed since its create or its last append (`NOT_FOUND`)."""
+"""Retention has passed since create or the last append of a new batch (`NOT_FOUND`)."""
 STREAM_ERROR_REASON_FENCED: StreamErrorReason.ValueType  # 3
-"""A later attempt of the same Producer has already written, and the Store fences
-(`FAILED_PRECONDITION`).
-"""
+"""A later attempt of this Producer has written, and fencing is enabled (`FAILED_PRECONDITION`)."""
 STREAM_ERROR_REASON_FORMAT_TOO_NEW: StreamErrorReason.ValueType  # 4
 """The Stream has a newer format than this caller knows (`FAILED_PRECONDITION`)."""
 STREAM_ERROR_REASON_OFFSET_TOO_HIGH: StreamErrorReason.ValueType  # 5
@@ -119,13 +110,11 @@ STREAM_ERROR_REASON_TOO_LARGE: StreamErrorReason.ValueType  # 6
 STREAM_ERROR_REASON_INVALID_ARGUMENT: StreamErrorReason.ValueType  # 7
 """The request is malformed (`INVALID_ARGUMENT`)."""
 STREAM_ERROR_REASON_STORE_UNAVAILABLE: StreamErrorReason.ValueType  # 8
-"""The Store failed or didn't answer, and a retry can succeed (`UNAVAILABLE`)."""
+"""The Store failed or did not respond. A retry can succeed (`UNAVAILABLE`)."""
 STREAM_ERROR_REASON_UNSUPPORTED: StreamErrorReason.ValueType  # 9
 """The Store doesn't support something that the call needs (`UNIMPLEMENTED`)."""
 STREAM_ERROR_REASON_ALREADY_EXISTS: StreamErrorReason.ValueType  # 10
 """A create with the `FAIL` policy found that the Stream already exists (`ALREADY_EXISTS`)."""
 STREAM_ERROR_REASON_STORE_CORRUPT: StreamErrorReason.ValueType  # 11
-"""The Store returned data that isn't valid, such as a stored value of the wrong length. A
-retry reads the same data (`DATA_LOSS`).
-"""
+"""Stored data is invalid. Retrying cannot repair it (`DATA_LOSS`)."""
 global___StreamErrorReason = StreamErrorReason

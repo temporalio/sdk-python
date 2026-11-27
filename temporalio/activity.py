@@ -174,8 +174,8 @@ class Info:
     """
 
     workflow_task: WorkflowTaskAttempt | None = None
-    """For a Local Activity, the Workflow Task in which the Worker dispatched this execution.
-    None for other Activities.
+    """Workflow Task attempt that dispatched this Local Activity execution.
+    ``None`` for other Activities.
 
     .. warning::
         This API is experimental and unstable.

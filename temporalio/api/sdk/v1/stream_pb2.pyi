@@ -20,11 +20,8 @@ DESCRIPTOR: google.protobuf.descriptor.FileDescriptor
 @typing.final
 class StreamRef(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    A reference to one Stream, which code passes to other code as data. Callers treat the `id` as
-    opaque. An id is never used for a second Stream while the Store remembers the first one, so a
-    create for an expired Stream fails. A Store can forget an expired Stream after a time of its
-    choice, and a create for its id succeeds after that. Every SDK encodes a ref in a Payload with
-    this message, so a ref that one SDK writes decodes in another.
+    Callers treat `id` as opaque. A Store can reuse an expired id only after it forgets the Stream.
+    SDKs encode references with this message so that other SDKs can decode them.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -33,10 +30,8 @@ class StreamRef(google.protobuf.message.Message):
     STORE_FIELD_NUMBER: builtins.int
     id: builtins.str
     store: builtins.str
-    """The name under which the client and Worker config registered the Store of this Stream. An
-    SDK uses it to send a call on this ref to the right Store. When it's empty, the SDK picks
-    the Store from its config. Only an SDK sets and reads this field. A Store and the server
-    never get it, because their requests have only the Stream id.
+    """The registered Store name. Empty selects the configured default.
+    This field is local to the SDK. Store and server requests omit it.
     """
     def __init__(
         self,
@@ -53,8 +48,7 @@ global___StreamRef = StreamRef
 @typing.final
 class CreateStreamRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The SDK form of `temporalio.api.streamservice.v1.CreateStreamRequest`, with the ref of the Stream
-    in place of its id. The other fields mean the same.
+    Uses the Store request contract, with a `StreamRef` for SDK routing.
     (-- api-linter: core::0133=disabled
         aip.dev/not-precedent: The request identifies a Stream by its ref. --)
     """
@@ -91,7 +85,7 @@ global___CreateStreamRequest = CreateStreamRequest
 @typing.final
 class CreateStreamResponse(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The Stream that the create made or found.
+    The reference includes the Store selected by the SDK.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -102,9 +96,7 @@ class CreateStreamResponse(google.protobuf.message.Message):
     """False when `USE_EXISTING` returned a Stream that already existed."""
     @property
     def ref(self) -> global___StreamRef:
-        """The ref of the Stream. The caller can pass it to other code as data. The SDK builds it from
-        the request and the Store that it picked.
-        """
+        """The SDK fills the Store name so that another caller can route the reference."""
 
     def __init__(
         self,
@@ -122,8 +114,7 @@ global___CreateStreamResponse = CreateStreamResponse
 @typing.final
 class AppendRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The SDK form of `temporalio.api.streamservice.v1.AppendRecordsRequest`, with the ref of the Stream
-    in place of its id. The other fields mean the same.
+    Uses the Store request contract, with a `StreamRef` for SDK routing.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -168,8 +159,7 @@ global___AppendRecordsRequest = AppendRecordsRequest
 @typing.final
 class ReadRecordsRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The SDK form of `temporalio.api.streamservice.v1.ReadRecordsRequest`, with the ref of the Stream
-    in place of its id. The other fields mean the same.
+    Uses the Store request contract, with a `StreamRef` for SDK routing.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor
@@ -224,8 +214,7 @@ global___ReadRecordsRequest = ReadRecordsRequest
 @typing.final
 class DescribeStreamRequest(google.protobuf.message.Message):
     """Experimental. Might change in the future.
-    The SDK form of `temporalio.api.streamservice.v1.DescribeStreamRequest`, with the ref of the
-    Stream in place of its id.
+    Uses the Store request contract, with a `StreamRef` for SDK routing.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

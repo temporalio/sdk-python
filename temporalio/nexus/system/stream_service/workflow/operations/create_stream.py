@@ -69,7 +69,7 @@ async def create_stream(
 ) -> Stream[typing.Any]:
     """
     Args:
-        id: The Stream id, 1 to 4096 bytes.
+        id: The Stream id. It must not be empty.
         store: The registered name of the Store. If empty, the SDK picks a Store.
         id_conflict_policy: What the create does if the Stream already exists.
             Unspecified means fail.

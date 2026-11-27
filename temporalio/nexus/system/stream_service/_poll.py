@@ -17,7 +17,7 @@ class PollIterator(typing.Generic[_PollRequestT, _PollItemT]):
 
     ``next_request`` is the request to resume with. After an item, the resume helper gives
     it. Without a resume helper, it reads the item's page again. After a page's last item,
-    it is the page helper's request, which is ``None`` after the last page.
+    it is the page helper's request. It is ``None`` when the page helper returns ``None``.
     """
 
     def __init__(
