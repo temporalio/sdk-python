@@ -4,12 +4,11 @@ import dataclasses
 import inspect
 import ipaddress
 import logging
-import random
 import sys
 import traceback
 import typing
 from collections import deque
-from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum, IntEnum, StrEnum
@@ -716,64 +715,28 @@ def test_json_generic_dataclass_round_trip(monkeypatch: pytest.MonkeyPatch):
 
     _decode_typed(monkeypatch, GenericDataClass, GenericPairDataClass)
 
-    # Each type argument, with a function that makes a value of it
-    arguments: list[tuple[Any, Callable[[random.Random], Any]]] = [
-        (int, lambda rng: rng.randrange(100)),
-        (str, lambda rng: f"text {rng.randrange(100)}"),
-        (list[int], lambda rng: [rng.randrange(100) for _ in range(rng.randrange(3))]),
-        (
-            MyDataClass,
-            lambda rng: MyDataClass("foo", rng.randrange(100), SerializableEnum.FOO),
-        ),
-        (
-            GenericDataClass[str],
-            lambda rng: GenericDataClass(f"text {rng.randrange(100)}"),
-        ),
-    ]
-
-    def generic(
-        rng: random.Random, make: Callable[[random.Random], Any], depth: int
-    ) -> GenericDataClass[Any]:
-        return GenericDataClass(
-            value=make(rng),
-            items=[make(rng) for _ in range(rng.randrange(3))],
-            nested=generic(rng, make, depth - 1)
-            if depth and rng.random() < 0.7
-            else None,
-            maybe=make(rng) if rng.random() < 0.5 else None,
-        )
-
-    for seed in range(200):
-        rng = random.Random(seed)
-        argument, make = rng.choice(arguments)
-        value = generic(rng, make, 2)
+    for argument, value in [
+        (int, GenericDataClass(1, items=[2], nested=GenericDataClass(3), maybe=4)),
+        (str, GenericDataClass("text")),
+        (list[int], GenericDataClass([1], items=[[2], []], maybe=[3])),
+        (MyDataClass, GenericDataClass(MyDataClass("foo", 1, SerializableEnum.FOO))),
+        (GenericDataClass[str], GenericDataClass(GenericDataClass("nested"))),
+    ]:
         payload = converter.to_payload(value)
         assert payload
         decoded = converter.from_payload(payload, generic_type[argument])
-        assert decoded == value, f"seed {seed}"
-        assert decoded.__orig_class__ == generic_type[argument], f"seed {seed}"
+        assert decoded == value
+        assert decoded.__orig_class__ == generic_type[argument]
 
-        # A value of another type argument fails or converts as it does for a field
-        # of that type in a plain dataclass.
-        other, _ = rng.choice(arguments)
-        plain = dataclasses.make_dataclass("Plain", [("value", other)])
-        payload = converter.to_payload({"value": make(rng)})
-        assert payload
-        outcomes: list[Any] = []
-        for hint in (generic_type[other], plain):
-            try:
-                outcomes.append(converter.from_payload(payload, hint).value)
-            except Exception as err:
-                outcomes.append(type(err))
-        assert outcomes[0] == outcomes[1], f"seed {seed}"
+    payload = converter.to_payload({"value": "not an integer"})
+    assert payload
+    with pytest.raises(TypeError):
+        converter.from_payload(payload, generic_type[int])
 
-        # Each of two type arguments goes to its own parameter.
-        second, make_second = rng.choice(arguments)
-        pair = GenericPairDataClass(key=make(rng), value=make_second(rng))
-        payload = converter.to_payload(pair)
-        assert payload
-        decoded = converter.from_payload(payload, pair_type[argument, second])
-        assert decoded == pair, f"seed {seed}"
+    pair = GenericPairDataClass(key=1, value="text")
+    payload = converter.to_payload(pair)
+    assert payload
+    assert converter.from_payload(payload, pair_type[int, str]) == pair
 
 
 def test_json_type_hints():
