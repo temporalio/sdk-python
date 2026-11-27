@@ -1533,6 +1533,7 @@ _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG = (
 _BATCH_ONLY_WORKFLOW_LOGIC_FLAG = (
     _WorkflowLogicFlag.APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS
 )
+_PRESERVE_TASK_CANCELLATION_FLAG = _WorkflowLogicFlag.PRESERVE_TASK_CANCELLATION
 
 
 @pytest.mark.parametrize(
@@ -1631,8 +1632,12 @@ async def test_workflow_logic_flag_enabled_after_replay(client: Client) -> None:
     ).replay_workflow(history)
 
 
-@pytest.mark.parametrize("single_batch", [False, True])
-async def test_workflow_cancel_before_run(client: Client, single_batch: bool):
+@pytest.mark.parametrize(
+    "flag", [None, _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, _PRESERVE_TASK_CANCELLATION_FLAG]
+)
+async def test_workflow_cancel_before_run(
+    client: Client, flag: _WorkflowLogicFlag | None
+):
     # Start the workflow _and_ send cancel before even starting the workflow
     task_queue = str(uuid.uuid4())
     handle = await client.start_workflow(
@@ -1643,9 +1648,8 @@ async def test_workflow_cancel_before_run(client: Client, single_batch: bool):
     await handle.cancel()
     # Start worker and wait for result
     worker = new_worker(client, TrapCancelWorkflow, task_queue=task_queue)
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=single_batch
-    )
+    if flag is not None:
+        worker._set_default_workflow_logic_flag(flag, enabled=True)
     async with worker:
         assert "cancelled" == await handle.result()
 
@@ -1690,9 +1694,19 @@ class CancelAtWaitConditionWorkflow:
         return self._waiting_after_cancel
 
 
+@pytest.mark.parametrize(
+    "flags",
+    [
+        pytest.param((_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG,), id="original-single-batch"),
+        pytest.param(
+            (_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, _PRESERVE_TASK_CANCELLATION_FLAG),
+            id="batching-with-task-cancellation",
+        ),
+    ],
+)
 @pytest.mark.parametrize("timeout", [False, True])
 async def test_workflow_cancel_and_condition_ready_in_same_activation(
-    client: Client, timeout: bool
+    client: Client, timeout: bool, flags: tuple[_WorkflowLogicFlag, ...]
 ):
     task_queue = str(uuid.uuid4())
     runner = CustomWorkflowRunner()
@@ -1713,9 +1727,8 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         # the normal queue.
         max_cached_workflows=0,
     )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-    )
+    for flag in flags:
+        worker._set_default_workflow_logic_flag(flag, enabled=True)
     async with worker:
 
         async def ready() -> bool:
@@ -1734,9 +1747,8 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         task_queue=task_queue,
         workflow_runner=runner,
     )
-    worker._set_default_workflow_logic_flag(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, enabled=True
-    )
+    for flag in flags:
+        worker._set_default_workflow_logic_flag(flag, enabled=True)
     async with worker:
 
         async def waiting_after_cancel() -> bool:
@@ -1748,10 +1760,12 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
         await handle.signal(CancelAtWaitConditionWorkflow.finish_after_cancel)
         assert await handle.result() == "cancelled"
 
-    assert any(
-        _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG in completion.successful.used_internal_flags
+    used_flags = {
+        flag
         for _, completion in runner._pairs
-    )
+        for flag in completion.successful.used_internal_flags
+    }
+    assert used_flags.issuperset(flags)
     assert any(
         {"signal_workflow", "cancel_workflow"}.issubset(
             {job.WhichOneof("variant") for job in activation.jobs}
@@ -1761,6 +1775,98 @@ async def test_workflow_cancel_and_condition_ready_in_same_activation(
     await Replayer(workflows=[CancelAtWaitConditionWorkflow]).replay_workflow(
         await handle.fetch_history()
     )
+
+
+@workflow.defn
+class ShieldedWaitConditionWorkflow:
+    def __init__(self) -> None:
+        self._confirmed = False
+        self._waiting = False
+        self._caught_cancel = False
+
+    async def _cleanup(self, timeout: bool) -> None:
+        self._waiting = True
+        await workflow.wait_condition(
+            lambda: self._confirmed, timeout=1000 if timeout else None
+        )
+        await workflow.sleep(0.01, summary="shielded cleanup")
+
+    @workflow.run
+    async def run(self, timeout: bool) -> None:
+        cleanup = asyncio.create_task(self._cleanup(timeout))
+        try:
+            await asyncio.shield(cleanup)
+        except asyncio.CancelledError:
+            self._caught_cancel = True
+            await cleanup
+            raise
+
+    @workflow.signal
+    def confirm(self) -> None:
+        self._confirmed = True
+
+    @workflow.query
+    def state(self) -> tuple[bool, bool]:
+        return self._waiting, self._caught_cancel
+
+
+@pytest.mark.parametrize("timeout", [False, True])
+@pytest.mark.parametrize(
+    ("batch_flag", "cleanup_completes"),
+    [
+        pytest.param(_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, True, id="task-cancellation"),
+        pytest.param(
+            _SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, False, id="original-behavior-preserved"
+        ),
+    ],
+)
+async def test_workflow_shielded_wait_condition_after_cancel(
+    client: Client,
+    timeout: bool,
+    batch_flag: _WorkflowLogicFlag,
+    cleanup_completes: bool,
+) -> None:
+    worker = new_worker(client, ShieldedWaitConditionWorkflow)
+    worker._set_default_workflow_logic_flag(batch_flag, enabled=True)
+    worker._set_default_workflow_logic_flag(
+        _PRESERVE_TASK_CANCELLATION_FLAG, enabled=True
+    )
+    async with worker:
+        handle = await client.start_workflow(
+            ShieldedWaitConditionWorkflow.run,
+            timeout,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+
+        async def state() -> tuple[bool, bool]:
+            return await handle.query(ShieldedWaitConditionWorkflow.state)
+
+        await assert_eq_eventually((True, False), state)
+        await handle.cancel()
+        await assert_eq_eventually((True, True), state)
+        await handle.signal(ShieldedWaitConditionWorkflow.confirm)
+        with pytest.raises(WorkflowFailureError) as err:
+            await handle.result()
+        assert isinstance(err.value.cause, CancelledError)
+
+    history = await handle.fetch_history()
+    assert (
+        any(
+            event.event_type == EventType.EVENT_TYPE_TIMER_FIRED
+            for event in history.events
+        )
+        is cleanup_completes
+    )
+    assert (
+        any(
+            _PRESERVE_TASK_CANCELLATION_FLAG
+            in event.workflow_task_completed_event_attributes.sdk_metadata.lang_used_flags
+            for event in history.events
+        )
+        is cleanup_completes
+    )
+    await Replayer(workflows=[ShieldedWaitConditionWorkflow]).replay_workflow(history)
 
 
 @workflow.defn
@@ -1803,6 +1909,7 @@ class CancelAtChildCompletionWorkflow:
     [
         pytest.param(_SINGLE_BATCH_WORKFLOW_LOGIC_FLAG, id="with-cancellation-changes"),
         pytest.param(_BATCH_ONLY_WORKFLOW_LOGIC_FLAG, id="batch-only"),
+        pytest.param(_PRESERVE_TASK_CANCELLATION_FLAG, id="cancellation-only"),
     ],
 )
 async def test_workflow_cancel_and_child_completion_in_same_activation(
@@ -8512,14 +8619,19 @@ class WaitConditionThenSleepWorkflow:
             await asyncio.sleep(0.01)
 
 
+@pytest.mark.parametrize("task_cancellation", [False, True])
 async def test_wait_condition_timer_options_not_used_by_later_timers(
-    client: Client, env: WorkflowEnvironment
+    client: Client, env: WorkflowEnvironment, task_cancellation: bool
 ):
     if env.supports_time_skipping_v1:
         pytest.skip(
             "Java test server: https://github.com/temporalio/sdk-java/issues/2219"
         )
-    async with new_worker(client, WaitConditionThenSleepWorkflow) as worker:
+    worker = new_worker(client, WaitConditionThenSleepWorkflow)
+    worker._set_default_workflow_logic_flag(
+        _PRESERVE_TASK_CANCELLATION_FLAG, enabled=task_cancellation
+    )
+    async with worker:
         handle = await client.start_workflow(
             WaitConditionThenSleepWorkflow.run,
             id=f"workflow-{uuid.uuid4()}",

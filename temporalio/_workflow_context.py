@@ -22,7 +22,7 @@ class _WorkflowLogicFlag(IntEnum):
     RAISE_ON_CANCELLING_COMPLETED_ACTIVITY = 1
     # Process all activation jobs in one batch instead of separate batches by job type.
     # Added in version 1.31.0.
-    # Not enabled by default.
+    # Enabled by default in version 1.36.0. Removed from default in version 1.36.1.
     PROCESS_WORKFLOW_ACTIVATION_JOBS_AS_SINGLE_BATCH = 2
     # Recognize sandbox proxies for datetime type hints during payload decoding.
     # Added on 2026-11-05.
@@ -34,6 +34,9 @@ class _WorkflowLogicFlag(IntEnum):
     # Batch activation jobs without enabling the cancellation changes in flag 2.
     # Not enabled by default.
     APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS = 4
+    # Preserve task cancellation when a condition or operation completes concurrently.
+    # Not enabled by default.
+    PRESERVE_TASK_CANCELLATION = 5
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
