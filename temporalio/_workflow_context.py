@@ -31,6 +31,9 @@ class _WorkflowLogicFlag(IntEnum):
     # Remove the explicit overrides for this flag from tests/worker/test_workflow_flags.py
     # when enabling it. Then remove this reminder.
     DECODE_DATETIME_PROXIES = 3
+    # Batch activation jobs without enabling the cancellation changes in flag 2.
+    # Not enabled by default.
+    APPLY_ACTIVATION_JOBS_BEFORE_RUNNING_TASKS = 4
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
