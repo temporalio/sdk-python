@@ -26,7 +26,6 @@ workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_s
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
 stream_output_dir = base_dir / "temporalio" / "nexus" / "system" / "stream_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
-# Empty-page polls need the cancellation fix before its nexgen release.
 NEX_GEN_REVISION = "09bdf2a6b9c690a92f65e3964d58d5db9b2c0a32"
 proto_files = [
     gen_protos.api_proto_dir
