@@ -2003,7 +2003,8 @@ global___AppendToStream = AppendToStream
 @typing.final
 class ReadStream(google.protobuf.message.Message):
     """Reads one page after from_offset. A reader continues from the page's last_offset until an
-    application Record tells it to stop. ResolveStreamRead follows the ordering of ResolveStreamAppend.
+    application Record tells it to stop.
+    ResolveStreamRead follows the ordering of ResolveStreamAppend.
 
     A page returns as soon as Records are available. For an empty page Core polls from the Store's
     returned offset at most once per 100 ms until wait expires or the task reaches its read time.
