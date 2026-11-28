@@ -210,6 +210,7 @@ async def test_a_client_call_reaches_the_selected_store(
     for _ in range(2):
         result = await (activity.run(call) if in_activity else call())
         if operation == "create":
+            assert result.created is False
             assert result.ref == StreamRef(
                 id="s", store="b" if routing == "selector" else "a"
             )
