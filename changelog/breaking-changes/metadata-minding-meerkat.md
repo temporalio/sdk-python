@@ -1,0 +1,1 @@
+The built-in `__temporal_workflow_metadata` query may now result in failures if a worker's custom payload converter does not pass `RawValue` payloads through unchanged, as required by `PayloadConverter.to_payloads`. Converters built on `CompositePayloadConverter`, including `DefaultPayloadConverter` and the Pydantic converter, already support this behavior and require no changes.
