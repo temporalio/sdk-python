@@ -3050,7 +3050,10 @@ class PreviousRunOutcomeWorkflow:
     @workflow.run
     async def run(self, _input: str) -> None:
         workflow.get_last_completion_result()
-        workflow.get_last_failure()
+        last_failure = workflow.get_last_failure()
+        # Reading details decodes them
+        assert isinstance(last_failure, ApplicationError)
+        assert last_failure.details == ("previous-failure-detail",)
 
 
 def _json_payload(value: str) -> temporalio.api.common.v1.Payload:

@@ -1,0 +1,1 @@
+`ApplicationError` and `CancelledError` now have `detail(index, type_hint)`, which returns one detail as the given type, for example `err.detail(0, MyDataclass)`, and `raw_details`, which returns the detail payloads.
