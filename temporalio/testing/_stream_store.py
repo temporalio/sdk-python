@@ -259,12 +259,14 @@ class _MemoryStreams(StreamStore):
             stream.records, request.from_offset, key=lambda record: record.offset
         )
         wait = request.wait.ToTimedelta().total_seconds()
-        if start == len(stream.records) and wait > 0:
+        until = self._now() + wait
+        while start == len(stream.records) and self._now() < until:
             try:
-                async with asyncio.timeout(wait):
+                async with asyncio.timeout_at(min(until, stream.expires_at)):
                     await stream.changed.wait()
             except TimeoutError:
                 pass
+            self._stream(request.stream_id)
         end = len(stream.records)
         if request.max_records > 0:
             end = min(end, start + request.max_records)

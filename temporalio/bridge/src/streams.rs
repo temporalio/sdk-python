@@ -38,8 +38,6 @@ fn lock(state: &Mutex<CallState>) -> MutexGuard<'_, CallState> {
     state.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// The callback that takes the Python task of a call from `_StoreCaller.call`, which then calls
-/// the Store.
 #[pyclass]
 struct OnTask {
     state: Arc<Mutex<CallState>>,
@@ -139,8 +137,7 @@ fn interpreter_gone<R: WireReason>(operation: &str) -> StreamError<R> {
     ))
 }
 
-/// Returns the error of an operation for the exception of a Store. A `StreamError` is a refusal
-/// with its reason, and any other exception is an outage, which the caller can try again.
+// Only Store refusals retain their reason. Other exceptions can be retried.
 fn store_error<R: WireReason>(py: Python<'_>, err: PyErr) -> StreamError<R> {
     let refusal = || -> PyResult<Option<(i32, String)>> {
         let value = err.value(py);
@@ -282,8 +279,6 @@ fn stream_ref(id: String) -> sdk::StreamRef {
     }
 }
 
-/// Returns the limits of a Stream config, which Python gives as its `max_record_bytes`,
-/// `max_batch_bytes` and `max_batch_records`.
 fn store_limits(
     (max_record_bytes, max_batch_bytes, max_batch_records): (usize, usize, usize),
 ) -> PyResult<StoreLimits> {
@@ -294,8 +289,6 @@ fn store_limits(
         .map_err(|err| PyValueError::new_err(err.message))
 }
 
-/// The Stream Stores of a Worker, which Python gives as a `WorkerStreams` of
-/// `temporalio.bridge.streams`.
 #[derive(FromPyObject)]
 pub(crate) struct WorkerStreams {
     limits: Option<(usize, usize, usize)>,
@@ -304,8 +297,6 @@ pub(crate) struct WorkerStreams {
 }
 
 impl WorkerStreams {
-    /// Returns the runtime of each Store by its name. Each Store runs its calls on the event
-    /// loop of `task_locals`.
     pub(crate) fn into_runtimes(
         self,
         task_locals: &Arc<OnceLock<pyo3_async_runtimes::TaskLocals>>,
@@ -327,9 +318,7 @@ impl WorkerStreams {
     }
 }
 
-/// Checks an encoded append of client code as the runtime of a Worker checks one of Workflow
-/// code, with the limits of the Stream config. Client code reaches its Store through no such
-/// runtime. Raises `StreamError` for an append that the check refuses.
+// Client and Workflow appends must enforce the same limits.
 #[pyfunction]
 pub fn check_stream_append(
     limits: (usize, usize, usize),
@@ -342,7 +331,6 @@ pub fn check_stream_append(
         .map_err(|err| stream_error(err.reason.into(), err.message))
 }
 
-/// Returns a `temporalio.exceptions.StreamError`, or the error that building it raised.
 fn stream_error(reason: StreamErrorReason, message: String) -> PyErr {
     Python::attach(|py| {
         let error = || {

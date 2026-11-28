@@ -232,9 +232,7 @@ class Client(StreamServiceClientExtension):
             stream_config: Stream Stores of this client and of each worker that
                 uses it. The client sends each Stream call to one of these
                 Stores, so a Stream call of a client with none raises
-                :exc:`ValueError`. A client interceptor that changes the Stream
-                of a call must change the ``ref`` of the request in place, since
-                a created Stream takes the ref of its create request.
+                :exc:`ValueError`.
 
                 .. warning::
                     This API is experimental and subject to change.

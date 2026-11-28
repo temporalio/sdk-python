@@ -348,17 +348,14 @@ class Worker:
                 Please report any issues you encounter with this setting or if you
                 feel the default should be changed.
                 WARNING: This setting is experimental.
-            stream_read_time: How long the Stream reads of a Workflow Task can
-                wait, from the start of the task or the end of its replay. At that
-                limit, a read with a wait gives a page with no Record. ``read`` and
-                ``read_pages`` never end at a page with no Record, and read again
-                with the whole wait, also in a later task. With no wait given,
-                their reads after the first page wait up to 1 minute, cut at this
-                limit. A read with no wait, such as ``read_page`` with none, goes
-                on without holding the task until the Store answers. Defaults to
-                half the Workflow Task timeout. The limit is always before the
-                heartbeat of the task, so a read alone never makes the Worker send
-                a heartbeat. Appends have no such limit.
+            stream_read_time: Maximum time that Stream reads can keep a Workflow
+                Task open, measured from its start or the end of replay. Defaults
+                to half the task timeout and always ends before its heartbeat.
+                Reads alone don't cause task heartbeats. Appends have no such limit.
+                At the limit, waiting reads return empty pages. Iterators continue
+                with a new wait, possibly in another task. Unset iterator waits
+                default to one minute after the first page. Immediate reads can
+                continue without holding the task open until the Store answers.
                 WARNING: This setting is experimental.
 
         """
@@ -515,7 +512,6 @@ class Worker:
         )
         activities = list(config.get("activities") or [])
         if client_config["stream_config"] and config.get("workflows"):
-            # Workflow code creates and describes a Stream in this Local Activity.
             activities.append(_stream_store_call)
         if activities:
             _warn_if_activity_executor_max_workers_is_inconsistent(config)

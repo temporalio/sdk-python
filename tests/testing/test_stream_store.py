@@ -357,40 +357,47 @@ def test_a_stream_expires_after_its_retention_from_its_create_or_last_write() ->
             run_with_virtual_clock(script(random.Random(seed)))
 
 
-def test_a_read_waits_for_the_next_write_or_for_its_wait() -> None:
-    async def script(rng: random.Random) -> None:
+@pytest.mark.parametrize(
+    "wait,write_in,answered_at,outcome",
+    [
+        (5, 3, 3, "record"),
+        (5, 7, 5, "empty"),
+        (5, None, 5, "empty"),
+        (20, None, 10, "expired"),
+        (10, None, 10, "expired"),
+    ],
+)
+def test_a_read_waits_for_a_write_its_timeout_or_expiry(
+    wait: int, write_in: int | None, answered_at: int, outcome: str
+) -> None:
+    async def script() -> None:
         loop = asyncio.get_running_loop()
-        streams = _streams(retention=100)
+        streams = _streams(retention=10)
         await streams.create_stream(CreateStreamRequest(stream_id=_S), request_id="")
         first = await streams.append_records(_client_append(), request_id="")
-        wait, write_in = rng.sample(range(1, 60), 2)
-        write = rng.random() < 0.5
-        read = asyncio.ensure_future(
-            streams.read_records(
-                ReadRecordsRequest(
-                    stream_id=_S,
-                    from_offset=first.last_offset,
-                    wait=Duration(seconds=wait),
-                )
-            )
+        request = ReadRecordsRequest(
+            stream_id=_S, from_offset=first.last_offset, wait=Duration(seconds=wait)
         )
-        answered_at: list[float] = []
-        read.add_done_callback(lambda _: answered_at.append(loop.time()))
-        await asyncio.sleep(write_in)
-        if write:
-            await streams.append_records(_client_append(), request_id="")
-        page = await read
-        in_time = write and write_in < wait
-        assert (
-            answered_at == [float(write_in if in_time else wait)]
-            and len(page.records) == in_time
-            and page.last_offset
-            == (page.records[-1].offset if in_time else first.last_offset)
-        ), f"{page} at {answered_at}"
 
-    for seed in range(200):
-        with failure_note(f"seed {seed}"):
-            run_with_virtual_clock(script(random.Random(seed)))
+        async def read() -> tuple[float, Any]:
+            response = await _answer(streams.read_records(request))
+            return loop.time(), response
+
+        reader = asyncio.create_task(read())
+        if write_in is not None:
+            await asyncio.sleep(write_in)
+            await streams.append_records(_client_append(), request_id="")
+        ended, page = await reader
+        assert ended == answered_at
+        if outcome == "expired":
+            assert page == _EXPIRED
+        elif outcome == "empty":
+            assert page == ReadRecordsResponse(last_offset=first.last_offset)
+        else:
+            [record] = page.records
+            assert page.last_offset == record.offset > first.last_offset
+
+    run_with_virtual_clock(script())
 
 
 async def test_a_store_call_of_the_bridge_gives_the_store_the_caps_of_the_read() -> (

@@ -1083,7 +1083,7 @@ def value_to_type(
         # Simply instantiate the dataclass. This will fail as expected when
         # missing required fields.
         # TODO(cretz): Want way to convert snake case to camel case?
-        # Calling the hint lets an instance of ``Box[int]`` keep its type argument.
+        # The alias retains type arguments that its dataclass origin would lose.
         obj = hint(**field_values)
         # init=False fields cannot be passed to __init__ but are serialized, so
         # restore them afterwards. object.__setattr__ also works on frozen
