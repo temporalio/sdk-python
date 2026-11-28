@@ -8312,6 +8312,77 @@ async def test_user_metadata_is_set(client: Client, env: WorkflowEnvironment):
         assert await describe_r.static_details() == "xtremely detailed"
 
 
+class NoProtobufPayloadConverter(temporalio.converter.CompositePayloadConverter):
+    def __init__(self) -> None:
+        super().__init__(
+            temporalio.converter.BinaryNullPayloadConverter(),
+            temporalio.converter.BinaryPlainPayloadConverter(),
+            temporalio.converter.JSONPlainPayloadConverter(),
+        )
+
+
+@workflow.defn
+class WorkflowMetadataQueryWorkflow:
+    @workflow.run
+    async def run(self) -> None:
+        await workflow.wait_condition(lambda: False)
+
+    @workflow.query(description="qdesc")
+    def some_query(self) -> None:
+        pass
+
+
+async def test_workflow_metadata_query_uses_default_payload_converter(
+    client: Client,
+):
+    config_default = client.config()
+    config_default["data_converter"] = DataConverter(payload_codec=SimpleCodec())
+    client_default = Client(**config_default)
+
+    config_custom = client.config()
+    config_custom["data_converter"] = DataConverter(
+        payload_converter_class=NoProtobufPayloadConverter,
+        payload_codec=SimpleCodec(),
+    )
+    client_custom = Client(**config_custom)
+
+    # Even with a worker converter that cannot serialize protobuf, the metadata
+    # response must use the default protobuf encoding and the configured codec.
+    async with new_worker(client_custom, WorkflowMetadataQueryWorkflow) as worker:
+        workflow_id = f"workflow-{uuid.uuid4()}"
+        await client_default.start_workflow(
+            WorkflowMetadataQueryWorkflow.run,
+            id=workflow_id,
+            task_queue=worker.task_queue,
+        )
+
+        metadata_query = "__temporal_workflow_metadata"
+        metadata_type = temporalio.api.sdk.v1.WorkflowMetadata
+
+        # Verify that the worker returns metadata the default client can decode.
+        handle_default = client_default.get_workflow_handle(workflow_id)
+        result_default = await handle_default.query(
+            metadata_query, result_type=metadata_type
+        )
+
+        # Verify that a client without protobuf support can retrieve the raw
+        # metadata and decode it explicitly with the default converter.
+        handle_custom = client_custom.get_workflow_handle(workflow_id)
+        raw_custom = await handle_custom.query(metadata_query, result_type=RawValue)
+        assert raw_custom.payload.metadata["encoding"] == b"json/protobuf"
+        result_custom = PayloadConverter.default.from_payload(
+            raw_custom.payload, metadata_type
+        )
+
+        for md in (result_default, result_custom):
+            assert md.definition.type == "WorkflowMetadataQueryWorkflow"
+            matched_q = [
+                q for q in md.definition.query_definitions if q.name == "some_query"
+            ]
+            assert len(matched_q) == 1
+            assert matched_q[0].description == "qdesc"
+
+
 @workflow.defn
 class WorkflowSleepWorkflow:
     @workflow.run
