@@ -72,9 +72,8 @@ class WorkflowActivation(google.protobuf.message.Message):
      that event, so it scans ahead in History for the marker, as for a local activity marker. Each
      result in the marker has the index of the activation that got it, so the replay gives it in
      that same activation. In one activation, the Stream results go first, appends before reads,
-     each in `seq` order, and then the local activity resolutions. A replay with workflow task
-     chunking on can give several activations of the first run as one. Then the results go in the
-     order of those activations.
+     each in `seq` order, and then the local activity resolutions. A task with a Stream marker
+     retains its recorded activation groups.
     * Queries always go last (and, in fact, always come in their own activation)
     * Evictions also always come in their own activation
 
@@ -1682,7 +1681,7 @@ global___RemoveFromCache = RemoveFromCache
 class ResolveStreamAppend(google.protobuf.message.Message):
     """Core delivers the result in the next activation, or in the next task when the Store answers
     during completion. Stream and Local Activity markers share an activation index. Replay
-    preserves result order. With task chunking, several activations can replay as one.
+    preserves the recorded activation groups for tasks that contain a Stream marker.
     """
 
     DESCRIPTOR: google.protobuf.descriptor.Descriptor

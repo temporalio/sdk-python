@@ -2,6 +2,7 @@ import asyncio
 import threading
 import time
 from contextvars import copy_context
+from datetime import datetime, timezone
 from unittest.mock import Mock
 
 import pytest
@@ -38,6 +39,10 @@ async def test_activity_env_async():
         return "done"
 
     env = ActivityEnvironment()
+    epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+    assert env.info.scheduled_time == epoch
+    assert env.info.current_attempt_scheduled_time == epoch
+    assert env.info.started_time == epoch
     # Set heartbeat handler to add to list
     heartbeats = []
     env.on_heartbeat = lambda *args: heartbeats.append(args[0])

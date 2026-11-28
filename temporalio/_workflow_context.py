@@ -32,10 +32,14 @@ class _WorkflowLogicFlag(IntEnum):
     # when enabling it. Then remove this reminder.
     DECODE_DATETIME_PROXIES = 3
     USE_LAST_STREAM_RECORD_OFFSET = 4
+    REPORT_EXISTING_STREAM_AS_FALSE = 5
 
 
 _DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
-    {_WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET}
+    {
+        _WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET,
+        _WorkflowLogicFlag.REPORT_EXISTING_STREAM_AS_FALSE,
+    }
 )
 
 

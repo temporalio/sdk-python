@@ -73,6 +73,10 @@ from temporalio.converter import (
 from temporalio.exceptions import ApplicationError, StreamError
 from temporalio.nexus.system import _support
 from temporalio.nexus.system.stream_service import StreamRef as ModelRef
+from temporalio.nexus.system.stream_service.models import (
+    CreateStreamResult,
+    StreamIdConflictPolicy,
+)
 from temporalio.testing import MemoryStreamStore
 from temporalio.worker._workflow import _CommandAwareDataConverter
 from temporalio.worker._workflow_instance import (
@@ -364,7 +368,9 @@ class _RecordingOutbound(temporalio.worker.WorkflowOutboundInterceptor):
         return await super().start_describe_stream(request)
 
 
-def _resolve_call(call: _Call, seq: int) -> WorkflowActivationJob:
+def _resolve_call(
+    call: _Call, seq: int, *, created: bool = True
+) -> WorkflowActivationJob:
     converter = temporalio.converter.DefaultPayloadConverter()
     job = WorkflowActivationJob()
     if call.operation == "append":
@@ -410,7 +416,9 @@ def _resolve_call(call: _Call, seq: int) -> WorkflowActivationJob:
         )
     else:
         answer: Message = (
-            CreateStreamResponse(ref=StreamRef(id=call.stream, store="b"), created=True)
+            CreateStreamResponse(
+                ref=StreamRef(id=call.stream, store="b"), created=created
+            )
             if call.operation == "create"
             else DescribeStreamResponse(last_offset=b"last%d" % seq)
         )
@@ -418,6 +426,68 @@ def _resolve_call(call: _Call, seq: int) -> WorkflowActivationJob:
             converter.to_payload(answer.SerializeToString())
         )
     return job
+
+
+@workflow.defn
+class _ReuseStreamWorkflow:
+    @workflow.run
+    async def run(self) -> bool | None:
+        stream = await workflow.create_stream(
+            id="s",
+            store="b",
+            id_conflict_policy=StreamIdConflictPolicy.StreamIdConflictPolicyUseExisting,
+        )
+        return stream.created
+
+
+@pytest.mark.parametrize("intercepted", [False, True])
+async def test_create_preserves_the_recorded_existing_stream_result(
+    intercepted: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def existing(_self: Any, request: Any, _output_type: Any = None) -> Any:
+        answer = asyncio.get_running_loop().create_future()
+        answer.set_result(CreateStreamResult(ref=request.stream_ref, created=False))
+        return answer
+
+    if intercepted:
+        monkeypatch.setattr(_RecordingOutbound, "start_create_stream", existing)
+    flag = _WorkflowLogicFlag.REPORT_EXISTING_STREAM_AS_FALSE
+    for replaying, flags, expected in [
+        (False, (), False),
+        (True, (), None),
+        (True, (flag,), False),
+    ]:
+        instance = _new_instance(
+            _ReuseStreamWorkflow,
+            StreamConfig([MemoryStreamStore(name="b")]),
+            [_RecordingInbound],
+        )
+        completion = await _activate(
+            instance,
+            WorkflowActivationJob(initialize_workflow=InitializeWorkflow()),
+            replaying=replaying,
+            flags=flags,
+        )
+        if not intercepted:
+            [schedule] = completion.successful.commands
+            completion = await _activate(
+                instance,
+                _resolve_call(
+                    _Call("create", "s"),
+                    schedule.schedule_local_activity.seq,
+                    created=False,
+                ),
+                replaying=replaying,
+                flags=flags,
+            )
+        [command] = completion.successful.commands
+        assert command.HasField("complete_workflow_execution")
+        payload = command.complete_workflow_execution.result
+        assert (
+            temporalio.converter.PayloadConverter.default.from_payload(payload)
+            is expected
+        )
+        assert (flag in completion.successful.used_internal_flags) == (not replaying)
 
 
 @pytest.mark.parametrize("replaying", [False, True])

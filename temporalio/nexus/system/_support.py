@@ -21,13 +21,20 @@ from temporalio.converter._payload_converter import _get_transfer_type_converter
 if typing.TYPE_CHECKING:
     import temporalio.activity
     import temporalio.client
+    from temporalio.client import NexusClient as ClientNexusClient
+    from temporalio.nexus.system.stream_service.client import Stream as ClientStream
     from temporalio.nexus.system.stream_service.models import (
+        CreateStreamResult,
         Producer,
         ReadRecordsRequest,
         ReadRecordsResponse,
         StreamRecord,
         Timestamp,
     )
+    from temporalio.nexus.system.stream_service.workflow._resources import (
+        Stream as WorkflowStream,
+    )
+    from temporalio.workflow import NexusClient as WorkflowNexusClient
 
 _BodyT = typing.TypeVar("_BodyT")
 _ModelT = typing.TypeVar("_ModelT")
@@ -72,6 +79,55 @@ def model_from_proto(
         )
     ):
         return converter.from_transfer_type(proto, model_type)
+
+
+@typing.overload
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "ClientNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "ClientStream[_BodyT]": ...
+
+
+@typing.overload
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "WorkflowNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "WorkflowStream[_BodyT]": ...
+
+
+def stream_from_create(
+    result: "CreateStreamResult[_BodyT]",
+    nexus_client: "ClientNexusClient[typing.Any] | WorkflowNexusClient[typing.Any]",
+    body_type: type[_BodyT],
+) -> "ClientStream[_BodyT] | WorkflowStream[_BodyT]":
+    import temporalio.workflow
+
+    if result.ref is None:
+        raise RuntimeError("CreateStream answered without `ref`")
+    created: bool | None = bool(result.created)
+    if isinstance(nexus_client, temporalio.workflow.NexusClient):
+        from temporalio.nexus.system.stream_service.workflow._resources import (
+            Stream as WorkflowStream,
+        )
+
+        if not created:
+            flags = _current_workflow_flags.get()
+            # Unflagged replay must retain None, including responses from interceptors.
+            if flags is not None and not flags.is_flag_enabled(
+                _WorkflowLogicFlag.REPORT_EXISTING_STREAM_AS_FALSE
+            ):
+                created = None
+        return WorkflowStream[body_type](  # type: ignore[valid-type, reportInvalidTypeForm]
+            ref=result.ref, created=created
+        )
+
+    from temporalio.nexus.system.stream_service.client import Stream as ClientStream
+
+    return ClientStream[body_type](  # type: ignore[valid-type, reportInvalidTypeForm]
+        nexus_client, ref=result.ref, created=created
+    )
 
 
 def default_producer(

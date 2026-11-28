@@ -67,7 +67,7 @@ class ActivityEnvironment:
         Returns a new default Info instance that can be modified using
         :py:func:`dataclasses.replace` before assigning to the info attribute.
         """
-        utc_zero = datetime.fromtimestamp(0).replace(tzinfo=timezone.utc)
+        utc_zero = datetime.fromtimestamp(0, tz=timezone.utc)
         return temporalio.activity.Info(
             activity_id="test",
             activity_type="unknown",

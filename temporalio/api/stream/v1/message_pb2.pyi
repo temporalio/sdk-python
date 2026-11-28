@@ -197,8 +197,8 @@ class LocalActivityProducer(google.protobuf.message.Message):
     run_id: builtins.str
     """Required."""
     activity_id: builtins.str
-    """Required. Local Activities have no scheduled event, so this id distinguishes calls in a run.
-    The SDK assigns an id from its counter unless the user sets one. Do not reuse it within a run.
+    """Required. Local Activities have no scheduled event, so this id must be unique in the run.
+    The SDK assigns an id unless the caller supplies one.
     """
     @property
     def attempt(self) -> global___LocalActivityAttempt:
@@ -491,11 +491,13 @@ class StreamRecord(google.protobuf.message.Message):
     BODY_FIELD_NUMBER: builtins.int
     OFFSET_FIELD_NUMBER: builtins.int
     offset: builtins.bytes
-    """Required and nonempty. Offsets are unique within a Stream. Unsigned byte order matches
-    Record order. Gaps cannot be used to count Records. Offsets do not identify their Stream.
+    """Required. Record offsets are 1 to 1,024 bytes and unique within a Stream. Unsigned byte order
+    matches Record order. Offsets can have gaps and do not identify the Stream.
     """
     @property
-    def producer(self) -> global___Producer: ...
+    def producer(self) -> global___Producer:
+        """Stores must return the Producer that appended this Record."""
+
     @property
     def body(self) -> temporalio.api.common.v1.message_pb2.Payload: ...
     def __init__(
