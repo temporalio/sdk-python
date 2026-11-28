@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import logging
-from collections.abc import AsyncIterator, Mapping, Sequence
-from contextlib import AbstractAsyncContextManager, asynccontextmanager
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager, aclosing, asynccontextmanager
 from dataclasses import dataclass
 
 from typing_extensions import TypedDict
@@ -153,7 +153,10 @@ class Replayer:
         async def history_iterator():
             yield history
 
-        async with self.workflow_replay_iterator(history_iterator()) as replay_iterator:
+        async with (
+            aclosing(history_iterator()) as histories,
+            self.workflow_replay_iterator(histories) as replay_iterator,
+        ):
             async for result in replay_iterator:
                 if raise_on_replay_failure and result.replay_failure:
                     raise result.replay_failure
@@ -383,7 +386,7 @@ class Replayer:
             workflow_worker_task = asyncio.create_task(workflow_worker.run())
 
             # Yield iterator
-            async def replay_iterator() -> AsyncIterator[WorkflowReplayResult]:
+            async def replay_iterator() -> AsyncGenerator[WorkflowReplayResult, None]:
                 async for history in histories:
                     # Clear last complete and push history
                     last_replay_complete.clear()
@@ -416,7 +419,8 @@ class Replayer:
                         replay_failure=last_replay_failure,
                     )
 
-            yield replay_iterator()
+            async with aclosing(replay_iterator()) as results:
+                yield results
         finally:
             # Close the pusher
             if pusher is not None:
