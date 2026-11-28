@@ -31,9 +31,12 @@ class _WorkflowLogicFlag(IntEnum):
     # Remove the explicit overrides for this flag from tests/worker/test_workflow_flags.py
     # when enabling it. Then remove this reminder.
     DECODE_DATETIME_PROXIES = 3
+    USE_LAST_STREAM_RECORD_OFFSET = 4
 
 
-_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset()
+_DEFAULT_ENABLED_WORKFLOW_LOGIC_FLAGS: frozenset[_WorkflowLogicFlag] = frozenset(
+    {_WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET}
+)
 
 
 @dataclass(frozen=True)

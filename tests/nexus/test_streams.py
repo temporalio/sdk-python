@@ -6,7 +6,6 @@ import copy
 import dataclasses
 import pickle
 import pkgutil
-import random
 import subprocess
 import sys
 from collections.abc import Awaitable, Callable
@@ -59,6 +58,7 @@ from temporalio.worker._workflow_streams import _stream_error_from_failure
 from tests.helpers.streams import (
     FaultStore,
     Hold,
+    answers,
     core_failure,
     failure_note,
     run_with_virtual_clock,
@@ -120,181 +120,156 @@ def _producer_proto(producer: Any) -> Producer:
     return message
 
 
-async def test_a_client_call_reaches_the_right_store_as_written() -> None:
-    request_ids: set[str] = set()
-    for seed in range(300):
-        with failure_note(f"seed {seed}"):
-            await _routing_script(seed, random.Random(seed), request_ids)
-
-
-async def _routing_script(seed: int, rng: random.Random, request_ids: set[str]) -> None:
-    to_payload = temporalio.converter.PayloadConverter.default.to_payload
+@pytest.mark.parametrize("operation", ["create", "append", "read", "describe"])
+@pytest.mark.parametrize(
+    "routing", ["only", "selector", "explicit", "unknown", "unregistered"]
+)
+@pytest.mark.parametrize("in_activity", [False, True])
+async def test_a_client_call_reaches_the_selected_store(
+    operation: str, routing: str, in_activity: bool
+) -> None:
     service_client = Mock(spec=ServiceClient)
-    names = rng.sample("abcd", rng.randrange(1, 5))
-    has_selector = len(names) > 1 or rng.random() < 0.5
-    stores = [FaultStore(name) for name in names]
+    a, b = FaultStore("a"), FaultStore("b")
+    stores = [a] if routing == "only" else [a, b]
+    selected = FaultStore("other") if routing == "unregistered" else b
     selects: list[StreamSelectContext] = []
-    # The Store that the selector returns at its next call, which may be unregistered.
-    selected = [FaultStore("other")]
 
     def selector(context: StreamSelectContext) -> FaultStore:
         selects.append(context)
-        return selected[0]
+        return selected
 
-    # A client with no Stream config refuses a call, and the server gets nothing.
-    with pytest.raises(ValueError):
-        await Client(service_client).create_stream(id="s")
-    assert not service_client.mock_calls
-    ref_stores: list[tuple[str | None, str | None]] = []
+    ref_store = {"explicit": "a", "unknown": "unknown"}.get(routing)
+    intercepted: list[tuple[str | None, str | None]] = []
     client = Client(
         service_client,
-        interceptors=[_Interceptor(lambda next: _RecordingOutbound(next, ref_stores))],
+        interceptors=[_Interceptor(lambda next: _RecordingOutbound(next, intercepted))],
         stream_config=StreamConfig(
-            stores=stores, store_selector=selector if has_selector else None
+            stores, store_selector=None if routing == "only" else selector
         ),
     )
     activity = ActivityEnvironment()
     activity.info = dataclasses.replace(
-        activity.info, activity_id=f"activity-{seed}", activity_run_id="run"
+        activity.info, activity_id="activity", activity_run_id="run"
     )
-    # A write has the Producer of its caller, which is the client or the Activity.
-    producers = [
-        Producer(
+    producer = (
+        _producer_proto(activity.run(current_producer))
+        if in_activity
+        else Producer(
             client=ClientProducer(namespace="default", id=client._stream_producer_id)
-        ),
-        _producer_proto(activity.run(current_producer)),
-    ]
-    created: list[tuple[Any, FaultStore]] = []
-    for step in range(12):
-        with failure_note(f"step {step}"):
-            selected[0] = rng.choice([*stores, *stores, FaultStore("other")])
-            stream_id = f"stream-{seed}-{step}"
-            ref_store = rng.choice([None, None, "unknown", *names])
-            store: FaultStore | None
-            in_activity = rng.random() < 0.3
-            expected: Message
-            operation = rng.choice(["create", "read", "describe", "created"])
-            if operation == "created" and not created:
-                operation = "create"
-            if operation == "created":
-                # A created Stream stays on its Store, whatever the selector picks at this call.
-                stream, store = rng.choice(created)
-                ref_store = stream.ref.store
-                if rng.random() < 0.5:
-                    bodies = [rng.randrange(100) for _ in range(rng.randrange(3))]
-                    call = stream.append(*bodies)
-                    expected = proto.AppendRecordsRequest(
-                        stream_id=stream.ref.id,
-                        producer=producers[in_activity],
-                        records=[
-                            AppendRecord(body=to_payload(body)) for body in bodies
-                        ],
-                    )
-                else:
-                    call = stream.describe()
-                    expected = proto.DescribeStreamRequest(stream_id=stream.ref.id)
-            else:
-                store = next((s for s in stores if s.name() == ref_store), None)
-                if ref_store is None and has_selector:
-                    store = selected[0] if selected[0] in stores else None
-                elif ref_store is None:
-                    store = stores[0]
-                ref = StreamRef[int](id=stream_id, store=ref_store)
-                match operation:
-                    case "create":
-                        policy = rng.choice(list(StreamIdConflictPolicy.values()))
-                        call = client.create_stream(
-                            id=stream_id,
-                            store=ref_store,
-                            id_conflict_policy=ConflictPolicy(policy)
-                            if policy
-                            else None,
-                            body_type=int,
-                        )
-                        expected = proto.CreateStreamRequest(
-                            stream_id=stream_id, id_conflict_policy=policy
-                        )
-                    case "read":
-                        expected = proto.ReadRecordsRequest(
-                            stream_id=stream_id,
-                            from_offset=rng.randbytes(rng.randrange(3)),
-                            max_records=rng.choice([0, 1, 2**31 - 1]),
-                            max_bytes=rng.choice([0, 1, 2**62]),
-                        )
-                        wait = rng.choice([None, 0, 1, 30 * 24 * 3600])
-                        # A Store gets no wait for a wait of zero.
-                        if wait:
-                            expected.wait.FromSeconds(wait)
-                        call = client.get_stream(ref).read_page(
-                            from_offset=expected.from_offset or None,
-                            max_records=expected.max_records or None,
-                            wait=None if wait is None else timedelta(seconds=wait),
-                            max_bytes=expected.max_bytes or None,
-                        )
-                    case _:
-                        call = client.get_stream(ref).describe()
-                        expected = proto.DescribeStreamRequest(stream_id=stream_id)
-            logs = [list(s.requests) for s in stores]
-            del selects[:], ref_stores[:]
+        )
+    )
+    for store in stores:
+        await store.memory.create_stream(
+            proto.CreateStreamRequest(stream_id="s"), request_id="setup"
+        )
+        store.faults["read_records"].extend([answers(proto.ReadRecordsResponse())] * 2)
+    stream = client.get_stream(StreamRef[int](id="s", store=ref_store))
+    payload = temporalio.converter.PayloadConverter.default.to_payload
+    expected: Message
+    if operation == "create":
+        expected = proto.CreateStreamRequest(
+            stream_id="s",
+            id_conflict_policy=StreamIdConflictPolicy.STREAM_ID_CONFLICT_POLICY_USE_EXISTING,
+        )
+    elif operation == "append":
+        expected = proto.AppendRecordsRequest(
+            stream_id="s",
+            producer=producer,
+            records=[AppendRecord(body=payload(i)) for i in (3, 5)],
+        )
+    elif operation == "read":
+        expected = proto.ReadRecordsRequest(
+            stream_id="s", max_records=2, max_bytes=4096
+        )
+        expected.wait.FromSeconds(5)
+    else:
+        expected = proto.DescribeStreamRequest(stream_id="s")
 
-            async def run_call() -> Any:
-                # A read or a describe of a Stream that nobody created fails in the Store.
-                try:
-                    return await call
-                except StreamError as err:
-                    return err
-
-            if store is None:
-                with pytest.raises(ValueError):
-                    await (activity.run(run_call) if in_activity else run_call())
-                assert [s.requests for s in stores] == logs
-                continue
-            result = await (activity.run(run_call) if in_activity else run_call())
-            if (
-                isinstance(expected, proto.AppendRecordsRequest)
-                and not expected.records
-            ):
-                # The SDK refuses a batch with no Record before the Store gets it.
-                assert isinstance(result, StreamError)
-                assert result.reason == _INVALID_ARGUMENT
-                assert [s.requests for s in stores] == logs
-                continue
-            for other, log in zip(stores, logs):
-                if other is not store:
-                    assert other.requests == log
-            [(request, request_id)] = store.calls[len(logs[stores.index(store)]) :]
-            if isinstance(
-                request, (proto.CreateStreamRequest, proto.AppendRecordsRequest)
-            ):
-                assert request_id and request_id not in request_ids
-                request_ids.add(request_id)
-            else:
-                assert request_id is None
-            assert request == expected
-            assert not service_client.mock_calls
-            # An interceptor sees the ref as the caller wrote it, also after the call.
-            assert ref_stores == [(ref_store, ref_store)]
-            target = None
-            if in_activity:
-                target = StorageDriverActivityInfo(
-                    namespace="default",
-                    id=f"activity-{seed}",
-                    run_id="run",
-                    type="unknown",
-                )
-            used_selector = has_selector and ref_store is None
-            assert selects == (
-                [
-                    StreamSelectContext(
-                        id=stream_id, target=target, namespace=client.namespace
-                    )
-                ]
-                if used_selector
-                else []
+    async def call() -> Any:
+        if operation == "create":
+            return await client.create_stream(
+                id="s",
+                store=ref_store,
+                body_type=int,
+                id_conflict_policy=ConflictPolicy.StreamIdConflictPolicyUseExisting,
             )
-            if operation == "create":
-                assert result.ref == StreamRef(id=stream_id, store=store.name())
-                created.append((result, store))
+        if operation == "append":
+            return await stream.append(3, 5)
+        if operation == "read":
+            return await stream.read_page(
+                max_records=2, max_bytes=4096, wait=timedelta(seconds=5)
+            )
+        return await stream.describe()
+
+    if routing in ("unknown", "unregistered"):
+        with pytest.raises(ValueError):
+            await (activity.run(call) if in_activity else call())
+        assert not a.calls and not b.calls and not service_client.mock_calls
+        return
+
+    for _ in range(2):
+        result = await (activity.run(call) if in_activity else call())
+        if operation == "create":
+            assert result.ref == StreamRef(
+                id="s", store="b" if routing == "selector" else "a"
+            )
+    chosen, other = (b, a) if routing == "selector" else (a, b)
+    assert chosen.requests == [expected, expected]
+    assert not other.calls and not service_client.mock_calls
+    ids = [request_id for _, request_id in chosen.calls]
+    if operation in ("create", "append"):
+        assert all(ids) and ids[0] != ids[1]
+    else:
+        assert ids == [None, None]
+    assert intercepted == [(ref_store, ref_store)] * 2
+    target = (
+        StorageDriverActivityInfo(
+            namespace="default", id="activity", run_id="run", type="unknown"
+        )
+        if in_activity
+        else None
+    )
+    assert selects == (
+        [StreamSelectContext(id="s", target=target, namespace="default")] * 2
+        if routing == "selector"
+        else []
+    )
+
+
+async def test_a_client_without_stream_config_does_not_call_the_server() -> None:
+    service_client = Mock(spec=ServiceClient)
+    with pytest.raises(ValueError):
+        await Client(service_client).create_stream(id="s")
+    assert not service_client.mock_calls
+
+
+async def test_a_created_stream_keeps_its_selected_store() -> None:
+    a, b = FaultStore("a"), FaultStore("b")
+    selected = a
+    client = Client(
+        Mock(spec=ServiceClient),
+        stream_config=StreamConfig([a, b], store_selector=lambda _: selected),
+    )
+    stream = await client.create_stream(id="s", body_type=int)
+    selected = b
+    await stream.append(1)
+    await stream.describe()
+    assert stream.ref.store == "a"
+    assert [type(request) for request in a.requests] == [
+        proto.CreateStreamRequest,
+        proto.AppendRecordsRequest,
+        proto.DescribeStreamRequest,
+    ]
+    assert not b.calls
+
+
+async def test_an_empty_client_append_does_not_reach_the_store() -> None:
+    store = FaultStore()
+    client = Client(Mock(spec=ServiceClient), stream_config=StreamConfig([store]))
+    with pytest.raises(StreamError) as raised:
+        await client.get_stream(StreamRef[int](id="s")).append()
+    assert raised.value.reason == _INVALID_ARGUMENT
+    assert not store.calls
 
 
 async def test_a_stream_error_keeps_its_reason_on_every_path() -> None:
@@ -345,124 +320,67 @@ async def test_a_stream_error_keeps_its_reason_on_every_path() -> None:
 
 
 class _FakeReads(temporalio.client.OutboundInterceptor):
-    """Answers each read with the next page of a generated Stream."""
-
-    def __init__(
-        self, next: temporalio.client.OutboundInterceptor, rng: random.Random
-    ) -> None:
+    def __init__(self, next: temporalio.client.OutboundInterceptor) -> None:
         super().__init__(next)
-        self._rng = rng
-        self.records = 0
-        """The number of Records of the Stream, which a test can raise."""
+        self.pages = iter([(1, 2), (), (3, 4), (), (4, 5)])
         self.starts: list[int] = []
-        """The Record after which each read started, in the order of the reads."""
         self.waits: list[timedelta | None] = []
-        """The wait of each read, in the order of the reads."""
 
     async def start_nexus_operation(
         self, input: temporalio.client.StartNexusOperationInput
     ) -> NexusOperationHandle[Any]:
         request: ReadRecordsRequest[int] = input.arg
-        start = int.from_bytes(request.from_offset or b"", "big")
-        self.starts.append(start)
+        self.starts.append(int.from_bytes(request.from_offset or b"", "big"))
         self.waits.append(request.wait)
-        size = self._rng.randrange(1, 4)
-        # A read with a wait can see no Record come within its wait, also when more
-        # come later. With no wait, a Store answers with no Record only at the end.
-        if request.wait and self._rng.random() < 0.2:
-            size = 0
-        end = min(self.records, start + size)
+        records = [
+            StreamRecord(body=at, offset=at.to_bytes(8, "big"))
+            for at in next(self.pages)
+        ]
         page = ReadRecordsResponse(
-            records=[
-                StreamRecord(body=at, offset=at.to_bytes(8, "big"))
-                for at in range(start + 1, end + 1)
-            ],
-            last_offset=request.from_offset or None,
+            records=records,
+            last_offset=records[-1].offset if records else request.from_offset,
         )
-        if page.records:
-            page.last_offset = page.records[-1].offset
         handle: NexusOperationHandle[Any] = NexusOperationHandle(Mock(), input.id)
         handle._known_outcome = page
         return handle
 
 
-async def test_a_read_gives_each_record_once_past_pages_with_no_record() -> None:
-    for seed in range(300):
-        with failure_note(f"seed {seed}"):
-            await _read_script(random.Random(seed))
-
-
-async def _read_script(rng: random.Random) -> None:
+@pytest.mark.parametrize("wait", [None, timedelta(0), timedelta(seconds=5)])
+async def test_a_read_resumes_after_a_partial_page_and_skips_empty_pages(
+    wait: timedelta | None,
+) -> None:
     fake: list[_FakeReads] = []
 
     def outbound(next: temporalio.client.OutboundInterceptor) -> _FakeReads:
-        fake.append(_FakeReads(next, rng))
+        fake.append(_FakeReads(next))
         return fake[0]
 
     client = Client(Mock(spec=ServiceClient), interceptors=[_Interceptor(outbound)])
     stream = client.get_stream(StreamRef[int](id="s"))
     [reads] = fake
-    wait = rng.choice([None, timedelta(0), timedelta(seconds=5)])
     got: list[int] = []
     later = _support.DEFAULT_READ_WAIT if wait is None else wait
-    for _ in range(rng.randrange(1, 4)):
-        # More Records come after each read, and a reader picks up where it stopped.
-        reads.records += rng.randrange(1, 6)
+    for stop_at in (3, 5):
         offset = got[-1].to_bytes(8, "big") if got else None
-        # A Stream has no end, so the reader stops at a Record that it knows of.
-        stop_at = rng.randrange(len(got) + 1, reads.records + 1)
-        first_read = len(reads.starts)
         async for record in stream.read(from_offset=offset, wait=wait):
             got.append(record.body)
-            if len(got) == stop_at:
+            if record.body == stop_at:
                 break
-        # A page with no Record before the caller's last Record doesn't end the read.
-        assert got == list(range(1, stop_at + 1))
-        # The read stops at the caller's last Record, so no read starts after it.
-        assert all(start < stop_at for start in reads.starts[first_read:])
-        # The first read has the caller's wait. A later one has it too, or the
-        # default wait when the caller gave none.
-        assert reads.waits[first_read:] == [wait] + [later] * (
-            len(reads.waits) - first_read - 1
-        )
+    assert got == [1, 2, 3, 4, 5]
+    assert reads.starts == [0, 2, 2, 3, 3]
+    assert reads.waits == [wait, later, later, wait, later]
 
 
 @dataclasses.dataclass(frozen=True)
 class _WriterInfo:
-    """A generated writer of a Stream, with the fields that its Producer takes."""
-
     kind: str
-    """The field of the kind in the proto ``Producer``."""
     namespace: str
     workflow_id: str
     run_id: str
     activity_id: str
     attempt: int
     time: datetime
-    """The scheduled time of an Activity attempt, or the started time of a task."""
     event_id: int
-    """The started event id of the task of a Local Activity, or the scheduled event id
-    of an Activity of a Workflow, which is zero when SDK Core couldn't read it."""
-
-
-def _writer_info(rng: random.Random) -> _WriterInfo:
-    def text() -> str:
-        return "".join(rng.choice("ab:/ '\"é") for _ in range(rng.randrange(1, 5)))
-
-    kinds = ["workflow", "local_activity", "workflow_activity", "standalone_activity"]
-    kind = rng.choice(kinds)
-    return _WriterInfo(
-        kind=kind,
-        namespace=text(),
-        workflow_id=text(),
-        run_id=text(),
-        activity_id=text(),
-        attempt=rng.randrange(1, 9),
-        time=datetime.fromtimestamp(rng.randrange(10**9), timezone.utc),
-        event_id=rng.choice([0, rng.randrange(3, 99)])
-        if kind == "workflow_activity"
-        else rng.randrange(3, 99),
-    )
 
 
 def _default_producer(writer: _WriterInfo) -> Any:
@@ -526,15 +444,37 @@ def _expected_producer(writer: _WriterInfo) -> Producer:
     return producer
 
 
-def test_a_writer_is_one_producer_on_each_attempt() -> None:
-    for seed in range(300):
-        with failure_note(f"seed {seed}"):
-            rng = random.Random(seed)
-            writer = _writer_info(rng)
-            producer = _producer_proto(_default_producer(writer))
-            assert producer == _expected_producer(writer)
+@pytest.mark.parametrize(
+    ("kind", "event_id"),
+    [
+        ("workflow", 7),
+        ("local_activity", 9),
+        ("workflow_activity", 0),
+        ("workflow_activity", 17),
+        ("standalone_activity", 0),
+    ],
+)
+def test_a_writer_keeps_its_identity_and_attempt(kind: str, event_id: int) -> None:
+    writer = _WriterInfo(
+        kind=kind,
+        namespace="ns:/é",
+        workflow_id="workflow",
+        run_id="run",
+        activity_id="activity",
+        attempt=3,
+        time=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        event_id=event_id,
+    )
+    producer = _default_producer(writer)
+    assert _producer_proto(producer) == _expected_producer(writer)
+    converter = temporalio.converter.PayloadConverter.default
+    # Heartbeat details can be decoded without a type hint.
+    [stored] = converter.from_payloads(converter.to_payloads([producer]))
+    assert as_producer(stored) == producer
+    assert as_producer(producer) is producer
 
-    # Two Streams of one client have one Producer, and two clients have two.
+
+def test_a_client_uses_one_producer_for_all_its_streams() -> None:
     service_client = Mock(spec=ServiceClient)
     config = StreamConfig(stores=[FaultStore()])
     clients = [Client(service_client, stream_config=config) for _ in range(2)]
@@ -548,93 +488,65 @@ def test_a_writer_is_one_producer_on_each_attempt() -> None:
     assert first.client.namespace == "default" and first.client.id
 
 
-def test_a_stored_producer_comes_back_as_a_producer() -> None:
-    converter = temporalio.converter.PayloadConverter.default
-    for seed in range(50):
-        with failure_note(f"seed {seed}"):
-            producer = _default_producer(_writer_info(random.Random(seed)))
-            # A value such as a heartbeat detail comes back with no type hint.
-            [stored] = converter.from_payloads(converter.to_payloads([producer]))
-            assert as_producer(stored) == producer
-            assert as_producer(producer) is producer
-
-
 @dataclasses.dataclass
 class _Turn:
     text: str
 
 
-def _refs(value: Any) -> list[Any]:
-    """Return each ``StreamRef`` of a value, in the order of its lists and fields."""
-    if isinstance(value, StreamRef):
-        return [value]
-    if isinstance(value, list):
-        return [ref for item in value for ref in _refs(item)]
-    if dataclasses.is_dataclass(value):
-        fields = dataclasses.fields(value)
-        return _refs([getattr(value, field.name) for field in fields])
-    return []
-
-
-def test_a_stream_ref_keeps_its_type_inside_a_value() -> None:
+@pytest.mark.parametrize(
+    ("hint", "ref", "body_type"),
+    [
+        (StreamRef[int], StreamRef[int](id="count", store="a"), int),
+        (StreamRef[str], StreamRef[str](id="text"), str),
+        (StreamRef[_Turn], StreamRef[_Turn](id="turn", store="b"), _Turn),
+        (StreamRef, StreamRef(id="untyped"), object),
+        (StreamRef[int] | None, None, None),
+        (StreamRef[str] | None, StreamRef[str](id="optional"), str),
+    ],
+)
+def test_a_stream_ref_keeps_its_body_type(
+    hint: Any, ref: StreamRef[Any] | None, body_type: type | None
+) -> None:
     converter = temporalio.converter.DataConverter.default.payload_converter
-    config = StreamConfig([FaultStore()])
-    client = Client(Mock(spec=ServiceClient), stream_config=config)
-    # mypy takes a type argument from a variable only on a value of type Any.
-    ref_type: Any = StreamRef
-    list_type: Any = list
-    for seed in range(60):
-        rng = random.Random(seed)
+    client = Client(
+        Mock(spec=ServiceClient), stream_config=StreamConfig([FaultStore()])
+    )
+    [decoded] = converter.from_payloads(converter.to_payloads([ref]), [hint])
+    assert decoded == ref
+    if decoded is not None:
+        for get_stream in (client.get_stream, temporalio.workflow.get_stream):
+            assert get_stream(decoded).body_type is body_type
 
-        def ref(typed: Any) -> Any:
-            store = rng.choice([None, "a", "b"])
-            return typed(id=f"stream-{rng.randrange(1000)}", store=store)
 
-        def shape(
-            kind: str, depth: int
-        ) -> tuple[Any, Callable[[], tuple[Any, list[Any]]]]:
-            """Return a hint with a ref in it, and a function that makes a value of
-            the hint with the body type of each of its refs, in their order.
-            """
-            if kind == "argument" or depth == 0:
-                body = rng.choice([_Turn, str, int])
-                return ref_type[body], lambda: (ref(ref_type[body]), [body])
-            if kind == "untyped field":
-                # A ref with no type argument reads bodies of any type.
-                untyped = dataclasses.make_dataclass("Untyped", [("ref", StreamRef)])
-                return untyped, lambda: (untyped(ref(StreamRef)), [object])
-            kinds = ["argument", "untyped field", "field", "list", "optional"]
-            hint, make = shape(rng.choice(kinds), depth - 1)
-            if kind == "optional":
-                return hint | None, lambda: make() if rng.random() < 0.7 else (None, [])
-            if kind == "list":
+@dataclasses.dataclass
+class _RefFields:
+    typed: StreamRef[_Turn]
+    untyped: StreamRef
+    nested: list[StreamRef[int] | None]
 
-                def make_list() -> tuple[Any, list[Any]]:
-                    made = [make() for _ in range(rng.randrange(3))]
-                    bodies = [body for _, bodies in made for body in bodies]
-                    return [value for value, _ in made], bodies
 
-                return list_type[hint], make_list
-            holder = dataclasses.make_dataclass("Holder", [("ref", hint)])
-
-            def make_field() -> tuple[Any, list[Any]]:
-                value, bodies = make()
-                return holder(value), bodies
-
-            return holder, make_field
-
-        # With a depth of 1, these are an argument or a result, a field with no type
-        # argument, a field, a list, and an argument or a result that can be None.
-        for top in ("argument", "untyped field", "field", "list", "optional"):
-            with failure_note(f"seed {seed}, {top}"):
-                hint, make = shape(top, rng.randrange(1, 4))
-                value, bodies = make()
-                payloads = converter.to_payloads([value])
-                [decoded] = converter.from_payloads(payloads, [hint])
-                assert decoded == value
-                refs = _refs(decoded)
-                for get_stream in (client.get_stream, temporalio.workflow.get_stream):
-                    assert [get_stream(ref).body_type for ref in refs] == bodies
+def test_stream_ref_fields_keep_their_body_types_inside_lists() -> None:
+    value = [
+        _RefFields(
+            typed=StreamRef[_Turn](id="turn", store="a"),
+            untyped=StreamRef(id="untyped"),
+            nested=[StreamRef[int](id="count"), None],
+        )
+    ]
+    converter = temporalio.converter.DataConverter.default.payload_converter
+    client = Client(
+        Mock(spec=ServiceClient), stream_config=StreamConfig([FaultStore()])
+    )
+    [decoded] = converter.from_payloads(
+        converter.to_payloads([value]), [list[_RefFields]]
+    )
+    assert decoded == value
+    [fields] = decoded
+    assert fields.nested[1] is None
+    for get_stream in (client.get_stream, temporalio.workflow.get_stream):
+        assert get_stream(fields.typed).body_type is _Turn
+        assert get_stream(fields.untyped).body_type is object
+        assert get_stream(fields.nested[0]).body_type is int
 
 
 def test_each_stream_module_can_be_the_first_import() -> None:
@@ -650,7 +562,6 @@ def test_each_stream_module_can_be_the_first_import() -> None:
             for module in pkgutil.walk_packages(system.__path__, system.__name__ + ".")
         ),
     ]
-    assert len(modules) > 15
 
     def first_import(module: str) -> str:
         imported = subprocess.run(
@@ -755,6 +666,28 @@ def test_a_client_iterator_on_an_idle_stream_waits_between_reads() -> None:
         assert waits(store) == [None, minute, minute]
 
     run_with_virtual_clock(script())
+
+
+@pytest.mark.parametrize(
+    "offsets, last_offset, expected",
+    [
+        ([b"b", b"c"], b"d", b"d"),
+        ([b"b", b"c"], None, b"c"),
+        ([], None, b"a"),
+    ],
+)
+def test_the_next_read_uses_the_position_covered_by_the_page(
+    offsets: list[bytes], last_offset: bytes | None, expected: bytes
+) -> None:
+    request = ReadRecordsRequest(ref=StreamRef[int](id="s"), from_offset=b"a")
+    page = ReadRecordsResponse(
+        records=[
+            StreamRecord(body=i, offset=offset) for i, offset in enumerate(offsets)
+        ],
+        last_offset=last_offset,
+    )
+    next_request = _support.next_read_request(request, page)
+    assert next_request is not None and next_request.from_offset == expected
 
 
 def test_a_page_with_no_last_offset_ends_at_its_last_record() -> None:

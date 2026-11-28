@@ -15,6 +15,7 @@ import temporalio.api.workflow.v1
 import temporalio.common
 import temporalio.converter
 import temporalio.nexus.system
+from temporalio._workflow_context import _current_workflow_flags, _WorkflowLogicFlag
 from temporalio.converter._payload_converter import _get_transfer_type_converter
 
 if typing.TYPE_CHECKING:
@@ -190,10 +191,18 @@ DEFAULT_READ_WAIT = timedelta(minutes=1)
 def next_read_request(
     request: "ReadRecordsRequest[_BodyT]", response: "ReadRecordsResponse[_BodyT]"
 ) -> "ReadRecordsRequest[_BodyT] | None":
+    cursor = response.last_offset or request.from_offset
+    if not response.last_offset and response.records:
+        # An unflagged replay must issue its next read at the recorded request cursor.
+        flags = _current_workflow_flags.get()
+        if flags is None or flags.is_flag_enabled(
+            _WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET
+        ):
+            cursor = response.records[-1].offset
     # Empty pages don't end a Stream. The default wait avoids busy polling.
     return dataclasses.replace(
         request,
-        from_offset=response.last_offset or request.from_offset,
+        from_offset=cursor,
         wait=DEFAULT_READ_WAIT if request.wait is None else request.wait,
     )
 
