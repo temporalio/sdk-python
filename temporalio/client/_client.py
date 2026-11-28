@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import (
     Awaitable,
     Callable,
@@ -291,6 +292,7 @@ class Client:
             header_codec_behavior=header_codec_behavior,
         )
         self._initial_config = config.copy()
+        self._stream_producer_id = str(uuid.uuid4())
 
         for plugin in plugins:
             config = plugin.configure_client(config)

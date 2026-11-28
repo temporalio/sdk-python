@@ -24,8 +24,9 @@ wit_input_dir = (
 wit_deps_dir = wit_input_dir / "deps"
 workflow_output_dir = base_dir / "temporalio" / "nexus" / "system" / "workflow_service"
 notification_output_dir = base_dir / "temporalio" / "nexus" / "notifications"
+stream_output_dir = base_dir / "temporalio" / "nexus" / "system" / "stream_service"
 workflow_init_path = base_dir / "temporalio" / "workflow" / "__init__.py"
-NEX_GEN_VERSION = "0.2.13"
+NEX_GEN_REVISION = "5983b56b047cea94acbdb4760ca76f145f5a55d7"
 proto_files = [
     gen_protos.api_proto_dir
     / "temporal"
@@ -39,31 +40,40 @@ proto_files = [
     / "notificationservice"
     / "v1"
     / "request_response.proto",
+    gen_protos.api_proto_dir
+    / "temporal"
+    / "api"
+    / "streamservice"
+    / "v1"
+    / "request_response.proto",
+    gen_protos.api_proto_dir / "temporal" / "api" / "sdk" / "v1" / "stream.proto",
 ]
 
 
 def nex_gen_command() -> list[str]:
     if bin_path := os.environ.get("NEX_GEN_BIN"):
         return [bin_path]
-    if (
-        shutil.which("nexgen") is None
-        or subprocess.check_output(["nexgen", "--version"], text=True).strip()
-        != f"nexgen {NEX_GEN_VERSION}"
-    ):
+    install_dir = base_dir / "build" / "nexgen" / NEX_GEN_REVISION
+    binary = install_dir / "bin" / ("nexgen.exe" if os.name == "nt" else "nexgen")
+    if not binary.is_file():
         subprocess.check_call(
             [
                 "cargo",
                 "install",
                 "--locked",
                 "nexgen",
-                "--version",
-                NEX_GEN_VERSION,
+                "--git",
+                "https://github.com/temporalio/nexgen.git",
+                "--rev",
+                NEX_GEN_REVISION,
+                "--root",
+                str(install_dir),
                 "--features",
                 "advanced",
                 "--force",
             ]
         )
-    return ["nexgen"]
+    return [str(binary)]
 
 
 def build_descriptor_set(descriptor_path: Path) -> None:
@@ -85,11 +95,11 @@ def generate_package(
     output_dir: Path,
     descriptor_path: Path,
     *,
-    native_api: bool,
+    targets: str | None,
 ) -> None:
     args = [*command, "python", str(wit_input_dir / wit_name), str(wit_deps_dir)]
-    if native_api:
-        args.extend(["--targets", "workflow"])
+    if targets:
+        args.extend(["--targets", targets])
     subprocess.check_call(
         [
             *args,
@@ -132,17 +142,28 @@ def replace_marker_block(
 
 
 def generate_workflow_exports() -> None:
-    exports = generated_exports(workflow_output_dir / "__init__.py")
-    import_block = [
-        "# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n",
-        "from temporalio.nexus.system.workflow_service import (\n",
-        *[f"    {export},\n" for export in exports],
-        ")\n",
-        "# END GENERATED NEXUS SYSTEM EXPORTS\n",
+    packages = [
+        (
+            "temporalio.nexus.system.stream_service.workflow",
+            stream_output_dir / "workflow" / "__init__.py",
+        ),
+        (
+            "temporalio.nexus.system.workflow_service",
+            workflow_output_dir / "__init__.py",
+        ),
     ]
+    exports = [(module, generated_exports(path)) for module, path in packages]
+    import_block = ["# BEGIN GENERATED NEXUS SYSTEM EXPORTS\n"]
+    for module, names in exports:
+        import_block += [
+            f"from {module} import (\n",
+            *[f"    {name},\n" for name in names],
+            ")\n",
+        ]
+    import_block.append("# END GENERATED NEXUS SYSTEM EXPORTS\n")
     all_block = [
         "    # BEGIN GENERATED NEXUS SYSTEM __ALL__\n",
-        *[f'    "{export}",\n' for export in exports],
+        *[f'    "{name}",\n' for _, names in exports for name in names],
         "    # END GENERATED NEXUS SYSTEM __ALL__\n",
     ]
     content = workflow_init_path.read_text()
@@ -163,6 +184,7 @@ def generate_nexus_system_api() -> None:
     required_paths = [
         wit_input_dir / "workflow-service.wit",
         wit_input_dir / "notification-service.wit",
+        wit_input_dir / "stream-service.wit",
         wit_deps_dir,
         *proto_files,
     ]
@@ -173,9 +195,10 @@ def generate_nexus_system_api() -> None:
         descriptor_path = Path(temp_dir) / "temporal_api.bin"
         build_descriptor_set(descriptor_path)
         command = nex_gen_command()
-        for wit_name, output_dir, native_api in (
-            ("workflow-service.wit", workflow_output_dir, True),
-            ("notification-service.wit", notification_output_dir, False),
+        for wit_name, output_dir, targets in (
+            ("workflow-service.wit", workflow_output_dir, "workflow"),
+            ("notification-service.wit", notification_output_dir, None),
+            ("stream-service.wit", stream_output_dir, "workflow,client"),
         ):
             shutil.rmtree(output_dir, ignore_errors=True)
             output_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -184,13 +207,14 @@ def generate_nexus_system_api() -> None:
                 wit_name,
                 output_dir,
                 descriptor_path,
-                native_api=native_api,
+                targets=targets,
             )
     workflow_output_dir.parent.joinpath("__init__.py").touch()
     generate_workflow_exports()
     format_paths = [
         str(workflow_output_dir),
         str(notification_output_dir),
+        str(stream_output_dir),
         str(workflow_init_path),
     ]
     subprocess.check_call(
