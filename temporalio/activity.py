@@ -181,6 +181,9 @@ class Info:
         This API is experimental and unstable.
     """
 
+    _scheduled_event_id: int = 0
+    """Allow Stream writes when the task token has no scheduling event ID."""
+
     @property
     def in_workflow(self) -> bool:
         """Was this activity started by a workflow?"""
