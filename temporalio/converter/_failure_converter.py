@@ -333,7 +333,6 @@ class DefaultFailureConverter(FailureConverter):
                 app_info = failure.application_failure_info
                 err = temporalio.exceptions.ApplicationError(
                     failure.message or "Application error",
-                    *payload_converter.from_payloads_wrapper(app_info.details),
                     type=app_info.type or None,
                     non_retryable=app_info.non_retryable,
                     next_retry_delay=app_info.next_retry_delay.ToTimedelta()
@@ -343,6 +342,7 @@ class DefaultFailureConverter(FailureConverter):
                         int(app_info.category)
                     ),
                 )
+                err._set_raw_details(app_info.details.payloads, payload_converter)
 
             case "timeout_failure_info":
                 timeout_info = failure.timeout_failure_info
@@ -361,9 +361,9 @@ class DefaultFailureConverter(FailureConverter):
             case "canceled_failure_info":
                 cancel_info = failure.canceled_failure_info
                 err = temporalio.exceptions.CancelledError(
-                    failure.message or "Cancelled",
-                    *payload_converter.from_payloads_wrapper(cancel_info.details),
+                    failure.message or "Cancelled"
                 )
+                err._set_raw_details(cancel_info.details.payloads, payload_converter)
             case "terminated_failure_info":
                 err = temporalio.exceptions.TerminatedError(
                     failure.message or "Terminated"

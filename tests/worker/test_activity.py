@@ -1572,6 +1572,46 @@ async def test_activity_async_cancel(
     assert list(err.value.cause.cause.details) == ["cancel details"]
 
 
+@dataclass
+class CancellationReason:
+    reason: str
+    retry: bool
+
+
+async def test_activity_async_cancel_detail_with_type_hint(
+    client: Client,
+    worker: ExternalWorker,
+    shared_state_manager: SharedStateManager,
+):
+    wrapper = AsyncActivityWrapper()
+    task = asyncio.create_task(
+        _execute_workflow_with_activity(
+            client,
+            worker,
+            wrapper.run,
+            cancel_after_ms=50,
+            wait_for_cancellation=True,
+            shared_state_manager=shared_state_manager,
+        )
+    )
+    await wrapper.wait_info()
+    # Sleep 2s before trying to cancel
+    await asyncio.sleep(2)
+    await wrapper.async_handle(client, False).report_cancellation(
+        CancellationReason(reason="shutting down", retry=True)
+    )
+    with pytest.raises(WorkflowFailureError) as err:
+        await task
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, CancelledError)
+    assert err.value.cause.cause.details == (
+        {"reason": "shutting down", "retry": True},
+    )
+    assert err.value.cause.cause.detail(0, CancellationReason) == CancellationReason(
+        reason="shutting down", retry=True
+    )
+
+
 some_context_var: ContextVar[str] = ContextVar("some_context_var", default="unset")
 
 

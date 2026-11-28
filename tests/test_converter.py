@@ -62,6 +62,7 @@ from temporalio.converter._payload_converter import (
 )
 from temporalio.exceptions import (
     ApplicationError,
+    CancelledError,
     FailureError,
     NexusOperationError,
 )
@@ -915,6 +916,70 @@ def test_application_error_next_retry_delay_round_trip():
         )
         assert isinstance(err, ApplicationError)
         assert err.next_retry_delay == next_retry_delay
+
+
+def test_failure_details_with_type_hint():
+    converter = DataConverter.default
+    detail = MyDataClass(foo="val1", bar=2, baz=SerializableEnum.FOO)
+    for error in [
+        ApplicationError("boom", detail, "detail2"),
+        CancelledError("cancelled", detail, "detail2"),
+    ]:
+        failure = Failure()
+        converter.failure_converter.to_failure(
+            error, converter.payload_converter, failure
+        )
+        err = converter.failure_converter.from_failure(
+            failure, converter.payload_converter
+        )
+        assert isinstance(err, (ApplicationError, CancelledError))
+        assert err.details == (
+            {"foo": "val1", "bar": 2, "baz": 1},
+            "detail2",
+        )
+        # Decoded once, then reused
+        assert err.details is err.details
+        assert err.detail(0, MyDataClass) == detail
+        assert err.detail(1, str) == "detail2"
+        failure_details = (
+            failure.application_failure_info.details
+            if isinstance(err, ApplicationError)
+            else failure.canceled_failure_info.details
+        )
+        assert err.raw_details == list(failure_details.payloads)
+        with pytest.raises(IndexError):
+            err.detail(2, str)
+
+
+def test_failure_details_with_type_hint_on_local_error():
+    detail = MyDataClass(foo="val1", bar=2, baz=SerializableEnum.FOO)
+    err = ApplicationError("boom", detail)
+    assert err.raw_details is None
+    assert err.detail(0, MyDataClass) is detail
+    with pytest.raises(IndexError):
+        err.detail(1, MyDataClass)
+
+
+def test_failure_details_decode_error_keeps_error():
+    converter = DataConverter.default
+    failure = Failure()
+    converter.failure_converter.to_failure(
+        ApplicationError("boom", "detail1", "detail2", type="MyError"),
+        converter.payload_converter,
+        failure,
+    )
+    failure.application_failure_info.details.payloads[0].metadata["encoding"] = (
+        b"bad-encoding"
+    )
+    err = converter.failure_converter.from_failure(failure, converter.payload_converter)
+    assert isinstance(err, ApplicationError)
+    assert err.message == "boom"
+    assert err.type == "MyError"
+    assert err.detail(1, str) == "detail2"
+    with pytest.raises(KeyError, match="Unknown payload encoding bad-encoding"):
+        err.detail(0, str)
+    with pytest.raises(KeyError, match="Unknown payload encoding bad-encoding"):
+        err.details
 
 
 @pytest.mark.parametrize(

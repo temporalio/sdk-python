@@ -1,13 +1,20 @@
 """Common Temporal exceptions."""
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Sequence
 from datetime import timedelta
 from enum import IntEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+import temporalio.api.common.v1
 import temporalio.api.enums.v1
 import temporalio.api.failure.v1
+import temporalio.types
+
+if TYPE_CHECKING:
+    from temporalio.converter import PayloadConverter
 
 
 class TemporalError(Exception):
@@ -126,6 +133,60 @@ class NexusOperationAlreadyStartedError(FailureError):
         self.run_id = run_id
 
 
+class _FailureDetails:
+    """Error details kept as payloads and decoded when first read."""
+
+    _details: Sequence[Any] | None = None
+    _raw_details: Sequence[temporalio.api.common.v1.Payload] | None = None
+    _payload_converter: PayloadConverter | None = None
+
+    def _set_raw_details(
+        self,
+        payloads: Sequence[temporalio.api.common.v1.Payload],
+        payload_converter: PayloadConverter,
+    ) -> None:
+        # Decode when read, so a detail that cannot be decoded does not lose the whole error
+        self._details = None
+        self._raw_details = list(payloads)
+        self._payload_converter = payload_converter
+
+    @property
+    def details(self) -> Sequence[Any]:
+        """User-defined details on the error.
+
+        For an error received from Temporal, these are decoded the first time
+        they are read, without type hints, so a dataclass detail comes back as
+        a dict. Use :py:meth:`detail` to decode one with a type hint.
+        """
+        if self._details is None:
+            assert self._raw_details is not None and self._payload_converter
+            self._details = tuple(
+                self._payload_converter.from_payloads(self._raw_details)
+            )
+        return self._details
+
+    @property
+    def raw_details(self) -> Sequence[temporalio.api.common.v1.Payload] | None:
+        """Payloads of the details for an error received from Temporal, or
+        ``None`` for an error created locally.
+        """
+        return self._raw_details
+
+    def detail(
+        self, index: int, type_hint: type[temporalio.types.AnyType]
+    ) -> temporalio.types.AnyType:
+        """Detail at the given index, decoded with the given type hint.
+
+        For an error created locally, ``details[index]`` is returned as is.
+
+        Raises:
+            IndexError: No detail at the given index.
+        """
+        if self._raw_details is None or self._payload_converter is None:
+            return self.details[index]
+        return self._payload_converter.from_payload(self._raw_details[index], type_hint)
+
+
 class ApplicationErrorCategory(IntEnum):
     """Severity category for your application error. Maps to corresponding client-side logging/metrics behaviors"""
 
@@ -139,7 +200,7 @@ class ApplicationErrorCategory(IntEnum):
     """BENIGN category errors emit DEBUG level logs and do not record metrics"""
 
 
-class ApplicationError(FailureError):
+class ApplicationError(_FailureDetails, FailureError):
     """Error raised during workflow/activity execution."""
 
     def __init__(
@@ -162,11 +223,6 @@ class ApplicationError(FailureError):
         self._non_retryable = non_retryable
         self._next_retry_delay = next_retry_delay
         self._category = category
-
-    @property
-    def details(self) -> Sequence[Any]:
-        """User-defined details on the error."""
-        return self._details
 
     @property
     def type(self) -> str | None:
@@ -198,18 +254,13 @@ class ApplicationError(FailureError):
         return self._category
 
 
-class CancelledError(FailureError):
+class CancelledError(_FailureDetails, FailureError):
     """Error raised on workflow/activity cancellation."""
 
     def __init__(self, message: str = "Cancelled", *details: Any) -> None:
         """Initialize a cancelled error."""
         super().__init__(message)
         self._details = details
-
-    @property
-    def details(self) -> Sequence[Any]:
-        """User-defined details on the error."""
-        return self._details
 
 
 class TerminatedError(FailureError):

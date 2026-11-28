@@ -11,12 +11,14 @@ import pytest
 from pydantic import BaseModel
 
 import temporalio.contrib.pydantic
+from temporalio.api.failure.v1 import Failure
 from temporalio.client import Client
 from temporalio.contrib.pydantic import (
     PydanticJSONPlainPayloadConverter,
     PydanticPayloadConverter,
     pydantic_data_converter,
 )
+from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 from temporalio.worker.workflow_sandbox._restrictions import (
     RestrictionContext,
@@ -126,6 +128,22 @@ def test_to_json_options_exclude_unset_keeps_aliases():
     assert payload is not None
     assert payload.data == b'{"orderId":7}'
     assert converter.from_payload(payload, AliasModel) == AliasModel(orderId=7)
+
+
+def test_application_error_detail_with_pydantic_type_hint():
+    converter = pydantic_data_converter
+    failure = Failure()
+    converter.failure_converter.to_failure(
+        ApplicationError("boom", AliasModel(orderId=7)),
+        converter.payload_converter,
+        failure,
+    )
+    err = converter.failure_converter.from_failure(failure, converter.payload_converter)
+    assert isinstance(err, ApplicationError)
+    assert err.details == (
+        {"orderId": 7, "note": "", "ratio": 1.0, "wait": "PT1S", "data": "data"},
+    )
+    assert err.detail(0, AliasModel) == AliasModel(orderId=7)
 
 
 async def test_pydantic_data_converter_pickle():

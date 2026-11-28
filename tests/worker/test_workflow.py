@@ -10487,6 +10487,100 @@ async def test_activity_failure_with_encoded_payload_is_decoded_in_workflow(
         assert result == "Handled encrypted failure successfully"
 
 
+@dataclass
+class ActivityFailureDetails:
+    error_code: str
+    id: str
+
+
+@activity.defn
+async def activity_that_fails_with_dataclass_details() -> str:
+    raise ApplicationError(
+        "Activity failed intentionally",
+        ActivityFailureDetails(error_code="NOT_FOUND", id="test-123"),
+        non_retryable=True,
+    )
+
+
+@workflow.defn
+class WorkflowWithFailingActivityDetailTypeHint:
+    @workflow.run
+    async def run(self) -> str:
+        try:
+            return await workflow.execute_activity(
+                activity_that_fails_with_dataclass_details,
+                schedule_to_close_timeout=timedelta(seconds=3),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except ActivityError as err:
+            assert isinstance(err.cause, ApplicationError)
+            assert err.cause.details[0] == {"error_code": "NOT_FOUND", "id": "test-123"}
+            assert err.cause.detail(
+                0, ActivityFailureDetails
+            ) == ActivityFailureDetails(error_code="NOT_FOUND", id="test-123")
+            return "Handled typed failure details successfully"
+
+
+async def test_activity_failure_detail_with_type_hint_in_workflow(client: Client):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=FakeEncryptionCodec()
+    )
+    client = Client(**config)
+
+    async with new_worker(
+        client,
+        WorkflowWithFailingActivityDetailTypeHint,
+        activities=[activity_that_fails_with_dataclass_details],
+    ) as worker:
+        result = await client.execute_workflow(
+            WorkflowWithFailingActivityDetailTypeHint.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=worker.task_queue,
+        )
+        assert result == "Handled typed failure details successfully"
+
+
+@workflow.defn
+class WorkflowWithUncaughtFailingActivity:
+    @workflow.run
+    async def run(self) -> str:
+        return await workflow.execute_activity(
+            activity_that_fails_with_dataclass_details,
+            schedule_to_close_timeout=timedelta(seconds=3),
+            retry_policy=RetryPolicy(maximum_attempts=1),
+        )
+
+
+async def test_activity_failure_detail_with_type_hint_in_client(client: Client):
+    config = client.config()
+    config["data_converter"] = dataclasses.replace(
+        temporalio.converter.default(), payload_codec=FakeEncryptionCodec()
+    )
+    client = Client(**config)
+
+    async with new_worker(
+        client,
+        WorkflowWithUncaughtFailingActivity,
+        activities=[activity_that_fails_with_dataclass_details],
+    ) as worker:
+        with pytest.raises(WorkflowFailureError) as err:
+            await client.execute_workflow(
+                WorkflowWithUncaughtFailingActivity.run,
+                id=f"workflow-{uuid.uuid4()}",
+                task_queue=worker.task_queue,
+            )
+    assert isinstance(err.value.cause, ActivityError)
+    assert isinstance(err.value.cause.cause, ApplicationError)
+    assert err.value.cause.cause.details[0] == {
+        "error_code": "NOT_FOUND",
+        "id": "test-123",
+    }
+    assert err.value.cause.cause.detail(
+        0, ActivityFailureDetails
+    ) == ActivityFailureDetails(error_code="NOT_FOUND", id="test-123")
+
+
 @workflow.defn
 class DisableLoggerSandbox:
     @workflow.run
