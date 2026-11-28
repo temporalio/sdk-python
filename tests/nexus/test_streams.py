@@ -668,6 +668,28 @@ def test_a_client_iterator_on_an_idle_stream_waits_between_reads() -> None:
     run_with_virtual_clock(script())
 
 
+@pytest.mark.parametrize(
+    "offsets, last_offset, expected",
+    [
+        ([b"b", b"c"], b"d", b"d"),
+        ([b"b", b"c"], None, b"c"),
+        ([], None, b"a"),
+    ],
+)
+def test_the_next_read_uses_the_position_covered_by_the_page(
+    offsets: list[bytes], last_offset: bytes | None, expected: bytes
+) -> None:
+    request = ReadRecordsRequest(ref=StreamRef[int](id="s"), from_offset=b"a")
+    page = ReadRecordsResponse(
+        records=[
+            StreamRecord(body=i, offset=offset) for i, offset in enumerate(offsets)
+        ],
+        last_offset=last_offset,
+    )
+    next_request = _support.next_read_request(request, page)
+    assert next_request is not None and next_request.from_offset == expected
+
+
 def test_a_page_with_no_last_offset_ends_at_its_last_record() -> None:
     async def unset(call: Callable[[], Awaitable[Any]]) -> Any:
         page = await call()

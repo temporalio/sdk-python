@@ -1081,6 +1081,16 @@ async def test_a_read_goes_on_after_a_page_with_no_record() -> None:
             expected = [1, 2] if how == "read" else [[1], [], [], [2]]
             assert result(completion) == expected
 
+    flag = _WorkflowLogicFlag.USE_LAST_STREAM_RECORD_OFFSET
+    for replaying, flags, after in [(False, (), 1), (True, (), 0), (True, (flag,), 1)]:
+        instance = _new_instance(_ReadToTwoWorkflow, config)
+        await _activate(instance, start("read_pages"), replaying=replaying, flags=flags)
+        completion = await _activate(
+            instance, page(1, [1], 0), replaying=replaying, flags=flags
+        )
+        assert list(completion.successful.commands) == [read(2, after)]
+        assert (flag in completion.successful.used_internal_flags) == (not replaying)
+
     # The first read of an iterator has the caller's wait. A later read has it too,
     # or the default of 1 minute when the caller gave none. A wait of zero stays.
     default = int(_support.DEFAULT_READ_WAIT.total_seconds())
