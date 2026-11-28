@@ -4,10 +4,12 @@ isort:skip_file
 """
 
 import builtins
+import collections.abc
 import typing
 
 import google.protobuf.descriptor
 import google.protobuf.duration_pb2
+import google.protobuf.internal.containers
 import google.protobuf.message
 import google.protobuf.timestamp_pb2
 
@@ -139,3 +141,289 @@ class PatchedMarkerData(google.protobuf.message.Message):
     ) -> None: ...
 
 global___PatchedMarkerData = PatchedMarkerData
+
+@typing.final
+class StreamAppendMarkerData(google.protobuf.message.Message):
+    """The data of a `core_stream_append` marker, as JSON with `bytes` fields in lower-case hex. An
+    empty marker keeps a task with an open append apart from the next task when chunking is on.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    APPENDS_FIELD_NUMBER: builtins.int
+    @property
+    def appends(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StreamAppendResult
+    ]: ...
+    def __init__(
+        self,
+        *,
+        appends: collections.abc.Iterable[global___StreamAppendResult] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["appends", b"appends"]) -> None: ...
+
+global___StreamAppendMarkerData = StreamAppendMarkerData
+
+@typing.final
+class StreamAppendResult(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
+    STORE_FIELD_NUMBER: builtins.int
+    ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
+    APPENDED_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    stream_id: builtins.str
+    store: builtins.str
+    """The name of the Store that the append used. For a ref with no Store name, it is the empty
+    name if the Worker has a Stream runtime under it, else the name of its only runtime.
+    """
+    activation_index: builtins.int
+    """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
+    @property
+    def appended(self) -> global___StreamAppendOffsets: ...
+    @property
+    def failure(self) -> global___StreamFailure: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream_id: builtins.str = ...,
+        store: builtins.str = ...,
+        activation_index: builtins.int = ...,
+        appended: global___StreamAppendOffsets | None = ...,
+        failure: global___StreamFailure | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "appended", b"appended", "failure", b"failure", "result", b"result"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "activation_index",
+            b"activation_index",
+            "appended",
+            b"appended",
+            "failure",
+            b"failure",
+            "result",
+            b"result",
+            "seq",
+            b"seq",
+            "store",
+            b"store",
+            "stream_id",
+            b"stream_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing.Literal["result", b"result"]
+    ) -> typing.Literal["appended", "failure"] | None: ...
+
+global___StreamAppendResult = StreamAppendResult
+
+@typing.final
+class StreamAppendOffsets(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    FIRST_OFFSET_FIELD_NUMBER: builtins.int
+    LAST_OFFSET_FIELD_NUMBER: builtins.int
+    first_offset: builtins.bytes
+    last_offset: builtins.bytes
+    def __init__(
+        self,
+        *,
+        first_offset: builtins.bytes = ...,
+        last_offset: builtins.bytes = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "first_offset", b"first_offset", "last_offset", b"last_offset"
+        ],
+    ) -> None: ...
+
+global___StreamAppendOffsets = StreamAppendOffsets
+
+@typing.final
+class StreamFailure(google.protobuf.message.Message):
+    """Why a Stream call failed. Core builds the failure that Workflow code gets from these two."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    REASON_FIELD_NUMBER: builtins.int
+    MESSAGE_FIELD_NUMBER: builtins.int
+    reason: builtins.str
+    """The name of the `temporalio.api.enums.v1.StreamErrorReason`, such as
+    `STREAM_ERROR_REASON_FENCED`. History stores the name, so a reason must never change its name.
+    """
+    message: builtins.str
+    """The message of the failure, of at most 4096 bytes."""
+    def __init__(
+        self,
+        *,
+        reason: builtins.str = ...,
+        message: builtins.str = ...,
+    ) -> None: ...
+    def ClearField(
+        self, field_name: typing.Literal["message", b"message", "reason", b"reason"]
+    ) -> None: ...
+
+global___StreamFailure = StreamFailure
+
+@typing.final
+class StreamReadMarkerData(google.protobuf.message.Message):
+    """The data of a `core_stream_read` marker. Core records one in each activation in which Workflow
+    code got the page of a read. An empty marker keeps a task with an open read and no open append
+    apart from the next task when chunking is on. The marker keeps the offsets, the count and a
+    digest of each page, never its Records. A replay reads the Records from the Store again. Its
+    JSON has `bytes` fields in lower-case hex, as for appends.
+    """
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    READS_FIELD_NUMBER: builtins.int
+    @property
+    def reads(
+        self,
+    ) -> google.protobuf.internal.containers.RepeatedCompositeFieldContainer[
+        global___StreamReadResult
+    ]: ...
+    def __init__(
+        self,
+        *,
+        reads: collections.abc.Iterable[global___StreamReadResult] | None = ...,
+    ) -> None: ...
+    def ClearField(self, field_name: typing.Literal["reads", b"reads"]) -> None: ...
+
+global___StreamReadMarkerData = StreamReadMarkerData
+
+@typing.final
+class StreamReadResult(google.protobuf.message.Message):
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    SEQ_FIELD_NUMBER: builtins.int
+    STREAM_ID_FIELD_NUMBER: builtins.int
+    STORE_FIELD_NUMBER: builtins.int
+    ACTIVATION_INDEX_FIELD_NUMBER: builtins.int
+    FROM_OFFSET_FIELD_NUMBER: builtins.int
+    PAGE_FIELD_NUMBER: builtins.int
+    FAILURE_FIELD_NUMBER: builtins.int
+    seq: builtins.int
+    stream_id: builtins.str
+    store: builtins.str
+    """The name of the Store that the read used. For a ref with no Store name, it is the empty name
+    if the Worker has a Stream runtime under it, else the name of its only runtime.
+    """
+    activation_index: builtins.int
+    """The index of the activation, within its Workflow Task, in which Workflow code got the result."""
+    from_offset: builtins.bytes
+    """The `from_offset` of the read. A replay reads the Records of the page after it."""
+    @property
+    def page(self) -> global___StreamReadPage: ...
+    @property
+    def failure(self) -> global___StreamFailure: ...
+    def __init__(
+        self,
+        *,
+        seq: builtins.int = ...,
+        stream_id: builtins.str = ...,
+        store: builtins.str = ...,
+        activation_index: builtins.int = ...,
+        from_offset: builtins.bytes = ...,
+        page: global___StreamReadPage | None = ...,
+        failure: global___StreamFailure | None = ...,
+    ) -> None: ...
+    def HasField(
+        self,
+        field_name: typing.Literal[
+            "failure", b"failure", "page", b"page", "result", b"result"
+        ],
+    ) -> builtins.bool: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "activation_index",
+            b"activation_index",
+            "failure",
+            b"failure",
+            "from_offset",
+            b"from_offset",
+            "page",
+            b"page",
+            "result",
+            b"result",
+            "seq",
+            b"seq",
+            "store",
+            b"store",
+            "stream_id",
+            b"stream_id",
+        ],
+    ) -> None: ...
+    def WhichOneof(
+        self, oneof_group: typing.Literal["result", b"result"]
+    ) -> typing.Literal["page", "failure"] | None: ...
+
+global___StreamReadResult = StreamReadResult
+
+@typing.final
+class StreamReadPage(google.protobuf.message.Message):
+    """A page that a read gave Workflow code, without its Records."""
+
+    DESCRIPTOR: google.protobuf.descriptor.Descriptor
+
+    RECORD_COUNT_FIELD_NUMBER: builtins.int
+    DIGEST_FIELD_NUMBER: builtins.int
+    RECORD_BYTES_FIELD_NUMBER: builtins.int
+    LAST_OFFSET_FIELD_NUMBER: builtins.int
+    WAIT_CUT_FIELD_NUMBER: builtins.int
+    record_count: builtins.int
+    digest: builtins.bytes
+    """The first 16 bytes of SHA-256 over the Records in a Core-owned encoding. New markers prefix
+    these bytes with version 1. Original markers contain just the legacy hash.
+    Empty for no Records.
+    """
+    record_bytes: builtins.int
+    """The size of the Records, as the `max_bytes` of a read measures it. A replay asks the Store for
+    this much.
+    """
+    last_offset: builtins.bytes
+    """The `last_offset` that Workflow code got. A replay gives the same value, since another read of
+    the Store can end at another offset.
+    """
+    wait_cut: builtins.bool
+    """The `wait_cut` that Workflow code got with the page."""
+    def __init__(
+        self,
+        *,
+        record_count: builtins.int = ...,
+        digest: builtins.bytes = ...,
+        record_bytes: builtins.int = ...,
+        last_offset: builtins.bytes = ...,
+        wait_cut: builtins.bool = ...,
+    ) -> None: ...
+    def ClearField(
+        self,
+        field_name: typing.Literal[
+            "digest",
+            b"digest",
+            "last_offset",
+            b"last_offset",
+            "record_bytes",
+            b"record_bytes",
+            "record_count",
+            b"record_count",
+            "wait_cut",
+            b"wait_cut",
+        ],
+    ) -> None: ...
+
+global___StreamReadPage = StreamReadPage

@@ -18,6 +18,7 @@ import temporalio.bridge.proto.nexus
 import temporalio.bridge.proto.workflow_activation
 import temporalio.bridge.proto.workflow_completion
 import temporalio.bridge.runtime
+import temporalio.bridge.streams
 import temporalio.bridge.temporal_sdk_bridge
 import temporalio.converter
 import temporalio.converter._extstore
@@ -29,7 +30,10 @@ from temporalio.bridge.temporal_sdk_bridge import (
 from temporalio.bridge.temporal_sdk_bridge import (
     PollShutdownError,  # type: ignore # noqa: F401
 )
-from temporalio.worker._command_aware_visitor import CommandAwarePayloadVisitor
+from temporalio.worker._command_aware_visitor import (
+    CommandAwarePayloadVisitor,
+    StoragePayloadVisitor,
+)
 
 
 @dataclass
@@ -60,6 +64,9 @@ class WorkerConfig:
     plugins: Sequence[tuple[str, str]]
     storage_drivers: set[str]
     disable_payload_error_limit: bool
+    streams: temporalio.bridge.streams.WorkerStreams
+    stream_replay_as_workflow_fail: bool
+    stream_replay_as_workflow_fail_for_types: set[str]
 
 
 @dataclass
@@ -315,14 +322,14 @@ async def decode_activation(
     Returns:
         Metrics from any external storage retrieval operations that occurred.
     """
-    await CommandAwarePayloadVisitor(
+    await StoragePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not decode_headers,
     ).visit(_Visitor(data_converter._decode_reference_payload_sequence), activation)
 
     metrics = temporalio.converter._extstore.StorageOperationMetrics()
     with metrics.track():
-        await CommandAwarePayloadVisitor(
+        await StoragePayloadVisitor(
             skip_search_attributes=True,
             skip_headers=not decode_headers,
             concurrency_limit=storage_concurrency_limit,
@@ -364,7 +371,7 @@ async def encode_completion(
 
     if data_converter.external_storage:
         with metrics.track():
-            await CommandAwarePayloadVisitor(
+            await StoragePayloadVisitor(
                 skip_search_attributes=True,
                 skip_headers=not encode_headers,
                 concurrency_limit=storage_concurrency_limit,
@@ -373,7 +380,7 @@ async def encode_completion(
                 completion,
             )
 
-    await CommandAwarePayloadVisitor(
+    await StoragePayloadVisitor(
         skip_search_attributes=True,
         skip_headers=not encode_headers,
     ).visit(

@@ -1,5 +1,6 @@
 from .workflow_commands_pb2 import (
     ActivityCancellationType,
+    AppendToStream,
     CancelChildWorkflowExecution,
     CancelSignalWorkflow,
     CancelTimer,
@@ -10,6 +11,7 @@ from .workflow_commands_pb2 import (
     ModifyWorkflowProperties,
     QueryResult,
     QuerySuccess,
+    ReadStream,
     RequestCancelActivity,
     RequestCancelExternalWorkflowExecution,
     RequestCancelLocalActivity,
@@ -28,6 +30,7 @@ from .workflow_commands_pb2 import (
 
 __all__ = [
     "ActivityCancellationType",
+    "AppendToStream",
     "CancelChildWorkflowExecution",
     "CancelSignalWorkflow",
     "CancelTimer",
@@ -38,6 +41,7 @@ __all__ = [
     "ModifyWorkflowProperties",
     "QueryResult",
     "QuerySuccess",
+    "ReadStream",
     "RequestCancelActivity",
     "RequestCancelExternalWorkflowExecution",
     "RequestCancelLocalActivity",

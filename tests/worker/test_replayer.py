@@ -3,6 +3,7 @@ import random
 import re
 import sys
 import uuid
+from contextlib import aclosing
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
@@ -129,6 +130,22 @@ async def test_replayer_workflow_complete_json() -> None:
     await Replayer(workflows=[SayHelloWorkflow]).replay_workflow(
         WorkflowHistory.from_json("fake", history_json)
     )
+
+
+async def test_replay_iterator_closes_after_an_early_exit() -> None:
+    path = Path(__file__).with_name("test_replayer_complete_history.json")
+    history = WorkflowHistory.from_json("fake", path.read_text())
+
+    async def histories():
+        yield history
+        yield history
+
+    replayer = Replayer(workflows=[SayHelloWorkflow])
+    async with aclosing(histories()) as source:
+        async with replayer.workflow_replay_iterator(source) as results:
+            assert (await anext(results)).replay_failure is None
+        assert await anext(results, None) is None
+        assert await anext(source) is history
 
 
 async def test_replayer_workflow_incomplete(client: Client) -> None:

@@ -1,0 +1,1 @@
+Core: Stream metrics record Store calls by `stream_store` and failures by `failure_reason`. Live append and read counters exclude replay. Replay Store reads have separate `stream_replay_read_total`, `stream_replay_read_execution_failed`, `stream_replay_read_records` and `stream_replay_read_execution_latency` instruments.

@@ -59,6 +59,7 @@ from temporalio.converter import (
 )
 from temporalio.converter._payload_converter import (
     _TemporalTransferTypePayloadConverter,
+    _typed_decode_types,
 )
 from temporalio.exceptions import (
     ApplicationError,
@@ -388,6 +389,28 @@ transfer_type_convertible(TemporalTransferTypeGenericValueConverter)(
 )
 
 
+class TemporalTransferTypeJSONValueConverter(
+    TransferTypeConverter["TemporalTransferTypeJSONValue", dict[str, str]]
+):
+    transfer_type = dict[str, str]
+
+    def to_transfer_type(self, value: TemporalTransferTypeJSONValue) -> dict[str, str]:
+        return {"id": value.value}
+
+    def from_transfer_type(
+        self,
+        value: dict[str, str],
+        type_hint: type[TemporalTransferTypeJSONValue],
+    ) -> TemporalTransferTypeJSONValue:
+        return TemporalTransferTypeJSONValue(value=value["id"])
+
+
+@transfer_type_convertible(TemporalTransferTypeJSONValueConverter)
+@dataclass
+class TemporalTransferTypeJSONValue:
+    value: str
+
+
 class CustomDefaultPayloadConverter(DefaultPayloadConverter):
     pass
 
@@ -453,6 +476,54 @@ def test_temporal_transfer_type_payload_converter_with_generic_value(
     payload = converter.to_payload(value)
 
     assert converter.from_payload(payload, type_hint) == value
+
+
+def _decode_typed(monkeypatch: pytest.MonkeyPatch, *types: type) -> None:
+    """Let ``types`` decode by their type arguments and under ``T | None`` in one test."""
+    monkeypatch.setattr(
+        "temporalio.converter._payload_converter._typed_decode_types",
+        _typed_decode_types | set(types),
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "type_hint"),
+    [
+        (TemporalTransferTypeValue("workflow-id"), TemporalTransferTypeValue | None),
+        (None, TemporalTransferTypeValue | None),
+        (
+            TemporalTransferTypeValueWithoutHint("workflow-id"),
+            TemporalTransferTypeValueWithoutHint | None,
+        ),
+        (
+            TemporalTransferTypeGenericValue(123),
+            TemporalTransferTypeGenericValue[int] | None,
+        ),
+        (None, TemporalTransferTypeGenericValue[int] | None),
+        (TemporalTransferTypeValue("workflow-id"), None | TemporalTransferTypeValue),
+        (TemporalTransferTypeJSONValue("id"), TemporalTransferTypeJSONValue | None),
+        (None, TemporalTransferTypeJSONValue | None),
+    ],
+)
+def test_temporal_transfer_type_payload_converter_with_optional_hint(
+    value: Any, type_hint: Any, monkeypatch: pytest.MonkeyPatch
+):
+    _decode_typed(
+        monkeypatch,
+        TemporalTransferTypeValue,
+        TemporalTransferTypeValueWithoutHint,
+        TemporalTransferTypeGenericValue,
+        TemporalTransferTypeJSONValue,
+    )
+    converter = DataConverter.default.payload_converter
+
+    payloads = [converter.to_payload(value)]
+    if value is None:
+        # A converter of another SDK can write None as a JSON null.
+        payloads.append(Payload(metadata={"encoding": b"json/plain"}, data=b"null"))
+
+    for payload in payloads:
+        assert converter.from_payload(payload, type_hint) == value
 
 
 def test_transfer_type_convertible_rejects_existing_converter():
@@ -564,6 +635,14 @@ class InitFalseIntDataClass:
     bar: int = dataclasses.field(default=0, init=False)
 
 
+@dataclass
+class GenericDataClass(Generic[T]):
+    value: T
+    items: list[T] = dataclasses.field(default_factory=list)
+    nested: GenericDataClass[T] | None = None
+    maybe: T | None = None
+
+
 class MyTypedDict(TypedDict):
     foo: str
     bar: MyDataClass
@@ -603,6 +682,61 @@ def test_json_nested_frozenset_round_trip():
     payload = converter.to_payload(value)
     assert payload is not None
     assert converter.from_payload(payload, set[frozenset[int]]) == value
+
+
+K = TypeVar("K")
+
+
+@dataclass
+class GenericPairDataClass(Generic[K, T]):
+    key: K
+    value: T
+
+
+def test_json_generic_dataclass_round_trip(monkeypatch: pytest.MonkeyPatch):
+    converter = JSONPlainPayloadConverter()
+    # mypy takes a type argument from a variable only on a value of type Any
+    generic_type: Any = GenericDataClass
+    pair_type: Any = GenericPairDataClass
+
+    # A generic dataclass that isn't registered keeps its decoding, which the replay of
+    # an existing History needs.
+    payload = converter.to_payload(GenericDataClass(1))
+    assert payload
+    with pytest.raises(TypeError):
+        converter.from_payload(payload, generic_type[int])
+    generic_or_dict: Any = generic_type[int] | dict
+    assert converter.from_payload(payload, generic_or_dict) == {
+        "value": 1,
+        "items": [],
+        "nested": None,
+        "maybe": None,
+    }
+
+    _decode_typed(monkeypatch, GenericDataClass, GenericPairDataClass)
+
+    for argument, value in [
+        (int, GenericDataClass(1, items=[2], nested=GenericDataClass(3), maybe=4)),
+        (str, GenericDataClass("text")),
+        (list[int], GenericDataClass([1], items=[[2], []], maybe=[3])),
+        (MyDataClass, GenericDataClass(MyDataClass("foo", 1, SerializableEnum.FOO))),
+        (GenericDataClass[str], GenericDataClass(GenericDataClass("nested"))),
+    ]:
+        payload = converter.to_payload(value)
+        assert payload
+        decoded = converter.from_payload(payload, generic_type[argument])
+        assert decoded == value
+        assert decoded.__orig_class__ == generic_type[argument]
+
+    payload = converter.to_payload({"value": "not an integer"})
+    assert payload
+    with pytest.raises(TypeError):
+        converter.from_payload(payload, generic_type[int])
+
+    pair = GenericPairDataClass(key=1, value="text")
+    payload = converter.to_payload(pair)
+    assert payload
+    assert converter.from_payload(payload, pair_type[int, str]) == pair
 
 
 def test_json_type_hints():

@@ -72,7 +72,10 @@ temporalio-sdk-core = { version = "0.12.0", path = "./sdk-core/crates/sdk-core",
     "ephemeral-server",
     "envconfig",
     "prometheus",
+    # Replay must retain the result groups of Stream create and describe Local Activities.
+    "disable_workflow_task_chunking",
 ] }
+temporalio-streams = { version = "0.1.0", path = "./sdk-core/crates/streams" }
 tokio = "1.26"
 # Matches the sdk-core client crate's rustls stack; used to build the custom
 # server certificate verifier for TLSConfig.verification_server_name.
