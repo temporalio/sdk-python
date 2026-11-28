@@ -73,15 +73,12 @@ class Replayer:
         will be shared across all replay calls and never explicitly shut down.
         Users are encouraged to provide their own if needing more control.
 
-        ``stream_config`` is the Stream config of the client that the worker
-        used. A replay chooses the Store of each Stream call again, so a
-        Workflow with Stream calls needs a config with the same Store names and
-        the same selector. A replay takes the result of each append, create and
-        describe of a Stream from history, so it calls no Store for them, and a
-        Store of the same name, for example a
-        :py:class:`temporalio.testing.MemoryStreamStore`, can stand in. It reads
-        the Records of each Stream read again from the Store, and fails if the
-        Store no longer has them.
+        ``stream_config`` must preserve the Worker's Store names and selector
+        choices because replay selects the Store of each call again. Append,
+        create and describe use recorded results without calling the Store.
+        A :py:class:`temporalio.testing.MemoryStreamStore` with the same name can
+        serve those operations during replay. Reads fetch Records from the Store
+        again and fail if the recorded Records are unavailable or changed.
         """
         self._config = ReplayerConfig(
             workflows=list(workflows),

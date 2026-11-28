@@ -154,6 +154,9 @@ class BufferedAppender(Generic[BodyT]):
         """Write the buffered Records. An error of the block wins over a write error."""
         try:
             await self.flush()
+        except asyncio.CancelledError:
+            if exc is None or self._error is None:
+                raise
         except Exception:
             if exc is None:
                 raise
@@ -178,6 +181,8 @@ class BufferedAppender(Generic[BodyT]):
 
     async def _write(self, batch: list[BodyT]) -> None:
         try:
+            # An eager task factory must let append return before the Store call starts.
+            await asyncio.sleep(0)
             response = await self._stream.append(*batch)
             self._last_offset = response.last_offset
         except BaseException as err:

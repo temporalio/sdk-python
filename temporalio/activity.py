@@ -182,9 +182,7 @@ class Info:
     """
 
     _scheduled_event_id: int = 0
-    """ID of the ``ActivityTaskScheduled`` event of an Activity that a Workflow scheduled, for
-    the Producer of its Stream writes. 0 for other Activities, and when SDK Core couldn't read
-    it from the task token."""
+    """Allow Stream writes when the task token has no scheduling event ID."""
 
     @property
     def in_workflow(self) -> bool:

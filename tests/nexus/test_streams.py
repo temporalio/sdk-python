@@ -61,6 +61,7 @@ from tests.helpers.streams import (
     answers,
     core_failure,
     failure_note,
+    loses_answer,
     run_with_virtual_clock,
 )
 
@@ -262,6 +263,37 @@ async def test_a_created_stream_keeps_its_selected_store() -> None:
         proto.DescribeStreamRequest,
     ]
     assert not b.calls
+
+
+async def test_a_client_retry_recovers_a_lost_store_answer() -> None:
+    class Retry(temporalio.client.OutboundInterceptor):
+        async def start_nexus_operation(
+            self, input: temporalio.client.StartNexusOperationInput
+        ) -> NexusOperationHandle[Any]:
+            try:
+                return await self.next.start_nexus_operation(dataclasses.replace(input))
+            except StreamError as err:
+                if err.reason != _UNAVAILABLE:
+                    raise
+            return await self.next.start_nexus_operation(dataclasses.replace(input))
+
+    store = FaultStore()
+    store.faults["create_stream"].append(loses_answer())
+    store.faults["append_records"].append(loses_answer())
+    client = Client(
+        Mock(spec=ServiceClient),
+        stream_config=StreamConfig([store]),
+        interceptors=[_Interceptor(Retry)],
+    )
+    stream = await client.create_stream(id="s", body_type=int)
+    assert stream.created is True
+    await stream.append(1)
+    await stream.append(2)
+    create, create_retry, append, append_retry, second = (key for _, key in store.calls)
+    assert create == create_retry
+    assert append == append_retry
+    assert len({create, append, second}) == 3
+    assert [record.body for record in (await stream.read_page()).records] == [1, 2]
 
 
 async def test_an_empty_client_append_does_not_reach_the_store() -> None:

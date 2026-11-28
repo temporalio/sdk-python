@@ -585,8 +585,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                         check_conditions=index == 1 or index == 2, jobs=act.jobs
                     )
         except Exception as err:
-            # A Stream call that the Worker can't serve fails the task, and so does a create
-            # or a describe in an outage, whatever the failure exception types are
+            # Store outages must remain retryable even when Workflow failure types include them.
             if self._streams.task_error:
                 activation_err = self._streams.task_error
             # We want some errors during activation, like those that can happen
@@ -1270,12 +1269,13 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                     return
                 raise
 
-        if not self._workflow_input:
+        workflow_input = self._workflow_input
+        if not workflow_input:
             raise RuntimeError(
                 "Expected workflow input to be set. This is an SDK Python bug."
             )
         self._primary_task = self.create_task(
-            self._run_top_level_workflow_function(run_workflow(self._workflow_input)),
+            self._run_top_level_workflow_function(lambda: run_workflow(workflow_input)),
             name="run",
         )
         if self._cancel_primary_task_pending:
@@ -2883,7 +2883,7 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
                 await self._inbound.handle_signal(input)
 
         task = self.create_task(
-            self._run_top_level_workflow_function(run_signal()),
+            self._run_top_level_workflow_function(run_signal),
             name=f"signal: {job.signal_name}",
         )
         task.add_done_callback(done_callback)
@@ -2964,9 +2964,12 @@ class _WorkflowInstanceImpl(  # type: ignore[reportImplicitAbstractClass]
 
     # This is used for the primary workflow function and signal handlers in
     # order to apply common exception handling to each
-    async def _run_top_level_workflow_function(self, coro: Awaitable[None]) -> None:
+    async def _run_top_level_workflow_function(
+        self, create_coro: Callable[[], Awaitable[None]]
+    ) -> None:
         try:
-            await coro
+            # Eviction can cancel this task before it starts, so defer the inner coroutine.
+            await create_coro()
         except _ContinueAsNewError as err:
             logger.debug("Workflow requested continue as new")
             err._apply_command()

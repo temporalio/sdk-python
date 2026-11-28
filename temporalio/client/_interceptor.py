@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import (
     Awaitable,
     Callable,
     Mapping,
     Sequence,
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import (
     TYPE_CHECKING,
@@ -609,6 +610,10 @@ class StartNexusOperationInput:
     rpc_metadata: Mapping[str, str | bytes]
     rpc_timeout: timedelta | None
     completion_callbacks: Sequence[temporalio.nexus.CompletionCallback[Any]] = ()
+    # Interceptors can retry a Store write with a copy of this input after losing its answer.
+    _stream_request_id: uuid.UUID = field(
+        default_factory=uuid.uuid4, repr=False, compare=False, kw_only=True
+    )
 
 
 @dataclass
