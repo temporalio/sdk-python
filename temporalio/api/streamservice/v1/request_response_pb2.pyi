@@ -133,7 +133,9 @@ class AppendRecordsResponse(google.protobuf.message.Message):
     FIRST_OFFSET_FIELD_NUMBER: builtins.int
     LAST_OFFSET_FIELD_NUMBER: builtins.int
     first_offset: builtins.bytes
+    """Required and nonempty."""
     last_offset: builtins.bytes
+    """Required and nonempty."""
     def __init__(
         self,
         *,
@@ -174,10 +176,8 @@ class ReadRecordsRequest(google.protobuf.message.Message):
     max_records: builtins.int
     """The maximum number of Records in one page. Zero uses the Store default."""
     max_bytes: builtins.int
-    """The maximum total size of the Records in one page, in bytes. A caller sets it so that a
-    page fits a limit of its own, such as the size of a History marker. A Record larger than
-    this is still returned, alone in its page, so a read always makes progress. Zero uses the
-    Store default.
+    """The target size of a page in bytes. A larger Record is returned alone so the read can
+    advance. Zero uses the Store default.
     """
     @property
     def wait(self) -> google.protobuf.duration_pb2.Duration:

@@ -30,7 +30,7 @@ class StreamRef(google.protobuf.message.Message):
     STORE_FIELD_NUMBER: builtins.int
     id: builtins.str
     store: builtins.str
-    """The registered Store name. Empty selects the configured default.
+    """When empty, the SDK uses its Store selector or the only registered Store.
     This field is local to the SDK. Store and server requests omit it.
     """
     def __init__(

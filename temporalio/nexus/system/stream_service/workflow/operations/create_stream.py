@@ -5,6 +5,7 @@ from __future__ import annotations
 import typing
 
 import temporalio.nexus.system
+import temporalio.nexus.system._support as _support
 import temporalio.workflow
 
 from ...models import (
@@ -32,12 +33,7 @@ async def _create_stream(
         output_type=CreateStreamResult[body_type],
     )
     result = await handle
-    if result.ref is None:
-        raise RuntimeError("CreateStream answered without `ref`")
-    return Stream[body_type](
-        ref=result.ref,
-        created=result.created or None,
-    )
+    return _support.stream_from_create(result, nexus_client, body_type)
 
 
 @typing.overload
@@ -70,7 +66,7 @@ async def create_stream(
     """
     Args:
         id: The Stream id. It must not be empty.
-        store: The registered name of the Store. If empty, the SDK picks a Store.
+        store: If empty, the SDK uses its Store selector or the only registered Store.
         id_conflict_policy: What the create does if the Stream already exists.
             Unspecified means fail.
     """

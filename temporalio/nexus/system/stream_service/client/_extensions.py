@@ -13,6 +13,8 @@ import temporalio.nexus.system
 if typing.TYPE_CHECKING:
     import temporalio.client
 
+import temporalio.nexus.system._support as _support
+
 from ..models import (
     CreateStreamRequest,
     CreateStreamResult,
@@ -107,14 +109,7 @@ class StreamServiceClientExtension(abc.ABC):
             rpc_timeout=rpc_timeout,
         )
         result = await handle.result()
-        if result.ref is None:
-            raise RuntimeError("CreateStream answered without `ref`")
-        resource = Stream[body_type](
-            nexus_client,
-            ref=result.ref,
-            created=result.created or None,
-        )
-        return resource
+        return _support.stream_from_create(result, nexus_client, body_type)
 
     @typing.overload
     async def create_stream(
@@ -153,7 +148,8 @@ class StreamServiceClientExtension(abc.ABC):
         """
         Args:
             id: The Stream id. It must not be empty.
-            store: The registered name of the Store. If empty, the SDK picks a Store.
+            store: If empty, the SDK uses its Store selector or the only registered
+                Store.
             id_conflict_policy: What the create does if the Stream already exists.
                 Unspecified means fail.
         """
