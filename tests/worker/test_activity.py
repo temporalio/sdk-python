@@ -2208,3 +2208,54 @@ async def test_local_activities_with_no_remote_activities_option(client: Client)
         )
 
         assert result == "Hello from local activity, Temporal!"
+
+
+@activity.defn
+async def capture_workflow_task() -> activity.WorkflowTaskAttempt | None:
+    return activity.info().workflow_task
+
+
+@workflow.defn(sandboxed=False)
+class WorkflowTaskInfoWorkflow:
+    @workflow.run
+    async def run(self) -> list[activity.WorkflowTaskAttempt | None]:
+        local = await workflow.execute_local_activity(
+            capture_workflow_task, start_to_close_timeout=timedelta(seconds=5)
+        )
+        regular = await workflow.execute_activity(
+            capture_workflow_task, start_to_close_timeout=timedelta(seconds=5)
+        )
+        return [local, regular]
+
+
+async def test_activity_info_workflow_task(client: Client):
+    task_queue = f"tq-{uuid.uuid4()}"
+    async with Worker(
+        client,
+        task_queue=task_queue,
+        activities=[capture_workflow_task],
+        workflows=[WorkflowTaskInfoWorkflow],
+    ):
+        handle = await client.start_workflow(
+            WorkflowTaskInfoWorkflow.run,
+            id=f"workflow-{uuid.uuid4()}",
+            task_queue=task_queue,
+        )
+        local, regular = await handle.result()
+    history = await handle.fetch_history()
+    started = next(
+        event
+        for event in history.events
+        if event.HasField("workflow_task_started_event_attributes")
+    )
+    scheduled = next(
+        event
+        for event in history.events
+        if event.event_id
+        == started.workflow_task_started_event_attributes.scheduled_event_id
+    )
+    assert local is not None
+    assert local.started_event_id == started.event_id
+    assert local.attempt == scheduled.workflow_task_scheduled_event_attributes.attempt
+    assert local.started_time == started.event_time.ToDatetime(tzinfo=timezone.utc)
+    assert regular is None
